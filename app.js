@@ -841,7 +841,7 @@ const App = {
   cotEditar(id){
     const e=window.NC_EMPRESA||'feroz';
     if(e==='smart'){ this.set(`<button class="btn-sm" onclick="App.go('cotizaciones')" style="margin-bottom:10px;background:var(--gris)">← Volver a cotizaciones</button>
-      <iframe src="../cotizador-smart/index.html?t=${Date.now()}&cot=${encodeURIComponent(id)}" style="width:100%;height:78vh;border:1px solid var(--linea);border-radius:12px;background:#fff"></iframe>`); }
+      <iframe src="cotizador-smart/index.html?t=${Date.now()}&cot=${encodeURIComponent(id)}" style="width:100%;height:78vh;border:1px solid var(--linea);border-radius:12px;background:#fff"></iframe>`); }
     else { this.vCotizacionNueva(); }
   },
   async vVentasSmart(){
@@ -1103,7 +1103,7 @@ const App = {
   },
   cotAbrir(doc){
     const e=window.NC_EMPRESA||'feroz';
-    if(e==='smart'){ const src='../cotizador-smart/index.html?t='+Date.now()+(doc?('&cliente='+encodeURIComponent(doc)):'');
+    if(e==='smart'){ const src='cotizador-smart/index.html?t='+Date.now()+(doc?('&cliente='+encodeURIComponent(doc)):'');
       this.set(`<button class="btn-sm" onclick="App.go('cotizaciones')" style="margin-bottom:10px;background:var(--gris)">← Volver a cotizaciones</button>
       <iframe src="${src}" style="width:100%;height:78vh;border:1px solid var(--linea);border-radius:12px;background:#fff"></iframe>`); }
     else { this.vCotizacionNueva(); }   // Feroz y demás: su cotizador propio de la plataforma

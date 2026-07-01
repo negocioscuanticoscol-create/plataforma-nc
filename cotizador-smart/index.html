@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cotizador Smart Packaging Colombia</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f5f0;--white:#fff;--dark:#111410;--dark2:#2a2d27;
+  --green:#1a7a4a;--gl:#e8f5ee;--gm:#2d9e5f;
+  --acc:#f0a500;--al:#fff8e6;
+  --red:#d63031;--rl:#fff0f0;
+  --blue:#1a3a5c;--bl:#e8f0f8;
+  --bd:#e2ddd6;--bd2:#c8c2b8;
+  --t:#2a2d27;--t2:#6b6860;--t3:#a8a49e;
+  --r:12px;--rl2:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--t);font-family:'Outfit',sans-serif;font-size:15px;min-height:100vh;overflow-x:hidden}
+a{text-decoration:none;color:inherit}
+
+.hdr{background:var(--dark);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.lmark{width:36px;height:36px;background:var(--gm);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.lmark svg{width:20px;height:20px;fill:white;stroke:none}
+.ltxt{font-size:14px;font-weight:700;color:white;letter-spacing:.04em}
+.lsub{font-size:10px;color:rgba(255,255,255,.45);font-family:'JetBrains Mono',monospace}
+.hwa{background:var(--gm);color:white;font-size:12px;font-weight:600;padding:7px 14px;border-radius:20px;display:flex;align-items:center;gap:6px}
+.hwa svg{width:14px;height:14px;fill:white}
+
+.hero{background:var(--dark);padding:28px 20px 36px;position:relative;overflow:hidden}
+.hero::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:30px;background:var(--bg);border-radius:30px 30px 0 0}
+.htag{display:inline-block;background:rgba(45,158,95,.2);color:#6ee9a0;font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;margin-bottom:12px}
+.hero h1{font-size:26px;font-weight:800;color:white;line-height:1.2;margin-bottom:8px}
+.hero h1 em{color:var(--acc);font-style:normal}
+.hero p{font-size:13px;color:rgba(255,255,255,.55);line-height:1.6}
+.hbadges{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.hbadge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);font-size:11px;padding:5px 10px;border-radius:20px}
+#inv-status{margin-top:8px;font-size:10px;color:rgba(255,255,255,.35);font-family:'JetBrains Mono',monospace}
+
+.aviso-trazabilidad{margin:14px 12px 4px;background:linear-gradient(135deg,#0a2a1a 0%,#1a4a2a 100%);border:1.5px solid var(--gm);border-radius:var(--rl2);padding:16px 16px 14px;position:relative;overflow:hidden;}
+.aviso-trazabilidad::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gm),var(--acc),var(--gm));}
+.aviso-trazabilidad-icon{font-size:26px;margin-bottom:8px;display:block}
+.aviso-trazabilidad-titulo{font-size:13px;font-weight:800;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;font-family:'JetBrains Mono',monospace;}
+.aviso-trazabilidad-texto{font-size:13px;color:rgba(255,255,255,.85);line-height:1.65;font-weight:500}
+.aviso-trazabilidad-texto strong{color:#6ee9a0;font-weight:700}
+
+.steps{display:flex;background:white;border-bottom:1px solid var(--bd);overflow-x:auto;scrollbar-width:none}
+.steps::-webkit-scrollbar{display:none}
+.step{flex:1;min-width:80px;padding:13px 8px 11px;text-align:center;font-size:10px;font-weight:600;color:var(--t3);letter-spacing:.08em;font-family:'JetBrains Mono',monospace;border-right:1px solid var(--bd);position:relative;transition:all .2s}
+.step:last-child{border-right:none}
+.step.active{color:var(--green);background:var(--gl)}
+.step.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--gm);border-radius:3px 3px 0 0}
+.step.done{color:var(--t2)}
+.snum{display:block;font-size:16px;font-weight:800;margin-bottom:3px;line-height:1;font-family:'Outfit',sans-serif}
+.step.active .snum{color:var(--green)}
+
+.panel{display:none;animation:fadeUp .2s ease}.panel.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+.slabel{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;padding:18px 20px 10px}
+
+.ibox{margin:14px 12px 0;background:var(--al);border:1px solid rgba(240,165,0,.3);border-radius:var(--r);padding:12px 14px;font-size:12px;color:#7a5800;line-height:1.6}
+.ibox strong{color:#5a4000}
+.aviso-paca{display:inline-flex;align-items:center;gap:5px;background:#fff3cd;border:1.5px solid var(--acc);border-radius:8px;padding:5px 10px;font-size:13px;font-weight:700;color:#7a5800;margin-top:4px;line-height:1.3;}
+.aviso-min{display:inline-flex;align-items:center;gap:5px;background:var(--rl);border:1.5px solid rgba(214,48,49,.35);border-radius:8px;padding:5px 10px;font-size:13px;font-weight:700;color:var(--red);margin-top:3px;line-height:1.3;}
+
+.promo{margin:10px 12px 0;background:white;border:2.5px solid var(--gm);border-radius:var(--rl2);overflow:hidden;transition:border-color .2s;box-shadow:0 2px 12px rgba(45,158,95,.15)}
+.promo.unlocked{border-color:var(--gm);background:var(--gl)}
+.promo-hdr{padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;background:linear-gradient(135deg,#f0fff6 0%,#ffffff 100%)}
+.picon{width:38px;height:38px;border-radius:10px;background:var(--gl);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.promo.unlocked .picon{background:var(--gl)}
+.ptitle{font-size:16px;font-weight:800;color:var(--green);letter-spacing:-.01em}
+.psub{font-size:12px;color:var(--t3);margin-top:2px}
+.promo.unlocked .psub{color:var(--green)}
+.pbody{padding:0 16px 15px;display:none}
+.promo.open .pbody{display:block}
+.prow{display:flex;gap:8px}
+.pinp{flex:1;background:var(--bg);border:2px solid var(--gm);border-radius:10px;color:var(--dark);font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;padding:12px 15px;outline:none;letter-spacing:.12em;text-transform:uppercase}
+.pinp:focus{border-color:var(--green);background:white}
+.pinp.perr{border-color:var(--red)}
+.pbtn{background:var(--green);color:white;border:none;border-radius:10px;padding:12px 18px;font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap}
+.pmsg{font-size:13px;margin-top:8px;padding:9px 12px;border-radius:8px;display:none}
+.pmsg.ok{background:var(--gl);color:var(--green);display:block}
+.pmsg.fail{background:var(--rl);color:var(--red);display:block}
+
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px;margin-bottom:16px}
+@media(max-width:400px){.pgrid{grid-template-columns:1fr}}
+.pc{background:white;border:1.5px solid var(--bd);border-radius:var(--r);padding:12px 11px;transition:all .18s;position:relative;overflow:hidden}
+.pc::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:transparent;transition:background .18s}
+.pc.sel{border-color:var(--gm);background:var(--gl)}
+.pc.sel::before{background:var(--gm)}
+.pvol{font-size:18px;font-weight:800;color:var(--dark);line-height:1;margin-bottom:0}
+.poz{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-bottom:4px;font-weight:500}
+.pline{font-size:10px;color:var(--t2);margin-bottom:2px;font-weight:500}
+.pdims{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t3);margin-bottom:5px}
+.ppaca{font-size:11px;color:var(--green);font-weight:700;margin-bottom:2px}
+.pmin{font-size:10px;color:var(--red);font-weight:700}
+
+.sbadge{display:inline-flex;align-items:center;font-size:9px;font-weight:600;padding:2px 6px;border-radius:8px;margin-top:3px}
+.s-ok{background:var(--gl);color:var(--green)}
+.s-out{background:var(--rl);color:var(--red)}
+.s-load{background:var(--bg);color:var(--t3);border:0.5px solid var(--bd)}
+
+.cqblock{margin-top:10px;padding-top:9px;border-top:1px dashed var(--bd2)}
+.cqblock-title{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.cqrow{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:0.5px dashed var(--bd)}
+.cqrow:last-child{border-bottom:none}
+.cqleft{display:flex;align-items:center;gap:5px}
+.cdot-t{width:12px;height:12px;border-radius:50%;background:linear-gradient(135deg,#fff 50%,#ccc 50%);border:1px solid #ccc;flex-shrink:0}
+.cdot-b{width:12px;height:12px;border-radius:50%;background:#fff;border:1.5px solid #bbb;flex-shrink:0}
+.clabel{font-size:11px;font-weight:600;color:var(--t2)}
+.cqright{display:flex;align-items:center;gap:5px}
+.qinp{width:68px;background:white;border:1.5px solid var(--bd2);border-radius:8px;color:var(--dark);font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:500;padding:6px 8px;outline:none;text-align:center;-webkit-appearance:none}
+.qinp:focus{border-color:var(--gm)}
+.qunit{font-size:10px;color:var(--t3)}
+.qwarn{font-size:10px;color:var(--red);margin-top:3px;display:none}
+.qtotline{font-size:10px;font-family:'JetBrains Mono',monospace;margin-top:5px;text-align:right;color:var(--t2)}
+
+.kit-muestras-card{margin:0 12px 16px;background:white;border:2px solid var(--acc);border-radius:var(--rl2);padding:14px 15px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;}
+.kit-muestras-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--acc)}
+.kit-muestras-card.sel{background:var(--al);border-color:var(--acc)}
+.km-top{display:flex;align-items:center;justify-content:space-between}
+.km-title{font-size:15px;font-weight:800;color:var(--dark)}
+.km-badge{background:var(--acc);color:white;font-size:10px;font-weight:700;padding:3px 9px;border-radius:10px}
+.km-desc{font-size:12px;color:var(--t2);margin-top:5px;line-height:1.5}
+.km-sel{display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--bd2);font-size:12px;color:var(--green);font-weight:600}
+
+.fwrap{padding:0 12px 14px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--t2);margin-bottom:5px;letter-spacing:.05em;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+.field input,.field textarea,.field select{width:100%;background:white;border:1.5px solid var(--bd);border-radius:var(--r);color:var(--dark);font-family:'Outfit',sans-serif;font-size:14px;padding:10px 13px;outline:none;transition:border-color .15s;-webkit-appearance:none}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--gm)}
+.field textarea{resize:none;height:72px;line-height:1.5}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.errmsg{color:var(--red);font-size:11px;margin-top:4px;display:none}
+.field.ferr input,.field.ferr select{border-color:var(--red)}
+.tipo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.tipo-card{border:1.5px solid var(--bd);border-radius:var(--r);padding:12px;text-align:center;cursor:pointer;transition:all .15s}
+.tipo-card.tsel{border-color:var(--gm);background:var(--gl)}
+.tipo-card .ticon{font-size:18px;margin-bottom:4px}
+.tipo-card .ttitle{font-size:13px;font-weight:600;color:var(--t2)}
+.tipo-card.tsel .ttitle{color:var(--green)}
+.tipo-card .tsub{font-size:10px;color:var(--t3);margin-top:2px}
+.fbox{background:var(--gl);border:1px solid rgba(45,158,95,.25);border-radius:var(--r);padding:11px 14px;margin-bottom:13px;font-size:12px;color:var(--green);line-height:1.6}
+
+.transp-label{font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.05em;text-transform:uppercase;font-family:'JetBrains Mono',monospace;margin-bottom:8px;margin-top:14px;display:block}
+.transp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+@media(max-width:400px){.transp-grid{grid-template-columns:1fr}}
+.transp-card{border:2px solid var(--bd);border-radius:var(--r);padding:12px 10px;text-align:center;cursor:pointer;transition:all .15s;background:white}
+.transp-card.tsel{border-color:var(--gm);background:var(--gl)}
+.transp-card .tc-icon{font-size:22px;margin-bottom:5px}
+.transp-card .tc-title{font-size:12px;font-weight:700;color:var(--t);margin-bottom:3px}
+.transp-card.tsel .tc-title{color:var(--green)}
+.transp-card .tc-desc{font-size:10px;color:var(--t3);line-height:1.4}
+.toggle-envio{display:flex;align-items:center;justify-content:space-between;background:white;border:1.5px solid var(--bd);border-radius:var(--r);padding:12px 14px;cursor:pointer;margin-bottom:10px;transition:all .15s}
+.toggle-envio.active{border-color:var(--gm);background:var(--gl)}
+.te-label{font-size:13px;font-weight:600;color:var(--t)}
+.te-sub{font-size:11px;color:var(--t3);margin-top:2px}
+.toggle-envio.active .te-sub{color:var(--green)}
+.te-sw{width:36px;height:20px;background:var(--bd2);border-radius:10px;position:relative;transition:background .2s;flex-shrink:0}
+.te-sw::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;background:white;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle-envio.active .te-sw{background:var(--gm)}
+.toggle-envio.active .te-sw::after{transform:translateX(16px)}
+.envio-box{display:none;background:white;border:1.5px solid var(--gm);border-radius:var(--r);padding:13px 14px;margin-bottom:4px}
+.envio-box-title{font-size:11px;font-weight:600;color:var(--green);font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+
+.swrap{padding:14px 12px}
+.scard{background:white;border:1px solid var(--bd);border-radius:var(--rl2);overflow:hidden;margin-bottom:12px}
+.shdr{background:var(--dark);padding:11px 15px;font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.shdr-folio{color:var(--acc);font-weight:600}
+.srow{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 15px;border-bottom:1px solid var(--bd);font-size:13px}
+.srow:last-child{border-bottom:none}
+.srl{color:var(--t2)}
+.srl small{display:block;font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.srr{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--dark);text-align:right}
+.snote{font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:14px}
+
+.btn{display:block;width:100%;padding:13px 20px;border-radius:var(--r);font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;cursor:pointer;border:none;transition:all .18s;text-align:center;letter-spacing:.02em}
+.btn-p{background:var(--gm);color:white}
+.btn-p:hover{background:#1f8a4e}
+.btn-acuerdo{background:var(--green);color:white;font-size:16px;padding:16px 20px;border-radius:14px;box-shadow:0 4px 20px rgba(26,122,74,.35);display:flex;align-items:center;justify-content:center;gap:10px}
+.btn-acuerdo:active{transform:scale(.98)}
+.btn-s{background:transparent;border:1.5px solid var(--bd2);color:var(--t2);margin-top:8px;font-size:14px}
+.btn-s:hover{border-color:var(--t2);color:var(--dark)}
+.bwrap{padding:0 12px 24px}
+#errbanner{display:none;margin:0 12px 12px;background:var(--rl);border:1px solid rgba(214,48,49,.3);border-radius:var(--r);padding:9px 13px;font-size:12px;color:var(--red)}
+
+.confirmado-box{background:var(--gl);border:2px solid var(--gm);border-radius:var(--rl2);padding:20px 18px;margin-bottom:16px;text-align:center}
+.confirmado-icon{font-size:40px;margin-bottom:8px}
+.confirmado-title{font-size:18px;font-weight:800;color:var(--green);margin-bottom:6px}
+.confirmado-sub{font-size:13px;color:var(--t2);line-height:1.6}
+
+.footer{padding:18px 20px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.08em;border-top:1px solid var(--bd)}
+.sheets-sending{display:none;text-align:center;padding:8px;font-size:12px;color:var(--t3)}
+label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;color:var(--green)!important}
+.ali-btn{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1.5px solid var(--bd);border-radius:8px;padding:8px 13px;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;user-select:none;-webkit-user-select:none;}
+.ali-btn.on{background:var(--gl);border-color:var(--gm);color:var(--green);font-weight:700;}
+.sheets-ok{display:none;font-size:11px;color:var(--green);text-align:center;margin-top:4px}
+.aviso-cliente{display:none;background:var(--gl);border:1px solid rgba(45,158,95,.25);border-radius:var(--r);padding:10px 13px;margin-bottom:10px;align-items:center;gap:10px}
+.aviso-cliente-ico{font-size:20px}
+.aviso-cliente-txt{font-size:12px;color:var(--green);line-height:1.5}
+.aviso-cliente-txt strong{font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">
+    <div class="lmark">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div><div class="ltxt">SMART PACKAGING</div><div class="lsub">COLOMBIA</div></div>
+  </div>
+  <a class="hwa" href="https://wa.me/573124124034" target="_blank">
+    <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    Hablar
+  </a>
+</div>
+
+<div class="hero">
+  <div class="htag">// COTIZADOR OFICIAL 2026 · v11</div>
+  <h1>Cotiza tus<br><em>envases Flexipack</em></h1>
+  <p>Precios reales con IVA incluido. Flete calculado. Envíos a todo Colombia en 2-3 días hábiles.</p>
+  <div class="hbadges">
+    <span class="hbadge">Desde 100 uds</span>
+    <span class="hbadge">Transparente o Blanco</span>
+    <span class="hbadge">Todo Colombia</span>
+  </div>
+  <div id="inv-status">Verificando disponibilidad...</div>
+</div>
+
+<div class="steps">
+  <div class="step active" id="st2"><span class="snum">1</span>Cliente</div>
+  <div class="step" id="st1"><span class="snum">2</span>Productos</div>
+  <div class="step" id="st3"><span class="snum">3</span>Cotización</div>
+</div>
+
+<div class="panel active" id="p1">
+  <div class="aviso-trazabilidad">
+    <span class="aviso-trazabilidad-icon">🛡️</span>
+    <div class="aviso-trazabilidad-titulo">⚠ Recomendación especial de trazabilidad y esterilización</div>
+    <div class="aviso-trazabilidad-texto">
+      Para garantizar la <strong>trazabilidad y esterilización</strong> de sus envases, le sugerimos realizar sus pedidos por <strong>'Packas'</strong> (empaque cerrado de origen).<br><br>
+      Esto asegura que sus envases lleguen en condiciones óptimas de higiene y con trazabilidad completa desde fábrica.
+    </div>
+  </div>
+  <div class="ibox" style="margin-top:12px">
+    <strong>Precios incluyen IVA (19%).</strong>
+    <span class="aviso-min">📦 Pedido mínimo: 100 unidades por color</span><br>
+    Tus compras se acumulan para precio mayorista. Cada caja ~200 uds · flete $36.800 por caja.
+  </div>
+  <div class="slabel" style="margin-top:14px">// Kit especial</div>
+  <div class="kit-muestras-card" id="card-muestras">
+    <div class="km-top"><div class="km-title">🧪 Kit de Muestras</div><div class="km-badge" id="kit-badge">elige precio</div></div>
+    <div class="km-desc">Muestrario completo de referencias Flexipack y PetMulti. Transporte incluido a todo Colombia.</div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button type="button" id="kit60" onclick="selectKit('60')" style="flex:1;padding:11px;border:2px solid var(--bd);border-radius:10px;background:#fff;cursor:pointer;font-weight:600;color:var(--dark)">Kit $60.000<br><span style="font-size:11px;color:var(--t3);font-weight:400">comisión $8.000</span></button>
+      <button type="button" id="kit39" onclick="selectKit('39')" style="flex:1;padding:11px;border:2px solid var(--bd);border-radius:10px;background:#fff;cursor:pointer;font-weight:600;color:var(--dark)">Kit $39.000<br><span style="font-size:11px;color:var(--t3);font-weight:400">comisión $3.000</span></button>
+      <button type="button" id="kit0" onclick="selectKit('gratis')" style="flex:1;padding:11px;border:2px solid var(--bd);border-radius:10px;background:#fff;cursor:pointer;font-weight:600;color:var(--dark)">Kit GRATIS<br><span style="font-size:11px;color:var(--t3);font-weight:400">sin costo · comisión $0</span></button>
+    </div>
+    <div class="km-sel" id="muestras-sel" style="margin-top:8px">✓ Kit agregado a tu pedido</div>
+  </div>
+  <div class="slabel">// Productos disponibles — de menor a mayor tamaño</div>
+  <div class="pgrid" id="grid-fp"></div>
+  <div id="errbanner">Selecciona al menos un producto con mínimo 100 unidades, o el kit de muestras.</div>
+  <div class="bwrap" style="padding-top:4px">
+    <button class="btn btn-p" onclick="goStep2()">Ver mi cotización →</button>
+    <button class="btn btn-s" onclick="goStep(2)" style="margin-top:8px">← Editar datos del cliente</button>
+  </div>
+</div>
+
+<div class="panel" id="p2">
+  <div class="fwrap" style="padding-top:14px">
+    <div class="fbox"><strong>Envío a toda Colombia</strong> — una vez verificado el pago despachamos de inmediato. Tu pedido llega en 2-3 días hábiles. Flete incluido en la factura.</div>
+    <div style="font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.05em;text-transform:uppercase;font-family:'JetBrains Mono',monospace;margin-bottom:8px">Tipo de cliente *</div>
+    <div class="tipo-grid">
+      <div class="tipo-card tsel" id="tc-nat" onclick="setTipo('nat')"><div class="ticon">👤</div><div class="ttitle">Persona natural</div><div class="tsub">Cédula de ciudadanía</div></div>
+      <div class="tipo-card" id="tc-jur" onclick="setTipo('jur')"><div class="ticon">🏢</div><div class="ttitle">Persona jurídica</div><div class="tsub">Empresa con NIT / RUT</div></div>
+    </div>
+    <div class="aviso-cliente" id="aviso-cliente">
+      <div class="aviso-cliente-ico">👋</div>
+      <div class="aviso-cliente-txt"><strong id="aviso-nombre"></strong><br><span id="aviso-sub"></span></div>
+    </div>
+    <div class="field" id="f-buscar" style="margin-bottom:12px;background:#eef6ff;border:1px solid #cfe2ff;border-radius:10px;padding:10px 12px">
+      <label style="color:#1d4ed8">🔍 Buscar cliente registrado (nombre, celular o NIT)</label>
+      <input type="text" id="cliBuscar" placeholder="Escribe nombre, celular o NIT…" oninput="buscarClienteLibre(this.value)" autocomplete="off">
+      <div id="cliBusRes" style="margin-top:4px"></div>
+    </div>
+    <div id="form-nat">
+      <div id="bloque-id-nat">
+        <div class="field" id="f-ced"><label>Cédula de ciudadanía *</label><input type="text" id="ced" list="cliDL" placeholder="Escribe o elige el cliente" oninput="buscarCliente()"><div class="errmsg">Requerido</div></div>
+        <datalist id="cliDL"></datalist>
+      </div>
+      <div class="field" id="f-neg"><label>Nombre del negocio / marca</label><input type="text" id="neg" placeholder="Ej: Lácteos El Campo, Deli Salsas..."></div>
+      <div class="field" id="f-nom"><label>Nombre de contacto *</label><input type="text" id="nom" placeholder="Nombre y apellidos de quien hace el pedido"><div class="errmsg">Requerido</div></div>
+      <div class="field" id="f-tel"><label>Celular *</label><input type="tel" id="tel" placeholder="300 000 0000"><div class="errmsg">Requerido</div></div>
+      <div class="field" id="f-dir"><label>Dirección completa *</label><input type="text" id="dir" placeholder="Calle, carrera, número"><div class="errmsg">Requerido</div></div>
+      <div class="frow">
+        <div class="field" id="f-bar"><label>Barrio *</label><input type="text" id="bar" placeholder="Barrio"><div class="errmsg">Requerido</div></div>
+        <div class="field" id="f-ciu"><label>Ciudad *</label><input type="text" id="ciu" placeholder="Ciudad" list="ciuDL" oninput="autoGeoCot('ciu','dep','cob')"><datalist id="ciuDL"></datalist><div class="errmsg">Requerido</div></div>
+      </div>
+      <div class="field" id="f-dep"><label>Departamento *</label><input type="text" id="dep" placeholder="Ej: Cundinamarca, Antioquia"><div class="errmsg">Requerido</div></div>
+      <div class="field" id="f-cob"><label>Área de cobertura</label><input type="text" id="cob" placeholder="Zona logística (automática)" readonly style="background:#f6f8fa;color:#555"><div class="errmsg"></div></div>
+      <div class="field" id="f-eml"><label>Correo electrónico *</label><input type="text" id="eml" placeholder="tucorreo@email.com"><div class="errmsg">Requerido</div></div>
+    </div>
+    <div id="form-jur" style="display:none">
+      <div id="bloque-id-jur">
+        <div class="field" id="f-rut"><label>RUT / NIT *</label><input type="text" id="rut" list="cliDL" placeholder="Escribe o elige el NIT" oninput="buscarCliente()"><div class="errmsg">Requerido</div></div>
+      </div>
+      <div class="field" id="f-rsoc"><label>Razón social *</label><input type="text" id="rsoc" placeholder="Nombre legal de la empresa"><div class="errmsg">Requerido</div></div>
+      <div class="field" id="f-rec"><label>Nombre de contacto (quien hace el pedido) *</label><input type="text" id="rec" placeholder="Nombre completo de la persona de contacto"><div class="errmsg">Requerido</div></div>
+      <div class="field" id="f-telj"><label>Celular *</label><input type="tel" id="telj" placeholder="300 000 0000"><div class="errmsg">Requerido</div></div>
+      <div class="field" id="f-dirj"><label>Dirección *</label><input type="text" id="dirj" placeholder="Calle, carrera, número"><div class="errmsg">Requerido</div></div>
+      <div class="frow">
+        <div class="field" id="f-barj"><label>Barrio *</label><input type="text" id="barj" placeholder="Barrio"><div class="errmsg">Requerido</div></div>
+        <div class="field" id="f-ciuj"><label>Ciudad *</label><input type="text" id="ciuj" placeholder="Ciudad" list="ciuDL" oninput="autoGeoCot('ciuj','depj','cobj')"><div class="errmsg">Requerido</div></div>
+      </div>
+      <div class="field" id="f-depj"><label>Departamento *</label><input type="text" id="depj" placeholder="Departamento"><div class="errmsg">Requerido</div></div>
+      <div class="field" id="f-cobj"><label>Área de cobertura</label><input type="text" id="cobj" placeholder="Zona logística (automática)" readonly style="background:#f6f8fa;color:#555"><div class="errmsg"></div></div>
+      <div class="field"><label>Correo electrónico</label><input type="text" id="emlj" placeholder="correo@empresa.com"></div>
+    </div>
+    <div style="background:var(--gl);border:1px solid rgba(45,158,95,.25);border-radius:var(--r);padding:10px 14px;margin:4px 0 10px;font-size:12px;color:var(--green);display:flex;align-items:center;gap:8px">
+      <span style="font-size:16px">📦</span>
+      <span><strong>Entrega en la misma dirección de facturación</strong> — si necesitas enviar a otro lugar actívalo abajo.</span>
+    </div>
+    <span class="transp-label">🚚 Tipo de transporte *</span>
+    <div class="transp-grid">
+      <div class="transp-card tsel" id="tr-incluido" onclick="setTransporte('incluido')">
+        <div class="tc-icon">📦</div>
+        <div class="tc-title">Incluido</div>
+        <div class="tc-desc">Sale en esta factura — flete calculado</div>
+      </div>
+      <div class="transp-card" id="tr-cobro" onclick="setTransporte('cobro')">
+        <div class="tc-icon">💰</div>
+        <div class="tc-title">Al cobro</div>
+        <div class="tc-desc">La transportadora cobra en la entrega</div>
+      </div>
+      <div class="transp-card" id="tr-propio" onclick="setTransporte('propio')">
+        <div class="tc-icon">🚛</div>
+        <div class="tc-title">Transporte propio</div>
+        <div class="tc-desc">Flete $0 — recoge el cliente</div>
+      </div>
+    </div>
+    <div class="toggle-envio" id="toggle-envio" onclick="toggleEnvioDif()">
+      <div><div class="te-label">Enviar a dirección diferente</div><div class="te-sub" id="envio-sub">Toca para ingresar otra dirección de entrega</div></div>
+      <div class="te-sw" id="te-sw"></div>
+    </div>
+    <div class="envio-box" id="envio-box">
+      <div class="envio-box-title">// Datos de entrega</div>
+      <div class="field" id="f-env-nom"><label>Nombre quien recibe *</label><input type="text" id="env-nom" placeholder="Nombre completo"><div class="errmsg">Requerido</div></div>
+      <div class="field" id="f-env-tel"><label>Celular de contacto *</label><input type="tel" id="env-tel" placeholder="300 000 0000"><div class="errmsg">Requerido</div></div>
+      <div class="field" id="f-env-dir"><label>Dirección *</label><input type="text" id="env-dir" placeholder="Calle, carrera, número"><div class="errmsg">Requerido</div></div>
+      <div class="frow">
+        <div class="field" id="f-env-bar"><label>Barrio *</label><input type="text" id="env-bar" placeholder="Barrio"><div class="errmsg">Requerido</div></div>
+        <div class="field" id="f-env-ciu"><label>Ciudad *</label><input type="text" id="env-ciu" placeholder="Ciudad"><div class="errmsg">Requerido</div></div>
+      </div>
+      <div class="field" id="f-env-dep"><label>Departamento *</label><input type="text" id="env-dep" placeholder="Departamento"><div class="errmsg">Requerido</div></div>
+    </div>
+    <div class="field" style="margin-top:8px">
+      <label>¿Qué vas a envasar?</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 6px" id="ali-btns">
+        <div class="ali-btn" data-val="Yogurt" onclick="toggleAli(this)">🥛 Yogurt</div>
+        <div class="ali-btn" data-val="Yogurt Griego" onclick="toggleAli(this)">🫙 Yogurt Griego</div>
+        <div class="ali-btn" data-val="Grasa de Cerdo" onclick="toggleAli(this)">🐷 Grasa de Cerdo</div>
+        <div class="ali-btn" data-val="Hummus" onclick="toggleAli(this)">🧆 Hummus</div>
+        <div class="ali-btn" data-val="Salsas" onclick="toggleAli(this)">🌶️ Salsas</div>
+        <div class="ali-btn" data-val="Guacamole" onclick="toggleAli(this)">🥑 Guacamole</div>
+        <div class="ali-btn" data-val="Quesos" onclick="toggleAli(this)">🧀 Quesos</div>
+        <div class="ali-btn" id="btn-otro" data-val="Otro" onclick="toggleAli(this)">✏️ Otro</div>
+      </div>
+      <input type="text" id="ali-otro" placeholder="¿Qué producto?" style="display:none;margin-top:4px" oninput="updateAli()">
+      <input type="hidden" id="ali">
+    </div>
+    <div class="field"><label>Notas adicionales</label><textarea id="notas" placeholder="Preguntas, referencias especiales, fechas..."></textarea></div>
+  </div>
+  <div class="bwrap">
+    <div id="errbanner2" style="display:none;background:#fff0f0;border:1px solid #d63031;border-radius:12px;padding:10px 14px;font-size:13px;color:#d63031;margin-bottom:10px"></div>
+    <div class="field" style="margin-bottom:12px"><label>📋 Nivel de lista de precios *</label>
+      <select id="lista-sel" onchange="setListaSel(this.value)" style="width:100%;padding:11px;border:1px solid #d9d9d9;border-radius:10px;font-size:14px">
+        <option value="0">L1 Muestras</option><option value="1">L2 Pyme</option><option value="2">L3 Mayorista</option><option value="3">L4 Distribuidor</option><option value="4">L5 Convenio</option>
+      </select>
+      <div style="font-size:11.5px;color:#7a7a7a;margin-top:4px">Se carga la lista que usaste con este cliente. Cámbiala si aplica otro nivel.</div>
+    </div>
+    <button class="btn btn-p" onclick="goStep3()">Continuar a productos →</button>
+  </div>
+</div>
+
+<div class="panel" id="p3">
+  <div class="swrap">
+    <div class="scard">
+      <div class="shdr"><span>Cotización Smart Packaging Colombia</span><span class="shdr-folio" id="folio-display"></span></div>
+      <div id="sum-items"></div>
+      <div style="padding:10px 15px;background:var(--bg)">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">Subtotal sin IVA</span><span style="font-family:'JetBrains Mono',monospace;font-weight:500" id="s-sub">-</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">IVA 19%</span><span style="font-family:'JetBrains Mono',monospace;font-weight:500" id="s-iva">-</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--t2)">Flete <span id="s-cajas" style="font-size:10px;color:var(--t3)"></span></span><span style="font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--acc)" id="s-flete">-</span></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 15px;background:var(--gl);border-top:2px solid var(--gm)">
+        <span style="font-size:13px;font-weight:700;color:var(--dark)">Total a pagar</span>
+        <span style="font-size:22px;font-weight:800;color:var(--green);font-family:'JetBrains Mono',monospace" id="s-total">$0</span>
+      </div>
+    </div>
+    <div class="scard">
+      <div class="shdr"><span>Datos de entrega</span></div>
+      <div id="sum-cliente"></div>
+    </div>
+    <p class="snote">Precios sin IVA en lista. IVA 19% y flete incluidos en el total. Cotización válida 5 días hábiles.</p>
+    <div id="acuerdo-section">
+      <button class="btn btn-acuerdo" onclick="guardarCotizacion()" id="btn-guardar">💾 Guardar cotización (en cola)</button>
+      <button class="btn btn-p" onclick="cotizacionAceptada()" id="btn-aceptar" style="margin-top:8px">✅ Generar pedido (pago confirmado)</button>
+      <div class="sheets-sending" id="sheets-sending">⏳ Procesando...</div>
+      <div class="sheets-ok" id="sheets-ok">✓ Listo</div>
+    </div>
+    <div class="confirmado-box" id="confirmado-box" style="display:none">
+      <div class="confirmado-icon">📝</div>
+      <div class="confirmado-title">¡Listo, tu cotización quedó guardada!</div>
+      <div class="confirmado-sub">Queda reservada en cola. Cuando confirmes el pago la pasamos a pedido. Te contactamos por WhatsApp con las formas de pago.</div>
+    </div>
+    <button class="btn btn-s" onclick="goStep(2)" style="margin-top:8px">← Editar datos</button>
+    <button class="btn btn-s" onclick="resetAll()" style="margin-top:8px">Nueva cotización</button>
+  </div>
+</div>
+
+<div class="footer">SMART PACKAGING COLOMBIA · 3124124034 · @smartpackagingcol</div>
+
+<script src="../geo-co.js"></script>
+<script>
+// geoposición automática: ciudad → departamento (igual que en la plataforma)
+function autoGeoCot(ciuId, depId, cobId){
+  const ci=document.getElementById(ciuId), de=document.getElementById(depId), co=cobId?document.getElementById(cobId):null;
+  if(!ci||!de||!window.GEO_CO) return;
+  const na=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const q=na(ci.value); if(!q) return; let depto='', zona='';
+  window.GEO_CO.zonas.forEach(z=>(z.deptos||[]).forEach(d=>(d.ciudades||[]).forEach(c=>{ if(na(c.nombre)===q){ depto=d.nombre; zona=(z.nombre||'')+(z.hub?' · hub '+z.hub:''); } })));
+  if(depto) de.value=depto;
+  if(co && zona) co.value=zona;
+}
+function _llenarCiudadesDL(){ const dl=document.getElementById('ciuDL'); if(!dl||!window.GEO_CO) return; const s=new Set(); window.GEO_CO.zonas.forEach(z=>(z.deptos||[]).forEach(d=>(d.ciudades||[]).forEach(c=>s.add(c.nombre)))); dl.innerHTML=[...s].sort().map(c=>`<option value="${c}">`).join(''); }
+const CONFIG = {
+  empresa:        'Smart Packaging Colombia',
+  wa_ventas:      '573124124034',
+  wa_bodega:      '573024967908',
+  wa_contabilidad:'573236375088',
+  sheets_webhook:  'https://script.google.com/macros/s/AKfycbyZHB89LCwnzLd0-ttzff5ZjocjfHq7k6GOBEG7QbbTIzSn7i13iCNvr8bJMM8vJn8V/exec',
+  sheet_inventario:'https://script.google.com/macros/s/AKfycbyZHB89LCwnzLd0-ttzff5ZjocjfHq7k6GOBEG7QbbTIzSn7i13iCNvr8bJMM8vJn8V/exec?action=inventario',
+};
+
+const WA = CONFIG.wa_ventas;
+
+const PROMOS = {
+  'PYME2026':        { lista: 1, msg: 'Código válido — precio pyme desbloqueado ✓', kitGratis: false },
+  'MAYORISTA2026':   { lista: 2, msg: 'Código válido — precio mayorista desbloqueado ✓', kitGratis: false },
+  'DISTRIBUIDOR2026':{ lista: 3, msg: 'Código válido — precio distribuidor desbloqueado ✓', kitGratis: false },
+  'CONVENIO2026':    { lista: 4, msg: 'Código válido — precio convenio desbloqueado ✓', kitGratis: false },
+  'L1MUESTRAS':      { lista: 0, msg: 'Código válido — kit de muestras sin costo desbloqueado ✓', kitGratis: true }
+};
+
+let promoOn = false, promoOpen = false, listaActiva = 0;
+
+const CAT = {
+  fp: [
+    {id:'f115',  oz:'4 oz', v:'115 ml', d:'Ø67×52',   pk:1890, col:['transparente'],                t:[592,547,507,474,444]},
+    {id:'f155',  oz:'5 oz', v:'155 ml', d:'Ø67×69',   pk:1800, col:['transparente','blanco'],       t:[593,548,508,475,445]},
+    {id:'f180',  oz:'6 oz', v:'180 ml', d:'Ø95×45',   pk:1056, col:['transparente','blanco'],       t:[851,786,729,681,638]},
+    {id:'f240',  oz:'8 oz', v:'240 ml', d:'Ø95×54',    pk:480, col:['transparente','blanco'],       t:[802,741,687,642,601]},
+    {id:'f365',  oz:'12.5 oz', v:'365 ml', d:'Ø97×82',    pk:600, col:['blanco','transparente'],       t:[1069,987,916,855,801]},
+    {id:'f520',  oz:'17.5 oz', v:'520 ml', d:'Ø95×116',   pk:575, col:['transparente','blanco'],       t:[1190,1099,1019,952,892]},
+    {id:'f565',  oz:'19 oz', v:'565 ml', d:'Ø118×80',   pk:435, col:['transparente','blanco'],       t:[1255,1158,1075,1003,940]},
+    {id:'f1001', oz:'34 oz', v:'1.000 ml',d:'Ø122×126', pk:308, col:['transparente','blanco'],       t:[1847,1706,1583,1478,1385]},
+    {id:'f1180', oz:'40 oz', v:'1.180 ml',d:'Ø133×131', pk:242, col:['transparente','blanco'],       t:[2626,2425,2251,2101,1969]}
+  ],
+  pm: [
+    {id:'pm330',  oz:'11 oz', v:'330 ml PET',   d:'Ø66.5×144', pk:2717, col:['transparente'],       t:[1066,984,913,852,799]},
+    {id:'pm1000', oz:'34 oz', v:'1.000 ml PET', d:'Ø66.5×248', pk:1008, col:['transparente'],       t:[1641,1515,1406,1313,1231]}
+  ],
+  nr: [
+    {id:'f235',  oz:'8 oz', v:'235 ml',               d:'Ø95×53',       pk:624, col:['transparente'],          t:[879,811,753,703,659]},
+    {id:'f275',  oz:'9.5 oz', v:'275 ml',               d:'Ø95×72',       pk:720, col:['transparente','blanco'],  t:[931,860,798,745,698]},
+    {id:'f285',  oz:'9.5 oz', v:'285 ml',               d:'Ø120×94×40',   pk:660, col:['blanco'],                 t:[951,878,815,760,713]},
+    {id:'f400',  oz:'13.5 oz', v:'400 ml',               d:'Ø120×94×52',   pk:640, col:['transparente'],           t:[1028,949,881,822,771]},
+    {id:'f801',  oz:'27 oz', v:'801 ml',               d:'Ø125×94×126',  pk:414, col:['transparente'],           t:[1658,1530,1420,1326,1243]},
+    {id:'f1500c',oz:'50.5 oz', v:'Flexipack 1500 ml',    d:'Ø151×135 mm',  pk:189, col:['transparente'],           t:[2730,2534,2365,2217,2081]},
+    {id:'f192',  v:'ITF 193×127mm Freeze', d:'193×127×65 mm',pk:300, col:['transparente'],           t:[1988,1835,1703,1591,1491]}
+  ]
+};
+
+const KIT_PRECIO = 60000;
+const KIT_L2     = 60000;
+const KIT_COMISION = 8000;
+const LISTA_NAMES = ['L1 Muestras','L2 Pyme','L3 Mayorista','L4 Distribuidor','L5 Convenio'];
+const allProds = () => [...CAT.fp, ...CAT.pm, ...CAT.nr];
+
+let tipo = 'nat', envioDif = false, pedidoMuestras = false, tipoTransporte = 'incluido', kitTipo = '60';
+
+function setTransporte(t){
+  tipoTransporte = t;
+  ['incluido','cobro','propio'].forEach(x=>{
+    const el = document.getElementById('tr-'+x);
+    if(el) el.classList.toggle('tsel', x===t);
+  });
+}
+
+function getFleteDisplay(){
+  if(tipoTransporte==='cobro')  return { monto:0, label:'Al cobro — transportadora cobra en entrega' };
+  if(tipoTransporte==='propio') return { monto:0, label:'Transporte propio' };
+  return null;
+}
+let inventory = {};
+
+function fmt(n){ return '$\u202f'+Math.round(n).toLocaleString('es-CO',{useGrouping:true})+'\u202fCOP'; }
+function fmtN(n){ return Math.round(n).toLocaleString('es-CO'); }
+function g(id){ const e=document.getElementById(id); return e?e.value.trim():''; }
+
+function getKitPrecio(){
+  if(promoOn){
+    const code=document.getElementById('pinp').value.trim().toUpperCase();
+    if(PROMOS[code]&&PROMOS[code].kitGratis) return 0;
+  }
+  return kitTipo==='gratis' ? 0 : (kitTipo==='39' ? 39000 : 60000);
+}
+function getKitComision(){ return kitTipo==='gratis' ? 0 : (kitTipo==='39' ? 3000 : 8000); }
+function genFolio(){
+  const n=new Date();
+  return 'SP-'+n.getFullYear()+String(n.getMonth()+1).padStart(2,'0')+String(n.getDate()).padStart(2,'0')+'-'+String(n.getHours()).padStart(2,'0')+String(n.getMinutes()).padStart(2,'0');
+}
+function calcFlete(selItems){
+  if(!selItems || selItems.length===0) return 36500;
+  let totalFlete=0;
+  let totalResiduoUds=0;
+  selItems.forEach(s=>{
+    const pkSize=s.prod.pk;
+    const pacasCompletas=Math.floor(s.qty/pkSize);
+    const residuo=s.qty % pkSize;
+    // PetMulti (pm) = $140.000/paca | Flexipack y nuevas = $65.000/paca
+    const esPM = s.prod.id.startsWith('pm');
+    totalFlete += pacasCompletas*(esPM ? 140000 : 65000);
+    totalResiduoUds += residuo;
+  });
+  // Fuera de paca: $36.500 por cada 200 uds o fracción
+  const cajasResiduo=Math.ceil(totalResiduoUds/200);
+  totalFlete += cajasResiduo*36500;
+  return Math.max(36500, totalFlete);
+}
+function toggleAli(el){
+  el.classList.toggle('on');
+  if(el.dataset.val==='Otro') document.getElementById('ali-otro').style.display=el.classList.contains('on')?'block':'none';
+  updateAli();
+}
+function updateAli(){
+  const btns=document.querySelectorAll('.ali-btn.on');
+  const vals=Array.from(btns).map(b=>b.dataset.val);
+  const otro=document.getElementById('ali-otro').value.trim();
+  const final=vals.map(v=>v==='Otro'&&otro?otro:v).filter(v=>v!=='Otro'||otro);
+  document.getElementById('ali').value=final.join(', ');
+}
+
+let inventoryLoaded=false;
+async function loadInventory(){
+  try{
+    const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+    const r=await fetch(SB+'/rest/v1/nc_inventario?empresa=eq.smart&select=sku,color,cantidad,activo,fecha,creado_en&order=fecha.desc,creado_en.desc',{headers:{apikey:K,Authorization:'Bearer '+K}});
+    const arr=await r.json(); const seen={};
+    (Array.isArray(arr)?arr:[]).forEach(x=>{ const k=(x.sku||'').toLowerCase()+'_'+(x.color||'').toLowerCase(); if(seen[k])return; seen[k]=1; inventory[k]=(x.activo&&(+x.cantidad||0)>0)?(+x.cantidad):0; });   // último montaje por sku+color (lo real, igual que el catálogo)
+    allProds().forEach(p=>p.col.forEach(c=>{ const k=p.id+'_'+c.toLowerCase(); if(inventory[k]===undefined) inventory[k]=0; }));   // color no montado = agotado
+    inventoryLoaded=true; buildGridSorted(); updateAllBadges();
+    const st=document.getElementById('inv-status'); if(st){ st.textContent='Disponibilidad real actualizada'; setTimeout(()=>{ st.style.opacity='0'; },3000); }
+  }catch(e){
+    allProds().forEach(p=>p.col.forEach(c=>{ inventory[p.id+'_'+c.toLowerCase()]=-1; }));   // si falla, no bloquear
+    updateAllBadges();
+  }
+}
+function getStock(id,color){ const k=id+'_'+(color||'').toLowerCase(); if(!inventoryLoaded) return -1; return inventory[k]!==undefined?inventory[k]:0; }
+function updateAllBadges(){ allProds().forEach(p=>p.col.forEach(c=>updateBadge(p.id,c))); }
+function updateBadge(id,color){
+  const el=document.getElementById('sb-'+id+'_'+color); if(!el) return;
+  const inp=document.getElementById('qty-'+id+'_'+color);
+  const stock=getStock(id,color);
+  const prod=allProds().find(p=>p.id===id);
+  if(stock===0){
+    el.className='sbadge s-out'; el.textContent='Agotado';
+    if(inp){ inp.disabled=true; inp.value=''; inp.style.opacity='.35'; inp.placeholder='—'; }
+  } else if(stock===-1){
+    el.className='sbadge s-ok'; el.textContent='Disponible';
+    if(inp){ inp.disabled=false; inp.style.opacity='1'; inp.removeAttribute('max'); inp.placeholder='0'; }
+  } else {
+    if(prod && stock<prod.pk){
+      el.className='sbadge';
+      el.style.cssText='background:#fff8e6;color:#CC5500;font-size:9px;padding:2px 6px;border-radius:8px;font-weight:700;display:inline-flex';
+      el.textContent='Solo '+fmtN(stock)+' uds';
+    } else { el.className='sbadge s-ok'; el.textContent='Disponible'; el.style.cssText=''; }
+    if(inp){ inp.disabled=false; inp.style.opacity='1'; inp.max=String(stock); inp.placeholder='0'; }
+  }
+}
+
+function _ml(v){ return parseInt(String(v).replace(/\./g,'').replace(/[^\d]/g,''))||0; }
+function buildGridSorted(){
+  const c=document.getElementById('grid-fp'); if(!c) return;
+  const LBL={fp:'Flexipack PP',pm:'PetMulti PET',nr:'Nuevas Referencias'};
+  let prods=[]; Object.keys(CAT).forEach(g=>CAT[g].forEach(p=>prods.push(Object.assign({},p,{_label:LBL[g]}))));
+  prods.sort((a,b)=>_ml(a.v)-_ml(b.v));   // menor a mayor tamaño
+  c.innerHTML=prods.map(prod=>{
+    const colorsDisp=prod.col.filter(color=>getStock(prod.id,color)!==0);   // ocultar agotados
+    if(!colorsDisp.length) return '';   // sin stock en ningún color → no se muestra
+    const colorRows=colorsDisp.map(color=>{
+      const cid=prod.id+'_'+color;
+      const dot=color==='blanco'?'<div class="cdot-b"></div>':'<div class="cdot-t"></div>';
+      const clabel=color==='blanco'?'Blanco':'Transparente';
+      return `<div class="cqrow">
+        <div class="cqleft">${dot}<span class="clabel">${clabel}</span>
+          <span class="sbadge s-load" id="sb-${cid}" style="font-size:9px;padding:1px 5px;margin-left:3px">...</span>
+        </div>
+        <div class="cqright">
+          <input class="qinp" type="number" id="qty-${cid}" min="0" step="50" placeholder="0"
+            oninput="onQtyChange('${prod.id}','${color}')">
+          <span class="qunit">uds</span>
+        </div>
+      </div>
+      <div class="qwarn" id="warn-${cid}">Mínimo 100 unidades</div>`;
+    }).join('');
+    return `<div class="pc" id="card-${prod.id}">
+      <div class="pvol">${prod.v}</div>
+      ${prod.oz?`<div class="poz">≈ ${prod.oz}</div>`:''}
+      <div class="pline">${prod._label}</div>
+      <div class="pdims">${prod.d} mm</div>
+      <div class="ppaca">📦 Paca: ${fmtN(prod.pk)} uds</div>
+      <div class="pmin">⚠ Mín. 100 uds por color</div>
+      <div class="cqblock">
+        <div class="cqblock-title">Cantidad por color</div>
+        ${colorRows}
+        <div class="qtotline" id="qtot-${prod.id}"></div>
+      </div>
+    </div>`;
+  }).filter(Boolean).join('') || '<div style="padding:20px;text-align:center;color:var(--t3)">No hay productos disponibles en inventario.</div>';
+}
+
+function onQtyChange(id, color){
+  const prod=allProds().find(p=>p.id===id);
+  const cid=id+'_'+color;
+  const qty=parseInt(document.getElementById('qty-'+cid).value)||0;
+  const warn=document.getElementById('warn-'+cid);
+  const stock=getStock(id,color);
+  if(qty>0 && qty<100){ warn.textContent='Mínimo 100 unidades'; warn.style.display='block'; }
+  else if(stock>0 && qty>stock){ document.getElementById('qty-'+cid).value=stock; warn.textContent='Solo hay '+fmtN(stock)+' uds — ajustado'; warn.style.display='block'; }
+  else { warn.style.display='none'; }
+  const totRef=prod.col.reduce((a,c)=>a+(parseInt((document.getElementById('qty-'+id+'_'+c)||{}).value)||0),0);
+  const card=document.getElementById('card-'+id);
+  if(totRef>0) card.classList.add('sel'); else card.classList.remove('sel');
+  const qtot=document.getElementById('qtot-'+id);
+  if(qtot){
+    if(totRef>=100){
+      const pacasCompletas=Math.floor(totRef/prod.pk);
+      const residuo=totRef % prod.pk;
+      const faltaParaPaca=residuo>0 ? prod.pk - residuo : 0;
+      let html=`<span style="color:var(--green)">${fmtN(totRef)} uds · ${(totRef/prod.pk).toFixed(1)} pacas</span>`;
+      if(faltaParaPaca>0) html+=`<div style="margin-top:6px;background:#e8f5ee;border:1.5px solid var(--gm);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;color:#1a5c35;line-height:1.5;">📦 Te faltan ${fmtN(faltaParaPaca)} uds para paca — llegan con empaque original de fábrica y sin manipulación.</div>`;
+      qtot.innerHTML=html;
+    } else if(totRef>0){ qtot.innerHTML=`<span style="color:var(--red)">${fmtN(totRef)} uds — mín. 100</span>`; }
+    else { qtot.textContent=''; }
+  }
+}
+
+function getSel(){
+  const items=[];
+  allProds().forEach(p=>{ p.col.forEach(color=>{ const inp=document.getElementById('qty-'+p.id+'_'+color); const qty=inp?(parseInt(inp.value)||0):0; if(qty>=100) items.push({prod:p, color, qty}); }); });
+  return items;
+}
+
+function goStep(n){
+  const order=[2,1,3]; const pos=order.indexOf(n);   // flujo cliente-primero: Datos(2) → Productos(1) → Cotización(3)
+  [1,2,3].forEach(i=>{ document.getElementById('p'+i).classList.toggle('active',i===n); const s=document.getElementById('st'+i); const ip=order.indexOf(i); s.className='step'+(i===n?' active':(ip>-1&&ip<pos)?' done':''); });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function goStep2(){
+  const sel=getSel();
+  const err=document.getElementById('errbanner');
+  if(pedidoMuestras && sel.length===0){ err.style.display='none'; buildResumen(); goStep(3); return; }
+  const incompletas=[];
+  allProds().forEach(p=>p.col.forEach(color=>{
+    const inp=document.getElementById('qty-'+p.id+'_'+color);
+    const qty=inp?(parseInt(inp.value)||0):0;
+    const stock=getStock(p.id,color);
+    const group=CAT.pm.some(x=>x.id===p.id)?'PetMulti PET':CAT.nr.some(x=>x.id===p.id)?'Nueva Ref':'Flexipack PP';
+    const clabel=color==='blanco'?'Blanco':'Transparente';
+    if(qty>0 && qty<100) incompletas.push(`${group} ${p.v} ${clabel} — pediste ${qty} uds, mínimo 100`);
+    else if(stock>0 && qty>stock) incompletas.push(`${group} ${p.v} ${clabel} — solo hay ${fmtN(stock)} disponibles`);
+  }));
+  if(incompletas.length){ err.style.display='block'; err.innerHTML='<strong>Ajusta estas referencias antes de continuar:</strong><br>'+incompletas.map(i=>'▸ '+i).join('<br>'); err.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+  if(!sel.length && !pedidoMuestras){ err.style.display='block'; err.textContent='⚠️ Agrega al menos un producto con mínimo 100 unidades para ver la cotización.'; err.scrollIntoView({behavior:'smooth',block:'center'}); return; }
+  err.style.display='none'; buildResumen(); goStep(3);   // productos OK → cotización
+}
+
+function setTipo(t){
+  tipo=t;
+  ['nat','jur'].forEach(x=>{ document.getElementById('tc-'+x).classList.toggle('tsel',x===t); document.getElementById('tc-'+x).querySelector('.ttitle').style.color=x===t?'var(--green)':'var(--t2)'; });
+  document.getElementById('form-nat').style.display=t==='nat'?'block':'none';
+  document.getElementById('form-jur').style.display=t==='jur'?'block':'none';
+  document.getElementById('bloque-id-nat').style.display=t==='nat'?'block':'none';
+  document.getElementById('bloque-id-jur').style.display=t==='jur'?'block':'none';
+  limpiarAviso();
+}
+
+function toggleEnvioDif(){
+  envioDif=!envioDif;
+  document.getElementById('toggle-envio').classList.toggle('active',envioDif);
+  document.getElementById('envio-box').style.display=envioDif?'block':'none';
+  document.getElementById('envio-sub').textContent=envioDif?'Completa los datos de entrega':'Toca para ingresar otra dirección de entrega';
+}
+
+function selectKit(t){
+  if(pedidoMuestras && kitTipo===t){ pedidoMuestras=false; }   // tocar el mismo = quitar
+  else { pedidoMuestras=true; kitTipo=t; }                     // elegir uno (o cambiar)
+  updateKitUI();
+}
+function updateKitUI(){
+  const card=document.getElementById('card-muestras'), sel=document.getElementById('muestras-sel');
+  const badge=document.getElementById('kit-badge');
+  if(card){ card.style.borderColor=pedidoMuestras?'var(--gm)':'var(--acc)'; card.style.background=pedidoMuestras?'var(--gl)':''; }
+  if(sel) sel.style.display=pedidoMuestras?'block':'none';
+  [['60','kit60'],['39','kit39'],['gratis','kit0']].forEach(([t,id])=>{ const b=document.getElementById(id); if(!b)return; const on=pedidoMuestras&&kitTipo===t; b.style.borderColor=on?'var(--gm)':'var(--bd)'; b.style.background=on?'var(--gl)':'#fff'; });
+  if(badge){ const gratis=pedidoMuestras&&getKitPrecio()===0; badge.textContent=!pedidoMuestras?'elige precio':(gratis?'GRATIS':(kitTipo==='39'?'$39.000':'$60.000')); }
+}
+function toggleMuestras(){ pedidoMuestras=!pedidoMuestras; updateKitUI(); }
+
+function req(fid,iid){
+  const f=document.getElementById(fid); const el=document.getElementById(iid); const v=el?el.value.trim():'';
+  if(!f) return true;
+  if(!v){ f.classList.add('ferr'); f.querySelector('.errmsg').style.display='block'; return false; }
+  f.classList.remove('ferr'); f.querySelector('.errmsg').style.display='none'; return true;
+}
+
+function goStep3(){
+  let ok=true;
+  let camposFallidos=[];
+  function reqDebug(fid,iid){
+    const f=document.getElementById(fid); const el=document.getElementById(iid); const v=el?el.value.trim():'';
+    if(!f) return true;
+    if(!v){ f.classList.add('ferr'); f.querySelector('.errmsg').style.display='block'; camposFallidos.push(iid); return false; }
+    f.classList.remove('ferr'); f.querySelector('.errmsg').style.display='none'; return true;
+  }
+  // Para llegar a la cotización (y poder Guardar en cola) solo pedimos lo esencial.
+  // La dirección/ciudad completas se exigen al "Aceptar → pedido" (cotizacionAceptada).
+  if(tipo==='nat'){ ['f-ced:ced','f-nom:nom','f-tel:tel'].forEach(p=>{ const [fid,iid]=p.split(':'); if(!reqDebug(fid,iid)) ok=false; }); }
+  else { ['f-rut:rut','f-rsoc:rsoc','f-rec:rec','f-telj:telj'].forEach(p=>{ const [fid,iid]=p.split(':'); if(!reqDebug(fid,iid)) ok=false; }); }
+  if(envioDif){ ['f-env-nom:env-nom','f-env-tel:env-tel','f-env-dir:env-dir','f-env-bar:env-bar','f-env-ciu:env-ciu','f-env-dep:env-dep'].forEach(p=>{ const [fid,iid]=p.split(':'); if(!reqDebug(fid,iid)) ok=false; }); }
+  if(!ok){
+    const err=document.getElementById('errbanner2');
+    if(err){ err.style.display='block'; err.textContent='Completa estos campos: '+camposFallidos.join(', '); }
+    return;
+  }
+  guardarCliente(); goStep(1);   // cliente OK → productos (con su lista ya cargada)
+}
+
+function getEnvio(){
+  if(envioDif) return { nombre:g('env-nom'), tel:g('env-tel'), dir:g('env-dir')+(g('env-bar')?', '+g('env-bar'):''), ciudad:g('env-ciu')+(g('env-dep')?', '+g('env-dep'):''), barrio:g('env-bar') };
+  if(tipo==='nat') return { nombre:g('nom'), tel:g('tel'), dir:g('dir')+(g('bar')?', '+g('bar'):''), ciudad:g('ciu')+(g('dep')?', '+g('dep'):''), barrio:g('bar') };
+  return { nombre:g('rec'), tel:g('telj'), dir:g('dirj')+(g('barj')?', '+g('barj'):''), ciudad:g('ciuj')+(g('depj')?', '+g('depj'):''), barrio:g('barj') };
+}
+function getContacto(){ return tipo==='nat'?g('nom'):g('rec'); }
+function getEmpresa(){ return tipo==='nat'?(g('neg')||g('nom')):g('rsoc'); }
+function getTel(){ return tipo==='nat'?g('tel'):g('telj'); }
+
+function buildResumen(){
+  const sel=getSel(); const folio=genFolio();
+  document.getElementById('folio-display').textContent=folio;
+  const IVA=0.19; let subBase=0;
+  let itemsHTML=sel.map(s=>{
+    const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP';
+    const clabel=s.color==='blanco'?'Blanco':'Transparente';
+    const precio=s.prod.t[listaActiva]; const subtotal=s.qty*precio; subBase+=subtotal;
+    const listaLabel=promoOn?'precio especial':LISTA_NAMES[listaActiva];
+    return `<div class="srow"><div class="srl">${group} ${s.prod.v} · ${clabel}<small>${fmtN(s.qty)} uds × ${fmt(precio)} s/IVA · ${listaLabel}</small></div><div class="srr">${fmt(subtotal)}</div></div>`;
+  }).join('');
+  if(pedidoMuestras) itemsHTML+=`<div class="srow"><div class="srl">🧪 Kit de Muestras<small>Muestrario completo · Transporte incluido</small></div><div class="srr" style="color:var(--acc)">${fmt(getKitPrecio())}</div></div>`;
+  document.getElementById('sum-items').innerHTML=itemsHTML||'<div class="srow"><div class="srl" style="color:var(--t3)">Solo kit de muestras</div></div>';
+  const iva=Math.round(subBase*IVA);
+  const totalUds=sel.reduce((a,s)=>a+s.qty,0);
+  const fleteDisplay = getFleteDisplay();
+  const flete = fleteDisplay ? 0 : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
+  const totalPacas=sel.reduce((a,s)=>a+Math.floor(s.qty/s.prod.pk),0);
+  const residuoUds=sel.reduce((a,s)=>a+(s.qty%s.prod.pk),0);
+  const cajasResiduo=Math.ceil(residuoUds/200);
+  const cajas=totalPacas>0?totalPacas:Math.ceil(totalUds/200);
+  const grand=subBase+iva+flete+(pedidoMuestras?getKitPrecio():0);
+  document.getElementById('s-sub').textContent=fmt(subBase);
+  document.getElementById('s-iva').textContent=fmt(iva);
+  document.getElementById('s-flete').textContent= fleteDisplay ? (fleteDisplay.label) : fmt(flete);
+  const cajasLabel=!fleteDisplay&&totalPacas>0?(totalPacas+` paca${totalPacas>1?'s':''}${cajasResiduo>0?' + '+cajasResiduo+' caja resid.':''}`):!fleteDisplay&&cajas?`(${cajas} caja${cajas>1?'s':''})`:'' ;
+  document.getElementById('s-cajas').textContent=cajasLabel?`(${cajasLabel})`:'';
+  document.getElementById('s-total').textContent=fmt(grand);
+  const envio=getEnvio(); const contacto=getContacto(); const empresa=getEmpresa(); const tel=getTel();
+  const clienteRows=tipo==='nat'?[['Empresa / Negocio',empresa],['Contacto',contacto],['Cédula',g('ced')],['Celular',tel],['Correo',g('eml')]]:[['Empresa',empresa],['NIT',g('rut')],['Contacto',contacto],['Celular',tel]];
+  document.getElementById('sum-cliente').innerHTML=
+    clienteRows.map(([l,v])=>`<div class="srow"><div class="srl">${l}</div><div class="srr">${v||'—'}</div></div>`).join('')+
+    `<div class="srow"><div class="srl">Dirección de entrega<small>Barrio: ${envio.barrio||'—'}</small></div><div class="srr" style="text-align:right;max-width:60%">${envio.dir}<small>${envio.ciudad}</small></div></div>`+
+    (envioDif?`<div class="srow"><div class="srl" style="color:var(--green);font-size:11px">⚠ Envío a dirección diferente al titular</div><div class="srr"></div></div>`:'')+
+    (g('ali')?`<div class="srow"><div class="srl">¿Qué envasa?</div><div class="srr">${g('ali')}</div></div>`:'')+
+    `<div class="srow"><div class="srl">Transporte</div><div class="srr">${tipoTransporte==='incluido'?'📦 Incluido en factura':tipoTransporte==='cobro'?'💰 Al cobro':' 🚛 Transporte propio'}</div></div>`+
+    (g('notas')?`<div class="srow"><div class="srl">Notas</div><div class="srr" style="text-align:right;max-width:60%">${g('notas')}</div></div>`:'');
+  document.getElementById('acuerdo-section').style.display='block';
+  document.getElementById('confirmado-box').style.display='none';
+  ['btn-guardar','btn-aceptar'].forEach(id=>{ const b=document.getElementById(id); if(b){ b.disabled=false; b.style.opacity='1'; } });
+  const sok=document.getElementById('sheets-ok'); if(sok) sok.style.display='none';
+  const ssd=document.getElementById('sheets-sending'); if(ssd) ssd.style.display='none';
+}
+
+async function guardarCotizacion(){ await procesarCot('cotizacion', false, 'Guardando cotización...', '¡Cotización guardada!', 'Queda en cola para seguimiento y remarketing. Cuando el cliente pague, dale "Cotización aceptada".'); }
+async function cotizacionAceptada(){
+  const fd=tipo==='nat'?['dir','bar','ciu','dep']:['dirj','barj','ciuj','depj'];
+  const falta=fd.filter(f=>!g(f));
+  if(falta.length){ alert('Para pasar a PEDIDO faltan datos de envío (dirección, barrio, ciudad o departamento). Complétalos arriba.\n\nSi aún no los tienes, usa "Guardar cotización" para dejarla en cola.'); goStep(2); return; }
+  if(!confirm('¿El cliente YA pagó? Esto la pasa a PEDIDOS.')) return;
+  await procesarCot('pedido', true, 'Pasando a pedidos...', '¡Aceptada → Pedido!', 'Pasó a pedidos. Continúa el ciclo (producción, despacho, factura).');
+}
+async function procesarCot(estado, irAPedidos, sending, title, sub){
+  document.getElementById('btn-guardar').disabled=true; document.getElementById('btn-aceptar').disabled=true;
+  const s=document.getElementById('sheets-sending'); s.textContent='⏳ '+sending; s.style.display='block';
+  await registrarEnSheets(estado, irAPedidos);
+  if(irAPedidos) await enviarAMake();   // webhook externo solo al Generar pedido; Guardar = solo cola
+  s.style.display='none';
+  document.getElementById('acuerdo-section').style.display='none';
+  const box=document.getElementById('confirmado-box');
+  box.querySelector('.confirmado-title').textContent=title;
+  box.querySelector('.confirmado-sub').textContent=sub;
+  box.querySelector('.confirmado-icon').textContent = irAPedidos?'🎉':'📝';
+  box.style.display='block';
+  if(irAPedidos) notificarJose(estado);   // WhatsApp solo al Generar pedido; Guardar = solo cola, silencioso
+}
+
+function notificarJose(estado){
+  const sel=getSel(); const contacto=getContacto(); const empresa=getEmpresa(); const tel=getTel(); const envio=getEnvio();
+  const folio=document.getElementById('folio-display').textContent;
+  const IVA=0.19; let subBase=0;
+  sel.forEach(s=>{ subBase+=s.qty*s.prod.t[listaActiva]; });
+  const iva=Math.round(subBase*IVA);
+  const totalUds=sel.reduce((a,s)=>a+s.qty,0);
+  const fleteDisp = getFleteDisplay();
+  const flete = fleteDisp ? 0 : (pedidoMuestras && sel.length===0 ? 0 : calcFlete(sel));
+  const grand=subBase+iva+flete+(pedidoMuestras?getKitPrecio():0);
+  const fleteStr = fleteDisp ? fleteDisp.label : fmt(flete);
+  const comision=calcComision(sel);
+  let msg=`${estado==='pedido'?'🎉 PEDIDO (cotización aceptada/pagada)':'📝 NUEVA COTIZACIÓN (en cola)'} · ${folio}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  msg+=`Empresa: ${empresa}\nContacto: ${contacto} · ${tel}\n`;
+  if(tipo==='nat') msg+=`Cédula: ${g('ced')}\n`; else msg+=`NIT: ${g('rut')}\n`;
+  msg+=`Entrega: ${envio.dir}, ${envio.barrio?'Barrio: '+envio.barrio+', ':''}${envio.ciudad}\n\n`;
+  sel.forEach(s=>{ const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; msg+=`▸ ${group} ${s.prod.v} (${s.color==='blanco'?'Blanco':'Transparente'}): ${fmtN(s.qty)} uds\n`; });
+  if(pedidoMuestras) msg+=`▸ Kit de muestras · ${fmt(getKitPrecio())}\n`;
+  msg+=`\nFlete: ${fleteStr}\nTOTAL: ${fmt(grand)}\nComisión estimada: ${fmt(comision)}\nTransporte: ${tipoTransporte==='incluido'?'Incluido en factura':tipoTransporte==='cobro'?'Al cobro':'Transporte propio'}\n\n✅ El cliente aceptó la cotización (queda en cola).\nEnvía las formas de pago — al pagar pasa a pedido.`;
+  window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg), '_blank');
+}
+
+function calcComision(sel){
+  if(listaActiva === 4){ return pedidoMuestras ? getKitComision() : 0; }
+  let com = sel.reduce((a, s) => {
+    const precioVenta = s.prod.t[listaActiva];
+    const precioBase  = s.prod.t[4];
+    const diff = precioVenta - precioBase;
+    return a + s.qty * diff;
+  }, 0);
+  if(pedidoMuestras) com += getKitComision();
+  return Math.max(0, Math.round(com));
+}
+
+async function registrarEnSheets(estadoCot, irAPedidos){
+  const sel=getSel(); const IVA=0.19; let subBase=0;
+  const productos=sel.map(s=>{ const precio=s.prod.t[listaActiva]; const subtotal=s.qty*precio; subBase+=subtotal; const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; return { ref:group+' '+s.prod.v, color:s.color==='blanco'?'Blanco':'Transparente', qty:s.qty, precio, subtotal }; });
+  const iva=Math.round(subBase*IVA);
+  const totalUds=sel.reduce((a,s)=>a+s.qty,0);
+  const fleteCalc = getFleteDisplay() ? 0 : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
+  const grand=subBase+iva+fleteCalc+(pedidoMuestras?getKitPrecio():0);
+  const envio=getEnvio();
+  const folio=document.getElementById('folio-display').textContent;
+  const now=new Date();
+  const params=new URLSearchParams({
+    folio,
+    fecha: now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'}),
+    hora:  now.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}),
+    empresa: getEmpresa(), contacto: getContacto(), celular: getTel(),
+    cedula_nit: (tipo==='nat'?g('ced'):g('rut')).replace(/\s+/g,''), tipo_cliente: tipo,
+    correo: tipo==='nat'?g('eml'):g('emlj'),
+    dir_factura: tipo==='nat'?g('dir'):g('dirj'),
+    barrio_factura: tipo==='nat'?g('bar'):g('barj'),
+    ciudad_factura: tipo==='nat'?g('ciu'):g('ciuj'),
+    dep_factura: tipo==='nat'?g('dep'):g('depj'),
+    envio_nombre: envio.nombre, envio_tel: envio.tel, envio_dir: envio.dir,
+    envio_barrio: envio.barrio, envio_ciudad: envio.ciudad,
+    envio_diferente: envioDif?'SI':'NO',
+    alimento: g('ali'), notas: g('notas'),
+    productos: JSON.stringify(productos), total_uds: totalUds,
+    subtotal_sin_iva: Math.round(subBase),
+    iva: Math.round(iva),
+    flete: Math.round(fleteCalc),
+    tipo_transporte: tipoTransporte,
+    total: Math.round(grand),
+    comision: Math.round(calcComision(sel)),
+    lista_idx: listaActiva, lista_nombre: LISTA_NAMES[listaActiva],
+    promo_code: promoOn?document.getElementById('pinp').value.trim().toUpperCase():'',
+    kit_muestras: pedidoMuestras?'SI':'NO',
+    kit_muestras_precio: pedidoMuestras?getKitPrecio():0,
+    kit_muestras_comision: pedidoMuestras?getKitComision():0,
+    estado: (irAPedidos?'Pedido':'Cotizacion')
+  });
+  // 📝 Guardar como COTIZACIÓN en la nube (cola). Pasa a pedido SOLO cuando paguen.
+  try{
+    const obj=Object.fromEntries(params);
+    const row={empresa:'smart',folio:obj.folio,cliente:obj.empresa,contacto:obj.contacto,celular:obj.celular,total:Number(obj.total)||0,estado:(estadoCot||'cotizacion'),datos:obj};
+    const hdr={apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json','Prefer':'return=minimal'};
+    // RAÍZ anti-duplicados: no insertar siempre. Decidir si ACTUALIZAR una fila existente.
+    let targetId=new URLSearchParams(location.search).get('cot')||null;   // 1) si vine editando (?cot=id) → esa fila
+    if(!targetId && obj.cedula_nit){   // 2) si el cliente YA tiene cotización abierta en cola → esa fila (no duplicar)
+      try{ const rr=await fetch(SBU+'/rest/v1/nc_cotizaciones?empresa=eq.smart&estado=eq.cotizacion&datos->>cedula_nit=eq.'+encodeURIComponent(obj.cedula_nit)+'&select=id&limit=1',{headers:{apikey:SBK,Authorization:'Bearer '+SBK}}); const arr=await rr.json(); if(Array.isArray(arr)&&arr[0]) targetId=arr[0].id; }catch(e){}
+    }
+    if(targetId){ await fetch(SBU+'/rest/v1/nc_cotizaciones?id=eq.'+encodeURIComponent(targetId),{method:'PATCH',headers:hdr,body:JSON.stringify(row)}); }
+    else { await fetch(SBU+'/rest/v1/nc_cotizaciones',{method:'POST',headers:hdr,body:JSON.stringify(row)}); }
+  }catch(e){ console.log('SB cotizacion error:',e); }
+  upsertCliente();   // guarda/actualiza el cliente en Supabase (+ su última lista)
+  // Solo cuando se ACEPTA (ya pagó) se escribe en pedidos (Sheet). Guardar cotización = solo cola.
+  if(irAPedidos){ try{ await fetch(CONFIG.sheets_webhook+'?'+params.toString(),{method:'GET',mode:'no-cors'}); await new Promise(r=>setTimeout(r,1000)); }catch(e){ console.log('Sheets',e); } }
+  else { await new Promise(r=>setTimeout(r,400)); }
+}
+
+function togglePromo(){
+  promoOpen=!promoOpen;
+  document.getElementById('promobox').classList.toggle('open',promoOpen);
+}
+function applyPromo(){
+  if(promoOn) return;
+  const code=document.getElementById('pinp').value.trim().toUpperCase();
+  const inp=document.getElementById('pinp'); const msg=document.getElementById('pmsg');
+  inp.classList.remove('perr');
+  if(!code){ inp.classList.add('perr'); return; }
+  if(PROMOS[code]){
+    promoOn=true; listaActiva=PROMOS[code].lista;
+    msg.className='pmsg ok'; msg.textContent=PROMOS[code].msg;
+    inp.disabled=true;
+    document.querySelector('.pbtn').textContent='Aplicado ✓';
+    document.querySelector('.pbtn').style.background='var(--gm)';
+    document.getElementById('promobox').classList.add('unlocked');
+    document.getElementById('picon').textContent='✓';
+    document.getElementById('ptitle').textContent='Código aplicado';
+    document.getElementById('psub').textContent='Precio especial activo en tu solicitud';
+    updateKitUI();
+  } else { msg.className='pmsg fail'; msg.textContent='Código no válido. Contacta a tu asesor.'; inp.classList.add('perr'); }
+}
+
+function resetAll(){
+  allProds().forEach(p=>p.col.forEach(color=>{
+    const inp=document.getElementById('qty-'+p.id+'_'+color); if(inp) inp.value='';
+    const warn=document.getElementById('warn-'+p.id+'_'+color); if(warn) warn.style.display='none';
+    const card=document.getElementById('card-'+p.id); if(card) card.classList.remove('sel');
+    const qtot=document.getElementById('qtot-'+p.id); if(qtot) qtot.textContent='';
+  }));
+  ['nom','tel','ced','neg','dir','bar','ciu','dep','eml','rut','rsoc','rec','telj','dirj','barj','ciuj','depj','emlj','ali','notas','env-nom','env-tel','env-dir','env-bar','env-ciu','env-dep'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  document.querySelectorAll('.ali-btn.on').forEach(b=>{ b.classList.remove('on'); if(b.dataset.val==='Otro') document.getElementById('ali-otro').style.display='none'; });
+  document.getElementById('errbanner').style.display='none';
+  if(envioDif) toggleEnvioDif();
+  if(pedidoMuestras) toggleMuestras();
+  setTransporte('incluido');
+  if(promoOn){
+    promoOn=false; promoOpen=false; listaActiva=0;
+    const pb=document.getElementById('promobox'); pb.classList.remove('unlocked','open');
+    const inp=document.getElementById('pinp'); inp.disabled=false; inp.value=''; inp.classList.remove('perr');
+    document.querySelector('.pbtn').textContent='Aplicar'; document.querySelector('.pbtn').style.background='';
+    document.getElementById('picon').textContent='🎁';
+    document.getElementById('ptitle').textContent='¡Pon tu código de precio aquí!';
+    document.getElementById('psub').textContent='Toca aquí · Ingresa tu código y ve tu precio especial';
+    updateKitUI();
+    document.getElementById('pmsg').className='pmsg';
+  }
+  setTipo('nat'); goStep(2);   // arranca en CLIENTE (cliente-primero)
+}
+
+const DB_KEY='sp_clientes_v2';
+function getClientesDB(){ let l={}; try{ l=JSON.parse(localStorage.getItem(DB_KEY)||'{}'); }catch(e){} return Object.assign({}, l, window._cliDB||{}); }
+function saveClientesDB(db){ try{ localStorage.setItem(DB_KEY,JSON.stringify(db)); }catch(e){} }
+// Clientes en Supabase (superdata): se cargan al abrir y se guardan al cotizar
+const SBU='https://fnayedgvamxktxfvywwl.supabase.co', SBK='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+async function loadClientes(){ try{ window._cliDB={};
+  // 1) BASE MAESTRA (1.100 clientes/prospectos) — para buscar por nombre/cel/NIT
+  try{ const rb=await fetch(SBU+'/rest/v1/smart_clientes_base?select=documento,nombre,celular,ciudad,depto,barrio,direccion,nicho,area&limit=5000',{headers:{apikey:SBK,Authorization:'Bearer '+SBK}}); const base=await rb.json(); (Array.isArray(base)?base:[]).forEach((c,i)=>{ const key=(c.documento&&c.documento.length>=5)?c.documento:('B'+i); window._cliDB[key]={empresa:c.nombre, nom:c.nombre, tel:c.celular, ciu:c.ciudad, dep:c.depto, bar:c.barrio, dir:c.direccion, nicho:c.nicho, cob:c.area, base:true}; }); }catch(e){}
+  // 2) CLIENTES REALES (nc_clientes) — prioridad: sobreescriben la base con datos+lista guardada
+  const r=await fetch(SBU+'/rest/v1/nc_clientes?empresa=eq.smart&limit=5000',{headers:{apikey:SBK,Authorization:'Bearer '+SBK}}); const arr=await r.json(); (Array.isArray(arr)?arr:[]).forEach(c=>{ window._cliDB[c.documento]=Object.assign({}, c.datos||{}, {last_lista:c.last_lista, empresa:c.nombre, fecha:(c.updated_at||'').slice(0,10)}); });
+  const dl=document.getElementById('cliDL'); if(dl){ dl.innerHTML=Object.entries(window._cliDB).map(([doc,c])=>'<option value="'+doc+'">'+((c.empresa||c.nom||c.rsoc||'')+'').replace(/[<>"]/g,'')+'</option>').join(''); }
+}catch(e){} }
+async function upsertCliente(){ const doc=tipo==='nat'?g('ced'):g('rut'); if(!doc||doc.length<5) return; const campos=['nom','neg','tel','ced','eml','dir','bar','ciu','dep','cob','rsoc','rec','telj','rut','emlj','dirj','barj','ciuj','depj','cobj']; const datos={tipo}; campos.forEach(f=>{ datos[f]=g(f); }); datos.last_lista=listaActiva; try{ await fetch(SBU+'/rest/v1/nc_clientes?on_conflict=empresa,documento',{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:'smart',documento:doc,nombre:getEmpresa(),celular:getTel(),last_lista:listaActiva,datos:datos})}); }catch(e){console.log('cliente',e);} }
+function autofillCliente(){
+  const cl=new URLSearchParams(location.search).get('cliente');
+  if(!cl || !window._cliDB || !window._cliDB[cl]) return;
+  const c=window._cliDB[cl];
+  const esJur = c.tipo==='juridica' || !!c.rut || !!c.rsoc;
+  setTipo(esJur?'jur':'nat');
+  const el=document.getElementById(esJur?'rut':'ced'); if(el) el.value=cl;
+  buscarCliente();
+  goStep(2);   // abre directo en los DATOS del cliente (ya registrado)
+}
+async function syncLocalClientes(){
+  let local={}; try{ local=JSON.parse(localStorage.getItem(DB_KEY)||'{}'); }catch(e){}
+  const rows=Object.entries(local).filter(([d,c])=>d&&c&&typeof c==='object').map(([doc,c])=>({empresa:'smart',documento:doc,nombre:c.empresa||c.nom||c.rsoc||doc,celular:c.tel||c.telj||'',last_lista:c.last_lista||0,datos:c}));
+  if(!rows.length) return;
+  try{ await fetch(SBU+'/rest/v1/nc_clientes?on_conflict=empresa,documento',{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(rows)});
+    const t=document.createElement('div'); t.textContent='✅ '+rows.length+' clientes sincronizados a la nube'; t.style.cssText='position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#0c3a26;color:#9ff0c8;padding:10px 16px;border-radius:10px;font-size:13px;z-index:9999'; document.body.appendChild(t); setTimeout(()=>t.remove(),4500);
+  }catch(e){console.log('sync',e);}
+}
+function autofillCot(){
+  const cotId=new URLSearchParams(location.search).get('cot');
+  if(!cotId) return;
+  fetch(SBU+'/rest/v1/nc_cotizaciones?id=eq.'+cotId,{headers:{apikey:SBK,Authorization:'Bearer '+SBK}}).then(r=>r.json()).then(arr=>{
+    const c=arr&&arr[0]; if(!c) return; const d=c.datos||{};
+    const esJur=d.tipo_cliente==='jur'; setTipo(esJur?'jur':'nat');
+    const sv=(id,val)=>{const el=document.getElementById(id); if(el&&val) el.value=val;};
+    if(esJur){ sv('rut',d.cedula_nit); sv('rsoc',d.empresa); sv('rec',d.contacto||d.empresa); sv('telj',d.celular); sv('emlj',d.correo); sv('dirj',d.dir_factura); sv('barj',d.barrio_factura); sv('ciuj',d.ciudad_factura); sv('depj',d.dep_factura); }
+    else { sv('ced',d.cedula_nit); sv('nom',d.empresa||d.contacto); sv('neg',d.empresa); sv('tel',d.celular); sv('eml',d.correo); sv('dir',d.dir_factura); sv('bar',d.barrio_factura); sv('ciu',d.ciudad_factura); sv('dep',d.dep_factura); }
+    let prods=d.productos; if(typeof prods==='string'){ try{prods=JSON.parse(prods);}catch(e){prods=null;} }
+    if(Array.isArray(prods)){ prods.forEach(p=>{ const prod=allProds().find(x=>(p.ref||'').includes(x.v)); if(!prod) return; const color=(p.color||'').toLowerCase().includes('blanc')?'blanco':'transparente'; const inp=document.getElementById('qty-'+prod.id+'_'+color); if(inp){ inp.value=p.qty; inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change')); } }); }
+  }).catch(()=>{});
+}
+goStep(2);   // arranca SIEMPRE en Cliente (cliente-primero), aunque no venga ?cliente
+loadClientes().then(()=>{ syncLocalClientes(); autofillCliente(); autofillCot(); });
+function limpiarAviso(){ const av=document.getElementById('aviso-cliente'); if(av) av.style.display='none'; }
+function setListaSel(v){ listaActiva=parseInt(v)||0; promoOn=false; }   // selección manual del nivel de lista
+function buscarCliente(){
+  let id=tipo==='nat'?g('ced'):g('rut');
+  if(!id||id.length<5) return;
+  const db=getClientesDB(); const cliente=db[id]; if(!cliente) return;
+  // detecta si es jurídico aunque venga importado (tipo_cliente/tipo_id/NIT)
+  const cliJur=cliente.tipo==='jur'||cliente.tipo==='juridica'||cliente.tipo_cliente==='jur'||cliente.tipo_id==='NIT'||cliente.tipo_id==='RUT'||!!cliente.rut||!!cliente.rsoc;
+  if(cliJur&&tipo!=='jur'){ setTipo('jur'); const e=document.getElementById('rut'); if(e)e.value=id; }
+  else if(!cliJur&&tipo!=='nat'){ setTipo('nat'); const e=document.getElementById('ced'); if(e)e.value=id; }
+  if(cliente.last_lista!=null) listaActiva=cliente.last_lista;   // recuerda su última lista de precios
+  const ls=document.getElementById('lista-sel'); if(ls) ls.value=String(listaActiva);   // refleja la lista del cliente en el selector
+  const setv=(f,val)=>{ const el=document.getElementById(f); if(el&&val) el.value=val; };
+  if(cliJur){ setv('rsoc',cliente.rsoc||cliente.empresa||cliente.nom); setv('rec',cliente.rec||cliente.contacto||cliente.nom); setv('telj',cliente.telj||cliente.tel||cliente.celular); setv('emlj',cliente.emlj||cliente.eml||cliente.correo); setv('dirj',cliente.dirj||cliente.dir); setv('barj',cliente.barj||cliente.bar); setv('ciuj',cliente.ciuj||cliente.ciu||cliente.ciudad); setv('depj',cliente.depj||cliente.dep); setv('cobj',cliente.cobj); autoGeoCot('ciuj','depj','cobj'); }
+  else { setv('nom',cliente.nom||cliente.empresa); setv('neg',cliente.neg||cliente.empresa); setv('tel',cliente.tel||cliente.celular); setv('eml',cliente.eml||cliente.correo); setv('dir',cliente.dir); setv('bar',cliente.bar); setv('ciu',cliente.ciu||cliente.ciudad); setv('dep',cliente.dep); setv('cob',cliente.cob); autoGeoCot('ciu','dep','cob'); }
+  const av=document.getElementById('aviso-cliente');
+  if(av){ av.style.display='flex'; document.getElementById('aviso-nombre').textContent='¡Bienvenido de nuevo, '+(cliente.empresa||cliente.nom||cliente.rsoc||'cliente')+'!'; document.getElementById('aviso-sub').textContent='Datos cargados automáticamente · Último pedido: '+(cliente.fecha||''); }
+}
+function buscarClienteLibre(q){
+  const res=document.getElementById('cliBusRes'); if(!res) return;
+  q=(q||'').toLowerCase().trim();
+  if(q.length<2){ res.innerHTML=''; return; }
+  const db=getClientesDB(); const na=s=>(s||'').toString().toLowerCase();
+  const hits=Object.entries(db).filter(([doc,c])=>{
+    if(!c||typeof c!=='object') return false;
+    const nom=na(c.empresa||c.nom||c.rsoc||c.neg), cel=na(c.tel||c.telj||c.celular).replace(/\D/g,''), d=na(doc);
+    return nom.includes(q)||cel.includes(q.replace(/\D/g,''))||d.includes(q);
+  }).slice(0,8);
+  if(!hits.length){ res.innerHTML='<div style="font-size:12px;color:#888;padding:6px 2px">Sin coincidencias. Registra el cliente nuevo abajo.</div>'; return; }
+  res.innerHTML=hits.map(([doc,c])=>{ const nom=(c.empresa||c.nom||c.rsoc||doc).toString().replace(/[<>"]/g,''); const cel=(c.tel||c.telj||c.celular||''); return '<div onclick="elegirCliente(\''+doc+'\')" style="cursor:pointer;padding:8px 10px;border:1px solid #cfe2ff;border-radius:8px;margin-top:5px;font-size:13px;background:#fff"><b>'+nom+'</b> <span style="color:#888">· '+doc+(cel?' · 📱 '+cel:'')+'</span></div>'; }).join('');
+}
+function elegirCliente(doc){
+  const db=getClientesDB(); const c=db[doc]||{};
+  const esJur = c.tipo==='jur'||c.tipo==='juridica'||c.tipo_cliente==='jur'||!!c.rut||!!c.rsoc||c.tipo_id==='NIT';
+  setTipo(esJur?'jur':'nat');
+  const el=document.getElementById(esJur?'rut':'ced'); if(el) el.value=doc;
+  buscarCliente();
+  const b=document.getElementById('cliBuscar'); if(b) b.value='';
+  const r=document.getElementById('cliBusRes'); if(r) r.innerHTML='';
+}
+function guardarCliente(){
+  const id=tipo==='nat'?g('ced'):g('rut'); if(!id) return;
+  const db=getClientesDB(); const now=new Date().toLocaleDateString('es-CO'); const actual=db[id]||{};
+  if(tipo==='nat'){ const nuevo={tipo:'nat',fecha:now}; ['nom','neg','tel','eml','dir','bar','ciu','dep'].forEach(f=>{ const v=g(f); if(v) nuevo[f]=v; }); db[id]=Object.assign({},actual,nuevo); db[id].empresa=nuevo.neg||nuevo.nom||actual.empresa||''; }
+  else { const nuevo={tipo:'jur',fecha:now}; ['rsoc','rec','telj','emlj','dirj','barj','ciuj','depj'].forEach(f=>{ const v=g(f); if(v) nuevo[f]=v; }); db[id]=Object.assign({},actual,nuevo); db[id].empresa=nuevo.rsoc||actual.empresa||''; }
+  saveClientesDB(db);
+}
+
+async function enviarAMake(){
+  try{
+    await fetch('https://hook.us2.make.com/wnlk1re4ubkhbkvjdde48v7mb483vsvd',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ empresa:getEmpresa(), contacto:getContacto(), celular:getTel(), ciudad:tipo==='nat'?g('ciu'):g('ciuj'), barrio:tipo==='nat'?g('bar'):g('barj'), empresa_nombre:'Smart Packaging Colombia', total:parseFloat(document.getElementById('s-total').textContent.replace(/[^0-9]/g,'')), fecha:new Date().toLocaleString('es-CO') })
+    });
+  }catch(e){ console.log(e); }
+}
+
+buildGridSorted();
+_llenarCiudadesDL();
+loadInventory();
+</script>
+</body>
+</html>
