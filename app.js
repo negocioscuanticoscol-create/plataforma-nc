@@ -912,25 +912,29 @@ const App = {
     clis=Array.isArray(clis)?clis:[];
     const MES=['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     const HERR=4000000, BOD=.01, LOG=.01, OPE=.01, BRUTA=.20;
+    const HERR_DESDE=7;   // el gasto de herramientas ($4M/mes) empezó en JULIO (antes no hubo)
     const M={}, firstMes={};
-    peds.forEach(p=>{ const m=new Date(p.creado_en).getMonth()+1; (M[m]=M[m]||{ventas:0,pares:0,comision:0,cli:new Set()});
-      M[m].ventas+=+p.total||0; M[m].pares+=+p.pares||0; M[m].comision+=(+p.comision_nc||0)+(+p.comision_gpjr||0); M[m].cli.add(p.cliente_id);
+    peds.forEach(p=>{ const m=new Date(p.creado_en).getMonth()+1; (M[m]=M[m]||{ventas:0,pares:0,cNC:0,cG:0,cli:new Set()});
+      M[m].ventas+=+p.total||0; M[m].pares+=+p.pares||0; M[m].cNC+=+p.comision_nc||0; M[m].cG+=+p.comision_gpjr||0; M[m].cli.add(p.cliente_id);
       if(!firstMes[p.cliente_id]||m<firstMes[p.cliente_id]) firstMes[p.cliente_id]=m; });
+    const curM=new Date().getMonth()+1; if(!M[curM]) M[curM]={ventas:0,pares:0,cNC:0,cG:0,cli:new Set()};   // el mes actual siempre se exhibe (aunque no haya ventas)
     const nuevosMes={}; clis.forEach(c=>{ const m=c.creado_en?new Date(c.creado_en).getMonth()+1:0; if(m) nuevosMes[m]=(nuevosMes[m]||0)+1; });
     let acum=0; const acumMes={}; for(let m=1;m<=12;m++){ acum+=nuevosMes[m]||0; acumMes[m]=acum; }
+    let hasGPJR=false;
     const rows=Object.keys(M).map(Number).sort((a,b)=>a-b).map(m=>{ const d=M[m], v=d.ventas, rec=[...d.cli].filter(id=>firstMes[id]<m).length;
-      return { mes:MES[m], ventas_libro:v, u_bruta:v*BRUTA, comision:d.comision, herramientas:HERR, bodega:v*BOD, logistica:v*LOG, operaciones:v*OPE,
-        utilidad_neta:v*BRUTA-d.comision-HERR-v*BOD-v*LOG-v*OPE, unidades:d.pares,
+      const com=d.cNC+d.cG, herr=(m>=HERR_DESDE?HERR:0); if(d.cG>0) hasGPJR=true;
+      return { mes:MES[m], ventas_libro:v, u_bruta:v*BRUTA, comision:com, comision_nc:d.cNC, comision_gpjr:d.cG, herramientas:herr, bodega:v*BOD, logistica:v*LOG, operaciones:v*OPE,
+        utilidad_neta:v*BRUTA-com-herr-v*BOD-v*LOG-v*OPE, unidades:d.pares,
         clientes_registrados:acumMes[m], clientes_nuevos:nuevosMes[m]||0, clientes_recurrentes:rec }; });
-    this._renderPanelFin(rows, {titulo:'Feroz', unidLabel:'Pares', pBod:'1%', pLog:'1%', pOpe:'1%',
+    this._renderPanelFin(rows, {titulo:'Feroz', unidLabel:'Pares', pBod:'1%', pLog:'1%', pOpe:'1%', splitComision:true, hasGPJR,
       nVentas:peds.length, muestras:{vend:muVend, gratis:muGratis},
-      sub:'EN VIVO desde pedidos reales · herramientas $4.000.000/mes · bodega 1% · logística 1% · operaciones 1% · U.bruta 20%',
+      sub:'EN VIVO desde pedidos reales · herramientas $4.000.000/mes (desde julio) · bodega 1% · logística 1% · operaciones 1% · U.bruta 20%',
       vacio:'Aún no hay pedidos con valor en Feroz. A medida que se vendan, aparecen aquí.'});
   },
   _renderPanelFin(rows, cfg){   // renderizador COMPARTIDO (Smart y Feroz)
     const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO'), nm=n=>Math.round(n||0).toLocaleString('es-CO');
     if(!rows.length) return this.set(`<h1>📊 Resultados · ${cfg.titulo}</h1><div class="empty">${cfg.vacio||'Sin datos todavía.'}</div>`);
-    const C={}; ['ventas_libro','u_bruta','comision','herramientas','bodega','logistica','operaciones','utilidad_neta','unidades','clientes_nuevos','clientes_recurrentes'].forEach(k=>C[k]=rows.reduce((a,x)=>a+(+x[k]||0),0));
+    const C={}; ['ventas_libro','u_bruta','comision','comision_nc','comision_gpjr','herramientas','bodega','logistica','operaciones','utilidad_neta','unidades','clientes_nuevos','clientes_recurrentes'].forEach(k=>C[k]=rows.reduce((a,x)=>a+(+x[k]||0),0));
     const costos=C.comision+C.herramientas+C.bodega+C.logistica+C.operaciones;
     const th=rows.map(x=>`<th style="text-align:right">${(x.mes||'').slice(0,3)}</th>`).join('');
     const fila=(l,k,p)=>`<tr><td>${l}${p?` <span style="color:#8a93a6;font-size:11px">${p}</span>`:''}</td>${rows.map(x=>{const v=+x[k]||0;return `<td style="text-align:right${v<0?';color:#dc2626':''}">${cl(v)}</td>`}).join('')}<td style="text-align:right;font-weight:800">${cl(C[k])}</td></tr>`;
@@ -949,7 +953,7 @@ const App = {
         <thead><tr><th style="text-align:left">Concepto</th>${th}<th style="text-align:right">TOTAL</th></tr></thead><tbody>
         ${fila('<b>Ventas</b>','ventas_libro')}
         ${fila('U. Bruta','u_bruta','20%')}
-        ${fila('Comisiones','comision','var')}
+        ${cfg.splitComision ? `${fila('Comisiones NC','comision_nc','var')}${cfg.hasGPJR?fila('Comisiones GPJR','comision_gpjr','⭐'):''}` : fila('Comisiones','comision','var')}
         ${fila('Herramientas','herramientas','fijo')}
         ${fila('Bodega','bodega',cfg.pBod||'')}
         ${fila('Logística','logistica',cfg.pLog||'')}
