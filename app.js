@@ -84,8 +84,8 @@ const App = {
       {v:'crm', ic:'📇', t:'CRM'},
       {v:'cotizaciones', ic:'📝', t:'Cotizar'},
       {v:'pedidos', ic:'📦', t:'Pedidos'},
-      {v:'cartera', ic:'💳', t:'Cartera'},
       {v:'despachos', ic:'🚚', t:'Despachos'},
+      {v:'cartera', ic:'💳', t:'Cartera'},
       {v:'planta', ic:'🏭', t:'Planta'},
       {v:'clientes', ic:'👥', t:'Clientes'},
     ];
