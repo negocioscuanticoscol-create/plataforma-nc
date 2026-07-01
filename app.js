@@ -84,6 +84,7 @@ const App = {
       {v:'crm', ic:'📇', t:'CRM'},
       {v:'cotizaciones', ic:'📝', t:'Cotizar'},
       {v:'pedidos', ic:'📦', t:'Pedidos'},
+      {v:'cartera', ic:'💳', t:'Cartera'},
       {v:'despachos', ic:'🚚', t:'Despachos'},
       {v:'planta', ic:'🏭', t:'Planta'},
       {v:'clientes', ic:'👥', t:'Clientes'},
@@ -94,9 +95,9 @@ const App = {
       {v:'admin', ic:'⚙️', t:'Equipo'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','datos','admin','permisos'];
-    const DEF={admin:TODOS, vendedor:['dashboard','cotizaciones','pedidos','clientes','crm','ventas','cobertura','panel','autopedido'],
-      facturacion:['dashboard','pedidos'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
+    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','datos','admin','permisos'];
+    const DEF={admin:TODOS, vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
+      facturacion:['dashboard','pedidos','cartera'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
     if(r==='admin') permitidos=TODOS;
     this._permitidos=permitidos;
@@ -141,7 +142,7 @@ const App = {
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
-      pedidos:this.vPedidos, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos}[view] || this.vDashboard).call(this);
+      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos}[view] || this.vDashboard).call(this);
   },
   set(html){ $('main').innerHTML = this._subnav() + html; },
   enConstruccion(view){
@@ -1891,6 +1892,22 @@ const App = {
     `);
   },
   despTab(t){ this._despTab=t; this.vDespachos(); },
+  async vCartera(){   // FEROZ · Cartera — ventas a crédito pendientes de cobro
+    this.loading();
+    const { data:peds=[] } = await this.sb.from('pedidos').select('*').eq('tipo_pago','credito').order('creado_en',{ascending:false});
+    const cartera=(peds||[]).filter(p=>!p.consignacion_validada_por && p.estado!=='anulado' && !p.es_muestra);
+    const money=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
+    const totalCobrar=cartera.reduce((a,p)=>a+(+p.total||0),0);
+    const dias=p=>{ const d=p.autorizado_en||p.despachado_en||p.creado_en; if(!d) return ''; const n=Math.floor((Date.now()-new Date(d).getTime())/86400000); return n+' día'+(n===1?'':'s'); };
+    this.set(`<h1>💳 Cartera · Feroz</h1><div class="sub">Ventas a crédito pendientes de cobro · marca "pagado" cuando el cliente consigne</div>
+      <div class="card" style="background:linear-gradient(135deg,#b45309,#d97706);color:#fff;border:none"><div style="font-size:12px;opacity:.85">💰 Total por cobrar</div><div style="font-size:25px;font-weight:800;margin-top:2px">${money(totalCobrar)}</div><div style="font-size:11px;opacity:.8">${cartera.length} pedido(s) a crédito sin pagar</div></div>
+      ${cartera.length?cartera.map(p=>{const nom=(p.cliente_snap||{}).nombre||'—';return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(nom)}</div><div class="meta">${esc(p.numero||'')} · ${p.pares||0} pares · ${dias(p)}${p.factura_num?' · Fact '+esc(p.factura_num):''}</div></div><div style="text-align:right"><div style="font-weight:800;color:#b45309">${money(p.total)}</div><div style="font-size:10px;color:#8a93a6">${ESTADOS[p.estado]||p.estado}</div></div></div><div style="margin-top:8px;text-align:right"><button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.cartMarcarPagado('${p.id}')">💰 Marcar pagado</button></div></div>`}).join(''):'<div class="empty">Sin cartera pendiente. Las ventas a <b>crédito</b> aparecen aquí (con su total por cobrar) hasta que el cliente consigne.</div>'}`);
+  },
+  async cartMarcarPagado(id){
+    if(!confirm('¿Confirmas que este cliente YA PAGÓ su crédito? Sale de Cartera (la venta se mantiene).')) return;
+    await this.sb.from('pedidos').update({consignacion_validada_por:this.user.id, consignacion_fecha:new Date().toISOString(), actualizado_en:new Date().toISOString()}).eq('id',id);
+    this.vCartera();
+  },
   async vVentas(){   // FEROZ · Ventas — espejo de Ventas·Smart con datos de Feroz
     this.loading();
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
