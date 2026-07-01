@@ -1894,8 +1894,8 @@ const App = {
   despTab(t){ this._despTab=t; this.vDespachos(); },
   async vCartera(){   // FEROZ · Cartera — ventas a crédito pendientes de cobro
     this.loading();
-    const { data:peds=[] } = await this.sb.from('pedidos').select('*').eq('tipo_pago','credito').order('creado_en',{ascending:false});
-    const cartera=(peds||[]).filter(p=>!p.consignacion_validada_por && p.estado!=='anulado' && !p.es_muestra);
+    const { data:peds=[] } = await this.sb.from('pedidos').select('*').order('creado_en',{ascending:false});
+    const cartera=(peds||[]).filter(p=>!p.es_muestra && !p.consignacion_validada_por && p.estado!=='anulado' && (p.tipo_pago==='credito' || p.guia || ['autorizado','despachado','entregado'].includes(p.estado)));
     const money=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     const totalCobrar=cartera.reduce((a,p)=>a+(+p.total||0),0);
     const dias=p=>{ const d=p.autorizado_en||p.despachado_en||p.creado_en; if(!d) return ''; const n=Math.floor((Date.now()-new Date(d).getTime())/86400000); return n+' día'+(n===1?'':'s'); };
@@ -1989,6 +1989,8 @@ const App = {
     const r=this.rol(), btns=[];
     if(p.estado==='pendiente_pago' && this.puede('admin','vendedor'))
       btns.push(`<button class="btn-sm" style="background:var(--azul);color:#fff" onclick="App.accConsignar(${p.id})">💳 Marcar consignación</button>`);
+    if(p.estado==='pendiente_pago' && this.puede('admin','facturacion','vendedor'))
+      btns.push(`<button class="btn-sm" style="background:#b45309;color:#fff" onclick="App.accAutorizarCredito(${p.id})">📝 Autorizar a crédito</button>`);
     // ya enviado pero aún sin pago: registrar guía sin forzar la autorización
     if(['pendiente_pago','consignado'].includes(p.estado) && this.puede('admin','bodega','vendedor'))
       btns.push(`<button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.accPonerGuia(${p.id})">🚚 ${p.guia?'Editar guía':'Poner guía'}</button>`);
@@ -2015,6 +2017,11 @@ const App = {
     else { const ta=document.createElement('textarea'); ta.value=g; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy'); ok();}catch(e){this._toast('Guía: '+g);} ta.remove(); }
   },
 
+  async accAutorizarCredito(id){
+    if(!confirm('¿Autorizar este pedido A CRÉDITO?\n\nPasa a 💳 Cartera (por cobrar) y ya puedes despacharlo. La venta queda registrada. Cuando el cliente pague, oprimes "Marcar pagado" en Cartera.')) return;
+    await this.sb.from('pedidos').update({estado:'autorizado', tipo_pago:'credito', autorizado_por:this.user.id, autorizado_en:new Date().toISOString(), actualizado_en:new Date().toISOString()}).eq('id',id);
+    this.go(this.view);
+  },
   accConsignar(id){
     this._consignId=id;
     this.modal(`<h3>💳 Marcar consignación · validar pago</h3>
