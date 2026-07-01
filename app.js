@@ -953,7 +953,7 @@ const App = {
         <thead><tr><th style="text-align:left">Concepto</th>${th}<th style="text-align:right">TOTAL</th></tr></thead><tbody>
         ${fila('<b>Ventas</b>','ventas_libro')}
         ${fila('U. Bruta','u_bruta','20%')}
-        ${cfg.splitComision ? `${fila('Comisiones NC','comision_nc','var')}${cfg.hasGPJR?fila('Comisiones GPJR','comision_gpjr','⭐'):''}` : fila('Comisiones','comision','var')}
+        ${cfg.splitComision ? `${fila('Comisiones NC','comision_nc','var')}${fila('Comisiones GPJR','comision_gpjr','⭐')}` : fila('Comisiones','comision','var')}
         ${fila('Herramientas','herramientas','fijo')}
         ${fila('Bodega','bodega',cfg.pBod||'')}
         ${fila('Logística','logistica',cfg.pLog||'')}
