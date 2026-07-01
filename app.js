@@ -901,11 +901,12 @@ const App = {
   async vPanelFinanzasFeroz(){   // FEROZ · Resultados — calculado en vivo desde pedidos reales
     this.loading();
     let peds=[], clis=[];
-    try{ const r=await this.sb.from('pedidos').select('total,pares,comision_nc,comision_gpjr,es_muestra,cliente_id,creado_en'); peds=r.data||[]; }catch(e){}
+    try{ const r=await this.sb.from('pedidos').select('total,pares,comision_nc,comision_gpjr,es_muestra,cliente_id,creado_en,estado'); peds=r.data||[]; }catch(e){}
     try{ const r=await this.sb.from('clientes').select('id,creado_en'); clis=r.data||[]; }catch(e){}
     const pedsRaw=Array.isArray(peds)?peds:[];
+    const PAGADO=['consignado','autorizado','despachado','entregado'];   // cuenta como venta SOLO si ya pagó
     const muestras=pedsRaw.filter(p=>p.es_muestra); const muVend=muestras.filter(p=>(+p.total||0)>0).length, muGratis=muestras.length-muVend;
-    peds=pedsRaw.filter(p=>!p.es_muestra && (+p.total||0)>0);
+    peds=pedsRaw.filter(p=>!p.es_muestra && (+p.total||0)>0 && PAGADO.includes(p.estado));
     clis=Array.isArray(clis)?clis:[];
     const MES=['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     const HERR=4000000, BOD=.01, LOG=.01, OPE=.01, BRUTA=.20;
@@ -1898,7 +1899,7 @@ const App = {
     try{ metas=await (await fetch(this._SBU()+'/rest/v1/nc_metas?empresa=eq.feroz&order=mes_num',{headers:H})).json(); }catch(e){}
     peds=Array.isArray(peds)?peds:[]; metas=Array.isArray(metas)?metas:[];
     const muestras=peds.filter(p=>p.es_muestra), muVend=muestras.filter(p=>(+p.total||0)>0).length, muGratis=muestras.length-muVend;
-    const v=peds.filter(p=>!p.es_muestra && (+p.total||0)>0);
+    const v=peds.filter(p=>!p.es_muestra && (+p.total||0)>0 && ['consignado','autorizado','despachado','entregado'].includes(p.estado));
     const totV=v.reduce((a,p)=>a+(+p.total||0),0), totNC=v.reduce((a,p)=>a+(+p.comision_nc||0),0);
     const totG=v.reduce((a,p)=>a+(+p.comision_gpjr||0),0), totPares=v.reduce((a,p)=>a+(+p.pares||0),0);
     const MESES=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
