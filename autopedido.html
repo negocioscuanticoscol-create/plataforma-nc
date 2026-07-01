@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<title>Feroz · Auto-pedido</title>
+<style>
+  :root{ --naranja:#E8620C; --negro:#15171c; --gris:#f4f5f7; --linea:#e3e5ea; --verde:#2e9e4f; --rojo:#d22; --suave:#6b7280; }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--gris);color:#1d1f24}
+  input,button{font-family:inherit;font-size:16px}
+  .wrap{max-width:520px;margin:0 auto;padding:0 14px 100px}
+  .top{background:var(--naranja);color:#fff;border-radius:0 0 18px 18px;padding:16px;margin:0 -14px 16px;text-align:center;position:relative}
+  .top b{font-size:24px;letter-spacing:1px} .top div{font-size:12px;opacity:.92;margin-top:2px}
+  .wa{display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--naranja);border-radius:20px;padding:6px 13px;font-size:13px;font-weight:700;text-decoration:none;margin-top:9px}
+  .card{background:#fff;border:1px solid var(--linea);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  h2{font-size:16px;margin-bottom:4px}
+  label{display:block;font-size:13px;font-weight:600;margin:10px 0 5px}
+  .field{width:100%;padding:13px;border:1.5px solid var(--linea);border-radius:10px}
+  .field:focus{outline:none;border-color:var(--naranja)}
+  .btn{width:100%;padding:15px;border:none;border-radius:11px;font-weight:700;cursor:pointer;margin-top:14px;background:var(--naranja);color:#fff;font-size:16px}
+  .btn:active{background:#cf550a} .btn.g{background:#fff;color:var(--negro);border:1.5px solid var(--linea)}
+  .msg{margin-top:10px;font-size:13px;padding:10px;border-radius:8px;text-align:center;display:none}
+  .msg.err{background:#fde8e8;color:#b3261e;display:block} .msg.ok{background:#e7f6ec;color:#1c7a3e;display:block}
+  /* rejilla vertical disponible */
+  .row{display:flex;justify-content:space-between;align-items:center;padding:9px 4px;border-bottom:1px solid var(--linea)}
+  .row .tl b{font-size:16px} .row .tl small{display:block;color:var(--suave);font-size:12px}
+  .qty{width:78px;padding:9px;text-align:center;border:1.5px solid var(--linea);border-radius:8px;font-weight:700}
+  .qty:focus{outline:none;border-color:var(--naranja)}
+  /* rejilla HORIZONTAL de tallas */
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:8px}
+  .cell{background:#fafbfc;border:1px solid var(--linea);border-radius:9px;padding:7px 5px;text-align:center}
+  .cell span{display:block;font-size:10.5px;color:var(--suave);font-weight:700;line-height:1.2}
+  .cell .st{font-size:15px;font-weight:800;margin-top:3px}
+  .cell .qty{width:100%;padding:6px;margin-top:4px;font-size:15px}
+  /* tu pedido */
+  .pedido .l{display:flex;justify-content:space-between;padding:4px 0;font-size:14px}
+  .cajas{margin-top:10px;padding:11px;border-radius:10px;font-size:13px;font-weight:600;text-align:center;background:#eef1f5;color:#555}
+  .cajas.ok{background:rgba(46,158,79,.15);color:#1c7a3e} .cajas.falta{background:#fff4e5;color:#8a5300}
+  .bar{position:fixed;bottom:0;left:0;right:0;max-width:520px;margin:0 auto;background:#fff;border-top:1px solid var(--linea);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .bar .t{font-size:12px;color:var(--suave)} .bar .t b{font-size:20px;color:var(--naranja);display:block}
+  .bar button{flex:0 0 auto;padding:13px 18px;border:none;border-radius:11px;font-weight:700;background:var(--verde);color:#fff}
+  .hide{display:none!important}
+  .pf{font-size:14px;line-height:1.9} .pf .tot{font-size:22px;font-weight:800;color:var(--naranja)}
+  .cons{background:#e7f6ec;border:1px solid #b7e4c7;border-radius:10px;padding:11px;font-size:13px;margin-top:12px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><b>FEROZ</b><div>Industrias Feroz SAS · Auto-pedido de tu empresa</div>
+    <a class="wa" id="wabtn" href="#" target="_blank">📲 Contáctanos</a></div>
+
+  <!-- LOGIN -->
+  <div id="login" class="card">
+    <h2>Ingresa con los datos de tu empresa</h2>
+    <div style="font-size:12.5px;color:var(--suave)">Solo empresas registradas. ¿No estás registrado? Escríbenos por WhatsApp.</div>
+    <label>NIT de la empresa</label>
+    <input id="nit" class="field" inputmode="numeric" placeholder="Ej: 900907734">
+    <label>Nombre de la empresa</label>
+    <input id="nom" class="field" placeholder="Ej: Dotaciones Produseg">
+    <button class="btn" onclick="entrar()">Entrar</button>
+    <div id="lgmsg" class="msg"></div>
+  </div>
+
+  <!-- CATÁLOGO -->
+  <div id="cat" class="hide">
+    <div class="card"><div style="font-size:13px;color:var(--suave)">Hola 👋</div><div id="hola" style="font-size:18px;font-weight:700"></div></div>
+
+    <div class="card">
+      <h2>👟 Bota dotación Ref. 701</h2>
+      <div style="font-size:12.5px;color:var(--suave)">$40.900/par + IVA · transporte al cobro</div>
+      <div style="font-weight:700;font-size:13px;margin:12px 0 2px">📦 Inventario disponible (en planta)</div>
+      <div id="disp"></div>
+    </div>
+
+    <div class="card">
+      <h2>🛒 Tu pedido</h2>
+      <div style="font-size:12.5px;color:var(--suave)">Escribe las cantidades por talla:</div>
+      <div id="orden" style="margin-top:6px"></div>
+      <div class="cajas" id="cajas">Elige tallas arriba 👆</div>
+    </div>
+  </div>
+
+  <!-- PROFORMA -->
+  <div id="proforma" class="hide">
+    <div class="card">
+      <h2>📄 Tu proforma</h2>
+      <div id="pfbody" class="pf"></div>
+      <div class="cons">📥 <b>Para confirmar el pedido</b>, consigna en:<br>Bancolombia Ahorros <b>5970-000825-3</b> · Industrias Feroz SAS · NIT 902072014.<br>Envía el comprobante por WhatsApp y lo despachamos.</div>
+      <button class="btn" onclick="registrar()">✓ Estoy de acuerdo · registrar pedido</button>
+      <button class="btn g" onclick="volver()">← Volver a editar</button>
+      <div id="pfmsg" class="msg"></div>
+    </div>
+  </div>
+
+  <!-- LISTO -->
+  <div id="ok" class="hide"><div class="card" style="text-align:center;padding:30px 18px">
+    <div style="font-size:48px">✅</div>
+    <div style="font-size:18px;font-weight:700;margin-top:8px">¡Pedido registrado!</div>
+    <div id="oknum" style="color:var(--suave);font-size:13px;margin-top:4px"></div>
+    <div style="font-size:14px;margin-top:12px">Un asesor de Feroz lo revisa y te contacta para confirmar el despacho. Gracias 🙌</div>
+  </div></div>
+</div>
+
+<div id="bar" class="bar hide">
+  <div class="t">Total estimado<b id="bartot">$0</b><span id="barpares" style="font-size:11px;color:var(--suave)">0 pares</span></div>
+  <button id="verbtn" onclick="verProforma()">Ver proforma →</button>
+</div>
+
+<script>
+const SBU='https://fnayedgvamxktxfvywwl.supabase.co', SBK='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const PRECIO=40900, IVA=0.19, PARES_CAJA=16, LIBRE_DESDE=60;
+const FEROZ_TEL='3000000000';   // ← TELÉFONO DE CONTACTO DE FEROZ (José me lo confirma)
+let cliente=null, inv=[];
+const $=id=>document.getElementById(id);
+const money=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
+async function rpc(fn,body){ const r=await fetch(SBU+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json'},body:JSON.stringify(body||{})}); if(!r.ok) throw new Error(await r.text()); return r.json(); }
+function msg(el,t,ok){ const m=$(el); m.innerHTML=t; m.className='msg '+(ok?'ok':'err'); }
+document.getElementById('wabtn').href='https://wa.me/57'+FEROZ_TEL.replace(/\D/g,'');
+
+async function entrar(){
+  const nit=$('nit').value.trim(), nom=$('nom').value.trim();
+  if(!nit||!nom){ msg('lgmsg','Escribe el NIT y el nombre de tu empresa.'); return; }
+  try{
+    const c=await rpc('fn_autopedido_login',{p_nit:nit,p_nombre:nom});
+    if(!c){ msg('lgmsg','No encontramos tu empresa con ese NIT y nombre. Verifica o escríbenos.'); return; }
+    cliente=c; inv=await rpc('fn_autopedido_inventario');
+    $('hola').textContent=c.nombre;
+    $('login').classList.add('hide'); $('cat').classList.remove('hide'); $('bar').classList.remove('hide');
+    renderInv();
+  }catch(e){ msg('lgmsg','No pudimos conectar. Intenta de nuevo.'); }
+}
+function renderInv(){
+  const ref=inv.filter(x=>x.referencia==='701').sort((a,b)=>a.talla-b.talla);
+  // DISPONIBLE (horizontal, solo lectura) — inventario real de planta
+  $('disp').innerHTML = ref.length? '<div class="grid">'+ref.map(x=>`<div class="cell"><span>Talla ${x.talla}</span><div class="st" style="color:${x.stock>0?'var(--verde)':'#c0392b'}">${x.stock>0?x.stock:'—'}</div></div>`).join('')+'</div>' : '<div style="color:var(--suave);text-align:center;padding:14px">Inventario no disponible.</div>';
+  // TU PEDIDO (horizontal, TODAS las tallas 34-45; agotadas bloqueadas)
+  $('orden').innerHTML = ref.length? '<div class="grid">'+ref.map(x=>{ const ago=x.stock<=0;
+    return `<div class="cell"><span>T${x.talla}${ago?' · agotado':' · máx '+x.stock}</span><input class="qty" type="number" min="0" max="${x.stock}" inputmode="numeric" data-talla="${x.talla}" data-stock="${x.stock}" placeholder="${ago?'—':'0'}" ${ago?'disabled':''} style="${ago?'background:#f0f0f0;color:#bbb':''}" oninput="calc()"></div>`; }).join('')+'</div>' : '<div style="color:var(--suave);text-align:center;padding:16px">Inventario no disponible.</div>';
+  calc();
+}
+function leerCurva(){ const cu={}; let pares=0;
+  document.querySelectorAll('#orden .qty').forEach(i=>{ let q=Math.max(0,Math.min(+i.value||0,+i.dataset.stock)); if(q>0){ cu[i.dataset.talla]=q; pares+=q; } });
+  return {cu,pares};
+}
+function cajas(p){
+  const c=Math.floor(p/PARES_CAJA), r=p%PARES_CAJA, faltan=r?PARES_CAJA-r:0, libre=p>LIBRE_DESDE;
+  if(p===0) return {ok:false,txt:'Elige tallas arriba 👆',cls:''};
+  if(libre) return {ok:true,txt:`📦 ${c} caja(s) + ${r} par(es) sueltos · pedido grande (más de 60), sin obligación de cajas ✓`,cls:'ok'};
+  if(faltan===0) return {ok:true,txt:`✔️ ${c} caja(s) completa(s) · ${p} pares`,cls:'ok'};
+  return {ok:false,txt:`📦 ${c} caja(s) · faltan <b>${faltan}</b> par(es) para la caja N° ${c+1}<br><small>Hasta 60 pares el pedido va en cajas completas de 16 (o pide más de 60 sueltos)</small>`,cls:'falta'};
+}
+function calc(){
+  const {pares}=leerCurva();
+  const sub=PRECIO*pares, tot=sub+Math.round(sub*IVA), bi=cajas(pares);
+  $('cajas').innerHTML=bi.txt; $('cajas').className='cajas '+bi.cls;
+  $('bartot').textContent=money(tot); $('barpares').textContent=pares+' pares';
+  $('verbtn').disabled=!bi.ok; $('verbtn').style.opacity=bi.ok?'1':'.45';
+}
+function verProforma(){
+  const {cu,pares}=leerCurva(); const bi=cajas(pares);
+  if(!bi.ok){ alert(pares===0?'Escribe las cantidades por talla.':'Hasta 60 pares el pedido debe ir en cajas completas de 16. Completa la caja o pide más de 60 pares.'); return; }
+  const sub=PRECIO*pares, iva=Math.round(sub*IVA), tot=sub+iva;
+  const filas=Object.keys(cu).sort((a,b)=>a-b).map(t=>`<div style="display:flex;justify-content:space-between"><span>Talla ${t}</span><span>${cu[t]} par(es)</span></div>`).join('');
+  const c=Math.floor(pares/PARES_CAJA), r=pares%PARES_CAJA;
+  $('pfbody').innerHTML=`<div style="font-weight:700;margin-bottom:2px">${cliente.nombre} · NIT ${cliente.nit||''}</div>
+    <div style="font-size:12px;color:var(--suave);margin-bottom:8px">📍 Entrega: ${[cliente.direccion,cliente.barrio,cliente.ciudad,cliente.depto].filter(Boolean).join(', ')||'— sin dirección registrada —'}</div>
+    <div style="display:flex;justify-content:space-between"><span>Bota Ref. 701 · ${pares} pares</span><span>${money(sub)}</span></div>
+    <div style="font-size:12px;color:var(--suave)">${c} caja(s)${r?' + '+r+' sueltos':''}</div>
+    <div style="margin:6px 0;padding:6px 0;border-top:1px dashed var(--linea);border-bottom:1px dashed var(--linea)">${filas}</div>
+    <div style="display:flex;justify-content:space-between"><span>IVA (19%)</span><span>${money(iva)}</span></div>
+    <div style="display:flex;justify-content:space-between"><span>🚚 Transporte</span><span>Al cobro</span></div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px"><span><b>TOTAL</b></span><span class="tot">${money(tot)}</span></div>`;
+  $('cat').classList.add('hide'); $('bar').classList.add('hide'); $('proforma').classList.remove('hide');
+}
+function volver(){ $('proforma').classList.add('hide'); $('cat').classList.remove('hide'); $('bar').classList.remove('hide'); }
+async function registrar(){
+  const {cu,pares}=leerCurva();
+  try{
+    const r=await rpc('fn_autopedido_crear',{p_cliente_id:cliente.id,p_curva:cu,p_pares:pares});
+    if(r && r.error==='cajas'){ msg('pfmsg','Hasta 60 pares debe ir en cajas completas de 16.'); return; }
+    if(!r || r.error){ msg('pfmsg','No se pudo registrar. Intenta de nuevo.'); return; }
+    $('proforma').classList.add('hide'); $('ok').classList.remove('hide');
+    $('oknum').textContent='Pedido '+r.numero+' · '+money(r.total);
+  }catch(e){ msg('pfmsg','No se pudo registrar. Intenta de nuevo.'); }
+}
+</script>
+</body>
+</html>

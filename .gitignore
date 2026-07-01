@@ -1,0 +1,9 @@
+# NUNCA publicar: scripts con credenciales / dev
+_run_schema.py
+_*.py
+db_schema.sql
+*.sql
+*.bak
+_backup_*
+SETUP.md
+.DS_Store
