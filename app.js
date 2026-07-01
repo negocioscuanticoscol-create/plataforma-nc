@@ -63,6 +63,7 @@ const App = {
       ({ data:perf } = await this.sb.from('perfiles').select('*').eq('id', this.user.id).maybeSingle());
     }
     this.perfil = perf || { rol:'vendedor', nombre:this.user.email };
+    if(this.perfil.activo===false){ await this.sb.auth.signOut(); alert('🔒 Este acceso fue bloqueado por el administrador.'); location.reload(); return; }
     $('view-login').classList.add('hide'); $('app').classList.remove('hide');
     $('me_nombre').textContent = this.perfil.nombre || this.user.email;
     $('me_rol').textContent = ROL_NOMBRE[this.perfil.rol] || this.perfil.rol;
@@ -2759,18 +2760,25 @@ const App = {
     this.set(`
       <h1>Equipo</h1><div class="sub">Asigna el rol de cada persona</div>
       ${perf.map(u=>`<div class="item"><div class="top"><div>
-        <div class="nom">${esc(u.nombre||'')}</div><div class="meta">${esc(u.id.slice(0,8))}…</div>
+        <div class="nom">${esc(u.nombre||'')} ${u.activo===false?'<span style="color:#dc2626;font-size:11px;font-weight:800">🔒 BLOQUEADO</span>':'<span style="color:#16a34a;font-size:11px;font-weight:700">● activo</span>'}</div><div class="meta">${esc(u.id.slice(0,8))}…</div>
       </div></div>
       <label style="margin-top:8px">Rol</label>
       <select class="field" onchange="App.cambiarRol('${u.id}', this.value)">
         ${Object.keys(ROL_NOMBRE).map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${ROL_NOMBRE[r]}</option>`).join('')}
-      </select></div>`).join('')}
-      <div class="hint" style="margin-top:10px">Cada persona se registra sola (botón "Crear cuenta" en el login) y luego tú le asignas el rol aquí.</div>
+      </select>
+      <button class="btn-sm" style="width:100%;margin-top:8px;background:${u.activo===false?'#16a34a':'#dc2626'};color:#fff;font-weight:700" onclick="App.toggleActivo('${u.id}', ${u.activo===false})">${u.activo===false?'✅ Activar acceso':'🔒 Bloquear acceso'}</button>
+      </div>`).join('')}
+      <div class="hint" style="margin-top:10px">Cada persona se registra sola (botón "Crear cuenta" en el login) y luego tú le asignas el rol aquí. Con 🔒 Bloquear le quitas el acceso al instante.</div>
     `);
   },
   async cambiarRol(id,rol){
     const { error } = await this.sb.from('perfiles').update({rol}).eq('id',id);
     if(error) alert('Error: '+error.message); else this.toast('Rol actualizado');
+  },
+  async toggleActivo(id, activar){
+    if(!confirm(activar?'¿Activar el acceso de esta persona?':'¿Bloquear el acceso? No podrá entrar hasta que la actives de nuevo.')) return;
+    const { error } = await this.sb.from('perfiles').update({activo:activar}).eq('id',id);
+    if(error) alert('Error: '+error.message); else { this.toast(activar?'✅ Acceso activado':'🔒 Acceso bloqueado'); this.vAdmin(); }
   },
   toast(t){ const d=document.createElement('div'); d.textContent=t;
     d.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#15171c;color:#fff;padding:10px 18px;border-radius:20px;z-index:80;font-size:13px';
