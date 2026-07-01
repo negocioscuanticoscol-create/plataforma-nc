@@ -968,7 +968,7 @@ const App = {
     const v=all.filter(x=>!esCancel(x));                          // solo estas suman
     const nCanc=all.length-v.length;
     const totV=v.reduce((a,x)=>a+(+x.total_vendido||0),0), totC=v.reduce((a,x)=>a+(+x.comision_bruta||0),0);
-    const nKits=v.filter(x=>x.es_kit).length, nFact=v.filter(x=>!x.es_kit).length;   // facturas reales (sin kit) y total de kits
+    const nKits=v.filter(x=>x.es_kit).length, nFact=v.length;   // TODAS las facturas del mes + cuántas fueron kit
     const byCli={};
     all.forEach(x=>{ const k=x.cliente||'s/cliente'; (byCli[k]=byCli[k]||[]).push(x); });   // agrupa TODOS (así aparece Mateo aunque esté cancelado)
     const clientes=Object.entries(byCli).sort((a,b)=>b[1].reduce((s,x)=>s+(esCancel(x)?0:(+x.total_vendido||0)),0)-a[1].reduce((s,x)=>s+(esCancel(x)?0:(+x.total_vendido||0)),0));
