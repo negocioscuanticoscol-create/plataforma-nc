@@ -1895,7 +1895,7 @@ const App = {
   async vCartera(){   // FEROZ · Cartera — ventas a crédito pendientes de cobro
     this.loading();
     const { data:peds=[] } = await this.sb.from('pedidos').select('*').order('creado_en',{ascending:false});
-    const cartera=(peds||[]).filter(p=>!p.es_muestra && !p.consignacion_validada_por && p.estado!=='anulado' && (p.tipo_pago==='credito' || p.guia || ['autorizado','despachado','entregado'].includes(p.estado)));
+    const cartera=(peds||[]).filter(p=>!p.es_muestra && p.tipo_pago==='credito' && !p.consignacion_validada_por && ['autorizado','despachado','entregado'].includes(p.estado));
     const money=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     const totalCobrar=cartera.reduce((a,p)=>a+(+p.total||0),0);
     const dias=p=>{ const d=p.autorizado_en||p.despachado_en||p.creado_en; if(!d) return ''; const n=Math.floor((Date.now()-new Date(d).getTime())/86400000); return n+' día'+(n===1?'':'s'); };
