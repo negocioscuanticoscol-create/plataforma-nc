@@ -968,12 +968,13 @@ const App = {
     const v=all.filter(x=>!esCancel(x));                          // solo estas suman
     const nCanc=all.length-v.length;
     const totV=v.reduce((a,x)=>a+(+x.total_vendido||0),0), totC=v.reduce((a,x)=>a+(+x.comision_bruta||0),0);
+    const nKits=v.filter(x=>x.es_kit).length, nFact=v.filter(x=>!x.es_kit).length;   // facturas reales (sin kit) y total de kits
     const byCli={};
     all.forEach(x=>{ const k=x.cliente||'s/cliente'; (byCli[k]=byCli[k]||[]).push(x); });   // agrupa TODOS (así aparece Mateo aunque esté cancelado)
     const clientes=Object.entries(byCli).sort((a,b)=>b[1].reduce((s,x)=>s+(esCancel(x)?0:(+x.total_vendido||0)),0)-a[1].reduce((s,x)=>s+(esCancel(x)?0:(+x.total_vendido||0)),0));
     this.set(`<button class="btn-sm" onclick="App.vVentasSmart()" style="margin-bottom:10px;background:var(--gris)">← Volver a Ventas</button>
       <h1>Ventas · ${esc(mes)}</h1><div class="sub">Detalle por cliente (auditoría) · ${v.length} ventas${nCanc?` · ${nCanc} canceladas (no suman)`:''}</div>
-      <div class="kpis"><div class="kpi naranja"><b>${cl(totV)}</b><span>Ventas del mes (s/IVA)</span></div><div class="kpi verde"><b>${cl(totC)}</b><span>Comisión del mes</span></div></div>
+      <div class="kpis"><div class="kpi naranja"><b>${cl(totV)}</b><span>Ventas del mes (s/IVA)</span></div><div class="kpi verde"><b>${cl(totC)}</b><span>Comisión del mes</span></div><div class="kpi"><b style="color:#2563eb">${nFact}</b><span>🧾 Pedidos (facturas)</span></div><div class="kpi"><b style="color:#b45309">${nKits}</b><span>🧪 Kits totales</span></div></div>
       ${clientes.map(([cliente,arr])=>{ const sv=arr.reduce((s,x)=>s+(esCancel(x)?0:(+x.total_vendido||0)),0), sc=arr.reduce((s,x)=>s+(esCancel(x)?0:(+x.comision_bruta||0)),0);
         return `<div class="card" style="margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="font-size:15px">${esc(cliente)}</h2><span style="font-size:12px"><b>${cl(sv)}</b> · <span style="color:var(--verde)">com ${cl(sc)}</span></span></div>
