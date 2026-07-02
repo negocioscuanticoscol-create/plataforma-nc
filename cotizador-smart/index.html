@@ -384,6 +384,7 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
       <div style="font-size:11.5px;color:#7a7a7a;margin-top:4px">Se carga la lista que usaste con este cliente. Cámbiala si aplica otro nivel.</div>
     </div>
     <button class="btn btn-p" onclick="goStep3()">Continuar a productos →</button>
+    <button class="btn" onclick="guardarDatosCliente()" id="btn-guardar-datos" style="margin-top:8px;background:#eef2ff;color:#3a48b3;border:1px solid #cfd8ff">💾 Guardar datos ahora (celular + lista)</button>
   </div>
 </div>
 
@@ -1017,6 +1018,8 @@ function autofillCot(){
     const sv=(id,val)=>{const el=document.getElementById(id); if(el&&val) el.value=val;};
     if(esJur){ sv('rut',d.cedula_nit); sv('rsoc',d.empresa); sv('rec',d.contacto||d.empresa); sv('telj',d.celular); sv('emlj',d.correo); sv('dirj',d.dir_factura); sv('barj',d.barrio_factura); sv('ciuj',d.ciudad_factura); sv('depj',d.dep_factura); }
     else { sv('ced',d.cedula_nit); sv('nom',d.empresa||d.contacto); sv('neg',d.empresa); sv('tel',d.celular); sv('eml',d.correo); sv('dir',d.dir_factura); sv('bar',d.barrio_factura); sv('ciu',d.ciudad_factura); sv('dep',d.dep_factura); }
+    // restaura la LISTA DE PRECIOS que tenía la cotización (antes se perdía y tocaba re-elegirla)
+    if(d.lista_idx!=null && d.lista_idx!==''){ const li=parseInt(d.lista_idx); if(!isNaN(li)){ listaActiva=li; const ls=document.getElementById('lista-sel'); if(ls) ls.value=String(li); } }
     let prods=d.productos; if(typeof prods==='string'){ try{prods=JSON.parse(prods);}catch(e){prods=null;} }
     if(Array.isArray(prods)){ prods.forEach(p=>{ const prod=allProds().find(x=>(p.ref||'').includes(x.v)); if(!prod) return; const color=(p.color||'').toLowerCase().includes('blanc')?'blanco':'transparente'; const inp=document.getElementById('qty-'+prod.id+'_'+color); if(inp){ inp.value=p.qty; inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change')); } }); }
   }).catch(()=>{});
@@ -1069,6 +1072,40 @@ function guardarCliente(){
   if(tipo==='nat'){ const nuevo={tipo:'nat',fecha:now}; ['nom','neg','tel','eml','dir','bar','ciu','dep'].forEach(f=>{ const v=g(f); if(v) nuevo[f]=v; }); db[id]=Object.assign({},actual,nuevo); db[id].empresa=nuevo.neg||nuevo.nom||actual.empresa||''; }
   else { const nuevo={tipo:'jur',fecha:now}; ['rsoc','rec','telj','emlj','dirj','barj','ciuj','depj'].forEach(f=>{ const v=g(f); if(v) nuevo[f]=v; }); db[id]=Object.assign({},actual,nuevo); db[id].empresa=nuevo.rsoc||actual.empresa||''; }
   saveClientesDB(db);
+}
+
+// 💾 Guarda YA los datos del cliente (celular + lista) sin tener que rehacer toda la cotización.
+// Si vine editando (?cot=id) → parcha esa cotización. Si es cliente nuevo → guarda su ficha para la próxima.
+async function guardarDatosCliente(){
+  const doc=tipo==='nat'?g('ced'):g('rut');
+  if(!doc||doc.length<5){ alert('Escribe la cédula o el NIT antes de guardar.'); return; }
+  const btn=document.getElementById('btn-guardar-datos'); const txt=btn?btn.textContent:''; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  try{
+    guardarCliente();        // ficha local del navegador
+    await upsertCliente();   // cliente en Supabase (+ su última lista de precios)
+    const cotId=new URLSearchParams(location.search).get('cot');
+    if(cotId){
+      const rr=await fetch(SBU+'/rest/v1/nc_cotizaciones?id=eq.'+cotId+'&select=datos',{headers:{apikey:SBK,Authorization:'Bearer '+SBK}});
+      const arr=await rr.json(); const cur=(arr&&arr[0]&&arr[0].datos)||{};
+      const upd=Object.assign({},cur,{
+        empresa:getEmpresa(), contacto:getContacto(), celular:getTel(),
+        correo:tipo==='nat'?g('eml'):g('emlj'),
+        cedula_nit:doc.replace(/\s+/g,''), tipo_cliente:tipo,
+        dir_factura:tipo==='nat'?g('dir'):g('dirj'),
+        barrio_factura:tipo==='nat'?g('bar'):g('barj'),
+        ciudad_factura:tipo==='nat'?g('ciu'):g('ciuj'),
+        dep_factura:tipo==='nat'?g('dep'):g('depj'),
+        lista_idx:listaActiva, lista_nombre:(typeof LISTA_NAMES!=='undefined'?LISTA_NAMES[listaActiva]:'')
+      });
+      const row={cliente:getEmpresa(),contacto:getContacto(),celular:getTel(),datos:upd};
+      const rp=await fetch(SBU+'/rest/v1/nc_cotizaciones?id=eq.'+cotId,{method:'PATCH',headers:{apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(row)});
+      if(!rp.ok) throw new Error('HTTP '+rp.status);
+      alert('✅ Datos guardados en la cotización: celular '+(getTel()||'—')+' · lista '+(typeof LISTA_NAMES!=='undefined'?LISTA_NAMES[listaActiva]:listaActiva)+'.');
+    } else {
+      alert('✅ Datos del cliente guardados (celular + lista). Se aplican a su próxima cotización.');
+    }
+  }catch(e){ alert('⚠️ No se pudo guardar: '+(e.message||e)); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent=txt; } }
 }
 
 async function enviarAMake(){
