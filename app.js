@@ -1073,8 +1073,8 @@ const App = {
     const enRuta=desp.filter(p=>p.estado_envio==='despachado').length, entregados=desp.filter(p=>p.estado_envio==='entregado').length;
     this.set(`<h1>Despachos</h1><div class="sub">Recibidos por transportadora / entregados · (luego: API Interrapidísimo)</div>
       <div class="kpis"><div class="kpi naranja"><b>${enRuta}</b><span>🚚 En ruta</span></div><div class="kpi verde"><b>${entregados}</b><span>✅ Entregados</span></div></div>
-      ${desp.length?desp.map(p=>{const ent=p.estado_envio==='entregado';return `<div class="item">
-        <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 🚚 ${esc(p.transportadora||'—')} · guía ${esc(p.guia||'—')}</div></div><span class="badge" style="${ent?'background:#e7f7ee;color:#16734a':'background:#fff3e0;color:#b45309'}">${ent?'✅ entregado':'🚚 en ruta'}</span></div>
+      ${desp.length?desp.map(p=>{const ent=p.estado_envio==='entregado';const tel=(p.celular||(p.datos&&p.datos.celular)||'').toString();return `<div class="item">
+        <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 🚚 ${esc(p.transportadora||'—')} · guía ${esc(p.guia||'—')}${tel?` · 📱 <a href="https://wa.me/57${esc(tel.replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">${esc(tel)}</a>`:''}</div></div><span class="badge" style="${ent?'background:#e7f7ee;color:#16734a':'background:#fff3e0;color:#b45309'}">${ent?'✅ entregado':'🚚 en ruta'}</span></div>
         <div class="acciones-item">
           ${p.guia_url?`<a class="btn-sm" href="${p.guia_url}" target="_blank" style="background:#e5e7eb">🖼️ Ver guía</a>`:''}
           ${ent?`<span class="btn-sm" style="background:#e7f7ee;color:#16734a">Entregado ${(p.entregado_at||'').slice(0,10)}</span>`:`<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.pedEntregado('${p.id}')">✅ Marcar entregado</button>`}
