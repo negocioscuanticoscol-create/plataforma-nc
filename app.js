@@ -1073,7 +1073,6 @@ const App = {
     const ruta=desp.filter(p=>p.estado_envio==='despachado'), entreg=desp.filter(p=>p.estado_envio==='entregado');
     const tab=(this._despTabSmart==='entregado')?'entregado':'ruta';
     const lista=tab==='entregado'?entreg:ruta;
-    const bs=(on,col)=>`flex:1;padding:13px 10px;border-radius:12px;border:2px solid ${on?col:'var(--linea)'};background:${on?col+'14':'#fff'};cursor:pointer;text-align:center;transition:.15s`;
     const item=p=>{const ent=p.estado_envio==='entregado';const tel=(p.celular||(p.datos&&p.datos.celular)||'').toString();return `<div class="item">
         <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 🚚 ${esc(p.transportadora||'—')} · guía ${esc(p.guia||'—')}${tel?` · 📱 <a href="https://wa.me/57${esc(tel.replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">${esc(tel)}</a>`:''}</div></div><span class="badge" style="${ent?'background:#e7f7ee;color:#16734a':'background:#fff3e0;color:#b45309'}">${ent?'✅ entregado':'🚚 en ruta'}</span></div>
         <div class="acciones-item">
@@ -1081,9 +1080,9 @@ const App = {
           ${ent?`<span class="btn-sm" style="background:#e7f7ee;color:#16734a">Entregado ${(p.entregado_at||'').slice(0,10)}</span>`:`<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.pedEntregado('${p.id}')">✅ Marcar entregado</button>`}
         </div></div>`;};
     this.set(`<h1>Despachos</h1><div class="sub">Recibidos por transportadora / entregados · (luego: API Interrapidísimo)</div>
-      <div style="display:flex;gap:10px;margin-bottom:12px">
-        <div onclick="App.despTabSmart('ruta')" style="${bs(tab==='ruta','#f59e0b')}"><div style="font-size:23px;font-weight:800;color:#b45309">${ruta.length}</div><div style="font-size:12px;color:#667">🚚 En ruta</div></div>
-        <div onclick="App.despTabSmart('entregado')" style="${bs(tab==='entregado','#16a34a')}"><div style="font-size:23px;font-weight:800;color:#16734a">${entreg.length}</div><div style="font-size:12px;color:#667">✅ Entregados</div></div>
+      <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px">
+        <button class="btn-sm" style="flex:0 0 auto;font-weight:700;background:${tab==='ruta'?'var(--naranja);color:#fff':'#eef1f5;color:#555'}" onclick="App.despTabSmart('ruta')">🚚 En ruta (${ruta.length})</button>
+        <button class="btn-sm" style="flex:0 0 auto;font-weight:700;background:${tab==='entregado'?'var(--naranja);color:#fff':'#eef1f5;color:#555'}" onclick="App.despTabSmart('entregado')">✅ Entregados (${entreg.length})</button>
       </div>
       ${lista.length?lista.map(item).join(''):`<div class="empty">${tab==='entregado'?'Aún no hay entregados.':'No hay envíos en ruta. Despacha pedidos desde 📦 Pedidos.'}</div>`}`);
   },
