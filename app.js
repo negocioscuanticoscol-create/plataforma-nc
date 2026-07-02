@@ -1997,8 +1997,8 @@ const App = {
       btns.push(`<button class="btn-sm" style="background:var(--azul);color:#fff" onclick="App.accConsignar(${p.id})">💳 Marcar consignación</button>`);
     if(p.estado==='pendiente_pago' && this.puede('admin','facturacion','vendedor'))
       btns.push(`<button class="btn-sm" style="background:#b45309;color:#fff" onclick="App.accAutorizarCredito(${p.id})">📝 Autorizar a crédito</button>`);
-    // ya enviado pero aún sin pago: registrar guía sin forzar la autorización
-    if(['pendiente_pago','consignado'].includes(p.estado) && this.puede('admin','bodega','vendedor'))
+    // poner/editar la guía en cualquier etapa de envío (incluye despachado/entregado)
+    if(['pendiente_pago','consignado','autorizado','despachado','entregado'].includes(p.estado) && this.puede('admin','bodega','vendedor'))
       btns.push(`<button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.accPonerGuia(${p.id})">🚚 ${p.guia?'Editar guía':'Poner guía'}</button>`);
     // Guía recibida: el cliente ya recibió el paquete (disponible cuando hay guía y aún no se marca entregado)
     if(p.guia && ['pendiente_pago','consignado','autorizado'].includes(p.estado) && this.puede('admin','bodega','vendedor'))
