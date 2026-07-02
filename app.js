@@ -1070,16 +1070,24 @@ const App = {
     const peds=await this._loadPeds();
     const desp=peds.filter(p=>['despachado','entregado'].includes(p.estado_envio||''));
     const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
-    const enRuta=desp.filter(p=>p.estado_envio==='despachado').length, entregados=desp.filter(p=>p.estado_envio==='entregado').length;
-    this.set(`<h1>Despachos</h1><div class="sub">Recibidos por transportadora / entregados · (luego: API Interrapidísimo)</div>
-      <div class="kpis"><div class="kpi naranja"><b>${enRuta}</b><span>🚚 En ruta</span></div><div class="kpi verde"><b>${entregados}</b><span>✅ Entregados</span></div></div>
-      ${desp.length?desp.map(p=>{const ent=p.estado_envio==='entregado';const tel=(p.celular||(p.datos&&p.datos.celular)||'').toString();return `<div class="item">
+    const ruta=desp.filter(p=>p.estado_envio==='despachado'), entreg=desp.filter(p=>p.estado_envio==='entregado');
+    const tab=(this._despTabSmart==='entregado')?'entregado':'ruta';
+    const lista=tab==='entregado'?entreg:ruta;
+    const bs=(on,col)=>`flex:1;padding:13px 10px;border-radius:12px;border:2px solid ${on?col:'var(--linea)'};background:${on?col+'14':'#fff'};cursor:pointer;text-align:center;transition:.15s`;
+    const item=p=>{const ent=p.estado_envio==='entregado';const tel=(p.celular||(p.datos&&p.datos.celular)||'').toString();return `<div class="item">
         <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 🚚 ${esc(p.transportadora||'—')} · guía ${esc(p.guia||'—')}${tel?` · 📱 <a href="https://wa.me/57${esc(tel.replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">${esc(tel)}</a>`:''}</div></div><span class="badge" style="${ent?'background:#e7f7ee;color:#16734a':'background:#fff3e0;color:#b45309'}">${ent?'✅ entregado':'🚚 en ruta'}</span></div>
         <div class="acciones-item">
           ${p.guia_url?`<a class="btn-sm" href="${p.guia_url}" target="_blank" style="background:#e5e7eb">🖼️ Ver guía</a>`:''}
           ${ent?`<span class="btn-sm" style="background:#e7f7ee;color:#16734a">Entregado ${(p.entregado_at||'').slice(0,10)}</span>`:`<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.pedEntregado('${p.id}')">✅ Marcar entregado</button>`}
-        </div></div>`;}).join(''):'<div class="empty">Aún no hay despachos. Despacha pedidos desde 📦 Pedidos.</div>'}`);
+        </div></div>`;};
+    this.set(`<h1>Despachos</h1><div class="sub">Recibidos por transportadora / entregados · (luego: API Interrapidísimo)</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <div onclick="App.despTabSmart('ruta')" style="${bs(tab==='ruta','#f59e0b')}"><div style="font-size:23px;font-weight:800;color:#b45309">${ruta.length}</div><div style="font-size:12px;color:#667">🚚 En ruta</div></div>
+        <div onclick="App.despTabSmart('entregado')" style="${bs(tab==='entregado','#16a34a')}"><div style="font-size:23px;font-weight:800;color:#16734a">${entreg.length}</div><div style="font-size:12px;color:#667">✅ Entregados</div></div>
+      </div>
+      ${lista.length?lista.map(item).join(''):`<div class="empty">${tab==='entregado'?'Aún no hay entregados.':'No hay envíos en ruta. Despacha pedidos desde 📦 Pedidos.'}</div>`}`);
   },
+  despTabSmart(t){ this._despTabSmart=t; this.vDespachosSmart(); },
   async pedDespachar(id){
     const transp=($('transp-'+id)||{}).value||''; const guia=(($('guia-'+id)||{}).value||'').trim();
     if(!guia){ alert('Pon el número de guía antes de despachar.'); return; }
@@ -1971,7 +1979,7 @@ const App = {
     return `<div class="item">
       <div class="top" style="cursor:pointer" onclick="App.toggleBox('ped_${p.id}')"><div>
         <div class="nom">${esc(cl.nombre||'Cliente')} ${p.es_muestra?'<span class="badge b-cotizada">MUESTRA</span>':''} <span style="font-size:12px;color:var(--suave)">▾</span></div>
-        <div class="meta">${esc(p.numero||'')}${(cl.tel||cl.cel2)?' · 📱 '+esc(cl.tel||cl.cel2):''} · ${detalle}</div>
+        <div class="meta">${esc(p.numero||'')}${(cl.tel||cl.cel2)?` · 📱 <a href="https://wa.me/57${esc((cl.tel||cl.cel2).replace(/\D/g,''))}" target="_blank" onclick="event.stopPropagation()" style="color:#16734a;font-weight:700;text-decoration:none">${esc(cl.tel||cl.cel2)}</a>`:''} · ${detalle}</div>
       </div><div style="text-align:right"><div class="tot">${totLbl}</div>
         <span class="badge b-${p.estado}">${ESTADOS[p.estado]}</span></div></div>
       <div id="ped_${p.id}" style="display:none;margin-top:8px">
