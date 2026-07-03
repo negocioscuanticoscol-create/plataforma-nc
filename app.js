@@ -1064,6 +1064,7 @@ const App = {
           <label class="btn-sm" style="background:#eef2ff;color:#3a48b3;cursor:pointer">📎 Adjuntar guía<input type="file" accept="image/*" style="display:none" onchange="App.pedSubirFoto('${p.id}',this)"></label>
           ${p.guia_url?`<a class="btn-sm" href="${p.guia_url}" target="_blank" style="background:#e5e7eb">🖼️ Ver foto</a>`:''}
           <button class="btn-sm" style="background:#16a34a;color:#fff;font-weight:700" onclick="App.pedDespachar('${p.id}')">📦 Despachar →</button>
+          <button class="btn-sm" style="background:#3a48b3;color:#fff;font-weight:700" onclick="App.pedDespacharPropio('${p.id}')">🚚 Transporte propio</button>
         </div></div>`;}).join(''):'<div class="empty">No hay pedidos por despachar.</div>'}`);
   },
   async vDespachosSmart(){
@@ -1093,6 +1094,12 @@ const App = {
     if(!guia){ alert('Pon el número de guía antes de despachar.'); return; }
     await this.cotUpd(id,{transportadora:transp,guia:guia,estado_envio:'despachado',despachado_at:new Date().toISOString()});
     this._toast('📦 '+guia+' despachado por '+transp+' → pasó a Despachos.');
+    this.vPedidosSmart();
+  },
+  async pedDespacharPropio(id){
+    if(!confirm('¿Despachar por TRANSPORTE PROPIO (sin guía de transportadora)?')) return;
+    await this.cotUpd(id,{transportadora:'Propio',guia:'',estado_envio:'despachado',despachado_at:new Date().toISOString()});
+    this._toast('🚚 Despachado por transporte propio → pasó a Despachos.');
     this.vPedidosSmart();
   },
   async pedEntregado(id){
