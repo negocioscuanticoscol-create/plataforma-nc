@@ -857,8 +857,16 @@ function notificarJose(estado){
   window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg), '_blank');
 }
 
+// Flexipack transparente = grupo Flexipack PP (no PetMulti, no Nueva Ref) en color transparente
+function esFlexTransparente(s){ return !CAT.pm.some(p=>p.id===s.prod.id) && !CAT.nr.some(p=>p.id===s.prod.id) && s.color!=='blanco'; }
+const FLEX_CONVENIO_PCT = 0.035;   // 3,5% de comisión en Flexipack transparente vendido a Convenio (para rotar inventario)
 function calcComision(sel){
-  if(listaActiva === 4){ return pedidoMuestras ? getKitComision() : 0; }
+  if(listaActiva === 4){
+    // Convenio = precio base → normalmente 0 comisión. EXCEPCIÓN: Flexipack transparente deja 3,5% del valor de venta (sin IVA).
+    let com = sel.reduce((a,s)=> a + (esFlexTransparente(s) ? s.qty * s.prod.t[4] * FLEX_CONVENIO_PCT : 0), 0);
+    if(pedidoMuestras) com += getKitComision();
+    return Math.max(0, Math.round(com));
+  }
   let com = sel.reduce((a, s) => {
     const precioVenta = s.prod.t[listaActiva];
     const precioBase  = s.prod.t[4];
