@@ -2234,12 +2234,36 @@ const App = {
       <div style="display:flex;gap:6px;margin:10px 0;flex-wrap:wrap">${PUERTAS.map(([v,n])=>`<button class="btn-sm" style="flex:1;min-width:88px;padding:11px;font-weight:700;background:${v===canal?'var(--naranja);color:#fff':'#e5e7eb'}" onclick="App.crmFCanal('${v}')">${n}</button>`).join('')}</div>
       <button class="btn-sm" style="width:100%;background:var(--verde);color:#fff;padding:12px;margin-bottom:10px;font-size:14px;font-weight:700" onclick="App.modalCliente(()=>App.vCrm())">🔎 Registrar / Editar contacto · valida en tus bases</button>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">${cajones.map(([v,n])=>`<button class="btn-sm" style="background:${v===cajon?'#0b1f2a;color:#fff':'#eef2ff;color:#3a48b3'}" onclick="App.crmFCajon('${v}')">${n}</button>`).join('')}</div>
+      ${canal==='prospectos'&&cajon!=='inter'?`<button class="btn-sm" style="width:100%;background:#0b1f2a;color:#fff;padding:11px;margin-bottom:10px;font-weight:700" onclick="App.crmInforme('${cajon}')">📄 Generar informe de ${String(cajon).toUpperCase()} (para WhatsApp)</button>`:''}
       ${this._crmFItems(canal,cajon)}`);
   },
   crmFCanal(c){ this._crmFCanal=c; this._crmFCajon=null; this.vCrm(); },
   crmEditarProsp(id){ const c=(this._crmFCli||[]).find(x=>x.id===id); if(c) this.modalCliente(()=>this.vCrm(), c); },
   async crmNota(id){ const c=(this._crmFCli||[]).find(x=>x.id===id)||{}; const v=prompt('📝 Nota para '+(c.nombre||'el cliente')+':', c.notas||''); if(v===null) return; await this.sb.from('clientes').update({notas:v}).eq('id',id); this._toast('Nota guardada'); this.vCrm(); },
   crmFCajon(s){ this._crmFCajon=s; this.vCrm(); },
+  crmInforme(cajon){
+    const cli=this._crmFCli||[];
+    const arr=cli.filter(c=> cajon==='esp'?!!c.especial : cajon==='gpjr'?(!!c.recomendado&&!c.especial) : (!c.recomendado&&!c.especial));
+    const lbl={esp:'ESPECIALES',gpjr:'GPJR',nc:'NC'}[cajon]||String(cajon).toUpperCase();
+    const clean=n=>{ if(!n) return ''; let t=String(n).replace(/wt?a?ha?s?s? ?app/ig,'WhatsApp').replace(/\s+/g,' ').trim().replace(/^[ ,.]+|[ ,.]+$/g,''); return t?t.charAt(0).toUpperCase()+t.slice(1):''; };
+    const tel=c=>{ const ns=[c.tel,c.cel2].map(x=>String(x||'').trim()).filter(x=>x && x.replace(/\s/g,'')!=='0000000'); return ns.join(' / ')||'—'; };
+    const by={}; arr.forEach(c=>{ const e=c.embudo||'sin'; (by[e]=by[e]||[]).push(c); });
+    const ET=[['interesado','🔥 INTERESADOS'],['muestra','📦 CON MUESTRA'],['contactado','📞 CONTACTADOS'],['sin','🆕 SIN GESTIÓN']];
+    const hoy=new Date().toLocaleDateString('es-CO');
+    let L=[`🥾 *INFORME FEROZ — ${lbl}*`, `_${arr.length} clientes · ${hoy}_`, '', '*Por etapa:*'];
+    ET.forEach(([k,t])=>{ L.push(`• ${t}: ${(by[k]||[]).length}`); });
+    L.push('');
+    ET.forEach(([k,tit])=>{ const g=(by[k]||[]).slice().sort((a,b)=>String(a.nombre||'').localeCompare(String(b.nombre||''))); if(!g.length) return; L.push('━━━━━━━━━━'); L.push(`${tit} (${g.length})`); L.push(''); g.forEach(c=>{ L.push(`*${c.nombre||'—'}*${c.ciudad?' · '+String(c.ciudad).trim():''}`); L.push(`📱 ${tel(c)}`); L.push(`📝 ${clean(c.notas)||'_sin nota_'}`); L.push(''); }); });
+    this._informeTxt=L.join('\n').trim();
+    this.modal(`<h3>📄 Informe ${lbl} · ${arr.length}</h3>
+      <div class="hint" style="margin-bottom:6px">Listo para WhatsApp (los *asteriscos* salen en negrita). Cópialo y pégalo en el chat.</div>
+      <textarea id="infTxt" readonly style="width:100%;height:46vh;font-size:12px;line-height:1.4;border:1px solid var(--linea);border-radius:8px;padding:8px;white-space:pre-wrap;box-sizing:border-box">${esc(this._informeTxt)}</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-main" style="flex:1" onclick="App.copiarInforme()">📋 Copiar</button>
+        <button class="btn" style="flex:1;background:#eef2ff;color:#3a48b3" onclick="App.cerrarModal()">Cerrar</button>
+      </div>`);
+  },
+  copiarInforme(){ const t=document.getElementById('infTxt'); const v=(t&&t.value)||this._informeTxt||''; try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(v); } else { t.select(); document.execCommand('copy'); } }catch(e){ try{ t.select(); document.execCommand('copy'); }catch(e2){} } this._toast('📋 Informe copiado — pégalo en WhatsApp'); },
   async crmFEmbudo(id,etapa){
     if(etapa==='cliente' && !confirm('¿Marcar PRIMER PEDIDO? Pasa a Clientes y sale de Prospectos.')){ this.vCrm(); return; }
     await this.sb.from('clientes').update({embudo:etapa}).eq('id',id);
