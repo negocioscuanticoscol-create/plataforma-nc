@@ -74,7 +74,7 @@ const App = {
   },
 
   rol(){ return this.perfil?.rol; },
-  puede(...roles){ return roles.includes(this.rol()); },
+  puede(...roles){ const r=this.rol(); if(r==='gerente'&&roles.some(x=>['vendedor','facturacion','bodega','planta'].includes(x))) return true; return roles.includes(r); },
 
   /* ---------- NAV ---------- */
   pintarNav(){
@@ -97,7 +97,8 @@ const App = {
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
     const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','datos','admin','permisos'];
-    const DEF={admin:TODOS, vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
+    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido'],
+      vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
       facturacion:['dashboard','pedidos','cartera'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
     if(r==='admin') permitidos=TODOS;
