@@ -747,7 +747,10 @@ const App = {
       </div>
       <div style="display:flex;gap:6px;margin-bottom:8px"><input id="cotq" placeholder="🔍 Nombre o celular (clientes · distribuidores · empresas)" style="flex:1;padding:11px;border:1px solid var(--linea);border-radius:10px" onkeydown="if(event.key==='Enter')App.cotBuscarBases()"><button class="btn-sm" style="background:var(--negro);color:#fff;white-space:nowrap" onclick="App.cotBuscarBases()">Buscar</button></div>
       <div id="cotbusres" style="margin-bottom:10px"></div>
-      <h2 style="font-size:15px;margin-bottom:8px">📝 En cola (sin aceptar) · ${cots.length}${this._cotsOcultas?` <span style="font-size:11px;color:#8a93a6;font-weight:400">· ${this._cotsOcultas} ya en ventas (ocultas)</span>`:''}</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+        <h2 style="font-size:15px;margin:0">📝 En cola (sin aceptar) · ${cots.length}${this._cotsOcultas?` <span style="font-size:11px;color:#8a93a6;font-weight:400">· ${this._cotsOcultas} ya en ventas (ocultas)</span>`:''}</h2>
+        ${cots.filter(c=>c.contactado).length?`<button class="btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;white-space:nowrap" onclick="App.cotResetContactados()" title="Apaga todos los círculos de contactado para empezar la semana">🔄 Reiniciar contactados (${cots.filter(c=>c.contactado).length})</button>`:''}
+      </div>
       ${cots.length? cots.map(c=>{const f=(c.creado_en||'').slice(0,10),cel=c.celular||'',doc=(c.datos&&c.datos.cedula_nit)||'';
         const ac=c.accion?`<span class="badge" style="background:#eef2ff;color:#3a48b3">${c.accion==='llamar'?'📞 en seguimiento':c.accion==='remarketing'?'📣 remarketing':esc(c.accion)}</span>`:'<span class="badge b-cotizada">en cola</span>';
         return `<div class="item"><div class="top"><div><div class="nom">${esc(c.cliente||c.folio||'—')}</div><div class="meta">${c.folio?esc(c.folio)+' · ':''}$${(+c.total||0).toLocaleString('es-CO')} · 📅 ${f}${cel?' · 📱 '+esc(cel):''}</div></div>${ac}</div>
@@ -787,6 +790,18 @@ const App = {
   async cotContactoToggle(id){
     const c=this._findCot(id); const nv=!(c&&c.contactado);
     try{ await this.cotUpd(id,{contactado:nv}); if(c) c.contactado=nv; const el=document.getElementById('ctc-'+id); if(el) el.style.background=nv?'#16a34a':'#fff'; }catch(e){}
+  },
+  async cotResetContactados(){
+    const n=(this._cotsCola||[]).filter(c=>c.contactado).length;
+    if(!n){ this._toast('No hay contactados que reiniciar.'); return; }
+    if(!confirm('¿Apagar los '+n+' círculos de "contactado"?\nÚsalo al cerrar la semana para empezar el seguimiento de cero. (No borra las cotizaciones, solo apaga los círculos.)')) return;
+    const e=window.NC_EMPRESA||'feroz'; const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'};
+    try{
+      await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.'+e+'&estado=eq.cotizacion&contactado=eq.true',{method:'PATCH',headers:H,body:JSON.stringify({contactado:false})});
+      (this._cotsCola||[]).forEach(c=>c.contactado=false);
+      this.renderCotLanding();
+      this._toast('✅ '+n+' contactados reiniciados. ¡Semana nueva! 🚀');
+    }catch(e2){ this._toast('No se pudo reiniciar, intenta de nuevo.'); }
   },
   async cotAutorizar(id){
     const c=this._findCot(id); if(!c||!c.datos){ alert('No encuentro los datos de la cotización.'); return; }
