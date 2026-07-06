@@ -1106,6 +1106,20 @@ const App = {
       ${lista.length?lista.map(item).join(''):`<div class="empty">${tab==='entregado'?'Aún no hay entregados.':'No hay envíos en ruta. Despacha pedidos desde 📦 Pedidos.'}</div>`}`);
   },
   despTabSmart(t){ this._despTabSmart=t; this.vDespachosSmart(); },
+  async _regVentaSiFalta(id){   // candado: si el pedido no está en Ventas, lo registra (idempotente por folio)
+    try{
+      const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
+      const rr=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?id=eq.'+id+'&select=folio,cliente,total,creado_en,datos&limit=1',{headers:H});
+      const cot=(await rr.json())[0]; if(!cot||!cot.folio) return;
+      const rx=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(cot.folio)+'&select=id&limit=1',{headers:H});
+      const ya=await rx.json(); if(Array.isArray(ya)&&ya.length) return;   // ya está, no duplica
+      const d=cot.datos||{}; const dt=new Date(cot.creado_en||Date.now()); const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      const mes=M[dt.getMonth()]+'-'+dt.getFullYear(); const esKit=(d.kit_muestras==='SI');
+      const tv=esKit?+(cot.total||d.total||0):+(d.subtotal_sin_iva||d.total||cot.total||0); const cb=+(d.comision||0);
+      await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify({empresa:'smart',mes,cliente:cot.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:cot.folio,notas:'Registrado al despachar'})});
+    }catch(e){ console.log('_regVentaSiFalta',e); }
+  },
   addGuia(id){ const box=document.getElementById('guias-'+id); if(!box) return; const i=document.createElement('input'); i.className='gguia field'; i.placeholder='N° de guía'; i.style.cssText='padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:4px'; box.appendChild(i); i.focus(); },
   async pedDespachar(id){
     const transp=($('transp-'+id)||{}).value||'';
@@ -1114,12 +1128,14 @@ const App = {
     if(!guias.length){ alert('Pon al menos un número de guía antes de despachar.'); return; }
     const guia=guias.join('\n');   // varias guías = una por línea
     await this.cotUpd(id,{transportadora:transp,guia:guia,estado_envio:'despachado',despachado_at:new Date().toISOString()});
+    await this._regVentaSiFalta(id);   // candado: asegura que la venta quede en Ventas
     this._toast('📦 '+guias.length+' guía'+(guias.length>1?'s':'')+' despachada'+(guias.length>1?'s':'')+' por '+transp+' → pasó a Despachos.');
     this.vPedidosSmart();
   },
   async pedDespacharPropio(id){
     if(!confirm('¿Despachar por TRANSPORTE PROPIO (sin guía de transportadora)?')) return;
     await this.cotUpd(id,{transportadora:'Propio',guia:'',estado_envio:'despachado',despachado_at:new Date().toISOString()});
+    await this._regVentaSiFalta(id);   // candado: asegura que la venta quede en Ventas
     this._toast('🚚 Despachado por transporte propio → pasó a Despachos.');
     this.vPedidosSmart();
   },
