@@ -1071,9 +1071,10 @@ const App = {
       ${pend.length?pend.map(p=>{const d=p.datos||{};const f=(p.creado_en||'').slice(0,10);return `<div class="item">
         <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 📅 ${f}${f===hoy?' · 🆕 hoy':''}${(d.celular||p.celular)?' · 📱 '+esc(d.celular||p.celular):''}</div></div><span class="badge b-cotizada">por despachar</span></div>
         <div style="font-size:11.5px;color:#667;margin:4px 0">${esc(this._prodResumen(d)).slice(0,90)}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0">
-          <select id="transp-${p.id}" class="field" style="padding:9px;border:1px solid var(--linea);border-radius:8px">${TR.map(t=>`<option ${p.transportadora===t?'selected':''}>${t}</option>`).join('')}</select>
-          <input id="guia-${p.id}" class="field" style="padding:9px;border:1px solid var(--linea);border-radius:8px" placeholder="N° de guía" value="${esc(p.guia||'')}">
+        <div style="margin:8px 0">
+          <select id="transp-${p.id}" class="field" style="padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:6px">${TR.map(t=>`<option ${p.transportadora===t?'selected':''}>${t}</option>`).join('')}</select>
+          <div id="guias-${p.id}">${(()=>{const gg=(p.guia||'').split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);return (gg.length?gg:['']).map(g=>`<input class="gguia field" style="padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:4px" placeholder="N° de guía" value="${esc(g)}">`).join('');})()}</div>
+          <button class="btn-sm" type="button" style="background:#eef2ff;color:#3a48b3;margin-top:2px" onclick="App.addGuia('${p.id}')">➕ Agregar otra guía</button>
         </div>
         <div class="acciones-item">
           <label class="btn-sm" style="background:#eef2ff;color:#3a48b3;cursor:pointer">📎 Adjuntar guía<input type="file" accept="image/*" style="display:none" onchange="App.pedSubirFoto('${p.id}',this)"></label>
@@ -1090,8 +1091,9 @@ const App = {
     const ruta=desp.filter(p=>p.estado_envio==='despachado'), entreg=desp.filter(p=>p.estado_envio==='entregado');
     const tab=(this._despTabSmart==='entregado')?'entregado':'ruta';
     const lista=tab==='entregado'?entreg:ruta;
-    const item=p=>{const ent=p.estado_envio==='entregado';const tel=(p.celular||(p.datos&&p.datos.celular)||'').toString();return `<div class="item">
-        <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 🚚 ${esc(p.transportadora||'—')} · guía ${esc(p.guia||'—')}${tel?` · 📱 <a href="https://wa.me/57${esc(tel.replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">${esc(tel)}</a>`:''}</div></div><span class="badge" style="${ent?'background:#e7f7ee;color:#16734a':'background:#fff3e0;color:#b45309'}">${ent?'✅ entregado':'🚚 en ruta'}</span></div>
+    const item=p=>{const ent=p.estado_envio==='entregado';const tel=(p.celular||(p.datos&&p.datos.celular)||'').toString();const gs=(p.guia||'').split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);const guiaLbl=gs.length>1?gs.length+' guías':(gs[0]||'—');return `<div class="item">
+        <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 🚚 ${esc(p.transportadora||'—')} · guía ${esc(guiaLbl)}${tel?` · 📱 <a href="https://wa.me/57${esc(tel.replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">${esc(tel)}</a>`:''}</div></div><span class="badge" style="${ent?'background:#e7f7ee;color:#16734a':'background:#fff3e0;color:#b45309'}">${ent?'✅ entregado':'🚚 en ruta'}</span></div>
+        ${gs.length>1?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">${gs.map((g,i)=>`<span onclick="App.copiarGuia('${esc(g)}')" title="copiar guía" style="font-size:11px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:6px;padding:3px 7px;cursor:pointer">${i+1}. ${esc(g)} 📋</span>`).join('')}</div>`:''}
         <div class="acciones-item">
           ${p.guia_url?`<a class="btn-sm" href="${p.guia_url}" target="_blank" style="background:#e5e7eb">🖼️ Ver guía</a>`:''}
           ${ent?`<span class="btn-sm" style="background:#e7f7ee;color:#16734a">Entregado ${(p.entregado_at||'').slice(0,10)}</span>`:`<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.pedEntregado('${p.id}')">✅ Marcar entregado</button>`}
@@ -1104,11 +1106,15 @@ const App = {
       ${lista.length?lista.map(item).join(''):`<div class="empty">${tab==='entregado'?'Aún no hay entregados.':'No hay envíos en ruta. Despacha pedidos desde 📦 Pedidos.'}</div>`}`);
   },
   despTabSmart(t){ this._despTabSmart=t; this.vDespachosSmart(); },
+  addGuia(id){ const box=document.getElementById('guias-'+id); if(!box) return; const i=document.createElement('input'); i.className='gguia field'; i.placeholder='N° de guía'; i.style.cssText='padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:4px'; box.appendChild(i); i.focus(); },
   async pedDespachar(id){
-    const transp=($('transp-'+id)||{}).value||''; const guia=(($('guia-'+id)||{}).value||'').trim();
-    if(!guia){ alert('Pon el número de guía antes de despachar.'); return; }
+    const transp=($('transp-'+id)||{}).value||'';
+    const box=document.getElementById('guias-'+id);
+    const guias=box?Array.from(box.querySelectorAll('.gguia')).map(i=>i.value.trim()).filter(Boolean):[];
+    if(!guias.length){ alert('Pon al menos un número de guía antes de despachar.'); return; }
+    const guia=guias.join('\n');   // varias guías = una por línea
     await this.cotUpd(id,{transportadora:transp,guia:guia,estado_envio:'despachado',despachado_at:new Date().toISOString()});
-    this._toast('📦 '+guia+' despachado por '+transp+' → pasó a Despachos.');
+    this._toast('📦 '+guias.length+' guía'+(guias.length>1?'s':'')+' despachada'+(guias.length>1?'s':'')+' por '+transp+' → pasó a Despachos.');
     this.vPedidosSmart();
   },
   async pedDespacharPropio(id){
