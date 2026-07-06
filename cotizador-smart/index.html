@@ -775,7 +775,7 @@ function buildResumen(){
   let itemsHTML=sel.map(s=>{
     const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP';
     const clabel=s.color==='blanco'?'Blanco':'Transparente';
-    const precio=s.prod.t[listaActiva]; const subtotal=s.qty*precio; subBase+=subtotal;
+    const precio=precioLinea(s); const subtotal=s.qty*precio; subBase+=subtotal;
     const listaLabel=promoOn?'precio especial':LISTA_NAMES[listaActiva];
     return `<div class="srow"><div class="srl">${group} ${s.prod.v} · ${clabel}<small>${fmtN(s.qty)} uds × ${fmt(precio)} s/IVA · ${listaLabel}</small></div><div class="srr">${fmt(subtotal)}</div></div>`;
   }).join('');
@@ -839,7 +839,7 @@ function notificarJose(estado){
   const sel=getSel(); const contacto=getContacto(); const empresa=getEmpresa(); const tel=getTel(); const envio=getEnvio();
   const folio=document.getElementById('folio-display').textContent;
   const IVA=0.19; let subBase=0;
-  sel.forEach(s=>{ subBase+=s.qty*s.prod.t[listaActiva]; });
+  sel.forEach(s=>{ subBase+=s.qty*precioLinea(s); });
   const iva=Math.round(subBase*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
   const fleteDisp = getFleteDisplay();
@@ -860,26 +860,29 @@ function notificarJose(estado){
 // Flexipack transparente = grupo Flexipack PP (no PetMulti, no Nueva Ref) en color transparente
 function esFlexTransparente(s){ return !CAT.pm.some(p=>p.id===s.prod.id) && !CAT.nr.some(p=>p.id===s.prod.id) && s.color!=='blanco'; }
 const FLEX_CONVENIO_PCT = 0.035;   // 3,5% de comisión en Flexipack transparente vendido a Convenio (para rotar inventario)
+// PET Multi 1000 ml: inventario que NO se repone. SIEMPRE precio mayorista (t[2]), sin importar la lista, y 3,5% de comisión en todo lado.
+const PETMULTI1000_PCT = 0.035;
+function esPetMulti1000(s){ return s.prod.id==='pm1000'; }
+function precioLinea(s){ return esPetMulti1000(s) ? s.prod.t[2] : s.prod.t[listaActiva]; }   // pm1000 SIEMPRE mayorista
 function calcComision(sel){
+  let com;
   if(listaActiva === 4){
-    // Convenio = precio base → normalmente 0 comisión. EXCEPCIÓN: Flexipack transparente deja 3,5% del valor de venta (sin IVA).
-    let com = sel.reduce((a,s)=> a + (esFlexTransparente(s) ? s.qty * s.prod.t[4] * FLEX_CONVENIO_PCT : 0), 0);
-    if(pedidoMuestras) com += getKitComision();
-    return Math.max(0, Math.round(com));
+    // Convenio = precio base → normalmente 0 comisión. Excepciones: Flexipack transparente y PET Multi 1000 dejan 3,5%.
+    com = sel.reduce((a,s)=> a + (esPetMulti1000(s) ? s.qty*s.prod.t[2]*PETMULTI1000_PCT : (esFlexTransparente(s) ? s.qty*s.prod.t[4]*FLEX_CONVENIO_PCT : 0)), 0);
+  } else {
+    com = sel.reduce((a, s) => {
+      if(esPetMulti1000(s)) return a + s.qty*s.prod.t[2]*PETMULTI1000_PCT;   // pm1000: 3,5% del mayorista, siempre
+      const diff = s.prod.t[listaActiva] - s.prod.t[4];
+      return a + s.qty * diff;
+    }, 0);
   }
-  let com = sel.reduce((a, s) => {
-    const precioVenta = s.prod.t[listaActiva];
-    const precioBase  = s.prod.t[4];
-    const diff = precioVenta - precioBase;
-    return a + s.qty * diff;
-  }, 0);
   if(pedidoMuestras) com += getKitComision();
   return Math.max(0, Math.round(com));
 }
 
 async function registrarEnSheets(estadoCot, irAPedidos){
   const sel=getSel(); const IVA=0.19; let subBase=0;
-  const productos=sel.map(s=>{ const precio=s.prod.t[listaActiva]; const subtotal=s.qty*precio; subBase+=subtotal; const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; return { ref:group+' '+s.prod.v, color:s.color==='blanco'?'Blanco':'Transparente', qty:s.qty, precio, subtotal }; });
+  const productos=sel.map(s=>{ const precio=precioLinea(s); const subtotal=s.qty*precio; subBase+=subtotal; const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; return { ref:group+' '+s.prod.v, color:s.color==='blanco'?'Blanco':'Transparente', qty:s.qty, precio, subtotal }; });
   const iva=Math.round(subBase*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
   const fleteCalc = getFleteDisplay() ? 0 : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
