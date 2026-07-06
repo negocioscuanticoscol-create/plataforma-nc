@@ -533,9 +533,11 @@ function genFolio(){
 }
 function calcFlete(selItems){
   if(!selItems || selItems.length===0) return 36500;
+  const items = selItems.filter(s=>s.prod.id!=='pm1000');   // pm1000: transporte INCLUIDO en el precio → no suma flete
+  if(items.length===0) return 0;                            // solo pm1000 → flete 0 (todo incluido)
   let totalFlete=0;
   let totalResiduoUds=0;
-  selItems.forEach(s=>{
+  items.forEach(s=>{
     const pkSize=s.prod.pk;
     const pacasCompletas=Math.floor(s.qty/pkSize);
     const residuo=s.qty % pkSize;
