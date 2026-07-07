@@ -917,7 +917,7 @@ const App = {
         const rv=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&mes=eq.'+encodeURIComponent(_mesAct)+'&select=total_vendido,comision_bruta',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}});
         const vs=await rv.json();
         if(Array.isArray(vs)&&vs.length){
-          const total=vs.reduce((a,x)=>a+(+x.total_vendido||0),0), comision=vs.reduce((a,x)=>a+(+x.comision_bruta||0),0), herr=650000;
+          const total=vs.reduce((a,x)=>a+(+x.total_vendido||0),0), comision=vs.reduce((a,x)=>a+(+x.comision_bruta||0),0), herr=2000000;   // herramientas $2M/mes desde julio-2026
           const u_bruta=total*0.20, bodega=total*0.03, logistica=total*0.02, operaciones=total*0.01;
           rows.push({mes:_mesAct,ventas:vs.length,total,ventas_libro:total,comision,u_bruta,herramientas:herr,bodega,logistica,operaciones,utilidad_neta:u_bruta-comision-herr-bodega-logistica-operaciones,unidades:0,clientes_registrados:0,clientes_nuevos:0,clientes_recurrentes:0,origen:'en-vivo'});
         }
