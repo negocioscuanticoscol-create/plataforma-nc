@@ -832,8 +832,8 @@ const App = {
       const d=c.datos||{}; const folio=c.folio||'';
       let ya=[]; if(folio){ const rx=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(folio)+'&select=id&limit=1',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); ya=await rx.json(); }
       if(!(Array.isArray(ya)&&ya.length)){
-        const dt=new Date(c.creado_en||Date.now()); const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-        const mes=M[dt.getMonth()]+'-'+dt.getFullYear();
+        const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+        const _dtv=new Date(); const mes=M[_dtv.getMonth()]+'-'+_dtv.getFullYear();   // mes de la venta = AHORA (cuándo se autoriza), no la creación → cierre a fin de mes cae en el mes correcto
         const esKit=(d.kit_muestras==='SI');
         const tv=esKit ? +(c.total||d.total||0) : +(d.subtotal_sin_iva||d.total||c.total||0);   // el kit ES venta: vale su precio, no 0
         const exceso=Math.max(0, (_cons||0) - (+(c.total||0)));   // lo que consignó de más → a comisión
@@ -910,6 +910,19 @@ const App = {
     this.loading();
     let rows=[];
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_resumen_mensual?empresa=eq.smart',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const j=await r.json(); rows=Array.isArray(j)?j:[]; }catch(e){}
+    // Mes actual EN VIVO: si no está en la tabla pre-agregada, lo calcula desde nc_ventas → así julio y cada mes nuevo aparecen solos
+    const _MA=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'], _hoy=new Date(), _mesAct=_MA[_hoy.getMonth()]+'-'+_hoy.getFullYear();
+    if(!rows.some(r=>(r.mes||'')===_mesAct)){
+      try{
+        const rv=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&mes=eq.'+encodeURIComponent(_mesAct)+'&select=total_vendido,comision_bruta',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}});
+        const vs=await rv.json();
+        if(Array.isArray(vs)&&vs.length){
+          const total=vs.reduce((a,x)=>a+(+x.total_vendido||0),0), comision=vs.reduce((a,x)=>a+(+x.comision_bruta||0),0), herr=650000;
+          const u_bruta=total*0.20, bodega=total*0.03, logistica=total*0.02, operaciones=total*0.01;
+          rows.push({mes:_mesAct,ventas:vs.length,total,ventas_libro:total,comision,u_bruta,herramientas:herr,bodega,logistica,operaciones,utilidad_neta:u_bruta-comision-herr-bodega-logistica-operaciones,unidades:0,clientes_registrados:0,clientes_nuevos:0,clientes_recurrentes:0,origen:'en-vivo'});
+        }
+      }catch(e){}
+    }
     const ORD={ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12};
     rows.sort((a,b)=>(ORD[(a.mes||'').slice(0,3)]||99)-(ORD[(b.mes||'').slice(0,3)]||99));
     this._renderPanelFin(rows, {titulo:'Smart', unidLabel:'Unidades', pBod:'3%', pLog:'2%', pOpe:'1%',
@@ -1113,8 +1126,9 @@ const App = {
       const cot=(await rr.json())[0]; if(!cot||!cot.folio) return;
       const rx=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(cot.folio)+'&select=id&limit=1',{headers:H});
       const ya=await rx.json(); if(Array.isArray(ya)&&ya.length) return;   // ya está, no duplica
-      const d=cot.datos||{}; const dt=new Date(cot.creado_en||Date.now()); const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-      const mes=M[dt.getMonth()]+'-'+dt.getFullYear(); const esKit=(d.kit_muestras==='SI');
+      const d=cot.datos||{}; const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      const _dtv=new Date(); const mes=M[_dtv.getMonth()]+'-'+_dtv.getFullYear();   // mes = AHORA (cuándo se despacha/registra la venta)
+      const esKit=(d.kit_muestras==='SI');
       const tv=esKit?+(cot.total||d.total||0):+(d.subtotal_sin_iva||d.total||cot.total||0); const cb=+(d.comision||0);
       await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
         body:JSON.stringify({empresa:'smart',mes,cliente:cot.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:cot.folio,notas:'Registrado al despachar'})});
