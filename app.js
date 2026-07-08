@@ -2501,13 +2501,16 @@ const App = {
   async vPlanta(){
     this.ptab = this.ptab || 'inv';
     this.loading();
-    const [inv, movs, peds, pp, cfg] = await Promise.all([
+    const [inv, movs, peds, pp, cfg, pedF, gar] = await Promise.all([
       this.sb.from('inventario').select('*').eq('referencia','701').order('talla'),
       this.sb.from('inv_movimientos').select('*').eq('referencia','701').order('creado_en',{ascending:false}).limit(400),
       this.sb.from('pedidos').select('cliente_snap,creado_en,curva,estado,total,pares,es_muestra').neq('estado','anulado'),
       this.sb.from('pedidos_planta').select('*').neq('estado','anulado').order('creado_en',{ascending:false}),
-      this.sb.from('config').select('value').eq('key','planta_whatsapp').maybeSingle()
+      this.sb.from('config').select('value').eq('key','planta_whatsapp').maybeSingle(),
+      this.sb.from('pedidos').select('id,numero,cliente_id,cliente_snap,curva,pares,total,estado,creado_en').neq('estado','anulado').order('creado_en',{ascending:false}),
+      this.sb.from('garantias').select('*').order('creado_en',{ascending:false})
     ]);
+    this._pedFull = pedF.data||[]; this._garantias = gar.data||[];
     this._inv={}; (inv.data||[]).forEach(r=>this._inv[r.talla]=r.stock);
     this._movs = movs.data||[];
     this._peds = peds.data||[];
@@ -2524,11 +2527,11 @@ const App = {
       .forEach(p=>{const c=p.curva||{};Object.entries(c).forEach(([t,q])=>this._comp[t]=(this._comp[t]||0)+(+q||0));});
     const INV2=[{k:'inv',t:'📦 Inventario'},{k:'ped',t:'Pedido Feroz'},{k:'ing',t:'Ingreso Bodega'},{k:'cont',t:'Conteo Auditoría'},{k:'mov',t:'Movimientos'},{k:'cob',t:'Cobertura'}];
     const inGroup=INV2.some(x=>x.k===this.ptab);
-    const L1=[{k:'inv',t:'📦 Inventario',a:inGroup},{k:'metas',t:'🎯 Meta Ventas',a:this.ptab==='metas'},{k:'pend',t:'📌 Pendientes',a:this.ptab==='pend'}];
+    const L1=[{k:'inv',t:'📦 Inventario',a:inGroup},{k:'garant',t:'🛡️ Garantías',a:this.ptab==='garant'},{k:'metas',t:'🎯 Meta Ventas',a:this.ptab==='metas'},{k:'pend',t:'📌 Pendientes',a:this.ptab==='pend'}];
     const btn=(k,t,a,sub)=>`<button class="btn-sm" style="white-space:nowrap;${a?(sub?'background:#334155;color:#fff':'background:var(--naranja);color:#fff'):'background:#fff;border:1px solid var(--linea);color:var(--suave)'}" onclick="App.ptab='${k}';App.vPlanta()">${t}</button>`;
     const bar1=`<div style="display:flex;gap:6px;overflow:auto;margin-bottom:8px;padding-bottom:2px">`+L1.map(x=>btn(x.k,x.t,x.a,false)).join('')+`</div>`;
     const bar2=inGroup?`<div style="display:flex;gap:6px;overflow:auto;margin-bottom:12px;padding-bottom:2px;padding-left:8px;border-left:3px solid var(--naranja)">`+INV2.map(x=>btn(x.k,x.t,this.ptab===x.k,true)).join('')+`</div>`:'';
-    const body={inv:this.subInv,ped:this.subPed,ing:this.subIng,cont:this.subCont,mov:this.subMov,cob:this.subCob,metas:this.subMetas,pend:this.subPend}[this.ptab].call(this);
+    const body={inv:this.subInv,ped:this.subPed,ing:this.subIng,cont:this.subCont,mov:this.subMov,cob:this.subCob,metas:this.subMetas,pend:this.subPend,garant:this.subGarant}[this.ptab].call(this);
     this.set(`<h1>🏭 Planta</h1><div class="sub">Inventario en tiempo real · Ref. 701</div>${bar1}${bar2}${body}`);
   },
   subMetas(){
@@ -2548,6 +2551,119 @@ const App = {
       </tbody></table></div>`;
   },
   subPend(){ return this._pendBody(this._pend); },
+
+  /* ---------- GARANTÍAS / DEVOLUCIONES (entrega en bodega + foto + WhatsApp) ---------- */
+  subGarant(){
+    const peds=this._pedFull||[], gars=this._garantias||[];
+    const sel=this._garSelId||'';
+    const pedSel=peds.find(p=>String(p.id)===String(sel));
+    const opts=peds.map(p=>{const c=p.cliente_snap||{};return `<option value="${p.id}" ${String(p.id)===String(sel)?'selected':''}>${esc(p.numero||('#'+p.id))} — ${esc(c.nombre||'cliente')} — ${p.pares||0} pares</option>`;}).join('');
+    let grid='';
+    if(pedSel){const cu=pedSel.curva||{};const ts=Object.keys(cu).sort((a,b)=>a-b);
+      grid=ts.length?`<label>Pares a devolver por talla</label><div class="grid-tallas" id="gar_grid">`+ts.map(t=>`<div class="t"><span>Talla ${t} (${cu[t]})</span><input type="number" min="0" max="${cu[t]}" inputmode="numeric" data-talla="${t}" placeholder="0"></div>`).join('')+`</div>`:`<div class="hint">Este pedido no tiene curva de tallas registrada.</div><div id="gar_grid"></div>`;}
+    const bc={abierta:'#f59e0b',enviada_planta:'#3b82f6',resuelta:'#16a34a',anulada:'#94a3b8'};
+    const lista=gars.length?gars.map(g=>{const c=g.cliente_snap||{},cu=g.curva||{};
+      return `<div class="item" style="display:block"><div class="top"><div>
+        <div class="nom">${esc(c.nombre||'cliente')} <span class="badge" style="background:${bc[g.estado]||'#999'};color:#fff">${(g.estado||'').replace('_',' ')}</span></div>
+        <div class="meta">${esc(g.tipo)} · ${g.pares||0} pares · ${new Date(g.creado_en).toLocaleDateString('es-CO')}${g.motivo?'<br>📝 '+esc(g.motivo):''}<br>${Object.entries(cu).map(([t,q])=>'T'+t+':'+q).join(' · ')}</div></div>
+        ${g.foto_url?`<a href="${g.foto_url}" target="_blank"><img src="${g.foto_url}" style="width:52px;height:52px;object-fit:cover;border-radius:8px"></a>`:''}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">
+          <button class="btn-sm" style="background:#111;color:#fff" onclick="App.garDoc(${g.id})">🖨️ Documento</button>
+          <button class="btn-sm" style="background:#25d366;color:#fff" onclick="App.garWa(${g.id},'dest')">📲 Bodega 316</button>
+          <button class="btn-sm" style="background:#0e8a4f;color:#fff" onclick="App.garWa(${g.id},'copia')">📋 Copia 323</button>
+          ${g.estado==='abierta'?`<button class="btn-sm" style="background:#3b82f6;color:#fff" onclick="App.garEstado(${g.id},'enviada_planta')">📤 Enviada</button>`:''}
+          ${(g.estado!=='resuelta'&&g.estado!=='anulada')?`<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.garEstado(${g.id},'resuelta')">✅ Resuelta</button>`:''}
+        </div></div>`;}).join(''):'<div class="empty">Aún no hay garantías ni devoluciones.</div>';
+    return `<div class="card"><label>🛡️ Nueva garantía / devolución</label>
+      <div class="hint">Elige el pedido, marca los pares por talla que se devuelven, adjunta la foto y genera el documento. Se ENTREGA EN BODEGA (no en planta).</div>
+      <label>Pedido del cliente</label>
+      <select class="field" id="gar_ped" onchange="App._garSelId=this.value;App.vPlanta()"><option value="">— elige un pedido —</option>${opts}</select>
+      ${pedSel?`<div style="font-size:12.5px;color:#556;margin:4px 0 8px">Cliente: <b>${esc((pedSel.cliente_snap||{}).nombre||'')}</b> · NIT ${esc((pedSel.cliente_snap||{}).nit||'—')} · ${esc((pedSel.cliente_snap||{}).tel||(pedSel.cliente_snap||{}).celular||'—')}</div>
+      ${grid}
+      <label>Tipo</label>
+      <select class="field" id="gar_tipo"><option value="garantia">Garantía (defecto de fábrica)</option><option value="devolucion">Devolución</option><option value="cambio">Cambio de talla</option></select>
+      <label>Bodega de entrega</label>
+      <input class="field" id="gar_bodega" placeholder="Dirección / nombre de la bodega" value="Bodega Feroz">
+      <label>Motivo / observación</label>
+      <textarea class="field" id="gar_motivo" rows="2" placeholder="Ej: costura abierta en 3 pares talla 40"></textarea>
+      <label>📷 Foto de la mercancía / entrega</label>
+      <input class="field" id="gar_foto" type="file" accept="image/*" capture="environment">
+      <button class="btn btn-main" id="gar_btn" onclick="App.garSave()">Registrar y generar documento</button>`:''}
+    </div>
+    <div class="card"><label>📋 Garantías y devoluciones</label>${lista}</div>`;
+  },
+  async garSave(){
+    const pid=this._garSelId; if(!pid){alert('Elige un pedido');return;}
+    const ped=(this._pedFull||[]).find(p=>String(p.id)===String(pid)); if(!ped)return;
+    const curva={};let pares=0;
+    document.querySelectorAll('#gar_grid input').forEach(i=>{const q=+i.value||0;if(q>0){curva[i.dataset.talla]=q;pares+=q;}});
+    if(pares<=0){alert('Indica cuántos pares se devuelven');return;}
+    const tipo=(document.getElementById('gar_tipo')||{}).value||'garantia';
+    const bodega=((document.getElementById('gar_bodega')||{}).value||'Bodega').trim();
+    const motivo=((document.getElementById('gar_motivo')||{}).value||'').trim();
+    const btn=document.getElementById('gar_btn'); if(btn){btn.disabled=true;btn.textContent='Guardando…';}
+    let foto_url=null;
+    const fi=document.getElementById('gar_foto');
+    if(fi&&fi.files&&fi.files[0]){
+      try{const f=fi.files[0];const ext=(f.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+        const path='g_'+pid+'_'+Math.floor(performance.now())+'.'+ext;
+        const up=await this.sb.storage.from('garantias').upload(path,f,{contentType:f.type||'image/jpeg',upsert:true});
+        if(!up.error) foto_url=this.sb.storage.from('garantias').getPublicUrl(path).data.publicUrl;
+      }catch(e){}
+    }
+    const reg={pedido_id:ped.id,cliente_id:ped.cliente_id,cliente_snap:ped.cliente_snap,tipo,curva,pares,motivo,estado:'abierta',entregar_en:bodega,foto_url};
+    try{if(this.user&&this.user.id) reg.creado_por=this.user.id;}catch(e){}
+    const {data,error}=await this.sb.from('garantias').insert(reg).select().single();
+    if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.textContent='Registrar y generar documento';}return;}
+    this._garSelId='';
+    await this.vPlanta();
+    this.garDoc(data.id);
+  },
+  async garEstado(id,estado){
+    if(estado==='anulada'&&!confirm('¿Anular esta garantía?'))return;
+    await this.sb.from('garantias').update({estado,actualizado_en:new Date().toISOString()}).eq('id',id);
+    this.vPlanta();
+  },
+  _garTxt(g){
+    const c=g.cliente_snap||{},cu=g.curva||{};
+    const ped=(this._pedFull||[]).find(p=>String(p.id)===String(g.pedido_id))||{};
+    const tallas=Object.entries(cu).sort((a,b)=>a[0]-b[0]).map(([t,q])=>'T'+t+':'+q).join(', ');
+    return `🥾 DEVOLUCIÓN A BODEGA — Feroz\nNº ${String(g.id).padStart(5,'0')} · ${new Date(g.creado_en).toLocaleDateString('es-CO')}\n`+
+      `Cliente: ${c.nombre||''} (NIT ${c.nit||'—'})\nPedido: ${ped.numero||('#'+g.pedido_id)}\nTipo: ${g.tipo}\n`+
+      `Ref 701 — ${tallas} (${g.pares} pares)\nMotivo: ${g.motivo||'—'}\nEntregar en: ${g.entregar_en||'Bodega'}`+
+      (g.foto_url?`\n📷 Foto: ${g.foto_url}`:'');
+  },
+  garWa(id,quien){
+    const g=(this._garantias||[]).find(x=>String(x.id)===String(id)); if(!g)return;
+    const num=quien==='copia'?'573236375088':'573164824615';
+    window.open('https://wa.me/'+num+'?text='+encodeURIComponent(this._garTxt(g)),'_blank');
+  },
+  garDoc(id){
+    const g=(this._garantias||[]).find(x=>String(x.id)===String(id)); if(!g)return;
+    const c=g.cliente_snap||{},cu=g.curva||{};
+    const ped=(this._pedFull||[]).find(p=>String(p.id)===String(g.pedido_id))||{};
+    const fecha=new Date(g.creado_en).toLocaleDateString('es-CO');
+    const filas=Object.entries(cu).sort((a,b)=>a[0]-b[0]).map(([t,q])=>`<tr><td>Ref. 701 — Talla ${t}</td><td style="text-align:center">${q}</td></tr>`).join('');
+    const tipoTxt={garantia:'GARANTÍA (defecto de fábrica)',devolucion:'DEVOLUCIÓN',cambio:'CAMBIO DE TALLA'}[g.tipo]||g.tipo;
+    const html=`<!doctype html><html><head><meta charset="utf-8"><title>Devolucion ${g.id}</title>
+      <style>body{font-family:Arial,sans-serif;color:#111;max-width:720px;margin:22px auto;padding:0 18px}
+      h1{font-size:20px;margin:0}.muted{color:#666;font-size:12px}table{width:100%;border-collapse:collapse;margin:12px 0}
+      th,td{border:1px solid #ccc;padding:7px;font-size:13px}th{background:#f3f4f6;text-align:left}
+      .box{border:1px solid #ddd;border-radius:8px;padding:12px;margin:10px 0}.firmas{display:flex;gap:40px;margin-top:46px}
+      .firma{flex:1;border-top:1px solid #111;padding-top:6px;font-size:12px;text-align:center}
+      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #e8551f;padding-bottom:10px}
+      .destaca{background:#fff4ed;border:1px solid #e8551f;color:#b23c10;font-weight:800;padding:8px;border-radius:8px;text-align:center;margin:10px 0}
+      img.ev{max-width:260px;border:1px solid #ccc;border-radius:8px;margin-top:8px}</style></head><body>
+      <div class="head"><div><h1>FEROZ SAFETY WEAR</h1><div class="muted">FUELING EQUIPMENT &amp; SUPPLIES SAS · NIT 902025524</div></div>
+        <div style="text-align:right"><div style="font-weight:800;color:#e8551f">DEVOLUCIÓN / GARANTÍA</div><div class="muted">Nº ${String(g.id).padStart(5,'0')} · ${fecha}</div></div></div>
+      <div class="destaca">📦 ENTREGAR EN BODEGA: ${esc(g.entregar_en||'Bodega')} — NO en planta</div>
+      <div class="box"><b>Tipo:</b> ${tipoTxt}<br><b>Cliente:</b> ${esc(c.nombre||'')} · NIT ${esc(c.nit||'—')} · Tel ${esc(c.tel||c.celular||'—')}<br><b>Pedido original:</b> ${esc(ped.numero||('#'+g.pedido_id))}</div>
+      <table><thead><tr><th>Ítem devuelto</th><th style="text-align:center">Pares</th></tr></thead><tbody>${filas}<tr style="font-weight:800"><td>TOTAL</td><td style="text-align:center">${g.pares}</td></tr></tbody></table>
+      <div class="box"><b>Motivo:</b><br>${esc(g.motivo||'—')}${g.foto_url?`<br><b>Evidencia:</b><br><img class="ev" src="${g.foto_url}">`:''}</div>
+      <div class="firmas"><div class="firma">Entrega (Feroz)</div><div class="firma">Recibe (Bodega)</div></div>
+      <script>window.onload=function(){setTimeout(function(){window.print();},450);}<\/script></body></html>`;
+    const w=window.open('','_blank'); if(w){w.document.write(html);w.document.close();}
+  },
 
   subInv(){
     let totS=0,totC=0,totP=0;
