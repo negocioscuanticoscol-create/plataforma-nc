@@ -2191,7 +2191,10 @@ const App = {
         <option value="nono">🎁 Muestra nono — sin valor comercial</option>
         <option value="pie">👟 Pie completo — ${money(C.MUESTRA_PAR)}/par + IVA (sin mínimo)</option>
         <option value="pedido">📦 Pedido formal — curva, mínimo ${C.PARES_CAJA} pares</option>
+        <option value="equipo">👔 Equipo comercial — sin valor comercial (curva)</option>
       </select>
+      <div id="cr_asesor_wrap" style="display:none;margin-top:8px"><label>Nombre del asesor *</label><input class="field" id="cr_asesor" placeholder="Ej: Juan Pérez — equipo comercial">
+        <label style="margin-top:8px">📦 Recoge en</label><select class="field" id="cr_recoge">${(C.BODEGAS||['Bodega']).map(b=>`<option value="${b}">${b}</option>`).join('')}</select></div>
       <div class="hint" id="cr_hint" style="margin-top:8px"></div>
       <label style="margin-top:10px">Cantidades por talla</label>
       <div class="grid-tallas" id="cr_grid"></div>
@@ -2204,10 +2207,13 @@ const App = {
   },
   crearToggle(){
     const t=$('cr_tipo').value, h=$('cr_hint');
+    const aw=$('cr_asesor_wrap'); if(aw) aw.style.display=(t==='equipo')?'block':'none';
     if(h) h.textContent = t==='nono'
       ? 'Zapato suelto, sin valor comercial. Pon las cantidades por talla para la orden de producción y envío.'
       : t==='pie'
       ? `Pie/par completo a ${money(C.MUESTRA_PAR)}/par + IVA · 🚚 transporte ${money(C.MUESTRA_FLETE||22000)} por cada ${C.MUESTRA_FLETE_PARES||3} pares. Sin mínimo.`
+      : t==='equipo'
+      ? 'Pedido interno para el EQUIPO COMERCIAL: sin valor comercial, con el nombre del asesor. Sigue el proceso normal (queda autorizado y pasa a Despachos). El cliente es opcional.'
       : `Curva formal: mínimo ${C.PARES_CAJA} pares, múltiplos de ${C.PARES_CAJA}, a ${money(C.PRECIO_PAR)}/par + IVA · 🚚 menos de ${C.MIN_CAJAS_SIN_FLETE} cajas = flete al cobro · ${C.MIN_CAJAS_SIN_FLETE} cajas o más = flete incluido.`;
     this.crearPreview();
   },
@@ -2216,6 +2222,7 @@ const App = {
     const tipo=$('cr_tipo').value, {pares}=this._crearTallas(); let html='Total: $0';
     if(pares){
       if(tipo==='nono'){ html=`${pares} und · Sin valor comercial`; }
+      else if(tipo==='equipo'){ html=`${pares} par(es) · 👔 Sin valor comercial (equipo)`; }
       else if(tipo==='pie'){ const sub=C.MUESTRA_PAR*pares, iva=Math.round(sub*C.IVA), flete=Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000); html=`${pares} par(es) · ${money(sub)} + IVA ${money(iva)} + 🚚 ${money(flete)} = <b>${money(sub+iva+flete)}</b>`; }
       else { const sub=C.PRECIO_PAR*pares, iva=Math.round(sub*C.IVA), ok=pares>=C.PARES_CAJA&&pares%C.PARES_CAJA===0, cajas=pares/C.PARES_CAJA, ftxt=cajas>=C.MIN_CAJAS_SIN_FLETE?'flete incluido':'flete al cobro'; html=`${pares} pares (${cajas.toFixed(pares%C.PARES_CAJA?2:0)} caja) · <b>${money(sub+iva)}</b> (IVA incl.) · 🚚 ${ftxt}`+(ok?'':` · ⚠ múltiplo de ${C.PARES_CAJA}`); }
     }
@@ -2223,35 +2230,40 @@ const App = {
   },
   async guardarCrear(){
     const tipo=$('cr_tipo').value, cid=$('mu_cliente').value;
-    if(!cid){ alert('Selecciona un cliente.'); return; }
+    const asesor=(($('cr_asesor')||{}).value||'').trim();
+    const recoge=(($('cr_recoge')||{}).value||'').trim();
+    if(tipo==='equipo'){ if(!asesor){ alert('Escribe el nombre del asesor.'); return; } }
+    else if(!cid){ alert('Selecciona un cliente.'); return; }
     const {pares,tallas}=this._crearTallas();
     if(pares<1){ alert('Pon las cantidades por talla en la tabla.'); return; }
     if(tipo==='pedido' && (pares<C.PARES_CAJA || pares%C.PARES_CAJA!==0)){ alert('Pedido formal: mínimo '+C.PARES_CAJA+' pares y en múltiplos de '+C.PARES_CAJA+' (cajas completas).'); return; }
-    const cl=this._clientesM.find(c=>c.id==cid);
+    const cl=this._clientesM.find(c=>c.id==cid) || (tipo==='equipo'?{nombre:'👔 '+asesor+' (equipo comercial)',tipo_pago:'contado'}:null);
     const partes=Object.keys(tallas).sort((a,b)=>a-b).map(t=>`T${t}×${tallas[t]}`).join(', ');
     let sub=0,iva=0,flete=0,esMuestra=false,muestraTipo=null,estado='pendiente_pago',detalle='',pref='PED';
     if(tipo==='nono'){ esMuestra=true; muestraTipo='nono'; estado='autorizado'; pref='MUE'; detalle=`${pares} nono(s) — zapato suelto, sin valor comercial · ${partes}`; }
+    else if(tipo==='equipo'){ estado='autorizado'; pref='EQ'; detalle=`Equipo comercial — ${asesor} · ${pares} pares SIN valor comercial · ${partes}${recoge?' · 📦 Recoge en '+recoge:''}`; }
     else if(tipo==='pie'){ sub=C.MUESTRA_PAR*pares; iva=Math.round(sub*C.IVA); flete=Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000); esMuestra=true; muestraTipo='par'; pref='MUE'; detalle=`${pares} pie(s) completo(s) de muestra · ${partes} · 🚚 transporte ${money(flete)}`; }
     else { sub=C.PRECIO_PAR*pares; iva=Math.round(sub*C.IVA); const cajas=pares/C.PARES_CAJA, ftxt=cajas>=C.MIN_CAJAS_SIN_FLETE?'flete incluido (gratis)':'flete al cobro (transportadora)'; detalle=`Pedido ${pares} pares (${cajas} caja(s)) · ${partes} · 🚚 ${ftxt}`; }
     const total=sub+iva+flete;
     // comisión por par (solo pedidos reales, no muestras) — desde feroz_comisiones (ref+lista) o el default
     let vNC=0,vGPJR=0;
-    if(!esMuestra){
+    if(!esMuestra && tipo!=='equipo'){
       let rate=null;
       try{ const {data}=await this.sb.from('feroz_comisiones').select('*').eq('referencia',(cl.referencia||'701')).eq('lista',(cl.lista_precio||'Distribuidor')).maybeSingle(); rate=data; }catch(e){}
       vNC  = cl.recomendado ? (rate?+rate.valor_par_nc_rec:900) : (rate?+rate.valor_par_nc:1900);
       vGPJR= cl.recomendado ? (rate?+rate.valor_par_gpjr:1000) : 0;
     }
     const d=new Date(), num=pref+'-'+d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)+'-'+('0'+d.getHours()).slice(-2)+('0'+d.getMinutes()).slice(-2)+('0'+d.getSeconds()).slice(-2);
-    const reg={numero:num,cliente_id:cid,cliente_snap:cl,curva:tallas,pares,total,flete,tipo_pago:cl.tipo_pago||'contado',estado,detalle,
-      referencia:cl.referencia||'701',recomendado:!!cl.recomendado,valor_par_nc:vNC,valor_par_gpjr:vGPJR,comision_nc:vNC*pares,comision_gpjr:vGPJR*pares};
+    const reg={numero:num,cliente_id:cid||null,cliente_snap:cl,curva:tallas,pares,total,flete,tipo_pago:(cl&&cl.tipo_pago)||'contado',estado,detalle,
+      referencia:(cl&&cl.referencia)||'701',recomendado:!!(cl&&cl.recomendado),valor_par_nc:vNC,valor_par_gpjr:vGPJR,comision_nc:vNC*pares,comision_gpjr:vGPJR*pares};
     if(esMuestra){ reg.es_muestra=true; reg.muestra_tipo=muestraTipo; }
+    if(tipo==='equipo'){ reg.interno=true; reg.asesor=asesor; if(recoge) reg.transporte='Recoge: '+recoge; }
     const { data:ped, error } = await this.sb.from('pedidos').insert(reg).select().single();
     if(error){ alert('Error: '+error.message); return; }
     await this.hist(ped.id, estado, detalle+(total>0?(' · '+money(total)):' · sin valor comercial'));
     this.cerrarModal();
-    alert('✅ '+(esMuestra?'Muestra':'Pedido')+' creado: '+num+(total>0?('\nTotal '+money(total)+(estado==='pendiente_pago'?' (pasa por pago)':'')):'\nSin valor comercial — lista para Bodega'));
-    this.go(esMuestra?this.view:'pedidos');
+    alert('✅ '+(tipo==='equipo'?'Pedido de equipo':(esMuestra?'Muestra':'Pedido'))+' creado: '+num+(total>0?('\nTotal '+money(total)+(estado==='pendiente_pago'?' (pasa por pago)':'')):'\nSin valor comercial — pasa a Despachos'));
+    this.go(esMuestra?this.view:(tipo==='equipo'?'despachos':'pedidos'));
   },
 
   async hist(pedido_id,etapa,nota){ try{ await this.sb.from('historial').insert({pedido_id,etapa,nota,usuario:this.user.id}); }catch(e){} },
@@ -2582,8 +2594,8 @@ const App = {
       ${grid}
       <label>Tipo</label>
       <select class="field" id="gar_tipo"><option value="garantia">Garantía (defecto de fábrica)</option><option value="devolucion">Devolución</option><option value="cambio">Cambio de talla</option></select>
-      <label>Bodega de entrega</label>
-      <input class="field" id="gar_bodega" placeholder="Dirección / nombre de la bodega" value="Bodega Feroz">
+      <label>📦 Bodega de entrega</label>
+      <select class="field" id="gar_bodega">${(C.BODEGAS||['Bodega']).map(b=>`<option value="${b}">${b}</option>`).join('')}</select>
       <label>Motivo / observación</label>
       <textarea class="field" id="gar_motivo" rows="2" placeholder="Ej: costura abierta en 3 pares talla 40"></textarea>
       <label>📷 Foto de la mercancía / entrega</label>

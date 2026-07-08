@@ -11,5 +11,6 @@ window.FEROZ_CONFIG = {
   IVA: 0.19,
   MIN_CAJAS_SIN_FLETE: 10,
   TALLAS: [34,35,36,37,38,39,40,41,42,43,44,45],
+  BODEGAS: ['Bodega Superior','Bodega Feroz Bogotá','Feroz Oficina'],
   CUENTA: 'Bancolombia Ahorros 5970-000825-3 · INDUSTRIAS FEROZ SAS · NIT 902072014'
 };
