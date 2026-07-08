@@ -2586,7 +2586,23 @@ const App = {
           ${g.estado==='abierta'?`<button class="btn-sm" style="background:#3b82f6;color:#fff" onclick="App.garEstado(${g.id},'enviada_planta')">📤 Enviada</button>`:''}
           ${(g.estado!=='resuelta'&&g.estado!=='anulada')?`<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.garEstado(${g.id},'resuelta')">✅ Resuelta</button>`:''}
         </div></div>`;}).join(''):'<div class="empty">Aún no hay garantías ni devoluciones.</div>';
-    return `<div class="card"><label>🛡️ Nueva garantía / devolución</label>
+    // análisis de recurrencia (para ver los errores más comunes)
+    const cFalla={},cTalla={},cCli={}; let nG=0,totPares=0;
+    gars.forEach(g=>{ if(g.estado==='anulada')return; nG++; totPares+=(+g.pares||0);
+      const f=g.falla||'Sin clasificar'; (cFalla[f]=cFalla[f]||{n:0,p:0}); cFalla[f].n++; cFalla[f].p+=(+g.pares||0);
+      const nm=(g.cliente_snap||{}).nombre||'—'; cCli[nm]=(cCli[nm]||0)+1;
+      Object.entries(g.curva||{}).forEach(([t,q])=>{cTalla[t]=(cTalla[t]||0)+(+q||0);}); });
+    const topF=Object.entries(cFalla).sort((a,b)=>b[1].n-a[1].n).slice(0,6);
+    const topT=Object.entries(cTalla).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    const topC=Object.entries(cCli).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const mF=topF.reduce((a,x)=>Math.max(a,x[1].n),0),mT=topT.reduce((a,x)=>Math.max(a,x[1]),0),mC=topC.reduce((a,x)=>Math.max(a,x[1]),0);
+    const bar=(l,v,mx,ex)=>`<div style="margin-bottom:5px"><div style="display:flex;justify-content:space-between;font-size:12px"><span>${esc(l)}</span><b>${v}${ex||''}</b></div><div style="height:6px;background:#eef1f5;border-radius:4px;overflow:hidden"><div style="height:100%;width:${mx?Math.round(v/mx*100):0}%;background:var(--naranja)"></div></div></div>`;
+    const analisis=nG?`<div class="card"><label>📊 Análisis de recurrencia</label>
+      <div class="kpis"><div class="kpi"><b>${nG}</b><span>Casos</span></div><div class="kpi naranja"><b>${totPares}</b><span>Pares devueltos</span></div></div>
+      <div style="font-size:13px;font-weight:700;margin:6px 0 4px">🔍 Fallas más frecuentes</div>${topF.map(([f,v])=>bar(f,v.n,mF,' · '+v.p+' pares')).join('')||'<div class="hint">—</div>'}
+      <div style="font-size:13px;font-weight:700;margin:10px 0 4px">👟 Tallas que más fallan</div>${topT.map(([t,v])=>bar('Talla '+t,v,mT)).join('')||'<div class="hint">—</div>'}
+      <div style="font-size:13px;font-weight:700;margin:10px 0 4px">🧑 Clientes con más casos</div>${topC.map(([c,v])=>bar(c,v,mC)).join('')||'<div class="hint">—</div>'}</div>`:'';
+    return `${analisis}<div class="card"><label>🛡️ Nueva garantía / devolución</label>
       <div class="hint">Elige el pedido, marca los pares por talla que se devuelven, adjunta la foto y genera el documento. Se ENTREGA EN BODEGA (no en planta).</div>
       <label>Pedido del cliente</label>
       <select class="field" id="gar_ped" onchange="App._garSelId=this.value;App.vPlanta()"><option value="">— elige un pedido —</option>${opts}</select>
@@ -2594,6 +2610,8 @@ const App = {
       ${grid}
       <label>Tipo</label>
       <select class="field" id="gar_tipo"><option value="garantia">Garantía (defecto de fábrica)</option><option value="devolucion">Devolución</option><option value="cambio">Cambio de talla</option></select>
+      <label>🔍 Tipo de falla (para el análisis)</label>
+      <select class="field" id="gar_falla">${(C.FALLAS||['Otro']).map(f=>`<option value="${f}">${f}</option>`).join('')}</select>
       <label>📦 Bodega de entrega</label>
       <select class="field" id="gar_bodega">${(C.BODEGAS||['Bodega']).map(b=>`<option value="${b}">${b}</option>`).join('')}</select>
       <label>Motivo / observación</label>
@@ -2611,6 +2629,7 @@ const App = {
     document.querySelectorAll('#gar_grid input').forEach(i=>{const q=+i.value||0;if(q>0){curva[i.dataset.talla]=q;pares+=q;}});
     if(pares<=0){alert('Indica cuántos pares se devuelven');return;}
     const tipo=(document.getElementById('gar_tipo')||{}).value||'garantia';
+    const falla=(document.getElementById('gar_falla')||{}).value||null;
     const bodega=((document.getElementById('gar_bodega')||{}).value||'Bodega').trim();
     const motivo=((document.getElementById('gar_motivo')||{}).value||'').trim();
     const btn=document.getElementById('gar_btn'); if(btn){btn.disabled=true;btn.textContent='Guardando…';}
@@ -2623,7 +2642,7 @@ const App = {
         if(!up.error) foto_url=this.sb.storage.from('garantias').getPublicUrl(path).data.publicUrl;
       }catch(e){}
     }
-    const reg={pedido_id:ped.id,cliente_id:ped.cliente_id,cliente_snap:ped.cliente_snap,tipo,curva,pares,motivo,estado:'abierta',entregar_en:bodega,foto_url};
+    const reg={pedido_id:ped.id,cliente_id:ped.cliente_id,cliente_snap:ped.cliente_snap,tipo,falla,curva,pares,motivo,estado:'abierta',entregar_en:bodega,foto_url};
     try{if(this.user&&this.user.id) reg.creado_por=this.user.id;}catch(e){}
     const {data,error}=await this.sb.from('garantias').insert(reg).select().single();
     if(error){alert('Error: '+error.message);if(btn){btn.disabled=false;btn.textContent='Registrar y generar documento';}return;}
@@ -2641,7 +2660,7 @@ const App = {
     const ped=(this._pedFull||[]).find(p=>String(p.id)===String(g.pedido_id))||{};
     const tallas=Object.entries(cu).sort((a,b)=>a[0]-b[0]).map(([t,q])=>'T'+t+':'+q).join(', ');
     return `🥾 DEVOLUCIÓN A BODEGA — Feroz\nNº ${String(g.id).padStart(5,'0')} · ${new Date(g.creado_en).toLocaleDateString('es-CO')}\n`+
-      `Cliente: ${c.nombre||''} (NIT ${c.nit||'—'})\nPedido: ${ped.numero||('#'+g.pedido_id)}\nTipo: ${g.tipo}\n`+
+      `Cliente: ${c.nombre||''} (NIT ${c.nit||'—'})\nPedido: ${ped.numero||('#'+g.pedido_id)}\nTipo: ${g.tipo}${g.falla?' — '+g.falla:''}\n`+
       `Ref 701 — ${tallas} (${g.pares} pares)\nMotivo: ${g.motivo||'—'}\nEntregar en: ${g.entregar_en||'Bodega'}`+
       (g.foto_url?`\n📷 Foto: ${g.foto_url}`:'');
   },
@@ -2669,7 +2688,7 @@ const App = {
       <div class="head"><div><h1>FEROZ SAFETY WEAR</h1><div class="muted">FUELING EQUIPMENT &amp; SUPPLIES SAS · NIT 902025524</div></div>
         <div style="text-align:right"><div style="font-weight:800;color:#e8551f">DEVOLUCIÓN / GARANTÍA</div><div class="muted">Nº ${String(g.id).padStart(5,'0')} · ${fecha}</div></div></div>
       <div class="destaca">📦 ENTREGAR EN BODEGA: ${esc(g.entregar_en||'Bodega')} — NO en planta</div>
-      <div class="box"><b>Tipo:</b> ${tipoTxt}<br><b>Cliente:</b> ${esc(c.nombre||'')} · NIT ${esc(c.nit||'—')} · Tel ${esc(c.tel||c.celular||'—')}<br><b>Pedido original:</b> ${esc(ped.numero||('#'+g.pedido_id))}</div>
+      <div class="box"><b>Tipo:</b> ${tipoTxt}${g.falla?' — <b>Falla:</b> '+esc(g.falla):''}<br><b>Cliente:</b> ${esc(c.nombre||'')} · NIT ${esc(c.nit||'—')} · Tel ${esc(c.tel||c.celular||'—')}<br><b>Pedido original:</b> ${esc(ped.numero||('#'+g.pedido_id))}</div>
       <table><thead><tr><th>Ítem devuelto</th><th style="text-align:center">Pares</th></tr></thead><tbody>${filas}<tr style="font-weight:800"><td>TOTAL</td><td style="text-align:center">${g.pares}</td></tr></tbody></table>
       <div class="box"><b>Motivo:</b><br>${esc(g.motivo||'—')}${g.foto_url?`<br><b>Evidencia:</b><br><img class="ev" src="${g.foto_url}">`:''}</div>
       <div class="firmas"><div class="firma">Entrega (Feroz)</div><div class="firma">Recibe (Bodega)</div></div>
