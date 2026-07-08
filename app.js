@@ -1780,6 +1780,8 @@ const App = {
           <div style="flex:1"><label style="font-size:12px;color:#667">Cantidad de nonos</label><input class="field" type="number" id="co_pie_cant" value="1" min="1" inputmode="numeric"></div>
         </div>
       </div>
+      <div class="card" style="border:1.5px solid var(--naranja)"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0"><input type="checkbox" id="co_iva" checked style="width:18px;height:18px;accent-color:var(--naranja)"> <b>Incluir IVA (19%)</b> en la cotización</label>
+        <div class="hint">Si lo desmarcas, la cotización queda SIN IVA (solo el valor de los pares + flete).</div></div>
       <button class="btn btn-main" onclick="App.guardarCotizacion()">${editId?'💾 Guardar cambios':'Guardar cotización'}</button>
     `);
     this._clientes = cli;
@@ -1790,6 +1792,7 @@ const App = {
       if(ec){ this._editCot=ec;
         const s=$('co_cliente'); if(s) s.value=ec.cliente_id;
         const mt=$('co_muestra_tipo'); if(mt) mt.value=ec.es_muestra?(ec.muestra_tipo==='pie'?'pie':'par'):'';
+        const ci=$('co_iva'); if(ci) ci.checked=(+ec.iva>0);
         const cv=ec.curva||{}; document.querySelectorAll('#co_grid input').forEach(i=>{ const t=i.dataset.talla; if(cv[t]!=null) i.value=cv[t]; });
         if(ec.muestra_tipo==='pie'){ const ks=Object.keys(cv); const pc=$('co_pie_cant'); if(pc) pc.value=ec.pares||1; const pt=$('co_pie_talla'); if(pt&&ks[0]) pt.value=ks[0]; }
         this.toggleCotMuestra(); this.curva();
@@ -1842,7 +1845,8 @@ const App = {
         cu=this.curva();
         if(cu.pares<1){ alert('Pon las tallas/pares de la muestra en la grilla.'); return; }
       }
-      const sub=esPie?0:C.MUESTRA_PAR*cu.pares, iva=Math.round(sub*C.IVA), flete=esPie?0:Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000), total=sub+iva+flete;
+      const conIvaM=(($('co_iva')||{checked:true}).checked);
+      const sub=esPie?0:C.MUESTRA_PAR*cu.pares, iva=(conIvaM?Math.round(sub*C.IVA):0), flete=esPie?0:Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000), total=sub+iva+flete;
       const partes=Object.keys(cu.tallas).length ? Object.keys(cu.tallas).sort((a,b)=>a-b).map(t=>`T${t}×${cu.tallas[t]}`).join(', ') : `${cu.pares} nono(s)`;
       const reg={numero:num,cliente_id:cid,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':'par',flete,
         detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:`Muestra par · ${cu.pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} + IVA ${money(iva)} + 🚚 transporte ${money(flete)} (aparte) · ${partes}`,
@@ -1858,7 +1862,8 @@ const App = {
     const cu=this.curva();
     if(cu.pares<1){ alert('Arma la curva (pares por talla) o marca 🎁 Cotizar MUESTRA.'); return; }
     if(!cu.libre && cu.faltan!==0 && !confirm(`Falta(n) ${cu.faltan} par(es) para completar la última caja. ¿Guardar igual?`)) return;
-    const subtotal=cu.pares*C.PRECIO_PAR, iva=subtotal*C.IVA, total=subtotal+iva;
+    const conIva=(($('co_iva')||{checked:true}).checked);
+    const subtotal=cu.pares*C.PRECIO_PAR, iva=conIva?Math.round(subtotal*C.IVA):0, total=subtotal+iva;
     // comisión por par desde la TABLA feroz_comisiones (ref+lista). Default global: NC $1.900 · si recomendado NC $900 + GPJR $1.000
     let rate=null;
     try{ const {data}=await this.sb.from('feroz_comisiones').select('*').eq('referencia',(cl.referencia||'701')).eq('lista',(cl.lista_precio||'Distribuidor')).maybeSingle(); rate=data; }catch(e){}
