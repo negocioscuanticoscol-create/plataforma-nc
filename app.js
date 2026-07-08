@@ -1753,6 +1753,7 @@ const App = {
           <option value="">No — cotización normal (curva)</option>
           <option value="par">Muestra PAR — ${money(C.MUESTRA_PAR)}/par + IVA + transporte ${money(C.MUESTRA_FLETE||22000)}</option>
           <option value="pie">Muestra DE PIE — sin valor comercial · envío gratis</option>
+          <option value="svc">Muestras SIN valor comercial (varias tallas) — sin precio</option>
         </select>
         <div class="hint" style="margin-top:6px" id="co_muestra_hint">La muestra usa las tallas de abajo (sin la regla de 16 pares por caja).</div>
       </div>
@@ -1791,7 +1792,7 @@ const App = {
       const { data:ec } = await this.sb.from('cotizaciones').select('*').eq('id',editId).single();
       if(ec){ this._editCot=ec;
         const s=$('co_cliente'); if(s) s.value=ec.cliente_id;
-        const mt=$('co_muestra_tipo'); if(mt) mt.value=ec.es_muestra?(ec.muestra_tipo==='pie'?'pie':'par'):'';
+        const mt=$('co_muestra_tipo'); if(mt) mt.value=ec.es_muestra?(ec.muestra_tipo==='pie'?'pie':(ec.muestra_tipo==='nono'?'svc':'par')):'';
         const ci=$('co_iva'); if(ci) ci.checked=(+ec.iva>0);
         const cv=ec.curva||{}; document.querySelectorAll('#co_grid input').forEach(i=>{ const t=i.dataset.talla; if(cv[t]!=null) i.value=cv[t]; });
         if(ec.muestra_tipo==='pie'){ const ks=Object.keys(cv); const pc=$('co_pie_cant'); if(pc) pc.value=ec.pares||1; const pt=$('co_pie_talla'); if(pt&&ks[0]) pt.value=ks[0]; }
@@ -1836,7 +1837,7 @@ const App = {
     // MUESTRA: PAR ($40.900 + IVA + transporte $22.000, se cobra) o DE PIE (sin valor comercial, envío gratis).
     const tipoM=$('co_muestra_tipo')?$('co_muestra_tipo').value:'';
     if(tipoM){
-      const esPie=(tipoM==='pie');
+      const esPie=(tipoM==='pie'), esSVC=(tipoM==='svc'), sinValor=(esPie||esSVC);
       let cu;
       if(esPie){   // muestra de pie (nono): no grilla; talla opcional + cantidad de nonos
         const talla=$('co_pie_talla')?$('co_pie_talla').value:''; const cant=Math.max(1,Math.floor(+(($('co_pie_cant')||{}).value)||1));
@@ -1846,17 +1847,17 @@ const App = {
         if(cu.pares<1){ alert('Pon las tallas/pares de la muestra en la grilla.'); return; }
       }
       const conIvaM=(($('co_iva')||{checked:true}).checked);
-      const sub=esPie?0:C.MUESTRA_PAR*cu.pares, iva=(conIvaM?Math.round(sub*C.IVA):0), flete=esPie?0:Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000), total=sub+iva+flete;
+      const sub=sinValor?0:C.MUESTRA_PAR*cu.pares, iva=(sinValor?0:(conIvaM?Math.round(sub*C.IVA):0)), flete=sinValor?0:Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000), total=sub+iva+flete;
       const partes=Object.keys(cu.tallas).length ? Object.keys(cu.tallas).sort((a,b)=>a-b).map(t=>`T${t}×${cu.tallas[t]}`).join(', ') : `${cu.pares} nono(s)`;
-      const reg={numero:num,cliente_id:cid,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':'par',flete,
-        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:`Muestra par · ${cu.pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} + IVA ${money(iva)} + 🚚 transporte ${money(flete)} (aparte) · ${partes}`,
-        pares:cu.pares,cajas:0,resto:0,curva:cu.tallas,precio_par:esPie?0:C.MUESTRA_PAR,subtotal:sub,iva,total,flete_al_cobro:false,estado:'cotizada',
+      const reg={numero:num,cliente_id:cid,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':(esSVC?'nono':'par'),flete,
+        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} + IVA ${money(iva)} + 🚚 transporte ${money(flete)} (aparte) · ${partes}`),
+        pares:cu.pares,cajas:0,resto:0,curva:cu.tallas,precio_par:sinValor?0:C.MUESTRA_PAR,subtotal:sub,iva,total,flete_al_cobro:false,estado:'cotizada',
         vendedor_id:this.user.id,referencia:cl.referencia||'701',recomendado:!!cl.recomendado,comision_nc:0,comision_gpjr:0};
       const error=await this._saveCot(reg);
       if(error){ alert('Error: '+error.message); return; }
       await this._avanzarEmbudo(cid,'muestra');   // aparece en CRM → Prospectos con la gestión
       const we=editing; this._editCotId=null; this._editCot=null;
-      alert('✅ Cotización de MUESTRA '+(esPie?'DE PIE (sin valor comercial)':`PAR (${money(total)})`)+' · '+cu.pares+` par(es): ${num}`+(we?' (actualizada)':''));
+      alert('✅ Cotización de MUESTRA '+(sinValor?'SIN VALOR COMERCIAL':`PAR (${money(total)})`)+' · '+cu.pares+` par(es): ${num}`+(we?' (actualizada)':''));
       this.go('cotizaciones'); return;
     }
     const cu=this.curva();
