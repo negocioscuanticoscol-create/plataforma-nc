@@ -886,16 +886,8 @@ const App = {
           body:JSON.stringify({empresa:'smart',mes,cliente:c.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:(d.kit_muestras==='SI'),folio:folio,notas:(exceso>0?('Consignó $'+(_cons).toLocaleString('es-CO')+' · excedente $'+exceso.toLocaleString('es-CO')+' a comisión'):'Generado en plataforma')})});
       }
     }catch(e){ console.log('nc_ventas insert',e); }
-    // limpieza anti-duplicado: anula OTRAS cotizaciones abiertas del mismo cliente (NIT sin dígito de verificación ni espacios)
-    try{
-      const norm=s=>String(s||'').split('-')[0].replace(/\D/g,'');
-      const nitN=norm((c.datos||{}).cedula_nit);
-      if(nitN.length>=5){
-        const r=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.smart&estado=eq.cotizacion&select=id,datos&limit=400',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}});
-        const arr=await r.json();
-        for(const x of (Array.isArray(arr)?arr:[])){ if(x.id===id) continue; if(norm((x.datos||{}).cedula_nit)===nitN){ await this.cotUpd(x.id,{estado:'anulada'}); } }
-      }
-    }catch(e){ console.log('limpieza dup',e); }
+    // (Quitado) Antes se anulaban las otras cotizaciones del mismo NIT al autorizar una.
+    // Un cliente PUEDE tener varios pedidos/cotizaciones a la vez — ya NO se tocan entre sí.
     this._toast('✅ '+(c.cliente||c.folio)+' autorizado → PEDIDO (Sheet + Supabase + comisión). Flujo iniciado.');
     this.vCotLanding();
   },
