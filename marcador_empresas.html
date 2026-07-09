@@ -1,0 +1,193 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Marcador Empresas · Feroz</title>
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--line:#334155;--tx:#e2e8f0;--mut:#94a3b8;--pri:#f59e0b}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx);padding-bottom:30px}
+  .wrap{max-width:520px;margin:0 auto;padding:14px}
+  h1{font-size:20px;margin:6px 0}
+  .mut{color:var(--mut);font-size:13px}
+  input,button,textarea{font-family:inherit}
+  .fld{width:100%;padding:14px;border-radius:12px;border:1px solid var(--line);background:#0b1220;color:var(--tx);font-size:17px;margin:6px 0}
+  .btn{display:block;width:100%;padding:15px;border:none;border-radius:12px;font-size:17px;font-weight:700;color:#fff;background:var(--pri);cursor:pointer;margin:8px 0}
+  .btn.sec{background:#334155}
+  .hide{display:none}
+  /* rendimiento */
+  .rank{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:8px 0;display:flex;align-items:center;gap:12px}
+  .rank .pos{font-size:22px;width:34px;text-align:center}
+  .rank .nm{flex:1;font-weight:700}
+  .rank .gn{font-size:20px;font-weight:800;color:#4ade80}
+  .rank .sub{font-size:12px;color:var(--mut);font-weight:400}
+  .yo{outline:2px solid var(--pri)}
+  /* sectores */
+  .sec{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:7px 0;cursor:pointer}
+  .sec .n{font-weight:700;font-size:16px}
+  .sec .d{color:#4ade80;font-size:13px}
+  .sec.lock{opacity:.55;cursor:not-allowed}
+  .sec.lock .d{color:#f87171}
+  /* trabajo */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:10px 0}
+  .card h2{margin:0 0 4px;font-size:22px}
+  .badge{display:inline-block;background:#0b1220;border:1px solid var(--line);border-radius:8px;padding:3px 8px;font-size:12px;color:var(--mut);margin:2px 4px 2px 0}
+  .call{display:block;text-align:center;text-decoration:none;color:#fff;background:#2563eb;padding:16px;border-radius:12px;font-size:20px;font-weight:800;margin:8px 0}
+  .wa{background:#25D366}
+  .res{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .res button{padding:14px 8px;border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;line-height:1.2}
+  .res button small{display:block;font-weight:400;opacity:.85;font-size:12px}
+  .bar{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+  .gan{font-size:15px;font-weight:800;color:#4ade80}
+  .lnk{background:none;border:none;color:var(--pri);font-size:14px;cursor:pointer;padding:0}
+</style>
+
+<div class="wrap">
+
+<!-- LOGIN -->
+<div id="login">
+  <h1>📞 Marcador Empresas</h1>
+  <p class="mut">Feroz · dotación y seguridad industrial</p>
+  <input class="fld" id="inNombre" placeholder="Tu nombre" autocomplete="off">
+  <input class="fld" id="inCedula" placeholder="Tu cédula (es tu clave)" inputmode="numeric" autocomplete="off">
+  <button class="btn" onclick="entrar()">Entrar</button>
+  <p class="mut" id="loginMsg"></p>
+</div>
+
+<!-- HOME / RENDIMIENTO -->
+<div id="home" class="hide">
+  <div class="bar"><h1 style="margin:0">🏆 Rendimiento</h1><button class="lnk" onclick="salir()">salir</button></div>
+  <p class="mut">Semana en curso · en vivo · <span id="quien"></span></p>
+  <div id="rankBox"></div>
+  <p class="mut" style="margin-top:14px">🎁 <b>Bonos:</b> +$5.000 a la que más interesados · +$5.000 a la que haga venta · extra a la que más ventas.</p>
+  <button class="btn" onclick="irSectores()">▶ Empezar a llamar</button>
+  <button class="btn sec" onclick="cargarRank()">↻ Actualizar</button>
+</div>
+
+<!-- SECTORES -->
+<div id="sectores" class="hide">
+  <div class="bar"><h1 style="margin:0">📍 Elige tu sector</h1><button class="lnk" onclick="verHome()">‹ volver</button></div>
+  <p class="mut">Un sector solo lo trabaja una persona a la vez.</p>
+  <div id="secBox"></div>
+  <button class="btn sec" onclick="cargarSectores()">↻ Actualizar</button>
+</div>
+
+<!-- TRABAJO -->
+<div id="trabajo" class="hide">
+  <div class="bar">
+    <div><b id="tbSector"></b><br><span class="gan" id="tbGan">$0</span> <span class="mut" id="tbCnt"></span></div>
+    <button class="lnk" onclick="cambiarSector()">cambiar sector</button>
+  </div>
+  <div id="cardBox"></div>
+</div>
+
+</div>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+const RES=[
+ {c:'no_contesta',t:'No contesta',p:50,col:'#64748b'},
+ {c:'fuera_servicio',t:'Fuera de servicio',p:50,col:'#64748b'},
+ {c:'no_aplica',t:'No aplica',p:100,col:'#475569'},
+ {c:'no_interesado',t:'No interesado',p:100,col:'#b91c1c'},
+ {c:'solo_info',t:'Solo info',p:200,col:'#0ea5e9'},
+ {c:'interesado',t:'🔥 Interesado',p:600,col:'#d97706'},
+ {c:'ordena',t:'🎁 Ordena muestra',p:8000,col:'#7c3aed'},
+ {c:'venta',t:'💰 Venta',p:500,col:'#16a34a'},
+];
+const PAY=Object.fromEntries(RES.map(r=>[r.c,r.p]));
+let OP=null, SECTOR=null, LEADS=[], IDX=0, GAN=0, hb=null;
+const $=id=>document.getElementById(id);
+const show=id=>{['login','home','sectores','trabajo'].forEach(s=>$(s).classList.toggle('hide',s!==id));};
+const fmt=n=>'$'+(n||0).toLocaleString('es-CO');
+async function rpc(fn,body){const r=await fetch(SB+'/rest/v1/rpc/'+fn,{method:'POST',headers:H,body:JSON.stringify(body||{})});return r.ok?r.json():[];}
+async function rest(path,opt){return fetch(SB+'/rest/v1/'+path,opt);}
+
+// ---- LOGIN ----
+async function entrar(){
+  const nombre=$('inNombre').value.trim(), cedula=$('inCedula').value.trim();
+  if(!nombre||!cedula){$('loginMsg').textContent='Escribe tu nombre y cédula.';return;}
+  $('loginMsg').textContent='Entrando…';
+  await rest('nc_marcador_operadoras?on_conflict=cedula',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({cedula,nombre,empresa:'feroz',activo:true})});
+  OP={nombre,cedula}; localStorage.setItem('marc_op',JSON.stringify(OP));
+  verHome();
+}
+function salir(){localStorage.removeItem('marc_op');OP=null;liberar();show('login');}
+
+// ---- HOME / RENDIMIENTO ----
+function verHome(){$('quien').textContent='tú: '+OP.nombre;show('home');cargarRank();}
+async function cargarRank(){
+  $('rankBox').innerHTML='<p class="mut">Cargando…</p>';
+  const d=await rpc('marcador_rendimiento',{});
+  if(!d.length){$('rankBox').innerHTML='<p class="mut">Aún sin llamadas esta semana. ¡Sé la primera! 💪</p>';return;}
+  const med=['🥇','🥈','🥉'];
+  $('rankBox').innerHTML=d.map((r,i)=>`<div class="rank ${r.vendedor===OP.nombre?'yo':''}">
+    <div class="pos">${med[i]||(i+1)}</div>
+    <div class="nm">${r.vendedor||'—'}<div class="sub">${r.llamadas} llam · 🔥${r.interesados} · 💰${r.ventas}</div></div>
+    <div class="gn">${fmt(r.ganado)}</div></div>`).join('');
+}
+
+// ---- SECTORES ----
+function irSectores(){show('sectores');cargarSectores();}
+async function cargarSectores(){
+  $('secBox').innerHTML='<p class="mut">Cargando…</p>';
+  const d=await rpc('marcador_sectores',{});
+  $('secBox').innerHTML=d.map(s=>{
+    const lock=s.tomado_por && s.tomado_por!==OP.nombre && s.activo_hace!=null && s.activo_hace<15;
+    return `<div class="sec ${lock?'lock':''}" ${lock?'':`onclick="tomar('${s.sector.replace(/'/g,"\\'")}')"`}>
+      <div><div class="n">${s.sector}</div><div class="d">${lock?'🔒 en uso por '+s.tomado_por:s.disponibles+' por llamar'}</div></div>
+      <div style="font-size:22px">${lock?'🔒':'▶'}</div></div>`;
+  }).join('')||'<p class="mut">No hay sectores con empresas por llamar.</p>';
+}
+async function tomar(sector){
+  // revalidar que siga libre
+  const d=await rpc('marcador_sectores',{});
+  const s=d.find(x=>x.sector===sector);
+  if(s && s.tomado_por && s.tomado_por!==OP.nombre && s.activo_hace!=null && s.activo_hace<15){
+    alert('Ese sector lo acaba de tomar '+s.tomado_por+'. Elige otro.');cargarSectores();return;}
+  await rest('nc_marcador_sesion?cedula=eq.'+encodeURIComponent(OP.cedula),{method:'DELETE',headers:H});
+  await rest('nc_marcador_sesion?on_conflict=empresa,sector',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:'feroz',sector,operador:OP.nombre,cedula:OP.cedula,ultima_actividad:new Date().toISOString()})});
+  SECTOR=sector; iniciarHb();
+  await cargarLote(); trabajar();
+}
+function cambiarSector(){liberar();irSectores();}
+
+// ---- TRABAJO ----
+function trabajar(){show('trabajo');$('tbSector').textContent='📍 '+SECTOR;render();}
+async function cargarLote(){const d=await rpc('marcador_lote',{p_sector:SECTOR,p_limit:50});LEADS=d||[];IDX=0;}
+function render(){
+  $('tbGan').textContent=fmt(GAN);
+  $('tbCnt').textContent=LEADS.length?`· ${LEADS.length-IDX} en cola`:'';
+  if(IDX>=LEADS.length){$('cardBox').innerHTML='<div class="card"><h2>✅ ¡Vas al día!</h2><p class="mut">No hay más empresas por llamar en este sector ahora.</p></div>'+
+    '<button class="btn" onclick="cargarMas()">↻ Buscar más</button><button class="btn sec" onclick="cambiarSector()">Cambiar de sector</button>';return;}
+  const l=LEADS[IDX];
+  const tel=(l.cel||l.fijo||'').replace(/\D/g,'');
+  const esMovil=/^3\d{9}$/.test(tel)||/^573\d{9}$/.test(tel);
+  const wnum='57'+tel.replace(/^57/,'');
+  const wamsg=encodeURIComponent('Hola 👋, le escribo de Feroz. Fabricamos botas de dotación y seguridad industrial (puntera, antideslizantes, trabajo pesado). ¿Le interesa recibir el catálogo y precios para su empresa?');
+  $('cardBox').innerHTML=`<div class="card">
+    <h2>${l.nombre||'(sin nombre)'}</h2>
+    <div>${l.categoria?`<span class="badge">${l.categoria}</span>`:''}${l.esp?`<span class="badge">${l.esp}</span>`:''}${l.ciudad?`<span class="badge">📍 ${l.ciudad}</span>`:''}</div>
+    ${l.contacto?`<p class="mut" style="margin:8px 0 0">👤 ${l.contacto}</p>`:''}
+    ${l.web?`<p class="mut" style="margin:4px 0 0">🌐 ${l.web}</p>`:''}
+    <a class="call" href="tel:+57${tel}">📞 LLAMAR · ${tel||'sin número'}</a>
+    ${esMovil?`<a class="call wa" href="https://wa.me/${wnum}?text=${wamsg}" target="_blank" rel="noopener">📲 WhatsApp</a>`:''}
+    <textarea class="fld" id="nota" rows="2" placeholder="Nota (opcional)" autocomplete="off"></textarea>
+    <div class="res">${RES.map(r=>`<button style="background:${r.col}" onclick="marcar('${r.c}')">${r.t}<small>${fmt(r.p)}</small></button>`).join('')}</div>
+  </div>`;
+}
+async function marcar(code){
+  const l=LEADS[IDX];
+  const rec={empresa:'feroz',mundo:'empresa',fila:l.fila,nombre:l.nombre,cel:l.cel||l.fijo,resultado:code,nota:($('nota')?.value||'').trim()||null,vendedor:OP.nombre,fecha:new Date().toISOString()};
+  rest('feroz_marcador_resultados',{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(rec)}).catch(()=>{});
+  GAN+=PAY[code]||0; IDX++; render();
+}
+async function cargarMas(){await cargarLote();render();}
+
+// ---- sesión / heartbeat ----
+function iniciarHb(){clearInterval(hb);hb=setInterval(()=>{if(SECTOR)rest('nc_marcador_sesion?cedula=eq.'+encodeURIComponent(OP.cedula),{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify({ultima_actividad:new Date().toISOString()})}).catch(()=>{});},60000);}
+function liberar(){clearInterval(hb);if(OP)rest('nc_marcador_sesion?cedula=eq.'+encodeURIComponent(OP.cedula),{method:'DELETE',headers:H}).catch(()=>{});SECTOR=null;}
+window.addEventListener('beforeunload',()=>{if(OP&&SECTOR)navigator.sendBeacon&&fetch(SB+'/rest/v1/nc_marcador_sesion?cedula=eq.'+encodeURIComponent(OP.cedula),{method:'DELETE',headers:H,keepalive:true});});
+
+// ---- arranque ----
+(function(){const s=localStorage.getItem('marc_op');if(s){OP=JSON.parse(s);verHome();}else show('login');})();
+</script>
