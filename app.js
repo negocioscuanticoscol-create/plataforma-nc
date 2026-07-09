@@ -1291,7 +1291,9 @@ const App = {
   _cityDeptoExtra(){ return {'cajica':'Cundinamarca','choconta':'Cundinamarca','madrid':'Cundinamarca','tenjo':'Cundinamarca','ubate':'Cundinamarca','zipaquira':'Cundinamarca','sopo':'Cundinamarca','chia':'Cundinamarca','funza':'Cundinamarca','mosquera':'Cundinamarca','caucasia':'Antioquia','girardota':'Antioquia','la estrella':'Antioquia','apartado':'Antioquia','rionegro':'Antioquia','chinacota':'Norte de Santander','los patios':'Norte de Santander','ocana':'Norte de Santander','pamplona':'Norte de Santander','cumaral':'Meta','acacias':'Meta','el espino':'Boyaca','sogamoso':'Boyaca','duitama':'Boyaca','la cumbre':'Valle del Cauca','la cruz':'Narino','pitalito':'Huila','san gil':'Santander','velez':'Santander','barrancas':'La Guajira'}; },
   _geoCiudadesOptions(){ const s=new Set(); (window.GEO_CO?window.GEO_CO.zonas:[]).forEach(z=>(z.deptos||[]).forEach(d=>(d.ciudades||[]).forEach(c=>s.add(c.nombre)))); return [...s].sort().map(c=>`<option value="${c}">`).join(''); },
   autoGeoRegistro(){ const ci=$('rc_ciudad')?this._na($('rc_ciudad').value):''; let g=this._geoMap()[ci]; if(!g){ const ex=this._cityDeptoExtra()[ci]; if(ex){ const zn=this._geoDeptoZona()[this._na(ex)]; if(zn) g={depto:ex,zona:zn}; } } const hub={}; (window.GEO_CO?window.GEO_CO.zonas:[]).forEach(z=>hub[z.nombre]=z.hub); if(g){ if($('rc_depto'))$('rc_depto').value=g.depto; if($('rc_zona'))$('rc_zona').value=g.zona; const n=$('rc_geo_note'); if(n) n.textContent='📍 '+($('rc_ciudad').value)+' → '+g.depto+' → Zona '+g.zona+(hub[g.zona]?' (hub '+hub[g.zona]+')':''); } else { const n=$('rc_geo_note'); if(n) n.textContent=''; } },
-  vRegistroForm(){
+  async _telemercsOpts(){ try{ const r=await fetch(this._SBU()+'/rest/v1/nc_marcador_operadoras?activo=eq.true&select=nombre&order=nombre.asc',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const j=await r.json(); return (Array.isArray(j)?j:[]).map(t=>`<option value="${t.nombre}">${t.nombre}</option>`).join(''); }catch(e){ return ''; } },
+  async vRegistroForm(){
+    const teleOpts=await this._telemercsOpts();
     this.set(`<button class="btn-sm" onclick="App.cotRegistro()" style="margin-bottom:10px;background:var(--gris)">← Volver</button>
       <h1>Nuevo cliente</h1><div class="sub">Se guarda en la nube y se reutiliza en cotizador, CRM y despachos</div>
       <div class="card">
@@ -1304,6 +1306,7 @@ const App = {
         <div class="row2"><div><label>Tipo de cliente</label><select id="rc_seg" class="field"><option value="cliente final">Cliente final</option><option value="distribuidor">Distribuidor</option><option value="mayorista">Mayorista</option><option value="empresa">Empresa</option></select></div>
           <div><label>Lista de precios habitual</label><select id="rc_lista" class="field">${this._listasOptions()}</select></div></div>
         <div class="row2"><div><label>Canal</label><select id="rc_canal" class="field"><option value="digital">Digital</option><option value="marcador">Marcador</option><option value="organico">Orgánico</option><option value="recomendado">Recomendado</option></select></div><div><label>Sector / nicho</label><input id="rc_sector" class="field"></div></div>
+        <label>📞 Telemercaderista (quién lo consiguió)</label><select id="rc_telemerc" class="field"><option value="">Sin telemercaderista</option>${teleOpts}</select>
       </div>
       <div class="card"><h2 style="font-size:15px;margin-bottom:8px">Datos de envío</h2>
         <label>Dirección</label><input id="rc_dir" class="field">
@@ -1349,7 +1352,7 @@ const App = {
       const base={nombre, nit:doc, tel:wa, correo:v('rc_email'), direccion:v('rc_dir'), barrio:v('rc_barrio'),
         ciudad:v('rc_ciudad'), depto:v('rc_depto'), clase:(v('rc_seg')==='distribuidor'?'distribuidor':'empresa'),
         contacto1:v('rc_contacto'), embudo:null, lista_precio:'Distribuidor', referencia:'701',
-        recomendado:(v('rc_canal')==='recomendado'), creado_por:this.user.id};
+        recomendado:(v('rc_canal')==='recomendado'), telemercaderista:v('rc_telemerc')||null, creado_por:this.user.id};
       const dup=await this._clienteDuplicado(wa, doc);
       if(dup && confirm(`⚠️ Ya existe "${dup.nombre}" con ese mismo teléfono/NIT.\n\nAceptar = NO crear duplicado (ir al CRM).\nCancelar = crear de todos modos.`)){ this.go('crm'); return; }
       const { error } = await this.sb.from('clientes').insert(base);
@@ -1357,7 +1360,7 @@ const App = {
       alert('✅ Prospecto guardado (lo ves en CRM → 🎯 Prospectos)'); this.go('crm'); return;
     }
     // SMART → nc_clientes
-    const datos={tipo, seg:v('rc_seg'), canal:v('rc_canal'), sector:v('rc_sector'), zona:v('rc_zona'), notas:v('rc_notas'), last_lista:Number(v('rc_lista'))||0};
+    const datos={tipo, seg:v('rc_seg'), canal:v('rc_canal'), sector:v('rc_sector'), zona:v('rc_zona'), notas:v('rc_notas'), telemerc:v('rc_telemerc')||null, last_lista:Number(v('rc_lista'))||0};
     if(tipo==='natural'){ Object.assign(datos,{nom:nombre,neg:nombre,ced:doc,tel:wa,eml:v('rc_email'),dir:v('rc_dir'),bar:v('rc_barrio'),ciu:v('rc_ciudad'),dep:v('rc_depto')}); }
     else { Object.assign(datos,{rsoc:nombre,rut:doc,rec:v('rc_contacto'),telj:wa,emlj:v('rc_email'),dirj:v('rc_dir'),barj:v('rc_barrio'),ciuj:v('rc_ciudad'),depj:v('rc_depto')}); }
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_clientes?on_conflict=empresa,documento',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:'smart',documento:doc,nombre:nombre,celular:wa,last_lista:Number(v('rc_lista'))||0,datos:datos})});
