@@ -744,7 +744,8 @@ const App = {
     const mesAct=new Date().toISOString().slice(0,7); const val=arr=>arr.reduce((a,c)=>a+(+c.total||0),0);
     const esKit=c=>((c.datos||{}).kit_muestras==='SI');
     const delMes=all.filter(c=>(c.creado_en||'').slice(0,7)===mesAct);
-    const anul=all.filter(c=>c.estado==='anulado');
+    const anul=all.filter(c=>/anul/i.test(c.estado||''));   // cubre 'anulado' y 'anulada'
+    const anulMot={}; anul.forEach(c=>{ const m=((c.datos||{}).motivo_anulacion)||'(sin motivo)'; anulMot[m]=(anulMot[m]||0)+1; });
     const kitAll=all.filter(esKit); const kitMes=kitAll.filter(c=>(c.creado_en||'').slice(0,7)===mesAct);
     this.set(`
       <h1>Cotizaciones</h1><div class="sub">Registra clientes · cotiza · sigue la cola</div>
@@ -760,6 +761,7 @@ const App = {
           <div class="kpi rojo"><b>${anul.length}</b><span>Anuladas · ${cl(val(anul))}</span></div>
           <div class="kpi"><b>${kitAll.length}</b><span>Kit acum · ${kitMes.length} del mes</span></div>
         </div>
+        ${anul.length?`<div style="font-size:11.5px;color:#667;margin-top:8px;border-top:1px solid var(--linea);padding-top:6px">🗂️ Motivos de anulación: ${Object.entries(anulMot).sort((a,b)=>b[1]-a[1]).map(([m,n])=>esc(m)+': <b>'+n+'</b>').join(' · ')}</div>`:''}
       </div>
       <div class="row2" style="margin-bottom:10px">
         <button class="btn btn-ghost" onclick="App.cotRegistro()" style="padding:18px;line-height:1.5">📋<br>Registro (resumen)</button>
@@ -806,8 +808,7 @@ const App = {
   cotWA(id){ const c=this._findCot(id); const m=`Hola ${c.cliente||''} 👋 Te recuerdo tu cotización ${c.folio||''} de Smart Packaging por $${(+c.total||0).toLocaleString('es-CO')}. ¿Te ayudo a cerrarla?`; window.open('https://wa.me/57'+(c.celular||'')+'?text='+encodeURIComponent(m),'_blank'); },
   async cotRemarket(id){ const c=this._findCot(id); const m=`Hola ${c.cliente||''} 👋 ¿Activamos tu cotización ${c.folio||''} ($${(+c.total||0).toLocaleString('es-CO')})? Te dejo lista la producción de tus envases.`; window.open('https://wa.me/57'+(c.celular||'')+'?text='+encodeURIComponent(m),'_blank'); await this.cotUpd(id,{accion:'remarketing'}); this.vCotLanding(); },
   async cotLlamar(id){ await this.cotUpd(id,{accion:'llamar'}); this.vCotLanding(); },
-  cotAnular(id){ this._anulId=id; this._anulMode='cot'; this._anulMotivo=''; this._anulModal('cotización'); },
-  pedAnularSmart(id){ this._anulId=id; this._anulMode='ped'; this._anulMotivo=''; this._anulModal('pedido'); },
+  cotAnular(id){ this._anulId=id; this._anulMotivo=''; this._anulModal('cotización'); },
   _anulModal(que){
     this.modal(`<h3>❌ Anular ${que}</h3>
       <div class="hint" style="margin-bottom:8px">¿Por qué se anula? Elige un motivo y/o escribe el detalle.</div>
@@ -824,18 +825,9 @@ const App = {
   async anulConfirmar(){
     const motivo=this._anulMotivo||''; const nota=((document.getElementById('anulNota')||{}).value||'').trim();
     if(!motivo && !nota){ alert('Elige un motivo o escribe el detalle.'); return; }
-    if(this._anulMode==='ped'){
-      const p=(this._peds||[]).find(x=>x.id===this._anulId)||{};
-      const d=Object.assign({}, p.datos||{}, {motivo_anulacion:motivo, nota_anulacion:nota});
-      await this.cotUpd(this._anulId,{estado:'anulado', datos:d});
-      // descuenta la venta de comisiones (marca la venta como Cancelada por folio)
-      if(p.folio){ try{ await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(p.folio),{method:'PATCH',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({estado_pago:'Cancelada'})}); }catch(e){} }
-      this.cerrarModal(); this._toast('Pedido anulado · venta descontada de comisiones'); this.vPedidosSmart();
-    } else {
-      const c=this._findCot(this._anulId)||{}; const d=Object.assign({}, c.datos||{}, {motivo_anulacion:motivo, nota_anulacion:nota});
-      await this.cotUpd(this._anulId,{estado:'anulado', datos:d});
-      this.cerrarModal(); this._toast('Cotización anulada · motivo guardado'); this.vCotLanding();
-    }
+    const c=this._findCot(this._anulId)||{}; const d=Object.assign({}, c.datos||{}, {motivo_anulacion:motivo, nota_anulacion:nota});
+    await this.cotUpd(this._anulId,{estado:'anulado', datos:d});
+    this.cerrarModal(); this._toast('Cotización anulada · motivo guardado'); this.vCotLanding();
   },
   _toast(msg){ const t=document.createElement('div'); t.textContent=msg; t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0c3a26;color:#9ff0c8;padding:12px 18px;border-radius:10px;font-size:13px;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,.25);max-width:90%'; document.body.appendChild(t); setTimeout(()=>t.remove(),5000); },
   async cotContactoToggle(id){
@@ -1146,7 +1138,6 @@ const App = {
           ${p.guia_url?`<a class="btn-sm" href="${p.guia_url}" target="_blank" style="background:#e5e7eb">🖼️ Ver foto</a>`:''}
           <button class="btn-sm" style="background:#16a34a;color:#fff;font-weight:700" onclick="App.pedDespachar('${p.id}')">📦 Despachar →</button>
           <button class="btn-sm" style="background:#3a48b3;color:#fff;font-weight:700" onclick="App.pedDespacharPropio('${p.id}')">🚚 Transporte propio</button>
-          <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.pedAnularSmart('${p.id}')">❌ Anular</button>
         </div></div>`;}).join(''):'<div class="empty">No hay pedidos por despachar.</div>'}`);
   },
   async vDespachosSmart(){
