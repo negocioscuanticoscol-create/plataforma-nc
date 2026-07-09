@@ -2347,10 +2347,11 @@ const App = {
       ${canal==='prospectos'&&cajon!=='inter'?`<button class="btn-sm" style="width:100%;background:#0b1f2a;color:#fff;padding:11px;margin-bottom:10px;font-weight:700" onclick="App.crmInforme('${cajon}')">📄 Generar informe de ${String(cajon).toUpperCase()} (para WhatsApp)</button>`:''}
       ${this._crmFItems(canal,cajon)}`);
   },
-  crmFCanal(c){ this._crmFCanal=c; this._crmFCajon=null; this.vCrm(); },
+  crmFCanal(c){ this._crmFCanal=c; this._crmFCajon=null; this._crmMarcCat=null; this.vCrm(); },
   crmEditarProsp(id){ const c=(this._crmFCli||[]).find(x=>x.id===id); if(c) this.modalCliente(()=>this.vCrm(), c); },
   async crmNota(id){ const c=(this._crmFCli||[]).find(x=>x.id===id)||{}; const v=prompt('📝 Nota para '+(c.nombre||'el cliente')+':', c.notas||''); if(v===null) return; await this.sb.from('clientes').update({notas:v}).eq('id',id); this._toast('Nota guardada'); this.vCrm(); },
-  crmFCajon(s){ this._crmFCajon=s; this.vCrm(); },
+  crmFCajon(s){ this._crmFCajon=s; this._crmMarcCat=null; this.vCrm(); },
+  crmMarcCat(c){ this._crmMarcCat=(this._crmMarcCat===c?null:c); this.vCrm(); },   // toggle: muestra los contactos de esa categoría; re-toca para ocultar
   crmInforme(cajon){
     const cli=this._crmFCli||[];
     const arr=cli.filter(c=> cajon==='esp'?!!c.especial : cajon==='gpjr'?(!!c.recomendado&&!c.especial) : (!c.recomendado&&!c.especial));
@@ -2425,15 +2426,22 @@ const App = {
       const trab=res.length, cubrir=Math.max(0,total-trab);
       const byCal={}; res.forEach(r=>{ const k=r.resultado||'—'; byCal[k]=(byCal[k]||0)+1; });
       const calBadge=r=>{ const v=(r.resultado||'').toLowerCase(); const c=/interes/.test(v)?'b-aceptada':/venta|muestra/.test(v)?'b-despachado':/no contesta|equiv|buz/.test(v)?'b-cotizada':'b-entregado'; return `<span class="badge ${c}">${esc(r.resultado||'—')}</span>`; };
+      const cat=this._crmMarcCat||null;
+      const cats=Object.entries(byCal).sort((a,b)=>b[1]-a[1]);
+      const botones=cats.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${cats.map(([k,v])=>`<button class="btn-sm" style="font-weight:800;padding:9px 13px;background:${k===cat?'#0b1f2a':'#eef2ff'};color:${k===cat?'#fff':'#3a48b3'}" onclick="App.crmMarcCat('${(k||'').replace(/'/g,'')}')">${esc(k)} <b>${v}</b></button>`).join('')}</div>`:'';
       const resumen=`<div class="card" style="border-left:4px solid var(--naranja)">
         <div style="font-size:12px;color:#667;margin-bottom:8px">👤 Asesor: <b>NC</b> <span style="color:#9aa3b0">(por ahora trabaja todo · filtro por asesor/ciudad/base: próximamente)</span></div>
         <div class="kpis"><div class="kpi"><b>${total.toLocaleString('es-CO')}</b><span>Total ${mundo==='distribuidor'?'distribuidores':'empresas'}</span></div>
           <div class="kpi verde"><b>${trab.toLocaleString('es-CO')}</b><span>Trabajados</span></div>
           <div class="kpi naranja"><b>${cubrir.toLocaleString('es-CO')}</b><span>Por cubrir</span></div></div>
-        ${Object.keys(byCal).length?`<div style="font-size:11.5px;color:#667;margin-top:8px">${Object.entries(byCal).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc(k)}: <b>${v}</b>`).join(' &nbsp;·&nbsp; ')}</div>`:''}
+        ${botones}
+        ${cats.length?`<div style="font-size:11px;color:#9aa3b0;margin-top:8px">👆 Toca una categoría para ver esos contactos</div>`:''}
       </div>`;
-      const lista=res.length? res.map(r=>{ const key='m'+((r.cel||r.nombre)+'').replace(/[^a-z0-9]/gi,'').slice(0,26); const base=-1; return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(r.nombre||'—')}</div><div class="meta">📱 ${esc(r.cel||'')}${r.fecha?' · 📅 '+esc((r.fecha||'').slice(0,10)):''}</div></div>${calBadge(r)}</div>${this._emb(key,base,'marcador',r.nombre,r.cel)}</div>`; }).join('')
-        : '<div class="empty">Aún sin trabajados. Se llenan desde el <b>Marcador</b> (power-dialer). Los 🔥 Interesado caen a Prospectos → Interesados.</div>';
+      let lista='';
+      if(!cats.length){ lista='<div class="empty">Aún sin trabajados. Se llenan desde el <b>Marcador</b> (power-dialer). Los 🔥 Interesado caen a Prospectos → Interesados.</div>'; }
+      else if(cat){ const sel=res.filter(r=>(r.resultado||'—')===cat);
+        lista=sel.length? sel.map(r=>{ const key='m'+((r.cel||r.nombre)+'').replace(/[^a-z0-9]/gi,'').slice(0,26); const base=-1; return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(r.nombre||'—')}</div><div class="meta">📱 ${esc(r.cel||'')}${r.fecha?' · 📅 '+esc((r.fecha||'').slice(0,10)):''}</div></div>${calBadge(r)}</div>${this._emb(key,base,'marcador',r.nombre,r.cel)}</div>`; }).join('')
+          : '<div class="empty">Sin contactos en esta categoría.</div>'; }
       return resumen+lista;
     }
     if(canal==='digital'){
