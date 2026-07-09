@@ -1,70 +1,73 @@
 <!doctype html><html lang="es"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Barrido Presencial · Feroz</title>
+<title>Barrido Presencial</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}
 body{background:#0f1620;color:#eaf1f8;max-width:480px;margin:0 auto;padding:0 0 90px}
 header{background:#0b1220;border-bottom:3px solid #E8620C;padding:12px 16px;position:sticky;top:0;z-index:5}
 header b{font-size:17px}header b span{color:#E8620C}
-#gps{font-size:12px;margin-top:4px;color:#7fd0a3}
-#gps.bad{color:#ff8a8a}
+#gps{font-size:12px;margin-top:4px;color:#7fd0a3}#gps.bad{color:#ff8a8a}
 main{padding:14px}
-label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px;color:#b9c4d0}
-input[type=text],input[type=tel],textarea,select{width:100%;padding:12px;border:1px solid #2b3a4a;border-radius:10px;background:#18222e;color:#eaf1f8;font-size:15px}
-textarea{min-height:60px;resize:vertical}
+label{display:block;font-size:13px;font-weight:600;margin:13px 0 5px;color:#b9c4d0}
+label .op{color:#5f6f7d;font-weight:400}
+input[type=text],input[type=tel],textarea{width:100%;padding:12px;border:1px solid #2b3a4a;border-radius:10px;background:#18222e;color:#eaf1f8;font-size:15px}
+textarea{min-height:58px;resize:vertical}
 .fotos{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
-.foto{position:relative;background:#18222e;border:1.5px dashed #33475b;border-radius:12px;height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
-.foto.big{grid-column:1/-1;height:120px}
+.foto{position:relative;background:#18222e;border:1.5px dashed #33475b;border-radius:12px;height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
+.foto.big{grid-column:1/-1;height:130px}
 .foto.ok{border:2px solid #22c55e;border-style:solid}
 .foto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.foto .ico{font-size:26px}.foto .txt{font-size:11px;color:#8ea3b5;margin-top:3px}
+.foto .ico{font-size:28px}.foto .txt{font-size:11.5px;color:#8ea3b5;margin-top:3px;text-align:center;padding:0 6px}
 .foto input{display:none}
-.foto .chk{position:absolute;top:4px;right:6px;background:#22c55e;color:#04240f;border-radius:50%;width:20px;height:20px;font-size:13px;display:none;align-items:center;justify-content:center}
+.foto .up{position:absolute;bottom:4px;left:6px;font-size:10px;background:#000a;padding:2px 6px;border-radius:6px}
+.foto .chk{position:absolute;top:5px;right:7px;background:#22c55e;color:#04240f;border-radius:50%;width:22px;height:22px;font-size:14px;display:none;align-items:center;justify-content:center;font-weight:800}
 .foto.ok .chk{display:flex}
-.foto .up{position:absolute;bottom:4px;left:6px;font-size:10px;background:#0009;padding:2px 6px;border-radius:6px}
-.int{display:flex;gap:8px;margin-top:6px}
-.int button{flex:1;padding:12px;border:none;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;background:#22303f;color:#b9c4d0}
-.int button.on-si{background:#16a34a;color:#fff}.int button.on-tal{background:#f59e0b;color:#3a2800}.int button.on-no{background:#ef4444;color:#fff}
+.int{display:flex;gap:10px;margin-top:6px}
+.int button{flex:1;padding:15px;border:none;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;background:#22303f;color:#b9c4d0}
+.int button.on-si{background:#16a34a;color:#fff}.int button.on-no{background:#ef4444;color:#fff}
 #save{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#E8620C;color:#fff;border:none;padding:18px;font-size:17px;font-weight:800;cursor:pointer}
 #save:disabled{background:#555}
 .cnt{text-align:center;font-size:12px;color:#8ea3b5;margin:10px 0}
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0c3a26;color:#9ff0c8;padding:11px 16px;border-radius:10px;font-size:13px;z-index:99;max-width:90%;display:none}
+.toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%);background:#0c3a26;color:#9ff0c8;padding:11px 16px;border-radius:10px;font-size:13px;z-index:99;max-width:90%;display:none}
 </style></head><body>
-<header><b>🥾 BARRIDO <span>PRESENCIAL</span> · Feroz</b><div id="gps" class="bad">📍 Obteniendo ubicación…</div></header>
+<header><b>🥾 BARRIDO <span>PRESENCIAL</span></b><div id="gps" class="bad">📍 Obteniendo ubicación…</div></header>
 <main>
   <div class="cnt" id="cnt">Hoy: 0 negocios</div>
-  <label>📷 Foto del negocio *</label>
-  <div class="fotos"><div class="foto big" id="f_neg" onclick="pick('neg')"><div class="ico">🏪</div><div class="txt">Tomar foto del negocio</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_neg" onchange="cap('neg',this)"></div></div>
 
-  <label>📦 3 fotos de las referencias que usan/venden</label>
+  <label>1️⃣ Foto de la FACHADA del negocio</label>
+  <div class="fotos"><div class="foto big" onclick="pick('fachada')"><div class="ico">🏪</div><div class="txt">Tomar foto de la fachada</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_fachada" onchange="cap('fachada',this)"></div></div>
+
+  <label>2️⃣ 2 fotos de lo que está comprando <span class="op">(las botas/dotación que maneja)</span></label>
   <div class="fotos">
-    <div class="foto" id="f_r1" onclick="pick('r1')"><div class="ico">📦</div><div class="txt">Ref 1</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_r1" onchange="cap('r1',this)"></div>
-    <div class="foto" id="f_r2" onclick="pick('r2')"><div class="ico">📦</div><div class="txt">Ref 2</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_r2" onchange="cap('r2',this)"></div>
-    <div class="foto" id="f_r3" onclick="pick('r3')"><div class="ico">📦</div><div class="txt">Ref 3</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_r3" onchange="cap('r3',this)"></div>
-    <div class="foto" id="f_tar" onclick="pick('tar')"><div class="ico">💳</div><div class="txt">Tarjeta</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_tar" onchange="cap('tar',this)"></div>
+    <div class="foto" onclick="pick('comp1')"><div class="ico">📦</div><div class="txt">Producto 1</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_comp1" onchange="cap('comp1',this)"></div>
+    <div class="foto" onclick="pick('comp2')"><div class="ico">📦</div><div class="txt">Producto 2</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_comp2" onchange="cap('comp2',this)"></div>
   </div>
 
-  <label>Nombre del negocio *</label><input type="text" id="nombre" placeholder="Ej: Dotaciones El Obrero">
-  <label>¿Qué vende? (dotación, EPP, botas…)</label><input type="text" id="vende" placeholder="Botas, ropa de trabajo, guantes…">
-  <label>¿A quién le compra? (proveedor actual)</label><input type="text" id="compra" placeholder="Marca/proveedor de botas que maneja">
-  <label>Teléfono de contacto</label><input type="tel" id="tel" inputmode="tel" placeholder="Cel o fijo (o toma foto de la tarjeta)">
+  <label>3️⃣ Foto de la TARJETA del negocio</label>
+  <div class="fotos"><div class="foto big" onclick="pick('tarjeta')"><div class="ico">💳</div><div class="txt">Tomar foto de la tarjeta</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_tarjeta" onchange="cap('tarjeta',this)"></div></div>
+
+  <label>Nombre del negocio <span class="op">(opcional)</span></label><input type="text" id="nombre" placeholder="Ej: Dotaciones El Obrero">
+  <label>¿Qué vende? <span class="op">(opcional)</span></label><input type="text" id="vende" placeholder="Botas, ropa de trabajo, guantes…">
+  <label>¿A quién le compra? <span class="op">(opcional)</span></label><input type="text" id="compra" placeholder="Proveedor/marca de botas que maneja">
+  <label>Teléfono <span class="op">(opcional)</span></label><input type="tel" id="tel" inputmode="tel" placeholder="Cel o fijo">
+  <label>Ciudad / barrio <span class="op">(opcional)</span></label><input type="text" id="ciudad" placeholder="Dónde estás">
+  <label>Notas <span class="op">(opcional)</span></label><textarea id="notas" placeholder="Con quién hablaste, tamaño, observaciones…"></textarea>
+
   <label>¿Le interesó? (le dejaste el volante)</label>
-  <div class="int"><button type="button" id="i_si" onclick="setInt('si')">🔥 Sí</button><button type="button" id="i_tal" onclick="setInt('talvez')">🤔 Tal vez</button><button type="button" id="i_no" onclick="setInt('no')">❌ No</button></div>
-  <label>Notas</label><textarea id="notas" placeholder="Lo que observaste, tamaño, con quién hablaste…"></textarea>
-  <label>Ciudad / zona</label><input type="text" id="ciudad" placeholder="Ciudad y barrio donde estás">
+  <div class="int"><button type="button" id="i_si" onclick="setInt('si')">🔥 Interesado</button><button type="button" id="i_no" onclick="setInt('no')">❌ No interesado</button></div>
 </main>
 <button id="save" onclick="guardar()">💾 Guardar negocio</button>
 <div class="toast" id="toast"></div>
 <script>
 const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
-let pos={lat:null,lng:null}, urls={neg:null,r1:null,r2:null,r3:null,tar:null}, interes='';
+let pos={lat:null,lng:null}, urls={fachada:null,comp1:null,comp2:null,tarjeta:null}, interes='';
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',3500);}
-function gps(){navigator.geolocation.getCurrentPosition(p=>{pos.lat=p.coords.latitude;pos.lng=p.coords.longitude;const g=document.getElementById('gps');g.className='';g.textContent='📍 Ubicación lista ('+pos.lat.toFixed(5)+', '+pos.lng.toFixed(5)+')';},e=>{const g=document.getElementById('gps');g.className='bad';g.textContent='📍 Sin permiso de ubicación — actívalo y recarga';},{enableHighAccuracy:true,timeout:15000});}
+function gps(){navigator.geolocation.getCurrentPosition(p=>{pos.lat=p.coords.latitude;pos.lng=p.coords.longitude;const g=document.getElementById('gps');g.className='';g.textContent='📍 Ubicación lista ('+pos.lat.toFixed(5)+', '+pos.lng.toFixed(5)+')';},e=>{const g=document.getElementById('gps');g.className='bad';g.textContent='📍 Activa el permiso de ubicación y recarga';},{enableHighAccuracy:true,timeout:15000});}
 gps();
 function pick(k){document.getElementById('in_'+k).click();}
 async function cap(k,input){
   const f=input.files&&input.files[0]; if(!f) return;
-  const box=document.getElementById('f_'+({neg:'neg',r1:'r1',r2:'r2',r3:'r3',tar:'tar'}[k]));
+  const box=input.parentElement;
   const url=URL.createObjectURL(f); let img=box.querySelector('img'); if(!img){img=document.createElement('img');box.appendChild(img);} img.src=url;
   const up=box.querySelector('.up'); up.style.display='block'; up.textContent='subiendo…';
   try{
@@ -76,31 +79,28 @@ async function cap(k,input){
     box.classList.add('ok'); up.textContent='✓ subida';
   }catch(e){ up.textContent='error, reintenta'; toast('No subió la foto: '+e.message); }
 }
-function setInt(v){interes=v;['si','tal','no'].forEach(x=>document.getElementById('i_'+x).className='');document.getElementById('i_'+(v==='talvez'?'tal':v)).className='on-'+(v==='talvez'?'tal':v);}
+function setInt(v){interes=v;['si','no'].forEach(x=>document.getElementById('i_'+x).className='');document.getElementById('i_'+v).className='on-'+v;}
 function hoyCount(){return +(localStorage.getItem('barrido_hoy_'+new Date().toDateString())||0);}
 function setCnt(){document.getElementById('cnt').textContent='Hoy: '+hoyCount()+' negocios';}
 setCnt();
 async function guardar(){
-  const nombre=document.getElementById('nombre').value.trim();
-  if(!nombre){toast('Pon el nombre del negocio');return;}
-  if(!urls.neg){toast('Toma al menos la foto del negocio');return;}
+  if(!urls.fachada){toast('Toma al menos la foto de la fachada');return;}
   const btn=document.getElementById('save'); btn.disabled=true; btn.textContent='Guardando…';
-  const rec={empresa:'feroz',nombre,ciudad:document.getElementById('ciudad').value.trim()||null,
-    lat:pos.lat,lng:pos.lng,vende:document.getElementById('vende').value.trim()||null,
-    compra_a:document.getElementById('compra').value.trim()||null,interesado:interes||null,
-    telefono:document.getElementById('tel').value.replace(/[^0-9+]/g,'')||null,
-    foto_negocio:urls.neg,foto_ref1:urls.r1,foto_ref2:urls.r2,foto_ref3:urls.r3,foto_tarjeta:urls.tar,
-    notas:document.getElementById('notas').value.trim()||null,vendedor:'Jose'};
+  const val=id=>document.getElementById(id).value.trim();
+  const rec={empresa:'feroz',nombre:val('nombre')||null,ciudad:val('ciudad')||null,lat:pos.lat,lng:pos.lng,
+    vende:val('vende')||null,compra_a:val('compra')||null,interesado:interes||null,
+    telefono:val('tel').replace(/[^0-9+]/g,'')||null,
+    foto_negocio:urls.fachada,foto_ref1:urls.comp1,foto_ref2:urls.comp2,foto_tarjeta:urls.tarjeta,
+    notas:val('notas')||null,vendedor:'Jose'};
   try{
     const r=await fetch(SB+'/rest/v1/nc_barrido_presencial',{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rec)});
     if(!r.ok) throw new Error('HTTP '+r.status);
     const k='barrido_hoy_'+new Date().toDateString(); localStorage.setItem(k,hoyCount()+1); setCnt();
-    toast('✅ Negocio guardado ('+nombre+')');
-    // reset (mantiene GPS)
-    ['nombre','vende','compra','tel','notas','ciudad'].forEach(id=>document.getElementById(id).value='');
-    urls={neg:null,r1:null,r2:null,r3:null,tar:null}; interes='';
+    toast('✅ Negocio guardado');
+    ['nombre','vende','compra','tel','ciudad','notas'].forEach(id=>document.getElementById(id).value='');
+    urls={fachada:null,comp1:null,comp2:null,tarjeta:null}; interes='';
     document.querySelectorAll('.foto').forEach(b=>{b.classList.remove('ok');const i=b.querySelector('img');if(i)i.remove();const u=b.querySelector('.up');if(u)u.style.display='none';});
-    ['si','tal','no'].forEach(x=>document.getElementById('i_'+x).className='');
+    ['si','no'].forEach(x=>document.getElementById('i_'+x).className='');
     gps();
   }catch(e){ toast('No guardó: '+e.message); }
   btn.disabled=false; btn.textContent='💾 Guardar negocio';
