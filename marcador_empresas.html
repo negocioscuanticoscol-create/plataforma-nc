@@ -203,11 +203,32 @@ function render(){
     <div class="res">${RES.map(r=>`<button style="background:${r.col}" onclick="marcar('${r.c}')">${r.t}<small>${fmt(r.p)}</small></button>`).join('')}</div>
   </div>`;
 }
-async function marcar(code){
+const CAP=['interesado','ordena','venta'];   // estos capturan el contacto real
+async function marcar(code){ if(CAP.includes(code)){ renderCap(code); return; } doSave(code,{}); }
+function doSave(code,extra){
   const l=LEADS[IDX];
-  const rec={empresa:'feroz',mundo:'empresa',fila:l.fila,nombre:l.nombre,cel:l.cel||l.fijo,resultado:code,nota:($('nota')?.value||'').trim()||null,vendedor:OP.nombre,fecha:new Date().toISOString()};
+  const nota=(extra._nota!==undefined?extra._nota:($('nota')?.value||'')).trim()||null;
+  const rec=Object.assign({empresa:'feroz',mundo:'empresa',fila:l.fila,nombre:l.nombre,cel:l.cel||l.fijo,resultado:code,nota,vendedor:OP.nombre,fecha:new Date().toISOString()},extra);
+  delete rec._nota;
   rest('feroz_marcador_resultados',{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(rec)}).catch(()=>{});
   GAN+=PAY[code]||0; IDX++; render(); cargarMiniRank();
+}
+function renderCap(code){
+  const l=LEADS[IDX]; const meta=RES.find(r=>r.c===code); const tel=(l.cel||l.fijo||'').replace(/\D/g,'');
+  $('cardBox').innerHTML=`<div class="card" style="border:2px solid ${meta.col}">
+    <h2 style="color:${meta.col}">${meta.t}</h2>
+    <p class="mut" style="margin:0 0 10px">Captura el contacto de <b>${l.nombre||''}</b> para el seguimiento</p>
+    <input class="fld" id="capNom" placeholder="👤 Nombre del contacto" autocomplete="off">
+    <input class="fld" id="capWa" placeholder="📲 WhatsApp" inputmode="tel" value="${tel}" autocomplete="off">
+    <input class="fld" id="capTel" placeholder="📞 Teléfono" inputmode="tel" autocomplete="off">
+    <textarea class="fld" id="capNota" rows="2" placeholder="Nota (opcional)" autocomplete="off"></textarea>
+    <button class="btn" style="background:${meta.col}" onclick="guardarCap('${code}')">✅ Guardar ${meta.t}</button>
+    <button class="btn sec" onclick="render()">‹ Volver</button>
+  </div>`;
+  $('capNom').focus();
+}
+function guardarCap(code){
+  doSave(code,{contacto:($('capNom').value||'').trim()||null, whatsapp:($('capWa').value||'').replace(/\s+/g,'')||null, telefono:($('capTel').value||'').replace(/\s+/g,'')||null, _nota:($('capNota').value||'')});
 }
 async function cargarMas(){await cargarLote();render();}
 function anterior(){ if(IDX>0){IDX--;render();} else alert('Ya estás en el primero.'); }
