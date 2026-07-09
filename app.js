@@ -104,7 +104,7 @@ const App = {
     if(r==='admin') permitidos=TODOS;
     this._permitidos=permitidos;
     const btn=i=>`<button data-v="${i.v}" onclick="App.go('${i.v}')"><span class="ic">${i.ic}</span>${i.t}</button>`;
-    const f1=ROW1.filter(i=>permitidos.includes(i.v) && !(window.NC_EMPRESA==='smart' && i.v==='cartera')).map(btn).join('');
+    const f1=ROW1.filter(i=>permitidos.includes(i.v)).map(btn).join('');
     const f2=ROW2.filter(i=>permitidos.includes(i.v)).map(btn).join('');
     $('nav').innerHTML = `<div class="nav-row">${f1}</div>${f2?`<div class="nav-row nav-row2">${f2}</div>`:''}`;
   },
@@ -133,6 +133,7 @@ const App = {
     if(window.NC_EMPRESA==='smart' && view==='crm') return this.vCrmSmart();
     if(window.NC_EMPRESA==='smart' && view==='planta') return this.vPlantaSmart();
     if(window.NC_EMPRESA==='smart' && view==='clientes') return this.vClientesSmart();
+    if(window.NC_EMPRESA==='smart' && view==='cartera') return this.vCarteraSmart();
     if(window.NC_EMPRESA==='smart' && view==='cobertura') return this.vCoberturaSmart();
     if(window.NC_EMPRESA==='smart' && view==='ventas') return this.vVentasSmart();
     if(window.NC_EMPRESA==='smart' && view==='panel') return this.vDashboardSmart();        // Panel = vista general
@@ -539,7 +540,9 @@ const App = {
           return `<tr style="${fut?'opacity:.45':''}"><td><b>${esc(m.mes)}</b></td><td style="text-align:right">${cl(meta)}</td><td style="text-align:right">${e?cl(e):'—'}</td><td style="text-align:right;font-weight:800;color:${fut?'#8a93a6':ok?'#16a34a':'#dc2626'}">${e?pct.toFixed(0)+'%':'—'}</td></tr>
             <tr><td colspan="4" style="padding:0 0 7px"><div style="height:7px;background:#eef1f5;border-radius:5px;overflow:hidden"><div style="height:100%;width:${Math.min(100,pct).toFixed(0)}%;background:${ok?'#16a34a':'#dc2626'}"></div></div></td></tr>`; }).join('')}
         <tr style="font-weight:800;border-top:2px solid #ddd"><td>TOTAL año</td><td style="text-align:right">${cl(totM)}</td><td style="text-align:right">${cl(totE)}</td><td style="text-align:right;color:${totE>=totM?'#16a34a':'#dc2626'}">${totM?(totE/totM*100).toFixed(0):0}%</td></tr>
-      </tbody></table></div>`;
+      </tbody></table>
+      <div style="margin-top:12px;padding:14px;background:#eff6ff;border:2px solid #1d4ed8;border-radius:10px;text-align:center"><b style="font-size:17px;color:#1d4ed8">📈 CRECIMIENTO DE 30% POR MES</b><div style="font-size:12px;color:#556;margin-top:3px">Metas automáticas desde mayo (ancla $20.000.000) · cada mes crece 30% sobre el anterior</div></div>
+      </div>`;
   },
   _plPendientes(){ return this._pendBody(this._pend); },
   _pendBody(pend){
@@ -755,6 +758,7 @@ const App = {
         const ac=c.accion?`<span class="badge" style="background:#eef2ff;color:#3a48b3">${c.accion==='llamar'?'📞 en seguimiento':c.accion==='remarketing'?'📣 remarketing':esc(c.accion)}</span>`:'<span class="badge b-cotizada">en cola</span>';
         return `<div class="item"><div class="top"><div><div class="nom">${esc(c.cliente||c.folio||'—')}</div><div class="meta">${c.folio?esc(c.folio)+' · ':''}$${(+c.total||0).toLocaleString('es-CO')} · 📅 ${f}${cel?' · 📱 '+esc(cel):''}</div></div>${ac}</div>
           <div class="acciones-item" style="align-items:center;gap:8px;flex-wrap:wrap">
+            <label style="font-size:12px;color:#b45309;display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:700" title="Si lo prendes, el pedido queda a crédito en Cartera (por cobrar)"><input type="checkbox" id="cotcred-${c.id}" style="accent-color:#d97706;width:15px;height:15px">💳 Crédito</label>
             <button class="btn-sm" style="background:#16a34a;color:#fff;font-weight:700" onclick="App.cotAutorizar('${c.id}')">✅ Autorizar → pedido</button>
             <button class="btn-sm" style="background:#6b7280;color:#fff" onclick="App.cotEditar('${c.id}')">✏️ Modificar</button>
             <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.cotAnular('${c.id}')">❌ Anular</button>
@@ -805,11 +809,12 @@ const App = {
   },
   async cotAutorizar(id){
     const c=this._findCot(id); if(!c||!c.datos){ alert('No encuentro los datos de la cotización.'); return; }
-    if(!confirm(`¿Confirmas el PAGO de "${c.cliente||c.folio}"?\n\nPasa a PEDIDO: escribe en el Sheet + Supabase e inicia el flujo de pedido.`)) return;
+    const _cred=!!(document.getElementById('cotcred-'+id)&&document.getElementById('cotcred-'+id).checked);
+    if(_cred){ if(!confirm(`¿Autorizar "${c.cliente||c.folio}" a CRÉDITO?\n\nPasa a PEDIDO y queda en 💳 Cartera (por cobrar). Cuando el cliente pague, marcas "pagado".`)) return; }
+    else if(!confirm(`¿Confirmas el PAGO de "${c.cliente||c.folio}"?\n\nPasa a PEDIDO: escribe en el Sheet + Supabase e inicia el flujo de pedido.`)) return;
     const _exp=+(c.total||0);
-    let _cons=prompt('¿Cuánto CONSIGNÓ el cliente?\n(déjalo igual si pagó exacto · si consignó de más, el excedente se suma a tu comisión)', String(_exp||''));
-    if(_cons===null) return;
-    _cons=+String(_cons).replace(/[^\d]/g,'')||_exp;
+    let _cons=_exp;
+    if(!_cred){ const _r=prompt('¿Cuánto CONSIGNÓ el cliente?\n(déjalo igual si pagó exacto · si consignó de más, el excedente se suma a tu comisión)', String(_exp||'')); if(_r===null) return; _cons=+String(_r).replace(/[^\d]/g,'')||_exp; }
     // 1) Sheet — best-effort, NO bloquea (la fuente de verdad es Supabase). Antes se colgaba aquí y dejaba "pensando".
     try{
       const d=Object.assign({}, c.datos);
@@ -825,7 +830,7 @@ const App = {
       fetch('https://script.google.com/macros/s/AKfycbyZHB89LCwnzLd0-ttzff5ZjocjfHq7k6GOBEG7QbbTIzSn7i13iCNvr8bJMM8vJn8V/exec?'+qs,{method:'GET',mode:'no-cors',signal:ctrl.signal}).catch(()=>{});   // fire-and-forget
     }catch(e){ console.log('Sheet pedido',e); }
     // 2) Supabase — marca pedido (y deja datos.estado coherente con la columna)
-    await this.cotUpd(id,{estado:'pedido', datos:Object.assign({}, c.datos||{}, {estado:'Pedido'})});
+    await this.cotUpd(id,{estado:'pedido', datos:Object.assign({}, c.datos||{}, {estado:'Pedido', tipo_pago:_cred?'credito':'contado'})});
     // 3) Supabase nc_ventas — ALIMENTA el libro de comisión desde la app (ya no es foto del Sheet).
     //    Check-then-insert por folio para no duplicar lo ya importado.
     try{
@@ -1119,6 +1124,27 @@ const App = {
       ${lista.length?lista.map(item).join(''):`<div class="empty">${tab==='entregado'?'Aún no hay entregados.':'No hay envíos en ruta. Despacha pedidos desde 📦 Pedidos.'}</div>`}`);
   },
   despTabSmart(t){ this._despTabSmart=t; this.vDespachosSmart(); },
+  async vCarteraSmart(){   // SMART · Cartera — ventas a crédito pendientes de cobro (datos de Smart, nunca Feroz)
+    this.loading();
+    const peds=await this._loadPeds();
+    const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
+    const esCredito=p=>{const d=p.datos||{};return /cred/i.test(d.tipo_pago||d.forma_pago||d.pago||'')||d.credito===true;};
+    const noPagado=p=>!(p.datos&&p.datos.cartera_pagada===true);
+    const cartera=peds.filter(p=>esCredito(p)&&noPagado(p));
+    const total=cartera.reduce((a,p)=>a+(+p.total||0),0);
+    this.set(`<h1>💳 Cartera · Smart</h1><div class="sub">Ventas a crédito pendientes de cobro · marca "pagado" cuando el cliente consigne</div>
+      <div class="card" style="background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;border:none"><div style="font-size:12px;opacity:.85">💰 Total por cobrar</div><div style="font-size:25px;font-weight:800;margin-top:2px">${cl(total)}</div><div style="font-size:11px;opacity:.8">${cartera.length} pedido(s) a crédito sin pagar</div></div>
+      ${cartera.length?cartera.map(p=>{const d=p.datos||{};const dias=Math.round((Date.now()-new Date(p.creado_en))/86400000);return `<div class="item"><div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}📅 ${dias} días${d.celular?' · 📱 '+esc(d.celular):''}</div></div><div style="text-align:right"><div style="color:#1d4ed8;font-weight:800">${cl(p.total)}</div><button class="btn-sm" style="background:#16a34a;color:#fff;margin-top:4px" onclick="App.carteraPagarSmart('${p.id}')">💰 Marcar pagado</button></div></div></div>`;}).join(''):`<div class="empty" style="text-align:center;padding:30px">✅ Aún no hay ventas a crédito en Smart.<br><span style="font-size:12px;color:#889">Cuando un pedido se venda a crédito, aparecerá aquí para cobrarlo.</span></div>`}`);
+  },
+  async carteraPagarSmart(id){
+    if(!confirm('¿Confirmas que este cliente YA PAGÓ su crédito? Sale de Cartera (la venta se mantiene).')) return;
+    try{ const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
+      const rr=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?id=eq.'+id+'&select=datos&limit=1',{headers:H});
+      const d=((await rr.json())[0]||{}).datos||{}; d.cartera_pagada=true;
+      await this.cotUpd(id,{datos:d});
+    }catch(e){ console.log('carteraPagarSmart',e); }
+    this.vCarteraSmart();
+  },
   async _regVentaSiFalta(id){   // candado: si el pedido no está en Ventas, lo registra (idempotente por folio)
     try{
       const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
