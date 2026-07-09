@@ -1733,7 +1733,7 @@ const App = {
   },
   _proformaFlete(c){
     const pares=+c.pares||0;
-    if(c.es_muestra && c.muestra_tipo==='pie') return {lbl:'Envío gratis',val:0};
+    if(c.es_muestra && (c.muestra_tipo==='pie'||c.muestra_tipo==='parsv')) return {lbl:'Envío gratis',val:0};
     if(c.es_muestra && c.muestra_tipo==='par'){ const v=(+c.flete)||Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000); return {lbl:money(v),val:v}; }
     const cajas=(+c.cajas)||(pares/C.PARES_CAJA);
     return cajas>=C.MIN_CAJAS_SIN_FLETE ? {lbl:'Incluido (gratis)',val:0} : {lbl:'Al cobro (transportadora que elija)',val:0};
@@ -1749,8 +1749,8 @@ const App = {
     const cl=c.cliente_snap||{};
     const pares=+c.pares||0, sub=+c.subtotal||0, iva=+c.iva||0, tot=+c.total||0;
     const fl=this._proformaFlete(c);
-    const concepto = c.es_muestra ? (c.muestra_tipo==='pie'?'Muestra de pie (sin valor comercial)':'Muestra de par completo') : ('Bota dotación Ref. '+(c.referencia||'701'));
-    const ppar = (+c.precio_par) || (c.es_muestra?(c.muestra_tipo==='par'?C.MUESTRA_PAR:0):C.PRECIO_PAR);
+    const concepto = c.es_muestra ? (c.muestra_tipo==='pie'?'Muestra de pie (sin valor comercial)':(c.muestra_tipo==='parsv'?'Muestra de par completo (sin valor comercial)':'Muestra de par completo')) : ('Bota dotación Ref. '+(c.referencia||'701'));
+    const ppar = c.muestra_tipo==='parsv'?0:((+c.precio_par) || (c.es_muestra?(c.muestra_tipo==='par'?C.MUESTRA_PAR:0):C.PRECIO_PAR));
     const curva=c.curva||{}; const tallas=Object.keys(curva).sort((a,b)=>a-b);
     const tallasRows = tallas.length ? tallas.map(t=>`<tr><td>Talla ${t}</td><td style="text-align:right">${curva[t]} par(es)</td></tr>`).join('') : '';
     const fecha=new Date(c.creado_en||Date.now()).toLocaleDateString('es-CO');
@@ -1809,6 +1809,7 @@ const App = {
         <select class="field" id="co_muestra_tipo" onchange="App.toggleCotMuestra()" style="margin-top:6px">
           <option value="">No — cotización normal (curva)</option>
           <option value="par">Muestra PAR — ${money(C.MUESTRA_PAR)}/par + IVA + transporte ${money(C.MUESTRA_FLETE||22000)}</option>
+          <option value="parsv">Muestra PAR — SIN valor comercial (regalo, no se cobra)</option>
           <option value="pie">Muestra DE PIE — sin valor comercial · envío gratis</option>
           <option value="svc">Muestras SIN valor comercial (varias tallas) — sin precio</option>
           <option value="vendedor">👔 Muestra de VENDEDOR (equipo) — sin valor · se procesa como pedido</option>
@@ -1900,7 +1901,7 @@ const App = {
     // MUESTRA: PAR ($40.900 + IVA + transporte $22.000, se cobra) o DE PIE (sin valor comercial, envío gratis).
     const tipoM=$('co_muestra_tipo')?$('co_muestra_tipo').value:'';
     if(tipoM){
-      const esPie=(tipoM==='pie'), esSVC=(tipoM==='svc'), esVend=(tipoM==='vendedor'), sinValor=(esPie||esSVC||esVend);
+      const esPie=(tipoM==='pie'), esSVC=(tipoM==='svc'), esVend=(tipoM==='vendedor'), esParSV=(tipoM==='parsv'), sinValor=(esPie||esSVC||esVend||esParSV);
       let cu;
       if(esPie){   // muestra de pie (nono): no grilla; talla opcional + cantidad de nonos
         const talla=$('co_pie_talla')?$('co_pie_talla').value:''; const cant=Math.max(1,Math.floor(+(($('co_pie_cant')||{}).value)||1));
@@ -1912,8 +1913,8 @@ const App = {
       const conIvaM=(($('co_iva')||{checked:true}).checked);
       const sub=sinValor?0:C.MUESTRA_PAR*cu.pares, iva=(sinValor?0:(conIvaM?Math.round(sub*C.IVA):0)), flete=sinValor?0:Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000), total=sub+iva+flete;
       const partes=Object.keys(cu.tallas).length ? Object.keys(cu.tallas).sort((a,b)=>a-b).map(t=>`T${t}×${cu.tallas[t]}`).join(', ') : `${cu.pares} nono(s)`;
-      const reg={numero:num,cliente_id:cid||null,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':((esSVC||esVend)?'nono':'par'),flete,
-        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} + IVA ${money(iva)} + 🚚 transporte ${money(flete)} (aparte) · ${partes}`)),
+      const reg={numero:num,cliente_id:cid||null,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':(esParSV?'parsv':((esSVC||esVend)?'nono':'par')),flete,
+        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esParSV?`Muestra PAR · SIN valor comercial (regalo) · ${cu.pares} par(es) · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} + IVA ${money(iva)} + 🚚 transporte ${money(flete)} (aparte) · ${partes}`))),
         pares:cu.pares,cajas:0,resto:0,curva:cu.tallas,precio_par:sinValor?0:C.MUESTRA_PAR,subtotal:sub,iva,total,flete_al_cobro:false,estado:'cotizada',
         interno:esVend,asesor:esVend?asesorV:null,
         vendedor_id:this.user.id,referencia:(cl&&cl.referencia)||'701',recomendado:!!(cl&&cl.recomendado),comision_nc:0,comision_gpjr:0};
