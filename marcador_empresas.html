@@ -76,6 +76,14 @@
     <div><b id="tbSector"></b><br><span class="gan" id="tbGan">$0</span> <span class="mut" id="tbCnt"></span></div>
     <button class="lnk" onclick="cambiarSector()">cambiar sector</button>
   </div>
+  <div style="display:flex;gap:8px;margin:6px 0">
+    <button class="btn sec" style="margin:0;flex:1;padding:11px" onclick="anterior()">‹ Anterior</button>
+    <button class="btn sec" style="margin:0;flex:1;padding:11px" onclick="toggleBuscar()">🔍 Buscar número</button>
+  </div>
+  <div id="buscarBox" class="hide" style="margin-bottom:6px">
+    <input class="fld" id="qBuscar" placeholder="Número o nombre de la empresa" autocomplete="off" onkeydown="if(event.key==='Enter')buscar()">
+    <button class="btn" style="margin:4px 0" onclick="buscar()">Buscar</button>
+  </div>
   <div id="cardBox"></div>
 </div>
 
@@ -182,6 +190,20 @@ async function marcar(code){
   GAN+=PAY[code]||0; IDX++; render();
 }
 async function cargarMas(){await cargarLote();render();}
+function anterior(){ if(IDX>0){IDX--;render();} else alert('Ya estás en el primero.'); }
+function toggleBuscar(){ const b=$('buscarBox'); b.classList.toggle('hide'); if(!b.classList.contains('hide'))$('qBuscar').focus(); }
+async function buscar(){
+  const q=($('qBuscar').value||'').trim(); if(!q) return;
+  const dig=q.replace(/\D/g,'');
+  const url = dig.length>=6
+    ? 'feroz_marcador_leads?mundo=eq.empresa&or=(cel.ilike.*'+dig+'*,fijo.ilike.*'+dig+'*)&limit=1'
+    : 'feroz_marcador_leads?mundo=eq.empresa&nombre=ilike.*'+encodeURIComponent(q)+'*&limit=1';
+  try{
+    const r=await (await fetch(SB+'/rest/v1/'+url,{headers:H})).json();
+    if(!r||!r.length){ alert('No encontré esa empresa/número en la base.'); return; }
+    LEADS.splice(IDX,0,r[0]); $('buscarBox').classList.add('hide'); $('qBuscar').value=''; render();
+  }catch(e){ alert('Error buscando.'); }
+}
 
 // ---- sesión / heartbeat ----
 function iniciarHb(){clearInterval(hb);hb=setInterval(()=>{if(SECTOR)rest('nc_marcador_sesion?cedula=eq.'+encodeURIComponent(OP.cedula),{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify({ultima_actividad:new Date().toISOString()})}).catch(()=>{});},60000);}
