@@ -1140,6 +1140,7 @@ const App = {
           ${p.guia_url?`<a class="btn-sm" href="${p.guia_url}" target="_blank" style="background:#e5e7eb">🖼️ Ver foto</a>`:''}
           <button class="btn-sm" style="background:#16a34a;color:#fff;font-weight:700" onclick="App.pedDespachar('${p.id}')">📦 Despachar →</button>
           <button class="btn-sm" style="background:#3a48b3;color:#fff;font-weight:700" onclick="App.pedDespacharPropio('${p.id}')">🚚 Transporte propio</button>
+          <button class="btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa" onclick="App.pedACotizacionSmart('${p.id}')">↩️ A cotización</button>
         </div></div>`;}).join(''):'<div class="empty">No hay pedidos por despachar.</div>'}`);
   },
   async vDespachosSmart(){
@@ -1165,6 +1166,14 @@ const App = {
       ${lista.length?lista.map(item).join(''):`<div class="empty">${tab==='entregado'?'Aún no hay entregados.':'No hay envíos en ruta. Despacha pedidos desde 📦 Pedidos.'}</div>`}`);
   },
   despTabSmart(t){ this._despTabSmart=t; this.vDespachosSmart(); },
+  async pedACotizacionSmart(id){
+    const p=(this._peds||[]).find(x=>x.id===id)||{};
+    if(!confirm('¿Devolver este pedido a COTIZACIÓN? (ej: aún no han pagado)\n\nSale de Pedidos, vuelve a la cola de Cotizaciones y su venta se descuenta de comisiones.')) return;
+    const d=Object.assign({}, p.datos||{}, {estado:'Cotizacion'});
+    await this.cotUpd(id,{estado:'cotizacion', datos:d});
+    if(p.folio){ try{ await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(p.folio),{method:'PATCH',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({estado_pago:'Cancelada'})}); }catch(e){} }
+    this._toast('Devuelto a cotización · venta descontada'); this.vPedidosSmart();
+  },
   async vCarteraSmart(){   // SMART · Cartera — ventas a crédito pendientes de cobro (datos de Smart, nunca Feroz)
     this.loading();
     const peds=await this._loadPeds();
