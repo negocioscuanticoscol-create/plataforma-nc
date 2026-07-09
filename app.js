@@ -732,17 +732,34 @@ const App = {
       (Array.isArray(vv)?vv:[]).forEach(v=>{ if(v.folio) vFol.add(v.folio); }); }catch(e2){}
     const total=cots.length;
     const pend=cots.filter(c=> !(c.folio && vFol.has(c.folio)) );
+    // TODAS las cotizaciones (para el resumen: acumuladas, del mes, anuladas, kit)
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.'+e+'&select=estado,total,creado_en,datos&limit=8000',{headers:H}); const j=await r.json(); this._cotAll=Array.isArray(j)?j:[]; }catch(e2){ this._cotAll=[]; }
     this._cotsCola=pend; this._cotsOcultas=total-pend.length;
     this.renderCotLanding();
   },
   renderCotLanding(){
     const cots=this._cotsCola||[];
     const totVal=cots.reduce((a,c)=>a+(+c.total||0),0);
+    const all=this._cotAll||[]; const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
+    const mesAct=new Date().toISOString().slice(0,7); const val=arr=>arr.reduce((a,c)=>a+(+c.total||0),0);
+    const esKit=c=>((c.datos||{}).kit_muestras==='SI');
+    const delMes=all.filter(c=>(c.creado_en||'').slice(0,7)===mesAct);
+    const anul=all.filter(c=>c.estado==='anulado');
+    const kitAll=all.filter(esKit); const kitMes=kitAll.filter(c=>(c.creado_en||'').slice(0,7)===mesAct);
     this.set(`
       <h1>Cotizaciones</h1><div class="sub">Registra clientes · cotiza · sigue la cola</div>
       <div class="kpis" style="margin-bottom:12px">
         <div class="kpi"><b>${cots.length}</b><span>Cotizaciones en cola</span></div>
         <div class="kpi"><b style="color:var(--naranja)">$${totVal.toLocaleString('es-CO')}</b><span>Valorización en juego</span></div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px">📊 Resumen de cotizaciones</div>
+        <div class="kpis" style="margin-bottom:0">
+          <div class="kpi"><b>${all.length}</b><span>Acumuladas · ${cl(val(all))}</span></div>
+          <div class="kpi"><b>${delMes.length}</b><span>Del mes · ${cl(val(delMes))}</span></div>
+          <div class="kpi rojo"><b>${anul.length}</b><span>Anuladas · ${cl(val(anul))}</span></div>
+          <div class="kpi"><b>${kitAll.length}</b><span>Kit acum · ${kitMes.length} del mes</span></div>
+        </div>
       </div>
       <div class="row2" style="margin-bottom:10px">
         <button class="btn btn-ghost" onclick="App.cotRegistro()" style="padding:18px;line-height:1.5">📋<br>Registro (resumen)</button>
@@ -789,7 +806,26 @@ const App = {
   cotWA(id){ const c=this._findCot(id); const m=`Hola ${c.cliente||''} 👋 Te recuerdo tu cotización ${c.folio||''} de Smart Packaging por $${(+c.total||0).toLocaleString('es-CO')}. ¿Te ayudo a cerrarla?`; window.open('https://wa.me/57'+(c.celular||'')+'?text='+encodeURIComponent(m),'_blank'); },
   async cotRemarket(id){ const c=this._findCot(id); const m=`Hola ${c.cliente||''} 👋 ¿Activamos tu cotización ${c.folio||''} ($${(+c.total||0).toLocaleString('es-CO')})? Te dejo lista la producción de tus envases.`; window.open('https://wa.me/57'+(c.celular||'')+'?text='+encodeURIComponent(m),'_blank'); await this.cotUpd(id,{accion:'remarketing'}); this.vCotLanding(); },
   async cotLlamar(id){ await this.cotUpd(id,{accion:'llamar'}); this.vCotLanding(); },
-  async cotAnular(id){ if(!confirm('¿Anular esta cotización? Sale de la cola.')) return; await this.cotUpd(id,{estado:'anulado'}); this.vCotLanding(); },
+  cotAnular(id){ this._anulId=id; this._anulMotivo='';
+    this.modal(`<h3>❌ Anular cotización</h3>
+      <div class="hint" style="margin-bottom:8px">¿Por qué se anula? Elige un motivo y/o escribe el detalle.</div>
+      <div id="anulMotivos" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${['Precio','Falta de dinero','No le interesa','Otro'].map(m=>`<button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="App.anulMotivo(this,'${m}')">${m}</button>`).join('')}
+      </div>
+      <textarea id="anulNota" placeholder="Detalle (opcional)" style="width:100%;padding:10px;border:1.5px solid var(--linea);border-radius:10px;min-height:62px;box-sizing:border-box"></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn" style="flex:1;background:var(--rojo);color:#fff" onclick="App.anulConfirmar()">❌ Anular</button>
+        <button class="btn" style="flex:1;background:#eef2ff;color:#3a48b3" onclick="App.cerrarModal()">Cancelar</button>
+      </div>`);
+  },
+  anulMotivo(btn,m){ this._anulMotivo=m; const box=document.getElementById('anulMotivos'); if(box) Array.from(box.children).forEach(b=>{b.style.background='#eef2ff';b.style.color='#3a48b3';}); btn.style.background='#3a48b3'; btn.style.color='#fff'; },
+  async anulConfirmar(){
+    const motivo=this._anulMotivo||''; const nota=((document.getElementById('anulNota')||{}).value||'').trim();
+    if(!motivo && !nota){ alert('Elige un motivo o escribe el detalle.'); return; }
+    const c=this._findCot(this._anulId)||{}; const d=Object.assign({}, c.datos||{}, {motivo_anulacion:motivo, nota_anulacion:nota});
+    await this.cotUpd(this._anulId,{estado:'anulado', datos:d});
+    this.cerrarModal(); this._toast('Cotización anulada · motivo guardado'); this.vCotLanding();
+  },
   _toast(msg){ const t=document.createElement('div'); t.textContent=msg; t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0c3a26;color:#9ff0c8;padding:12px 18px;border-radius:10px;font-size:13px;z-index:99999;box-shadow:0 4px 20px rgba(0,0,0,.25);max-width:90%'; document.body.appendChild(t); setTimeout(()=>t.remove(),5000); },
   async cotContactoToggle(id){
     const c=this._findCot(id); const nv=!(c&&c.contactado);
