@@ -104,7 +104,7 @@ const App = {
     if(r==='admin') permitidos=TODOS;
     this._permitidos=permitidos;
     const btn=i=>`<button data-v="${i.v}" onclick="App.go('${i.v}')"><span class="ic">${i.ic}</span>${i.t}</button>`;
-    const f1=ROW1.filter(i=>permitidos.includes(i.v)).map(btn).join('');
+    const f1=ROW1.filter(i=>permitidos.includes(i.v) && !(window.NC_EMPRESA==='smart' && i.v==='cartera')).map(btn).join('');
     const f2=ROW2.filter(i=>permitidos.includes(i.v)).map(btn).join('');
     $('nav').innerHTML = `<div class="nav-row">${f1}</div>${f2?`<div class="nav-row nav-row2">${f2}</div>`:''}`;
   },
@@ -141,7 +141,7 @@ const App = {
     if(window.NC_EMPRESA==='smart' && view==='pedidos') return this.vPedidosSmart();
     if(window.NC_EMPRESA==='smart' && view==='despachos') return this.vDespachosSmart();
     if(window.NC_EMPRESA==='smart' && view==='autopedido') return this.vAutoPedidosSmart();
-    const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
+    const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
       pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos}[view] || this.vDashboard).call(this);
