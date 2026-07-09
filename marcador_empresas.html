@@ -192,7 +192,9 @@ function render(){
   const esMovil=/^3\d{9}$/.test(tel)||/^573\d{9}$/.test(tel);
   const wnum='57'+tel.replace(/^57/,'');
   const wamsg=encodeURIComponent('Hola 👋, le escribo de Feroz. Fabricamos botas de dotación y seguridad industrial (puntera, antideslizantes, trabajo pesado). ¿Le interesa recibir el catálogo y precios para su empresa?');
+  const yaM=l._res?RES.find(r=>r.c===l._res):null;
   $('cardBox').innerHTML=`<div class="card">
+    ${yaM?`<div style="background:#0b1220;border:1px solid ${yaM.col};border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:13px">✅ Ya lo marcaste: <b style="color:${yaM.col}">${yaM.t}</b> · si fue prueba, márcalo de nuevo y se corrige</div>`:''}
     <h2>${l.nombre||'(sin nombre)'}</h2>
     <div>${l.categoria?`<span class="badge">${l.categoria}</span>`:''}${l.esp?`<span class="badge">${l.esp}</span>`:''}${l.ciudad?`<span class="badge">📍 ${l.ciudad}</span>`:''}</div>
     ${l.contacto?`<p class="mut" style="margin:8px 0 0">👤 ${l.contacto}</p>`:''}
@@ -207,11 +209,19 @@ const CAP=['interesado','ordena','venta'];   // estos capturan el contacto real
 async function marcar(code){ if(CAP.includes(code)){ renderCap(code); return; } doSave(code,{}); }
 function doSave(code,extra){
   const l=LEADS[IDX];
+  const primera=!l._res;                 // ¿primera vez que se marca este?
+  if(l._res){                             // re-marca (volvió atrás): descuenta y borra la fila anterior en la base
+    GAN-=PAY[l._res]||0;
+    const cel=(l.cel||l.fijo||'');
+    if(cel) rest('feroz_marcador_resultados?empresa=eq.feroz&vendedor=eq.'+encodeURIComponent(OP.nombre)+'&cel=eq.'+encodeURIComponent(cel),{method:'DELETE',headers:H}).catch(()=>{});
+  }
   const nota=(extra._nota!==undefined?extra._nota:($('nota')?.value||'')).trim()||null;
   const rec=Object.assign({empresa:'feroz',mundo:'empresa',fila:l.fila,nombre:l.nombre,cel:l.cel||l.fijo,resultado:code,nota,vendedor:OP.nombre,fecha:new Date().toISOString()},extra);
   delete rec._nota;
   rest('feroz_marcador_resultados',{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(rec)}).catch(()=>{});
-  GAN+=PAY[code]||0; IDX++; render(); cargarMiniRank();
+  GAN+=PAY[code]||0; l._res=code; l._cap=extra;
+  if(primera) IDX++;                     // primera vez avanza; re-marca se queda mostrando el cambio
+  render(); cargarMiniRank();
 }
 function renderCap(code){
   const l=LEADS[IDX]; const meta=RES.find(r=>r.c===code); const tel=(l.cel||l.fijo||'').replace(/\D/g,'');
