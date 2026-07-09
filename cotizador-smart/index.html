@@ -926,10 +926,11 @@ async function registrarEnSheets(estadoCot, irAPedidos){
     const obj=Object.fromEntries(params);
     const row={empresa:'smart',folio:obj.folio,cliente:obj.empresa,contacto:obj.contacto,celular:obj.celular,total:Number(obj.total)||0,estado:(estadoCot||'cotizacion'),datos:obj};
     const hdr={apikey:SBK,Authorization:'Bearer '+SBK,'Content-Type':'application/json','Prefer':'return=minimal'};
-    // RAÍZ anti-duplicados: no insertar siempre. Decidir si ACTUALIZAR una fila existente.
-    let targetId=new URLSearchParams(location.search).get('cot')||null;   // 1) si vine editando (?cot=id) → esa fila
-    if(!targetId && obj.cedula_nit){   // 2) si el cliente YA tiene cotización abierta en cola → esa fila (no duplicar)
-      try{ const rr=await fetch(SBU+'/rest/v1/nc_cotizaciones?empresa=eq.smart&estado=eq.cotizacion&datos->>cedula_nit=eq.'+encodeURIComponent(obj.cedula_nit)+'&select=id&limit=1',{headers:{apikey:SBK,Authorization:'Bearer '+SBK}}); const arr=await rr.json(); if(Array.isArray(arr)&&arr[0]) targetId=arr[0].id; }catch(e){}
+    // Cada cotización es INDEPENDIENTE: un mismo cliente puede tener VARIAS en cola (folios distintos) sin que una borre a otra.
+    // Solo se ACTUALIZA si (1) vine editando esa fila (?cot=id), o (2) re-guardo la MISMA cotización (mismo FOLIO). NUNCA por cédula/NIT.
+    let targetId=new URLSearchParams(location.search).get('cot')||null;
+    if(!targetId && obj.folio){   // re-guardar la misma (mismo folio) → actualiza esa, no duplica
+      try{ const rr=await fetch(SBU+'/rest/v1/nc_cotizaciones?empresa=eq.smart&folio=eq.'+encodeURIComponent(obj.folio)+'&select=id&limit=1',{headers:{apikey:SBK,Authorization:'Bearer '+SBK}}); const arr=await rr.json(); if(Array.isArray(arr)&&arr[0]) targetId=arr[0].id; }catch(e){}
     }
     if(targetId){ await fetch(SBU+'/rest/v1/nc_cotizaciones?id=eq.'+encodeURIComponent(targetId),{method:'PATCH',headers:hdr,body:JSON.stringify(row)}); }
     else { await fetch(SBU+'/rest/v1/nc_cotizaciones',{method:'POST',headers:hdr,body:JSON.stringify(row)}); }
