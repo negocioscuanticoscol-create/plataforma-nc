@@ -399,7 +399,7 @@ const App = {
     vReal.forEach(x=>{ const k=norm(x.cliente)||'s/c'; const g=(porCli[k]=porCli[k]||{v:0,c:0,n:0,best:x.cliente,bv:-1,esteMes:false,doc:''}); const tv=+x.total_vendido||0; g.v+=tv; g.c+=+x.comision_bruta||0; g.n++; if(tv>g.bv){g.bv=tv;g.best=x.cliente;} if(x.documento && !g.doc) g.doc=x.documento; if(x.mes===mesActual) g.esteMes=true; });
     // ── Inteligencia de recompra por cliente ──
     this._cliByDoc={}; cli.forEach(c=>{ this._cliByDoc[c.documento]=c; });
-    this._celByName={}; cli.forEach(c=>{ const kk=norm(c.nombre); if(kk && c.celular) this._celByName[kk]=c.celular; });
+    this._celByName={}; cli.forEach(c=>{ if(!c.celular) return; const kk=norm(c.nombre); if(kk) this._celByName[kk]=c.celular; const core=norm(String(c.nombre).replace(/\(.*?\)/g,'')); if(core && !this._celByName[core]) this._celByName[core]=c.celular; });
     const mNum=m=>{const M={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};const[a,b]=String(m||'').split('-');return b?(+b)*12+(M[(a||'').toLowerCase()]||0):0;};
     const MM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; const numM=n=>n?MM[n%12]+'-'+Math.floor(n/12):'—';
     const nowM=mNum(mesActual);
