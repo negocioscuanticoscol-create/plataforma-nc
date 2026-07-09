@@ -896,6 +896,12 @@ const App = {
           body:JSON.stringify({empresa:'smart',mes,cliente:c.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:(d.kit_muestras==='SI'),folio:folio,notas:(exceso>0?('Consignó $'+(_cons).toLocaleString('es-CO')+' · excedente $'+exceso.toLocaleString('es-CO')+' a comisión'):'Generado en plataforma')})});
       }
     }catch(e){ console.log('nc_ventas insert',e); }
+    // 🔒 VERIFICACIÓN: confirmar que la venta SÍ quedó (si no, avisar — nunca perder comisión en silencio)
+    try{
+      const folioV=c.folio||'';
+      if(folioV){ const rc=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(folioV)+'&select=id&limit=1',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const chk=await rc.json();
+        if(!(Array.isArray(chk)&&chk.length)) alert('⚠️ OJO: el pedido de '+(c.cliente||folioV)+' quedó autorizado pero la VENTA no se registró. Ve a Ventas · Smart → botón rojo "Reparar" para sumarla a tu comisión.'); }
+    }catch(e){}
     // (Quitado) Antes se anulaban las otras cotizaciones del mismo NIT al autorizar una.
     // Un cliente PUEDE tener varios pedidos/cotizaciones a la vez — ya NO se tocan entre sí.
     this._toast('✅ '+(c.cliente||c.folio)+' autorizado → PEDIDO (Sheet + Supabase + comisión). Flujo iniciado.');
@@ -912,6 +918,10 @@ const App = {
     let all=[];
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&limit=3000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const j=await r.json(); all=Array.isArray(j)?j:[]; }catch(e){}
     this._ventas=all;   // guardado para el detalle por mes (auditoría)
+    // 🔒 CANDADO anti-comisión-perdida: pedidos autorizados que NO quedaron como venta (folio sin fila en nc_ventas)
+    let _peds=[]; try{ const rp=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.smart&estado=eq.pedido&select=folio,cliente,total,datos&limit=3000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jp=await rp.json(); _peds=Array.isArray(jp)?jp:[]; }catch(e){}
+    const _vFol=new Set(all.map(x=>x.folio).filter(Boolean));
+    this._ventasFaltantes=_peds.filter(p=>p.folio && !_vFol.has(p.folio));
     let metas=[]; try{ const rm=await fetch(this._SBU()+'/rest/v1/nc_metas?empresa=eq.smart&order=mes_num.asc',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jm=await rm.json(); metas=Array.isArray(jm)?jm:[]; }catch(e){}
     // 📦 envases vendidos (unidades) — del HISTÓRICO REAL (nc_ventas_ref), el dato alineado en todo lado
     let vref=[]; try{ const rp=await fetch(this._SBU()+'/rest/v1/nc_ventas_ref?empresa=eq.smart&select=mes,unidades&limit=5000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jp=await rp.json(); vref=Array.isArray(jp)?jp:[]; }catch(e){}
@@ -934,6 +944,11 @@ const App = {
     const metaActual=metas.find(m=>m.mes===mesActual)||{meta:0};
     const metaMes=+metaActual.meta||0, logMes=(porMes[mesActual]&&porMes[mesActual].v)||0, avMes=metaMes?logMes/metaMes*100:0, okMes=avMes>=100;
     this.set(`<h1>Ventas · Smart</h1><div class="sub">Libro de comisión (Sheet) · solo ventas reales · ${canc} canceladas no cuentan</div>
+      ${this._ventasFaltantes.length?`<div class="card" style="border:2px solid #dc2626;background:#fef2f2">
+        <div style="font-weight:800;color:#b91c1c">⚠️ ${this._ventasFaltantes.length} pedido(s) SIN venta registrada — tu comisión NO los está sumando</div>
+        <div style="font-size:12px;color:#7f1d1d;margin:6px 0">${this._ventasFaltantes.map(p=>esc(p.cliente||p.folio)+' · '+esc(p.folio)+' · $'+(+p.total||0).toLocaleString('es-CO')).join('<br>')}</div>
+        <button class="btn" style="background:#dc2626;color:#fff" onclick="App.repararVentasFaltantes()">🔧 Reparar y sumar a mi comisión</button>
+      </div>`:''}
       <div class="kpis">
         <div class="kpi naranja"><b>${cl(totV)}</b><span>Ventas 2026 (acum. s/IVA)</span></div>
         <div class="kpi verde"><b>${cl(totC)}</b><span>Comisión bruta</span></div>
@@ -951,6 +966,23 @@ const App = {
         <div style="font-size:11.5px;color:#667;margin-bottom:10px">🔵 cumplió la meta · 🔴 no cumplió · (metas en Supabase)</div>
         ${(()=>{ const MO={ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12}; const key=ms=>{const p=String(ms||'').split('-');return (+(p[1]||0))*100+(MO[(p[0]||'').toLowerCase()]||0);}; const curKey=hoy.getFullYear()*100+(hoy.getMonth()+1); const metaBy={}; metas.forEach(m=>{metaBy[m.mes]=+m.meta||0;}); const S=new Set(); Object.keys(porMes).forEach(m=>{if(m&&m!=='s/f')S.add(m);}); metas.forEach(m=>{if((+m.meta||0)>0)S.add(m.mes);}); S.add(mesActual); const arr=Array.from(S).filter(m=>key(m)>0&&key(m)<=curKey).sort((a,b)=>key(b)-key(a)); return arr.map(ms=>{ const meta=metaBy[ms]||0, info=porMes[ms]||{v:0,c:0}, log=info.v||0, com=info.c||0, pct=meta?log/meta*100:0, ok=meta&&pct>=100; const der=meta?`logrado <b>${cl(log)}</b> / meta ${cl(meta)} · <b style="color:${ok?'#2563eb':'#dc2626'}">${pct.toFixed(0)}%</b>`:`logrado <b>${cl(log)}</b> · <span style="color:#8a93a6">sin meta cargada</span>`; return `<div onclick="App.ventasMes('${ms}')" style="margin-bottom:11px;cursor:pointer;padding:5px;border-radius:7px" onmouseover="this.style.background='#f4f6fb'" onmouseout="this.style.background=''" title="Clic para ver el detalle"><div style="display:flex;justify-content:space-between;font-size:13px"><span><b>${ms}</b>${ms===mesActual?' <span style="color:#2563eb;font-weight:800">• actual</span>':''} <span style="color:#8a93a6">▸ ver</span></span><span>${der}</span></div><div style="height:11px;background:var(--gris);border-radius:6px;margin-top:3px;overflow:hidden"><div style="height:100%;width:${Math.min(100,pct).toFixed(0)}%;background:${ok?'#2563eb':'#dc2626'}"></div></div>${com?`<div style="font-size:10.5px;color:var(--verde);margin-top:2px">Comisión ${cl(com)}</div>`:''}</div>`;}).join('')||'<div class="empty">Sin datos</div>'; })()}
       </div>`);
+  },
+  async repararVentasFaltantes(){
+    const faltan=this._ventasFaltantes||[]; if(!faltan.length) return;
+    if(!confirm(`¿Registrar ${faltan.length} venta(s) faltante(s) y sumarlas a tu comisión?`)) return;
+    const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    let ok=0;
+    for(const p of faltan){
+      const d=p.datos||{}; const folio=p.folio||''; if(!folio) continue;
+      try{ const rx=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(folio)+'&select=id&limit=1',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const ya=await rx.json(); if(Array.isArray(ya)&&ya.length) continue; }catch(e){}
+      const dt=new Date(); const mes=M[dt.getMonth()]+'-'+dt.getFullYear();
+      const esKit=(d.kit_muestras==='SI');
+      const tv=esKit?+(p.total||d.total||0):+(d.subtotal_sin_iva||d.total||p.total||0);
+      const cb=+(d.comision||0);
+      try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({empresa:'smart',mes,cliente:p.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:folio,notas:'Reparada por candado (pedido sin venta)'})}); if(r.ok) ok++; }catch(e){}
+    }
+    this._toast('✅ '+ok+' venta(s) reparada(s) y sumada(s) a comisión');
+    this.vVentasSmart();
   },
   async vPanelFinanzas(){   // SMART · Resultados — lee la tabla pre-agregada
     this.loading();
