@@ -85,6 +85,7 @@
     <button class="btn" style="margin:4px 0" onclick="buscar()">Buscar</button>
   </div>
   <div id="cardBox"></div>
+  <div id="miniRank" style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px"></div>
 </div>
 
 </div>
@@ -160,7 +161,26 @@ async function tomar(sector){
 function cambiarSector(){liberar();irSectores();}
 
 // ---- TRABAJO ----
-function trabajar(){show('trabajo');$('tbSector').textContent='📍 '+SECTOR;render();}
+function trabajar(){show('trabajo');$('tbSector').textContent='📍 '+SECTOR;render();cargarMiniRank();clearInterval(mrTimer);mrTimer=setInterval(cargarMiniRank,45000);}
+async function cargarMiniRank(){
+  const box=$('miniRank'); if(!box) return;
+  const t=new Date(); t.setHours(0,0,0,0);
+  const d=await rpc('marcador_rendimiento',{p_desde:t.toISOString()});
+  if(!d.length){ box.innerHTML='<div class="mut" style="text-align:center">📊 Hoy nadie ha marcado aún. ¡Sé la primera! 💪</div>'; return; }
+  const maxV=Math.max(...d.map(r=>r.ventas||0)), maxI=Math.max(...d.map(r=>r.interesados||0));
+  const med=['🥇','🥈','🥉'];
+  box.innerHTML='<div style="font-weight:800;font-size:13px;margin-bottom:8px;color:var(--pri)">📊 Hoy · quién va ganando el bono</div>'+
+    d.map((r,i)=>{
+      const yo=r.vendedor===OP.nombre;
+      const bV=maxV>0&&r.ventas===maxV?' <span style="color:#4ade80">🏆venta</span>':'';
+      const bI=maxI>0&&r.interesados===maxI?' <span style="color:#f59e0b">🏆interes</span>':'';
+      return `<div class="rank ${yo?'yo':''}" style="padding:8px 10px;margin:5px 0">
+        <div class="pos" style="font-size:16px">${med[i]||(i+1)}</div>
+        <div class="nm" style="font-size:14px">${yo?'⭐ '+r.vendedor+' (tú)':r.vendedor}${bV}${bI}<div class="sub">${r.llamadas} llam · 🔥${r.interesados} · 💰${r.ventas}</div></div>
+        <div class="gn" style="font-size:16px">${fmt(r.ganado)}</div></div>`;
+    }).join('');
+}
+let mrTimer=null;
 async function cargarLote(){const d=await rpc('marcador_lote',{p_sector:SECTOR,p_limit:50});LEADS=d||[];IDX=0;}
 function render(){
   $('tbGan').textContent=fmt(GAN);
@@ -187,7 +207,7 @@ async function marcar(code){
   const l=LEADS[IDX];
   const rec={empresa:'feroz',mundo:'empresa',fila:l.fila,nombre:l.nombre,cel:l.cel||l.fijo,resultado:code,nota:($('nota')?.value||'').trim()||null,vendedor:OP.nombre,fecha:new Date().toISOString()};
   rest('feroz_marcador_resultados',{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(rec)}).catch(()=>{});
-  GAN+=PAY[code]||0; IDX++; render();
+  GAN+=PAY[code]||0; IDX++; render(); cargarMiniRank();
 }
 async function cargarMas(){await cargarLote();render();}
 function anterior(){ if(IDX>0){IDX--;render();} else alert('Ya estás en el primero.'); }
@@ -207,7 +227,7 @@ async function buscar(){
 
 // ---- sesión / heartbeat ----
 function iniciarHb(){clearInterval(hb);hb=setInterval(()=>{if(SECTOR)rest('nc_marcador_sesion?cedula=eq.'+encodeURIComponent(OP.cedula),{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify({ultima_actividad:new Date().toISOString()})}).catch(()=>{});},60000);}
-function liberar(){clearInterval(hb);if(OP)rest('nc_marcador_sesion?cedula=eq.'+encodeURIComponent(OP.cedula),{method:'DELETE',headers:H}).catch(()=>{});SECTOR=null;}
+function liberar(){clearInterval(hb);clearInterval(mrTimer);if(OP)rest('nc_marcador_sesion?cedula=eq.'+encodeURIComponent(OP.cedula),{method:'DELETE',headers:H}).catch(()=>{});SECTOR=null;}
 window.addEventListener('beforeunload',()=>{if(OP&&SECTOR)navigator.sendBeacon&&fetch(SB+'/rest/v1/nc_marcador_sesion?cedula=eq.'+encodeURIComponent(OP.cedula),{method:'DELETE',headers:H,keepalive:true});});
 
 // ---- arranque ----
