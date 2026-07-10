@@ -181,7 +181,10 @@ const App = {
     const cotD=this._crmCots.filter(c=>c.estado==='cotizacion'&&c.origen==='digital').length;
     const rmkD=this._crmCots.filter(c=>/remark/i.test(c.accion||'')&&c.origen==='digital').length;
     const kitBuyers=new Set(kits.map(k=>norm(k.cliente))).size;
-    const DCAJ1=[['todos','Todos',bc('curioso')+bc('interesado')+bc('kit')+cotD],['curioso','🤔 Curioso',bc('curioso')],['interesado','💡 Interesado',bc('interesado')],['kit','📦 Kit',bc('kit')],['cotiz','📝 Cotización',cotD]];
+    const mesISO=new Date().toISOString().slice(0,7);   // leads que LLEGARON este mes (por creado_en)
+    const bcM=t=>bot.filter(l=>l.etiqueta===t && (l.creado_en||'').slice(0,7)===mesISO).length;
+    const cotDM=this._crmCots.filter(c=>c.estado==='cotizacion'&&c.origen==='digital'&&(c.creado_en||'').slice(0,7)===mesISO).length;
+    const DCAJ1=[['todos','Todos',bc('curioso')+bc('interesado')+bc('kit')+cotD,bcM('curioso')+bcM('interesado')+bcM('kit')+cotDM],['curioso','🤔 Curioso',bc('curioso'),bcM('curioso')],['interesado','💡 Interesado',bc('interesado'),bcM('interesado')],['kit','📦 Kit',bc('kit'),bcM('kit')],['cotiz','📝 Cotización',cotD,cotDM]];
     const DCAJ2=[['remarketing','📣 Remarketing',bc('interesado')],['plantilla','📨 Plantilla Meta',bc('curioso')+bc('plantilla_meta')],['mantenimiento','🔧 Mantenimiento',bc('kit')+bc('comprador')]];
     const DCAJ=[...DCAJ1,...DCAJ2];
     const canal=this._crmCanal||'prospectos'; this._crmCanal=canal;
@@ -190,8 +193,8 @@ const App = {
       <div class="card" style="border-left:4px solid var(--naranja);padding:10px 14px"><div style="font-size:12.5px;color:#445">☎️ <b>${(window.LEADS||[]).length}</b> empresas en marcador · 💬 <b>${bot.length}</b> digital · 🎯 <b>${kitBuyers}</b> prospectos (kit) · 📝 <b>${cotD}</b> en cotización</div>
         <div style="font-size:11px;color:#8a93a6;margin-top:4px">Toca un círculo del embudo para mover un lead de etapa.</div></div>
       <div style="display:flex;gap:6px;margin:10px 0">${PUERTAS.map(([v,n])=>`<button class="btn-sm" style="flex:1;padding:11px;font-weight:700;background:${v===canal?'var(--naranja);color:#fff':'#e5e7eb'}" onclick="App.crmCanal('${v}')">${n}</button>`).join('')}</div>
-      ${canal==='digital'?(()=>{ const btn=([v,n,c])=>`<button class="btn-sm" style="background:${v===cajon?'#0b1f2a;color:#fff':'#eef2ff;color:#3a48b3'}" onclick="App.crmCajon('${v}')">${n} (${c})</button>`;
-        return `<div style="font-size:10px;color:#8a93a6;font-weight:800;margin:6px 0 3px">RESUMEN POR CALIFICACIÓN</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${DCAJ1.map(btn).join('')}</div>
+      ${canal==='digital'?(()=>{ const btn=([v,n,c,m])=>`<button class="btn-sm" style="background:${v===cajon?'#0b1f2a;color:#fff':'#eef2ff;color:#3a48b3'}" onclick="App.crmCajon('${v}')">${n} (${c}${m!==undefined?' · <b>'+m+'</b> mes':''})</button>`;
+        return `<div style="font-size:10px;color:#8a93a6;font-weight:800;margin:6px 0 3px">RESUMEN POR CALIFICACIÓN <span style="font-weight:400">(acumulado · este mes)</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${DCAJ1.map(btn).join('')}</div>
         <div style="font-size:10px;color:#8a93a6;font-weight:800;margin:8px 0 3px">QUÉ HACER · CAMPAÑAS</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${DCAJ2.map(btn).join('')}</div>`; })():''}
       ${this._crmItems(canal,cajon)}`);
   },
