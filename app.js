@@ -1736,6 +1736,7 @@ const App = {
         <div><label>Nombre de quien recibe</label><input class="field" id="cl_cont_recibe" value="${v(e.contacto_recibe)}" placeholder="Encargado de bodega"></div>
         <div><label>Celular de quien recibe</label><input class="field" id="cl_cel_recibe" inputmode="tel" value="${v(e.cel_recibe)}"></div>
       </div>
+      <label>📝 Notas / instrucciones de despacho</label><textarea class="field" id="cl_notas" style="min-height:54px" placeholder="Ej: recibe solo mañanas · dejar en portería · llamar antes">${v(e.notas)}</textarea>
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">💰 CONDICIONES DE COMISIONES</div>
       <div class="row2">
         <div><label>Referencia</label><input class="field" id="cl_ref" value="${v(e.referencia)||'701'}"></div>
@@ -1762,6 +1763,7 @@ const App = {
       cel2:($('cl_cel2')?$('cl_cel2').value.trim():''),
       contacto_recibe:($('cl_cont_recibe')?$('cl_cont_recibe').value.trim():''),
       cel_recibe:($('cl_cel_recibe')?$('cl_cel_recibe').value.trim():''),
+      notas:($('cl_notas')?$('cl_notas').value.trim():''),
       referencia:($('cl_ref')?$('cl_ref').value.trim():'701'),
       lista_precio:($('cl_lista')?$('cl_lista').value:'Distribuidor'),
       recomendado:($('cl_recom')?($('cl_recom').value==='si'||$('cl_recom').value==='especial'):false),
@@ -2225,7 +2227,7 @@ const App = {
         <div class="meta" style="margin-bottom:4px">${liq}</div>
         <div class="card" style="background:#f4f7fb;border:1px dashed var(--naranja);margin:6px 0;padding:10px 12px">
           <div style="font-size:11px;font-weight:700;color:var(--naranja);margin-bottom:5px">📦 DATOS DE ENVÍO · picking & packing</div>
-          <div style="font-size:13px;line-height:1.8">📍 <b>${esc(env||'— sin dirección registrada —')}</b>${cl.contacto1?`<br>👤 Contacto: <b>${esc(cl.contacto1)}</b>`:''}${(cl.tel||cl.cel2)?`<br>📱 Celular: <b>${esc(cl.tel||cl.cel2)}</b>${(cl.tel&&cl.cel2)?' · '+esc(cl.cel2):''}`:''}</div>
+          <div style="font-size:13px;line-height:1.8">📍 <b>${esc(env||'— sin dirección registrada —')}</b>${cl.contacto1?`<br>👤 Oficina: <b>${esc(cl.contacto1)}</b>`:''}${(cl.tel||cl.cel2)?`<br>📱 Celular: <b>${esc(cl.tel||cl.cel2)}</b>${(cl.tel&&cl.cel2)?' · '+esc(cl.cel2):''}`:''}${(cl.contacto_recibe||cl.cel_recibe)?`<br>📦 <b>Recibe:</b> ${esc(cl.contacto_recibe||'')}${cl.cel_recibe?' · 📱 '+esc(cl.cel_recibe):''}`:''}${cl.notas?`<br>📝 <b>Notas:</b> ${esc(cl.notas)}`:''}</div>
         </div>
         ${p.consignacion_validada_por?`<div class="meta" style="color:#16a34a;margin-bottom:4px">💳 Pago validado por <b>${esc(p.consignacion_validada_por)}</b></div>`:''}
         ${(!p.es_muestra && p.guia && p.estado==='pendiente_pago')?`<div style="font-size:11.5px;color:#b3261e;background:#fde8e8;border-radius:7px;padding:6px 9px;margin-bottom:6px">⚠️ CARTERA: enviado SIN validar el pago — falta oprimir 💳 Marcar consignación</div>`:''}
