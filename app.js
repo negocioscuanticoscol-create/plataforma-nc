@@ -2426,7 +2426,7 @@ const App = {
     this.loading();
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
     let cli=[]; try{ const r=await this.sb.from('clientes').select('*').order('creado_en',{ascending:false}); cli=r.data||[]; }catch(e){}
-    let res=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_resultados?select=fila,nombre,cel,resultado,mundo,fecha&order=fecha.desc&limit=5000',{headers:H}); const j=await r.json(); res=Array.isArray(j)?j:[]; }catch(e){}
+    let res=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_resultados?select=fila,nombre,cel,ciudad,resultado,mundo,fecha&order=fecha.desc&limit=5000',{headers:H}); const j=await r.json(); res=Array.isArray(j)?j:[]; }catch(e){}
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.feroz&limit=5000',{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmEmbRows.forEach(x=>this._crmEmb[x.lead_key]=x.etapa); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; }
     this._crmFRes=res; const inter=res.filter(r=>/interes/i.test(r.resultado||''));
     let bot=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000',{headers:H}); const j=await r.json(); bot=Array.isArray(j)?j:[]; }catch(e){}
@@ -2507,7 +2507,7 @@ const App = {
       if(cajon==='inter'){   // 🔥 interesados CRUDOS de canales → a clasificar (no son prospectos aún)
         const raw=this._crmFIntRaw||[];
         if(!raw.length) return '<div class="empty">Sin interesados nuevos. Aquí caen los que marques 🔥 Interesado en Marcador/Digital/Orgánico, para clasificarlos en NC/GPJR/Especial.</div>';
-        return raw.map((x,i)=>{ const key='i'+((x.cel||x.nombre)+'').replace(/[^a-z0-9]/gi,'').slice(0,26); return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(x.nombre||'—')}</div><div class="meta">${x.mundo==='distribuidor'?'🏪 distribuidor':'🏭 empresa'} · 🔥 interesado</div></div></div>${this._emb(key,-1,'marcador',x.nombre,x.cel)}</div>`; }).join('');
+        return raw.map((x,i)=>{ const key='i'+((x.cel||x.nombre)+'').replace(/[^a-z0-9]/gi,'').slice(0,26); return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(x.nombre||'—')}${x.cel?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(x.cel)}</span>`:''}</div><div class="meta">${x.ciudad?'📍 '+esc(x.ciudad)+' · ':''}${x.mundo==='distribuidor'?'🏪 distribuidor':'🏭 empresa'} · 🔥 interesado</div></div></div>${this._emb(key,-1,'marcador',x.nombre,x.cel)}</div>`; }).join('');
       }
       const arr=cli.filter(c=> cajon==='esp'?!!c.especial : cajon==='gpjr'?(!!c.recomendado&&!c.especial) : (!c.recomendado&&!c.especial));
       if(!arr.length) return `<div class="empty">Sin prospectos ${cajon==='esp'?'Especiales':cajon==='gpjr'?'GPJR':'NC'}.</div>`;
