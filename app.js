@@ -222,7 +222,7 @@ const App = {
     const tel=(o.telefono||'').replace(/\D/g,'');
     const acc=(!o.noWa&&tel)?`${o.call?`<a class="btn-sm" href="tel:${esc(o.telefono)}" style="background:#2f6fed;color:#fff">📞</a>`:''}<a class="btn-sm" href="https://wa.me/57${tel}" target="_blank" style="background:#25d366;color:#fff">📱</a>`:'';
     const desc=o.descartar?`<button class="btn-sm" style="background:#fde8e8;color:#b3261e;padding:5px 9px" title="Descartar prospecto" onclick="App.crmDescartar('${o.key}')">✕ Descartar</button>`:'';
-    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(o.nombre||'—')}</div><div class="meta">${(!o.noWa&&o.telefono)?'📱 '+esc(o.telefono):''}${o.ciudad?(!o.noWa&&o.telefono?' · ':'')+esc(o.ciudad):''}${o.sub?'<br>'+esc(o.sub):''}</div></div><div style="display:flex;gap:5px;align-items:center">${o.badge||''}${acc}${desc}</div></div>${this._emb(o.key,o.base,o.canal,o.nombre,o.telefono)}</div>`;
+    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(o.nombre||'—')}${o.telefono?` <span style="font-weight:600;color:var(--azul);font-size:13px">📱 ${esc(o.telefono)}</span>`:''}</div><div class="meta">${o.ciudad?esc(o.ciudad):''}${o.sub?(o.ciudad?'<br>':'')+esc(o.sub):''}</div></div><div style="display:flex;gap:5px;align-items:center">${o.badge||''}${acc}${desc}</div></div>${this._emb(o.key,o.base,o.canal,o.nombre,o.telefono)}</div>`;
   },
   async crmDescartar(key){
     if(!confirm('¿Descartar este prospecto? Sale de la lista (no se borra de las bases).')) return;
@@ -2567,7 +2567,7 @@ const App = {
     const key=canal[0]+((b.telefono||b.nombre)+'').replace(/[^a-z0-9]/gi,'').slice(0,26);
     const base=canal==='digital'?this._baseEtapa('digital',tag):-1;   // digital auto interesado/kit · orgánico vacío
     const c=/interes/.test(v)?'b-aceptada':/cotiz/.test(v)?'b-cotizada':'b-entregado';
-    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(b.nombre||b.telefono||'—')}</div><div class="meta">${b.ciudad?esc(b.ciudad):''}${b.producto?(b.ciudad?' · ':'')+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono)}</div>`;
+    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(b.nombre||b.telefono||'—')}${b.telefono?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(b.telefono)}</span>`:''}</div><div class="meta">${b.ciudad?esc(b.ciudad):''}${b.producto?(b.ciudad?' · ':'')+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono)}</div>`;
   },
   crmLeadAProspecto(i){
     const b=(this._crmFLeadShown||[])[i]; if(!b) return;
