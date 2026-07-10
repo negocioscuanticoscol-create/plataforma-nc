@@ -202,7 +202,7 @@ const App = {
   crmCajon(s){ this._crmCajon=s; this.vCrmSmart(); },
   _embStages(canal){
     if(canal==='marcador') return ['👋 Contactado','💡 Interesado','✅ Calificado'];
-    if(canal==='digital')  return ['💡 Interesado','📦 Kit','✅ Calificado'];
+    if(canal==='digital')  return (window.NC_EMPRESA==='feroz')?['💡 Interesado','🎁 Muestra','✅ Calificado']:['💡 Interesado','📦 Kit','✅ Calificado'];
     if(canal==='organico') return ['🤔 Curioso','💡 Interesado','📦 Kit'];
     return ['👋 Contactado','💡 Interesado','📦 Kit','🛒 1ª Compra'];
   },
@@ -211,18 +211,32 @@ const App = {
     if(canal==='organico') { const m={curioso:0,interesado:1,kit:2}; return m[tag]!=null?m[tag]:-1; }
     return -1;   // marcador y demás: círculos vacíos hasta que haya acción
   },
-  _emb(key,base,canal,nombre,telefono){
+  _emb(key,base,canal,nombre,telefono,mode){
+    mode=mode||'full';
+    if(mode==='none') return '';   // tarjeta liviana, sin círculos
     (this._crmLeadInfo=this._crmLeadInfo||{})[key]={nombre,telefono,canal};
+    const dot=on=>`<span style="display:inline-block;width:13px;height:13px;border-radius:50%;vertical-align:middle;background:${on?'#16a34a':'#fff'};border:2px solid ${on?'#0f7a33':'#b9c2cf'}"></span>`;
+    if(mode==='seg'){   // Interesado: 1 círculo para marcar seguimiento
+      const on=!!(this._crmEmb&&this._crmEmb[key]!=null&&this._crmEmb[key]>=0);
+      return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px" onclick="event.stopPropagation()"><span onclick="App.crmSeg('${key}')" title="Marca si le estás haciendo seguimiento" style="cursor:pointer;font-size:11px;font-weight:${on?700:500};color:${on?'#0f7a33':'#6b7686'};white-space:nowrap">${dot(on)} ${on?'🔔 En seguimiento':'Marcar seguimiento'}</span></div>`;
+    }
     const st=(this._crmEmb&&this._crmEmb[key]!=null)?this._crmEmb[key]:(base!=null?base:-1);
     const S=this._embStages(canal);
-    const dot=on=>`<span style="display:inline-block;width:13px;height:13px;border-radius:50%;vertical-align:middle;background:${on?'#16a34a':'#fff'};border:2px solid ${on?'#0f7a33':'#b9c2cf'}"></span>`;
     return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px;display:flex;gap:8px;flex-wrap:wrap" onclick="event.stopPropagation()">${S.map((s,i)=>`<span onclick="App.crmAvanzar('${key}',${i})" title="Marcar: ${s}" style="cursor:pointer;font-size:10px;font-weight:${i<=st?700:500};color:${i<=st?'#0f7a33':'#6b7686'};white-space:nowrap">${dot(i<=st)} ${s}</span>`).join('')}</div>`;
+  },
+  async crmSeg(key){
+    const info=(this._crmLeadInfo||{})[key]||{};
+    const cur=(this._crmEmb&&this._crmEmb[key]!=null)?this._crmEmb[key]:-1;
+    const nv=cur>=0?-1:0;   // toggle seguimiento on/off
+    (this._crmEmb=this._crmEmb||{})[key]=nv;
+    try{ await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:window.NC_EMPRESA||'smart',lead_key:key,nombre:info.nombre||'',telefono:info.telefono||'',canal:info.canal||'',etapa:nv})}); }catch(e){}
+    (window.NC_EMPRESA==='feroz' && this.vCrm)?this.vCrm():this.vCrmSmart();
   },
   _crmCard(o){
     const tel=(o.telefono||'').replace(/\D/g,'');
     const acc=(!o.noWa&&tel)?`${o.call?`<a class="btn-sm" href="tel:${esc(o.telefono)}" style="background:#2f6fed;color:#fff">📞</a>`:''}<a class="btn-sm" href="https://wa.me/57${tel}" target="_blank" style="background:#25d366;color:#fff">📱</a>`:'';
     const desc=o.descartar?`<button class="btn-sm" style="background:#fde8e8;color:#b3261e;padding:5px 9px" title="Descartar prospecto" onclick="App.crmDescartar('${o.key}')">✕ Descartar</button>`:'';
-    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(o.nombre||'—')}${o.telefono?` <span style="font-weight:600;color:var(--azul);font-size:13px">📱 ${esc(o.telefono)}</span>`:''}</div><div class="meta">${o.ciudad?esc(o.ciudad):''}${o.sub?(o.ciudad?'<br>':'')+esc(o.sub):''}</div></div><div style="display:flex;gap:5px;align-items:center">${o.badge||''}${acc}${desc}</div></div>${this._emb(o.key,o.base,o.canal,o.nombre,o.telefono)}</div>`;
+    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(o.nombre||'—')}${o.telefono?` <span style="font-weight:600;color:var(--azul);font-size:13px">📱 ${esc(o.telefono)}</span>`:''}</div><div class="meta">${o.ciudad?esc(o.ciudad):''}${o.sub?(o.ciudad?'<br>':'')+esc(o.sub):''}</div></div><div style="display:flex;gap:5px;align-items:center">${o.badge||''}${acc}${desc}</div></div>${this._emb(o.key,o.base,o.canal,o.nombre,o.telefono,o.dots)}</div>`;
   },
   async crmDescartar(key){
     if(!confirm('¿Descartar este prospecto? Sale de la lista (no se borra de las bases).')) return;
@@ -252,7 +266,8 @@ const App = {
     const stages=cajon==='todos'?['curioso','interesado','kit']:[cajon];
     const bot=(this._crmBot||[]).filter(l=>stages.includes(l.etiqueta));
     if(!bot.length) return '<div class="empty">Sin leads en este cajón.</div>';
-    return bot.map(l=>this._crmCard({key:'d'+((l.telefono||l.id)+'').replace(/\D/g,'').slice(0,18),nombre:l.nombre||l.telefono,telefono:l.telefono,ciudad:l.ciudad,sub:(l.ultimo_mensaje||'').slice(0,46),canal:'digital',base:this._baseEtapa('digital',l.etiqueta),noWa:true})).join('');
+    const dots=cajon==='interesado'?'seg':'none';   // interesado: círculo de seguimiento · resto: liviano
+    return bot.map(l=>this._crmCard({key:'d'+((l.telefono||l.id)+'').replace(/\D/g,'').slice(0,18),nombre:l.nombre||l.telefono,telefono:l.telefono,ciudad:l.ciudad,sub:(l.ultimo_mensaje||'').slice(0,46),canal:'digital',base:this._baseEtapa('digital',l.etiqueta),noWa:true,dots})).join('');
   },
   _crmCampCard(l){
     const tel=(l.telefono||'').replace(/\D/g,'');
@@ -2549,7 +2564,7 @@ const App = {
       const cur=(bot||[]).filter(b=>/curios/i.test(b.etiqueta||'')).length, intr=(bot||[]).filter(b=>/interes|distribu/i.test(b.etiqueta||'')).length;
       const head=`<div class="card" style="border-left:4px solid var(--naranja)"><div style="font-size:12px;color:#667">💬 WhatsApp Feroz (Sofía) · <b>${nom}</b></div><div class="kpis" style="margin-top:6px"><div class="kpi"><b>${(bot||[]).length}</b><span>Leads totales</span></div><div class="kpi"><b>${cur}</b><span>👀 Curiosos</span></div><div class="kpi naranja"><b>${intr}</b><span>🔥 Calientes</span></div></div></div>`;
       if(!arr.length) return head+'<div class="empty">Aún sin leads en este estado. Los llena Sofía (el bot de Feroz) en tiempo real.</div>';
-      return head+arr.map((b,i)=>this._cardLead(b,i,'digital')).join('');
+      return head+arr.map((b,i)=>this._cardLead(b,i,'digital',cajon)).join('');
     }
     if(canal==='organico'){
       const estOf=b=>{ const v=(b.etiqueta||'').toLowerCase(); return /cotiz/.test(v)?'cotiz':/interes/.test(v)?'interesado':'curioso'; };
@@ -2560,14 +2575,15 @@ const App = {
     }
     return '';
   },
-  _cardLead(b,i,canal){
+  _cardLead(b,i,canal,cajon){
     canal=canal||'digital';
     const v=(b.etiqueta||'').toLowerCase();
     const tag=/interes/.test(v)?'interesado':/kit/.test(v)?'kit':/curios/.test(v)?'curioso':'';
     const key=canal[0]+((b.telefono||b.nombre)+'').replace(/[^a-z0-9]/gi,'').slice(0,26);
     const base=canal==='digital'?this._baseEtapa('digital',tag):-1;   // digital auto interesado/kit · orgánico vacío
     const c=/interes/.test(v)?'b-aceptada':/cotiz/.test(v)?'b-cotizada':'b-entregado';
-    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(b.nombre||b.telefono||'—')}${b.telefono?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(b.telefono)}</span>`:''}</div><div class="meta">${b.ciudad?esc(b.ciudad):''}${b.producto?(b.ciudad?' · ':'')+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono)}</div>`;
+    const mode=cajon==='distribuidor'?'full':cajon==='interesado'?'seg':'none';   // distribuidor: 3 círculos · interesado: seguimiento · resto: liviano
+    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(b.nombre||b.telefono||'—')}${b.telefono?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(b.telefono)}</span>`:''}</div><div class="meta">${b.ciudad?esc(b.ciudad):''}${b.producto?(b.ciudad?' · ':'')+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono,mode)}</div>`;
   },
   crmLeadAProspecto(i){
     const b=(this._crmFLeadShown||[])[i]; if(!b) return;
