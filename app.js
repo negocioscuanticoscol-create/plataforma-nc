@@ -1175,6 +1175,26 @@ const App = {
   },
   _findPed(id){ return (this._peds||[]).find(x=>x.id===id)||{}; },
   _prodResumen(d){ let p=d&&d.productos; if(typeof p==='string'){ try{p=JSON.parse(p);}catch(e){ return d&&typeof d.productos==='string'?d.productos:''; } } if(Array.isArray(p)) return p.map(x=>`${x.ref||''} ${x.color||''} ×${x.qty||0}`).join(' · '); return (d&&d.productos)||''; },
+  _dirDespacho(d){ d=d||{}; return [d.envio_dir||d.dir_factura, d.envio_barrio||d.barrio_factura, d.envio_ciudad||d.ciudad_factura].map(x=>(x||'').toString().trim()).filter(Boolean).join(', '); },
+  pedPicking(id){
+    const p=(this._peds||[]).find(x=>x.id===id)||{}; const d=p.datos||{};
+    let pr=d.productos; if(typeof pr==='string'){ try{pr=JSON.parse(pr);}catch(e){pr=[];} } if(!Array.isArray(pr)) pr=[];
+    const dir=this._dirDespacho(d); const dest=d.envio_nombre||p.cliente; const tel=d.envio_tel||d.celular||p.celular;
+    const totUds=pr.reduce((s,x)=>s+(+x.qty||0),0);
+    const filas=pr.length?pr.map(x=>`<tr><td style="padding:8px;border-bottom:1px solid var(--linea)"><b>${esc(x.ref||x.n||'—')}</b></td><td style="padding:8px;border-bottom:1px solid var(--linea)">${esc(x.color||'')}</td><td style="padding:8px;border-bottom:1px solid var(--linea);text-align:right;font-weight:800;font-size:16px">${(+x.qty||0)}</td></tr>`).join(''):'<tr><td colspan="3" style="padding:10px;color:#999">Sin detalle de productos en este pedido.</td></tr>';
+    this.modal(`<h3>📋 Picking · ${esc(p.cliente||p.folio||'')}</h3>
+      <div style="font-size:12px;color:#667;margin-bottom:8px">${p.folio?esc(p.folio)+' · ':''}<b>${totUds}</b> unidades a empacar</div>
+      <div class="card" style="border-left:4px solid #2563eb;padding:10px 12px;margin-bottom:12px">
+        <div style="font-size:13px"><b>📍 Despachar a:</b> ${esc(dest||'—')}</div>
+        <div style="font-size:13px;margin-top:2px">${esc(dir||'(sin dirección registrada)')}</div>
+        ${tel?`<div style="font-size:13px;margin-top:2px">📱 ${esc(tel)}</div>`:''}
+        ${d.tipo_transporte?`<div style="font-size:12px;color:#667;margin-top:3px">🚚 Transporte: ${esc(d.tipo_transporte)}</div>`:''}
+      </div>
+      <div style="font-weight:800;margin-bottom:4px">📦 A empacar (picking / packing)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left;color:#667;font-size:11px;text-transform:uppercase"><th style="padding:4px 8px">Referencia</th><th style="padding:4px 8px">Color</th><th style="padding:4px 8px;text-align:right">Cant.</th></tr></thead><tbody>${filas}</tbody></table>
+      ${(d.alimento||d.notas)?`<div style="font-size:12px;color:#667;margin-top:10px;background:#f6f8fa;padding:7px 9px;border-radius:8px">${d.alimento?'🍯 '+esc(d.alimento):''}${d.notas?' · 📝 '+esc(d.notas):''}</div>`:''}
+      <button class="btn" style="width:100%;margin-top:12px;background:#eef0f2;color:#555" onclick="App.cerrarModal()">Cerrar</button>`);
+  },
   async _loadPeds(){ try{ const r=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.smart&estado=eq.pedido&order=creado_en.desc&limit=500',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const j=await r.json(); this._peds=Array.isArray(j)?j:[]; }catch(e){ this._peds=[]; } return this._peds; },
   async vPedidosSmart(){
     this.loading();
@@ -1189,6 +1209,8 @@ const App = {
       ${pend.length?pend.map(p=>{const d=p.datos||{};const f=(p.creado_en||'').slice(0,10);return `<div class="item">
         <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 📅 ${f}${f===hoy?' · 🆕 hoy':''}${(d.celular||p.celular)?' · 📱 '+esc(d.celular||p.celular):''}</div></div><span class="badge b-cotizada">por despachar</span></div>
         <div style="font-size:11.5px;color:#667;margin:4px 0">${esc(this._prodResumen(d)).slice(0,90)}</div>
+        ${(()=>{const dir=this._dirDespacho(d);return dir?`<div style="font-size:12px;color:#2563eb;margin:2px 0;font-weight:600">📍 ${esc(dir)}</div>`:'';})()}
+        <button class="btn-sm" type="button" style="background:#0b1f2a;color:#fff;width:100%;margin:4px 0" onclick="App.pedPicking('${p.id}')">📋 Abrir pedido — picking / packing</button>
         <div style="margin:8px 0">
           <select id="transp-${p.id}" class="field" style="padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:6px">${TR.map(t=>`<option ${p.transportadora===t?'selected':''}>${t}</option>`).join('')}</select>
           <div id="guias-${p.id}">${(()=>{const gg=(p.guia||'').split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);return (gg.length?gg:['']).map(g=>`<input class="gguia field" style="padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:4px" placeholder="N° de guía" value="${esc(g)}">`).join('');})()}</div>
