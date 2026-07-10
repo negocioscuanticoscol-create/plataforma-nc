@@ -2203,6 +2203,8 @@ const App = {
     const cl=p.cliente_snap||{};
     const env=[cl.direccion,cl.barrio,cl.ciudad,cl.depto].filter(Boolean).join(', ');
     const tot=+p.total||0, pares=+p.pares||0;
+    const _cv=p.curva||{}; const _tk=Object.keys(_cv).filter(t=>+_cv[t]>0).sort((a,b)=>a-b);
+    const tallasTxt=_tk.length?_tk.map(t=>`<b>${esc(t)}</b>×${esc(_cv[t])}`).join(' &nbsp; '):'';
     const detalle = p.es_muestra ? `🎁 ${esc(p.detalle||'Muestra')}` : `${pares} pares · ${esc(p.tipo_pago)}`;
     const totLbl = (p.es_muestra && tot===0) ? 'Sin costo' : money(tot);
     // liquidación discriminada (proforma): producto + IVA + transporte según la regla
@@ -2228,6 +2230,7 @@ const App = {
         <div class="card" style="background:#f4f7fb;border:1px dashed var(--naranja);margin:6px 0;padding:10px 12px">
           <div style="font-size:11px;font-weight:700;color:var(--naranja);margin-bottom:5px">📦 DATOS DE ENVÍO · picking & packing</div>
           <div style="font-size:13px;line-height:1.8">📍 <b>${esc(env||'— sin dirección registrada —')}</b>${cl.contacto1?`<br>👤 Oficina: <b>${esc(cl.contacto1)}</b>`:''}${(cl.tel||cl.cel2)?`<br>📱 Celular: <b>${esc(cl.tel||cl.cel2)}</b>${(cl.tel&&cl.cel2)?' · '+esc(cl.cel2):''}`:''}${(cl.contacto_recibe||cl.cel_recibe)?`<br>📦 <b>Recibe:</b> ${esc(cl.contacto_recibe||'')}${cl.cel_recibe?' · 📱 '+esc(cl.cel_recibe):''}`:''}${cl.notas?`<br>📝 <b>Notas:</b> ${esc(cl.notas)}`:''}</div>
+          ${tallasTxt?`<div style="margin-top:8px;font-size:14px;background:#fff;border:1px solid var(--linea);border-radius:8px;padding:9px 11px"><span style="font-size:11px;font-weight:800;color:var(--naranja)">👟 TALLAS A EMPACAR · ${pares} pares</span><br><div style="margin-top:3px;line-height:2">${tallasTxt}</div></div>`:''}
         </div>
         ${p.consignacion_validada_por?`<div class="meta" style="color:#16a34a;margin-bottom:4px">💳 Pago validado por <b>${esc(p.consignacion_validada_por)}</b></div>`:''}
         ${(!p.es_muestra && p.guia && p.estado==='pendiente_pago')?`<div style="font-size:11.5px;color:#b3261e;background:#fde8e8;border-radius:7px;padding:6px 9px;margin-bottom:6px">⚠️ CARTERA: enviado SIN validar el pago — falta oprimir 💳 Marcar consignación</div>`:''}
