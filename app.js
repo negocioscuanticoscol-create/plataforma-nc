@@ -2411,7 +2411,7 @@ const App = {
     let res=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_resultados?select=fila,nombre,cel,resultado,mundo,fecha&order=fecha.desc&limit=5000',{headers:H}); const j=await r.json(); res=Array.isArray(j)?j:[]; }catch(e){}
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.feroz&limit=5000',{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmEmbRows.forEach(x=>this._crmEmb[x.lead_key]=x.etapa); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; }
     this._crmFRes=res; const inter=res.filter(r=>/interes/i.test(r.resultado||''));
-    let bot=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_bot_leads?select=*&order=creado_en.desc&limit=500',{headers:H}); const j=await r.json(); bot=Array.isArray(j)?j:[]; }catch(e){}
+    let bot=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000',{headers:H}); const j=await r.json(); bot=Array.isArray(j)?j:[]; }catch(e){}
     let cots=[]; try{ const r=await this.sb.from('cotizaciones').select('id,cliente_id,numero,total,estado,es_muestra,creado_en').order('creado_en',{ascending:false}); cots=r.data||[]; }catch(e){}
     const cotByCli={}; cots.forEach(q=>{ if(q.cliente_id && !cotByCli[q.cliente_id]) cotByCli[q.cliente_id]=q; }); this._crmFCots=cotByCli;
     const cnt=async(mundo)=>{ try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_leads?mundo=eq.'+mundo+'&select=fila&limit=1',{headers:{...H,'Prefer':'count=exact'}}); return +((r.headers.get('content-range')||'').split('/')[1])||0; }catch(e){ return 0; } };
@@ -2423,15 +2423,15 @@ const App = {
     const yaTel=new Set(cli.map(c=>(c.tel||'').replace(/\D/g,'')).filter(Boolean));
     const intRaw=inter.filter(x=>{ const t=(x.cel||'').replace(/\D/g,''); return !t||!yaTel.has(t); });
     this._crmFIntRaw=intRaw;
-    const segOf=b=>{ const s=(b.segmento||'').toLowerCase(); return s==='distribuidor'?'dist':s==='empresa'?'emp':'b2c'; };
-    const dCnt={dist:0,emp:0,b2c:0}; bot.forEach(b=>dCnt[segOf(b)]++);
+    const etOf=b=>{ const v=(b.etiqueta||'').toLowerCase(); return /distribu/.test(v)?'distribuidor':/interes/.test(v)?'interesado':'curioso'; };
+    const dCnt={curioso:0,interesado:0,distribuidor:0}; bot.forEach(b=>dCnt[etOf(b)]++);
     const estOf=b=>{ const v=(b.etiqueta||'').toLowerCase(); return /cotiz/.test(v)?'cotiz':/interes/.test(v)?'interesado':'curioso'; };
     const orgLeads=bot.filter(b=>/organic|seo|red/i.test(b.origen||b.canal||''));
     const oCnt={curioso:0,interesado:0,cotiz:0}; orgLeads.forEach(b=>oCnt[estOf(b)]++);
     const PUERTAS=[['prospectos','🎯 Prospectos'],['marcador','☎️ Marcador'],['digital','💬 Digital'],['organico','🌱 Orgánico']];
     const CAJ={prospectos:[['inter',`🔥 Interesados ${intRaw.length}`],['nc',`👤 NC ${nc.length}`],['gpjr',`⭐ GPJR ${gpjr.length}`],['esp',`⭐⭐ Especiales ${esp.length}`]],
       marcador:[['emp',`🏭 Empresas ${nEmp.toLocaleString('es-CO')}`],['dist',`🏪 Distribuidores ${nDist.toLocaleString('es-CO')}`]],
-      digital:[['dist',`🏪 Distribuidores ${dCnt.dist}`],['emp',`🏭 Empresas ${dCnt.emp}`],['b2c',`🛒 Final B2C ${dCnt.b2c}`]],
+      digital:[['curioso',`👀 Curiosos ${dCnt.curioso}`],['interesado',`🔥 Interesados ${dCnt.interesado}`],['distribuidor',`🏪 Distribuidores ${dCnt.distribuidor}`]],
       organico:[['curioso',`👀 Curiosos ${oCnt.curioso}`],['interesado',`🔥 Interesados ${oCnt.interesado}`],['cotiz',`📝 Cotización ${oCnt.cotiz}`]]};
     const canal=this._crmFCanal||'prospectos'; this._crmFCanal=canal;
     const cajones=CAJ[canal]; let cajon=this._crmFCajon; if(!cajones.find(c=>c[0]===cajon)) cajon=cajones[0][0]; this._crmFCajon=cajon;
@@ -2540,12 +2540,12 @@ const App = {
       return resumen+lista;
     }
     if(canal==='digital'){
-      const segOf=b=>{ const s=(b.segmento||'').toLowerCase(); return s==='distribuidor'?'dist':s==='empresa'?'emp':'b2c'; };
-      const arr=(bot||[]).filter(b=>segOf(b)===cajon); this._crmFLeadShown=arr;
-      const nom={dist:'Distribuidores',emp:'Empresas',b2c:'Final (B2C)'}[cajon]||'Digital';
-      const cur=arr.filter(b=>/curios/i.test(b.etiqueta||'')).length, intr=arr.filter(b=>/interes/i.test(b.etiqueta||'')).length;
-      const head=`<div class="card" style="border-left:4px solid var(--naranja)"><div style="font-size:12px;color:#667">💬 WhatsApp <b>${nom}</b></div><div class="kpis" style="margin-top:6px"><div class="kpi"><b>${arr.length}</b><span>Leads</span></div><div class="kpi"><b>${cur}</b><span>👀 Curiosos</span></div><div class="kpi naranja"><b>${intr}</b><span>🔥 Interesados</span></div></div></div>`;
-      if(!arr.length) return head+'<div class="empty">Aún sin leads de este WhatsApp. (Lo llena el bot/pauta de Feroz.)</div>';
+      const etOf=b=>{ const v=(b.etiqueta||'').toLowerCase(); return /distribu/.test(v)?'distribuidor':/interes/.test(v)?'interesado':'curioso'; };
+      const arr=(bot||[]).filter(b=>etOf(b)===cajon); this._crmFLeadShown=arr;
+      const nom={curioso:'Curiosos',interesado:'Interesados',distribuidor:'Distribuidores'}[cajon]||'Digital';
+      const cur=(bot||[]).filter(b=>/curios/i.test(b.etiqueta||'')).length, intr=(bot||[]).filter(b=>/interes|distribu/i.test(b.etiqueta||'')).length;
+      const head=`<div class="card" style="border-left:4px solid var(--naranja)"><div style="font-size:12px;color:#667">💬 WhatsApp Feroz (Sofía) · <b>${nom}</b></div><div class="kpis" style="margin-top:6px"><div class="kpi"><b>${(bot||[]).length}</b><span>Leads totales</span></div><div class="kpi"><b>${cur}</b><span>👀 Curiosos</span></div><div class="kpi naranja"><b>${intr}</b><span>🔥 Calientes</span></div></div></div>`;
+      if(!arr.length) return head+'<div class="empty">Aún sin leads en este estado. Los llena Sofía (el bot de Feroz) en tiempo real.</div>';
       return head+arr.map((b,i)=>this._cardLead(b,i,'digital')).join('');
     }
     if(canal==='organico'){
@@ -2568,7 +2568,7 @@ const App = {
   },
   crmLeadAProspecto(i){
     const b=(this._crmFLeadShown||[])[i]; if(!b) return;
-    const clase=(b.segmento||'').toLowerCase()==='distribuidor'?'distribuidor':'empresa';
+    const clase=/empresa/.test((b.etiqueta||'').toLowerCase())?'empresa':'distribuidor';
     const et=(b.etiqueta||'').toLowerCase();
     this.modalCliente(async(c)=>{ if(c&&c.id) await this._avanzarEmbudo(c.id, /interes|cotiz/.test(et)?'interesado':'contactado'); this._crmFCanal='prospectos'; this.vCrm(); },
       {nombre:b.nombre, tel:b.telefono, ciudad:b.ciudad, clase});
