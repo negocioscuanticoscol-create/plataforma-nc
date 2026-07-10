@@ -2628,7 +2628,14 @@ const App = {
     const base=canal==='digital'?this._baseEtapa('digital',tag):-1;   // digital auto interesado/kit · orgánico vacío
     const c=/interes/.test(v)?'b-aceptada':/cotiz/.test(v)?'b-cotizada':'b-entregado';
     const mode=cajon==='distribuidor'?'full':cajon==='interesado'?'seg':'none';   // distribuidor: 3 círculos · interesado: seguimiento · resto: liviano
-    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(b.nombre||b.telefono||'—')}${b.telefono?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(b.telefono)}</span>`:''}</div><div class="meta">${b.ciudad?esc(b.ciudad):''}${b.producto?(b.ciudad?' · ':'')+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono,mode)}</div>`;
+    const anular=(cajon&&cajon!=='curioso')?`<div style="text-align:right;margin-top:6px"><button class="btn-sm" style="background:#fde8e8;color:#b3261e;padding:4px 11px;font-size:12px" onclick="App.crmLeadAnular('${(b.telefono||'').toString().replace(/\D/g,'')}')">↩️ Anular → Curioso</button></div>`:'';
+    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(b.nombre||b.telefono||'—')}${b.telefono?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(b.telefono)}</span>`:''}</div><div class="meta">${b.ciudad?esc(b.ciudad):''}${b.producto?(b.ciudad?' · ':'')+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono,mode)}${anular}</div>`;
+  },
+  async crmLeadAnular(tel){
+    tel=(tel||'').toString().replace(/\D/g,''); if(!tel) return;
+    if(!confirm('¿Anular este lead y devolverlo a Curioso?')) return;
+    try{ await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?telefono=eq.'+encodeURIComponent(tel),{method:'PATCH',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({etiqueta:'curioso'})}); }catch(e){}
+    this._toast('↩️ Devuelto a Curioso'); this.vCrm();
   },
   crmLeadAProspecto(i){
     const b=(this._crmFLeadShown||[])[i]; if(!b) return;
