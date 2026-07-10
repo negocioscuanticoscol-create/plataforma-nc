@@ -1725,12 +1725,17 @@ const App = {
         <div><label>Dirección</label><input class="field" id="cl_dir" value="${v(e.direccion)}"></div></div>
       <label>Localidad / Comuna (para cobertura)</label><input class="field" id="cl_localidad" value="${v(e.localidad)}">
       <label>Correo</label><input class="field" id="cl_correo" inputmode="email" value="${v(e.correo)}">
-      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">👥 CONTACTOS (hasta 2)</div>
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">👥 CONTACTOS DE OFICINA (hasta 2)</div>
       <div class="row2">
         <div><label>Contacto 1 (nombre)</label><input class="field" id="cl_cont1" value="${v(e.contacto1)}" placeholder="Quién contesta el Celular 1"></div>
         <div><label>Contacto 2 (nombre)</label><input class="field" id="cl_cont2" value="${v(e.contacto2)}"></div>
       </div>
       <label>Celular 2 (del contacto 2)</label><input class="field" id="cl_cel2" inputmode="tel" value="${v(e.cel2)}">
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">📦 QUIÉN RECIBE LOS PAQUETES <span style="font-weight:400;color:var(--suave)">(bodega/almacén, no oficina)</span></div>
+      <div class="row2">
+        <div><label>Nombre de quien recibe</label><input class="field" id="cl_cont_recibe" value="${v(e.contacto_recibe)}" placeholder="Encargado de bodega"></div>
+        <div><label>Celular de quien recibe</label><input class="field" id="cl_cel_recibe" inputmode="tel" value="${v(e.cel_recibe)}"></div>
+      </div>
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">💰 CONDICIONES DE COMISIONES</div>
       <div class="row2">
         <div><label>Referencia</label><input class="field" id="cl_ref" value="${v(e.referencia)||'701'}"></div>
@@ -1755,6 +1760,8 @@ const App = {
       contacto1:($('cl_cont1')?$('cl_cont1').value.trim():''),
       contacto2:($('cl_cont2')?$('cl_cont2').value.trim():''),
       cel2:($('cl_cel2')?$('cl_cel2').value.trim():''),
+      contacto_recibe:($('cl_cont_recibe')?$('cl_cont_recibe').value.trim():''),
+      cel_recibe:($('cl_cel_recibe')?$('cl_cel_recibe').value.trim():''),
       referencia:($('cl_ref')?$('cl_ref').value.trim():'701'),
       lista_precio:($('cl_lista')?$('cl_lista').value:'Distribuidor'),
       recomendado:($('cl_recom')?($('cl_recom').value==='si'||$('cl_recom').value==='especial'):false),
