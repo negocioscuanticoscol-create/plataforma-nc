@@ -2488,6 +2488,27 @@ const App = {
       </div>`);
   },
   copiarInforme(){ const t=document.getElementById('infTxt'); const v=(t&&t.value)||this._informeTxt||''; try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(v); } else { t.select(); document.execCommand('copy'); } }catch(e){ try{ t.select(); document.execCommand('copy'); }catch(e2){} } this._toast('📋 Informe copiado — pégalo en WhatsApp'); },
+  copiarTxt(id){ const t=document.getElementById(id); const v=(t&&t.value)||''; try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(v); } else { t.select(); document.execCommand('copy'); } }catch(e){ try{ t.select(); document.execCommand('copy'); }catch(e2){} } this._toast('📋 Copiado'); },
+  crmInteresadosLista(){
+    const arr=(this._crmFInter||[]).slice().sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
+    if(!arr.length){ this._toast('No hay interesados aún'); return; }
+    const clean=n=>String(n||'').replace(/\s+/g,' ').trim();
+    const hoy=new Date().toLocaleDateString('es-CO');
+    const L=[`🔥 *INTERESADOS FEROZ* — ${arr.length}`,`_${hoy} · para volver a llamar o remarketing_`,''];
+    arr.forEach(x=>{ L.push(`*${clean(x.nombre)||'—'}*${x.ciudad?' · '+clean(x.ciudad):''}`); L.push(`📱 ${clean(x.cel)||'—'}${x.fecha?' · '+String(x.fecha).slice(0,10):''}`); if(clean(x.nota)) L.push(`📝 ${clean(x.nota)}`); L.push(''); });
+    const nums=[...new Set(arr.map(x=>(x.cel||'').replace(/\D/g,'')).filter(t=>t.length>=10))];
+    this._interLista=L.join('\n').trim(); this._interNums=nums.join(', ');
+    this.modal(`<h3>📋 Interesados Feroz · ${arr.length}</h3>
+      <div class="hint" style="margin-bottom:6px">Para volver a llamar o hacer remarketing. Copia y úsalo.</div>
+      <textarea id="intTxt" readonly style="width:100%;height:36vh;font-size:12px;line-height:1.4;border:1px solid var(--linea);border-radius:8px;padding:8px;white-space:pre-wrap;box-sizing:border-box">${esc(this._interLista)}</textarea>
+      <div class="hint" style="margin:8px 0 4px">Solo números (${nums.length}) — para difusión de WhatsApp:</div>
+      <textarea id="intNums" readonly style="width:100%;height:64px;font-size:12px;border:1px solid var(--linea);border-radius:8px;padding:8px;box-sizing:border-box">${esc(this._interNums)}</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-main" style="flex:1" onclick="App.copiarTxt('intTxt')">📋 Copiar listado</button>
+        <button class="btn" style="flex:1;background:#eef2ff;color:#3a48b3" onclick="App.copiarTxt('intNums')">Copiar números</button>
+      </div>
+      <button class="btn" style="width:100%;margin-top:8px;background:#eef0f2;color:#555" onclick="App.cerrarModal()">Cerrar</button>`);
+  },
   async crmFEmbudo(id,etapa){
     if(etapa==='cliente' && !confirm('¿Marcar PRIMER PEDIDO? Pasa a Clientes y sale de Prospectos.')){ this.vCrm(); return; }
     await this.sb.from('clientes').update({embudo:etapa}).eq('id',id);
@@ -2506,8 +2527,10 @@ const App = {
     if(canal==='prospectos'){
       if(cajon==='inter'){   // 🔥 interesados CRUDOS de canales → a clasificar (no son prospectos aún)
         const raw=this._crmFIntRaw||[];
-        if(!raw.length) return '<div class="empty">Sin interesados nuevos. Aquí caen los que marques 🔥 Interesado en Marcador/Digital/Orgánico, para clasificarlos en NC/GPJR/Especial.</div>';
-        return raw.map((x,i)=>{ const key='i'+((x.cel||x.nombre)+'').replace(/[^a-z0-9]/gi,'').slice(0,26); return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(x.nombre||'—')}${x.cel?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(x.cel)}</span>`:''}</div><div class="meta">${x.ciudad?'📍 '+esc(x.ciudad)+' · ':''}${x.mundo==='distribuidor'?'🏪 distribuidor':'🏭 empresa'} · 🔥 interesado</div></div></div>${this._emb(key,-1,'marcador',x.nombre,x.cel)}</div>`; }).join('');
+        const nInt=(this._crmFInter||[]).length;
+        const btnLista=nInt?`<button class="btn-sm" style="width:100%;background:#0b1f2a;color:#fff;padding:11px;margin-bottom:10px;font-weight:700" onclick="App.crmInteresadosLista()">📋 Sacar listado de interesados (${nInt}) — llamar / remarketing</button>`:'';
+        if(!raw.length) return btnLista+'<div class="empty">Sin interesados nuevos por clasificar. Aquí caen los que marques 🔥 Interesado en Marcador/Digital/Orgánico.</div>';
+        return btnLista+raw.map((x,i)=>{ const key='i'+((x.cel||x.nombre)+'').replace(/[^a-z0-9]/gi,'').slice(0,26); return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(x.nombre||'—')}${x.cel?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(x.cel)}</span>`:''}</div><div class="meta">${x.ciudad?'📍 '+esc(x.ciudad)+' · ':''}${x.mundo==='distribuidor'?'🏪 distribuidor':'🏭 empresa'} · 🔥 interesado</div></div></div>${this._emb(key,-1,'marcador',x.nombre,x.cel)}</div>`; }).join('');
       }
       const arr=cli.filter(c=> cajon==='esp'?!!c.especial : cajon==='gpjr'?(!!c.recomendado&&!c.especial) : (!c.recomendado&&!c.especial));
       if(!arr.length) return `<div class="empty">Sin prospectos ${cajon==='esp'?'Especiales':cajon==='gpjr'?'GPJR':'NC'}.</div>`;
