@@ -2126,7 +2126,7 @@ const App = {
       <h1>📦 Pedidos</h1><div class="sub">${peds.length} por consignar/autorizar · toca uno para abrir</div>
       <div class="card" style="background:linear-gradient(135deg,#0b3d91,#1558d6);color:#fff;border:none"><div style="font-size:12px;opacity:.85">💰 Valorización en pedidos</div><div style="font-size:25px;font-weight:800;margin-top:2px">${money(valorPed)}</div><div style="font-size:11px;opacity:.8">${peds.length} pedido(s) por consignar/autorizar</div></div>
       ${this.puede('admin','vendedor')?`<button class="btn btn-main" style="margin-bottom:14px" onclick="App.modalCrear()">🛒 Hacer pedido / Muestra</button>`:''}
-      <button class="btn-sm" style="width:100%;background:#0b1f2a;color:#fff;padding:11px;margin-bottom:12px;font-weight:700" onclick="App.resumenTiempos()">⏱ Resumen de tiempos · picking &amp; packing</button>
+      ${this.puede('admin')?`<button class="btn-sm" style="width:100%;background:#0b1f2a;color:#fff;padding:11px;margin-bottom:12px;font-weight:700" onclick="App.resumenTiempos()">⏱ Resumen de tiempos · picking &amp; packing</button>`:''}
       ${peds.length?peds.map(p=>this.cardPedido(p)).join(''):'<div class="empty">No hay pedidos por autorizar.</div>'}
     `);
   },
@@ -2233,7 +2233,7 @@ const App = {
           <div style="font-size:13px;line-height:1.8">📍 <b>${esc(env||'— sin dirección registrada —')}</b>${cl.contacto1?`<br>👤 Oficina: <b>${esc(cl.contacto1)}</b>`:''}${(cl.tel||cl.cel2)?`<br>📱 Celular: <b>${esc(cl.tel||cl.cel2)}</b>${(cl.tel&&cl.cel2)?' · '+esc(cl.cel2):''}`:''}${(cl.contacto_recibe||cl.cel_recibe)?`<br>📦 <b>Recibe:</b> ${esc(cl.contacto_recibe||'')}${cl.cel_recibe?' · 📱 '+esc(cl.cel_recibe):''}`:''}${cl.notas?`<br>📝 <b>Notas:</b> ${esc(cl.notas)}`:''}</div>
           ${tallasTxt?`<div style="margin-top:8px;font-size:14px;background:#fff;border:1px solid var(--linea);border-radius:8px;padding:9px 11px"><span style="font-size:11px;font-weight:800;color:var(--naranja)">👟 TALLAS A EMPACAR · ${pares} pares</span><br><div style="margin-top:3px;line-height:2">${tallasTxt}</div></div>`:''}
         </div>
-        ${this._tiemposPedido(p)}
+        ${this.puede('admin')?this._tiemposPedido(p):''}
         ${p.consignacion_validada_por?`<div class="meta" style="color:#16a34a;margin-bottom:4px">💳 Pago validado por <b>${esc(p.consignacion_validada_por)}</b></div>`:''}
         ${(!p.es_muestra && p.guia && p.estado==='pendiente_pago')?`<div style="font-size:11.5px;color:#b3261e;background:#fde8e8;border-radius:7px;padding:6px 9px;margin-bottom:6px">⚠️ CARTERA: enviado SIN validar el pago — falta oprimir 💳 Marcar consignación</div>`:''}
         <div class="acciones-item">${this.accionesPedido(p)}</div>
@@ -2369,10 +2369,10 @@ const App = {
   },
   async accRecibir(id){
     const quien=(this.perfil&&this.perfil.nombre)||this.user.email||'bodega';
-    if(!confirm('¿Confirmas que RECIBISTE este pedido en bodega?\n\nArranca el cronómetro de picking & packing.')) return;
+    if(!confirm('¿Confirmas que RECIBISTE este pedido en bodega para alistarlo?')) return;
     await this.sb.from('pedidos').update({recibido_en:new Date().toISOString(), recibido_por:quien, actualizado_en:new Date().toISOString()}).eq('id',id);
     try{ await this.hist(id,'recibido','Recibido en bodega por '+quien); }catch(e){}
-    this.toast('📥 Recibido en bodega · cronómetro iniciado'); this.go(this.view);
+    this.toast('📥 Recibido en bodega'); this.go(this.view);
   },
   _hm(t){ return t?new Date(t).toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; },
   _dur(a,b){ if(!a||!b) return ''; const ms=new Date(b)-new Date(a); if(ms<0) return ''; const m=Math.round(ms/60000);
