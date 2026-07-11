@@ -2126,6 +2126,7 @@ const App = {
       <h1>📦 Pedidos</h1><div class="sub">${peds.length} por consignar/autorizar · toca uno para abrir</div>
       <div class="card" style="background:linear-gradient(135deg,#0b3d91,#1558d6);color:#fff;border:none"><div style="font-size:12px;opacity:.85">💰 Valorización en pedidos</div><div style="font-size:25px;font-weight:800;margin-top:2px">${money(valorPed)}</div><div style="font-size:11px;opacity:.8">${peds.length} pedido(s) por consignar/autorizar</div></div>
       ${this.puede('admin','vendedor')?`<button class="btn btn-main" style="margin-bottom:14px" onclick="App.modalCrear()">🛒 Hacer pedido / Muestra</button>`:''}
+      <button class="btn-sm" style="width:100%;background:#0b1f2a;color:#fff;padding:11px;margin-bottom:12px;font-weight:700" onclick="App.resumenTiempos()">⏱ Resumen de tiempos · picking &amp; packing</button>
       ${peds.length?peds.map(p=>this.cardPedido(p)).join(''):'<div class="empty">No hay pedidos por autorizar.</div>'}
     `);
   },
@@ -2232,6 +2233,7 @@ const App = {
           <div style="font-size:13px;line-height:1.8">📍 <b>${esc(env||'— sin dirección registrada —')}</b>${cl.contacto1?`<br>👤 Oficina: <b>${esc(cl.contacto1)}</b>`:''}${(cl.tel||cl.cel2)?`<br>📱 Celular: <b>${esc(cl.tel||cl.cel2)}</b>${(cl.tel&&cl.cel2)?' · '+esc(cl.cel2):''}`:''}${(cl.contacto_recibe||cl.cel_recibe)?`<br>📦 <b>Recibe:</b> ${esc(cl.contacto_recibe||'')}${cl.cel_recibe?' · 📱 '+esc(cl.cel_recibe):''}`:''}${cl.notas?`<br>📝 <b>Notas:</b> ${esc(cl.notas)}`:''}</div>
           ${tallasTxt?`<div style="margin-top:8px;font-size:14px;background:#fff;border:1px solid var(--linea);border-radius:8px;padding:9px 11px"><span style="font-size:11px;font-weight:800;color:var(--naranja)">👟 TALLAS A EMPACAR · ${pares} pares</span><br><div style="margin-top:3px;line-height:2">${tallasTxt}</div></div>`:''}
         </div>
+        ${this._tiemposPedido(p)}
         ${p.consignacion_validada_por?`<div class="meta" style="color:#16a34a;margin-bottom:4px">💳 Pago validado por <b>${esc(p.consignacion_validada_por)}</b></div>`:''}
         ${(!p.es_muestra && p.guia && p.estado==='pendiente_pago')?`<div style="font-size:11.5px;color:#b3261e;background:#fde8e8;border-radius:7px;padding:6px 9px;margin-bottom:6px">⚠️ CARTERA: enviado SIN validar el pago — falta oprimir 💳 Marcar consignación</div>`:''}
         <div class="acciones-item">${this.accionesPedido(p)}</div>
@@ -2257,6 +2259,9 @@ const App = {
       btns.push(`<button class="btn-sm" style="background:var(--verde);color:#fff" onclick="App.accEntregar(${p.id})">✅ Guía recibida</button>`);
     if(p.estado==='consignado' && this.puede('admin','facturacion'))
       btns.push(`<button class="btn-sm" style="background:var(--azul);color:#fff" onclick="App.accAutorizar(${p.id})">✓ Validar y autorizar</button>`);
+    // ⏱ BODEGA: el bodeguero marca que RECIBIÓ el pedido (arranca el cronómetro de picking & packing)
+    if(p.estado==='autorizado' && !p.recibido_en && this.puede('admin','bodega'))
+      btns.push(`<button class="btn-sm" style="background:#0b1f2a;color:#fff;font-weight:700" onclick="App.accRecibir(${p.id})">📥 Recibí (bodega)</button>`);
     if(p.estado==='autorizado' && this.puede('admin','bodega'))
       btns.push(`<button class="btn-sm" style="background:var(--verde);color:#fff" onclick="App.accDespachar(${p.id})">🚚 Despachar</button>`);
     if(p.estado==='despachado'){
@@ -2323,18 +2328,83 @@ const App = {
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>
     `);
   },
+  /* ---------- ⏱ TIEMPOS DE BODEGA (picking & packing) ---------- */
+  async resumenTiempos(){
+    const { data:peds=[] } = await this.sb.from('pedidos').select('numero,cliente_snap,pares,autorizado_en,recibido_en,recibido_por,despachado_en,guia_en,estado')
+      .not('recibido_en','is',null).order('recibido_en',{ascending:false}).limit(200);
+    if(!peds.length){ this.modal('<h3>⏱ Resumen de tiempos</h3><div class="empty">Aún no hay pedidos con tiempos registrados.<br><br>Cuando bodega oprima <b>📥 Recibí</b> en un pedido, empieza a medirse el picking & packing.</div><button class="btn" style="width:100%;background:#eef0f2;color:#555" onclick="App.cerrarModal()">Cerrar</button>'); return; }
+    const mins=(a,b)=>{ if(!a||!b) return null; const m=Math.round((new Date(b)-new Date(a))/60000); return m>=0?m:null; };
+    const prom=arr=>{ const v=arr.filter(x=>x!=null); return v.length?Math.round(v.reduce((s,x)=>s+x,0)/v.length):null; };
+    const fmt=m=>m==null?'—':(m<60?m+' min':Math.floor(m/60)+'h'+(m%60?' '+(m%60)+'m':''));
+    const rows=peds.map(p=>({n:p.numero||'—', cli:((p.cliente_snap||{}).nombre)||'—', pares:+p.pares||0, quien:p.recibido_por||'—',
+      resp:mins(p.autorizado_en,p.recibido_en), pick:mins(p.recibido_en,p.despachado_en), gui:mins(p.despachado_en,p.guia_en), tot:mins(p.autorizado_en,p.guia_en)}));
+    const pResp=prom(rows.map(r=>r.resp)), pPick=prom(rows.map(r=>r.pick)), pGui=prom(rows.map(r=>r.gui)), pTot=prom(rows.map(r=>r.tot));
+    // picking por par (productividad)
+    const conPares=rows.filter(r=>r.pick!=null && r.pares>0);
+    const minPorPar=conPares.length?(conPares.reduce((s,r)=>s+r.pick/r.pares,0)/conPares.length).toFixed(1):null;
+    this.modal(`<h3>⏱ Resumen de tiempos · bodega</h3>
+      <div class="hint" style="margin-bottom:8px">${rows.length} pedido(s) con cronómetro. Promedios de la operación.</div>
+      <div class="kpis" style="grid-template-columns:1fr 1fr">
+        <div class="kpi"><b style="font-size:20px">${fmt(pResp)}</b><span>📥 Tardan en recibirlo</span></div>
+        <div class="kpi naranja"><b style="font-size:20px">${fmt(pPick)}</b><span>📦 Picking &amp; packing</span></div>
+        <div class="kpi"><b style="font-size:20px">${fmt(pGui)}</b><span>🚚 Hasta poner la guía</span></div>
+        <div class="kpi verde"><b style="font-size:20px">${fmt(pTot)}</b><span>⏱ Total del ciclo</span></div>
+      </div>
+      ${minPorPar?`<div class="card" style="border-left:4px solid var(--naranja);padding:9px 12px;font-size:13px">⚡ Productividad: <b>${minPorPar} min por par</b> en promedio (picking).</div>`:''}
+      <div style="overflow-x:auto;margin-top:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;white-space:nowrap">
+        <thead><tr style="text-align:left;color:#667;font-size:10.5px;text-transform:uppercase">
+          <th style="padding:5px 7px">Pedido</th><th style="padding:5px 7px">Bodeguero</th><th style="padding:5px 7px;text-align:right">Pares</th>
+          <th style="padding:5px 7px;text-align:right">Recibir</th><th style="padding:5px 7px;text-align:right">Picking</th><th style="padding:5px 7px;text-align:right">Guía</th><th style="padding:5px 7px;text-align:right">Total</th></tr></thead>
+        <tbody>${rows.map(r=>`<tr style="border-top:1px solid var(--linea)">
+          <td style="padding:6px 7px"><b>${esc(r.n)}</b><div style="color:#8a93a6;font-size:11px">${esc(r.cli).slice(0,22)}</div></td>
+          <td style="padding:6px 7px">${esc(r.quien)}</td>
+          <td style="padding:6px 7px;text-align:right">${r.pares}</td>
+          <td style="padding:6px 7px;text-align:right">${fmt(r.resp)}</td>
+          <td style="padding:6px 7px;text-align:right;font-weight:800;color:var(--naranja)">${fmt(r.pick)}</td>
+          <td style="padding:6px 7px;text-align:right">${fmt(r.gui)}</td>
+          <td style="padding:6px 7px;text-align:right;font-weight:700">${fmt(r.tot)}</td></tr>`).join('')}</tbody>
+      </table></div>
+      <button class="btn" style="width:100%;margin-top:12px;background:#eef0f2;color:#555" onclick="App.cerrarModal()">Cerrar</button>`);
+  },
+  async accRecibir(id){
+    const quien=(this.perfil&&this.perfil.nombre)||this.user.email||'bodega';
+    if(!confirm('¿Confirmas que RECIBISTE este pedido en bodega?\n\nArranca el cronómetro de picking & packing.')) return;
+    await this.sb.from('pedidos').update({recibido_en:new Date().toISOString(), recibido_por:quien, actualizado_en:new Date().toISOString()}).eq('id',id);
+    try{ await this.hist(id,'recibido','Recibido en bodega por '+quien); }catch(e){}
+    this.toast('📥 Recibido en bodega · cronómetro iniciado'); this.go(this.view);
+  },
+  _hm(t){ return t?new Date(t).toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):''; },
+  _dur(a,b){ if(!a||!b) return ''; const ms=new Date(b)-new Date(a); if(ms<0) return ''; const m=Math.round(ms/60000);
+    if(m<60) return m+' min'; const h=Math.floor(m/60), r=m%60; if(h<24) return h+'h'+(r?' '+r+'m':''); const d=Math.floor(h/24); return d+'d '+(h%24)+'h'; },
+  _tiemposPedido(p){
+    const pub=p.autorizado_en, rec=p.recibido_en, des=p.despachado_en, gui=p.guia_en;
+    if(!pub && !rec && !des) return '';
+    const row=(ic,lbl,t,dur,extra)=>t?`<div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:2px 0"><span>${ic} ${lbl} <b>${this._hm(t)}</b>${extra?` <span style="color:var(--suave)">${esc(extra)}</span>`:''}</span>${dur?`<span style="color:var(--naranja);font-weight:800;white-space:nowrap">${dur}</span>`:''}</div>`:'';
+    const pick=this._dur(rec,des);
+    return `<div class="card" style="background:#fff;border:1px solid var(--linea);margin:6px 0;padding:9px 11px">
+      <div style="font-size:11px;font-weight:800;color:var(--naranja);margin-bottom:4px">⏱ TIEMPOS DE BODEGA</div>
+      ${row('📢','Publicado',pub,'')}
+      ${row('📥','Recibido',rec,this._dur(pub,rec),p.recibido_por?('· '+p.recibido_por):'')}
+      ${row('📦','Despachado',des,pick?pick+' picking':'')}
+      ${row('🚚','Guía puesta',gui,this._dur(des,gui))}
+      ${(pub&&gui)?`<div style="border-top:1px dashed var(--linea);margin-top:5px;padding-top:5px;font-size:12.5px;display:flex;justify-content:space-between"><b>Total (publicado → guía)</b><b style="color:var(--verde)">${this._dur(pub,gui)}</b></div>`:''}
+    </div>`;
+  },
   async guardarGuia(id, modo){
     const transporte=$('g_transp').value, guia=$('g_guia').value.trim();
     if(modo==='despachar'){
-      await this.sb.from('pedidos').update({estado:'despachado',transporte,guia,despachado_por:this.user.id,despachado_en:new Date().toISOString(),actualizado_en:new Date().toISOString()}).eq('id',id);
+      await this.sb.from('pedidos').update({estado:'despachado',transporte,guia,despachado_por:this.user.id,despachado_en:new Date().toISOString(),guia_en:(guia?new Date().toISOString():null),actualizado_en:new Date().toISOString()}).eq('id',id);
       await this.hist(id,'despachado','Despachado por '+transporte+(guia?(' · guía '+guia):''));
       const { data:pp } = await this.sb.from('pedidos').select('curva,numero').eq('id',id).single();
       if(pp) await this.descontarInventario(id, pp.curva, 'Despacho '+(pp.numero||''));
       this.cerrarModal(); this.go(this.view);
       setTimeout(()=>{ if(confirm('Pedido despachado ✅\n¿Avisar al cliente por WhatsApp ahora?')) this.waCliente(id); },300);
     } else {
-      const { data:p } = await this.sb.from('pedidos').select('estado').eq('id',id).single();
-      await this.sb.from('pedidos').update({transporte,guia,actualizado_en:new Date().toISOString()}).eq('id',id);
+      const { data:p } = await this.sb.from('pedidos').select('estado,guia_en').eq('id',id).single();
+      const _upd={transporte,guia,actualizado_en:new Date().toISOString()};
+      if(guia && !(p&&p.guia_en)) _upd.guia_en=new Date().toISOString();   // ⏱ hora en que se puso la guía (solo la 1ra vez)
+      await this.sb.from('pedidos').update(_upd).eq('id',id);
       await this.hist(id,(p&&p.estado)||'pendiente_pago','Guía registrada (enviado antes del pago): '+transporte+(guia?(' · guía '+guia):''));
       this.cerrarModal(); this.toast('🚚 Guía registrada ✅ — ya aparece en Despachos'); this.go(this.view);
     }
