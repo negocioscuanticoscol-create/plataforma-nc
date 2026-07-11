@@ -539,14 +539,20 @@ const App = {
     const refMap={}; this._invCat().forEach(c=>refMap[c.sku]={sku:c.sku,ref:c.ref,cols:[...c.cols]});
     vigente.forEach(x=>{ const r=(refMap[x.sku]=refMap[x.sku]||{sku:x.sku,ref:x.referencia||'',cols:[]}); if(!r.cols.includes(x.color)) r.cols.push(x.color); if(x.referencia&&!r.ref) r.ref=x.referencia; });
     this._plRefs=Object.values(refMap).sort((a,b)=>a.sku.localeCompare(b.sku));
-    const bajos=vigente.filter(x=>x.activo && (+x.cantidad||0)>0 && (+x.cantidad||0)<1000);
+    const agotados=vigente.filter(x=>x.activo && (+x.cantidad||0)<=0);                              // 🔴 en CERO
+    const bajos=vigente.filter(x=>x.activo && (+x.cantidad||0)>0 && (+x.cantidad||0)<1000);        // ⚠️ bajo 1.000
     const tab=this._plTab||'ver'; this._plTab=tab;
     const INV2=[['ver','📦 Inventario'],['nuevaref','🆕 Nueva ref'],['registrar','➕ Registrar'],['informes','📊 Informes']];
     const inGroup=INV2.some(([v])=>v===tab);
     const L1=[['ver','📦 Inventario',inGroup],['metas','🎯 Meta Ventas',tab==='metas'],['pendientes','📌 Pendientes',tab==='pendientes']];
     const body = tab==='nuevaref'?this._plNuevaRef() : tab==='registrar'?this._plRegistrar() : tab==='informes'?this._plInformes() : tab==='metas'?this._plMetas() : tab==='pendientes'?this._plPendientes() : this._plVer();
     this.set(`<h1>Planta · Inventario</h1><div class="sub">Referencias · montajes · informes</div>
-      <div class="card" style="border-left:4px solid ${bajos.length?'var(--rojo)':'var(--verde)'};padding:10px 14px"><b style="color:${bajos.length?'var(--rojo)':'var(--verde)'}">${bajos.length?('⚠️ '+bajos.length+' referencia(s) con menos de 1.000 envases'):'✅ Ninguna referencia bajo 1.000'}</b>${bajos.length?'<div style="font-size:12px;margin-top:4px">'+bajos.map(b=>esc(b.sku)+' '+esc(b.color)+' ('+Math.round(b.cantidad)+')').join(' · ')+'</div>':''}</div>
+      <div class="card" style="border-left:4px solid ${(agotados.length||bajos.length)?'var(--rojo)':'var(--verde)'};padding:10px 14px">
+        ${agotados.length?`<b style="color:var(--rojo)">🔴 ${agotados.length} referencia(s) AGOTADA(S) — en cero</b><div style="font-size:12px;margin-top:4px;font-weight:700;color:var(--rojo)">${agotados.map(b=>esc(b.sku)+' '+esc(b.color)).join(' · ')}</div>`:''}
+        ${(agotados.length&&bajos.length)?'<div style="border-top:1px solid var(--linea);margin:8px 0"></div>':''}
+        ${bajos.length?`<b style="color:#b45309">⚠️ ${bajos.length} referencia(s) con menos de 1.000 envases</b><div style="font-size:12px;margin-top:4px">${bajos.map(b=>esc(b.sku)+' '+esc(b.color)+' ('+Math.round(b.cantidad)+')').join(' · ')}</div>`:''}
+        ${(!agotados.length&&!bajos.length)?'<b style="color:var(--verde)">✅ Ninguna referencia agotada ni bajo 1.000</b>':''}
+      </div>
       <div style="display:flex;gap:6px;margin:10px 0 8px;overflow-x:auto">${L1.map(([v,n,a])=>`<button class="btn-sm" style="flex:0 0 auto;padding:10px 16px;font-weight:700;font-size:12.5px;background:${a?'var(--naranja);color:#fff':'#e5e7eb;color:#555'}" onclick="App.plTab('${v}')">${n}</button>`).join('')}</div>
       ${inGroup?`<div style="display:flex;gap:5px;margin:0 0 12px;overflow-x:auto;padding-left:8px;border-left:3px solid var(--naranja)">${INV2.map(([v,n])=>`<button class="btn-sm" style="flex:0 0 auto;padding:8px 12px;font-weight:600;font-size:12px;background:${v===tab?'#334155;color:#fff':'#f1f5f9;color:#555'}" onclick="App.plTab('${v}')">${n}</button>`).join('')}</div>`:''}
       ${body}`);
