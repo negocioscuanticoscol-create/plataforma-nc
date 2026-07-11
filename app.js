@@ -177,14 +177,27 @@ const App = {
     this._crmCots=cots.filter(c=>!esTest(c.cliente)); this._crmKits=kits; this._crmNorm=norm;
     const PUERTAS=[['prospectos','🎯 Prospectos'],['marcador','☎️ Marcador'],['digital','💬 Digital'],['organico','🌱 Orgánico']];
     const bot=this._crmBot||[];
-    const bc=t=>bot.filter(l=>l.etiqueta===t).length;
+    // 🔗 EMBUDO REAL: el lead pasa a Kit cuando llegó a COTIZACIÓN, y SALE del lead cuando ya hay PEDIDO (cruce por celular o nombre)
+    const _dig=t=>(t||'').toString().replace(/\D/g,'').slice(-10);
+    const telPed=new Set(), nomPed=new Set(), telCot=new Set(), nomCot=new Set();
+    (this._crmCots||[]).forEach(c=>{ const t=_dig(c.celular||((c.datos||{}).celular)), n=norm(c.cliente);
+      if(c.estado==='pedido'){ if(t)telPed.add(t); if(n)nomPed.add(n); }
+      else if(c.estado==='cotizacion'){ if(t)telCot.add(t); if(n)nomCot.add(n); } });
+    this._crmCajonDe=l=>{
+      const t=_dig(l.telefono), n=norm(l.nombre);
+      if((t&&telPed.has(t))||(n&&nomPed.has(n))) return null;      // ya tiene PEDIDO → sale del lead (es cliente)
+      if((t&&telCot.has(t))||(n&&nomCot.has(n))) return 'kit';     // llegó a COTIZACIÓN → Kit (prospecto)
+      const e=(l.etiqueta||'').toLowerCase();
+      return (e==='kit'||e==='interesado'||e==='curioso')?e:null;  // el resto (comprador/baja) queda fuera
+    };
+    const bc=t=>bot.filter(l=>this._crmCajonDe(l)===t).length;
     const cotD=this._crmCots.filter(c=>c.estado==='cotizacion'&&c.origen==='digital').length;
     const rmkD=this._crmCots.filter(c=>/remark/i.test(c.accion||'')&&c.origen==='digital').length;
     const kitBuyers=new Set(kits.map(k=>norm(k.cliente))).size;
     const mesISO=new Date().toISOString().slice(0,7);   // leads que LLEGARON este mes (por creado_en)
-    const bcM=t=>bot.filter(l=>l.etiqueta===t && (l.creado_en||'').slice(0,7)===mesISO).length;
+    const bcM=t=>bot.filter(l=>this._crmCajonDe(l)===t && (l.creado_en||'').slice(0,7)===mesISO).length;
     const cotDM=this._crmCots.filter(c=>c.estado==='cotizacion'&&c.origen==='digital'&&(c.creado_en||'').slice(0,7)===mesISO).length;
-    const DCAJ1=[['todos','Todos',bc('curioso')+bc('interesado')+bc('kit')+cotD,bcM('curioso')+bcM('interesado')+bcM('kit')+cotDM],['curioso','🤔 Curioso',bc('curioso'),bcM('curioso')],['interesado','💡 Interesado',bc('interesado'),bcM('interesado')],['kit','📦 Kit',bc('kit'),bcM('kit')],['cotiz','📝 Cotización',cotD,cotDM]];
+    const DCAJ1=[['todos','Todos',bc('curioso')+bc('interesado')+bc('kit'),bcM('curioso')+bcM('interesado')+bcM('kit')],['curioso','🤔 Curioso',bc('curioso'),bcM('curioso')],['interesado','💡 Interesado',bc('interesado'),bcM('interesado')],['kit','📦 Kit',bc('kit'),bcM('kit')],['cotiz','📝 Cotización',cotD,cotDM]];
     const DCAJ2=[['remarketing','📣 Remarketing',bc('interesado')],['plantilla','📨 Plantilla Meta',bc('curioso')+bc('plantilla_meta')],['mantenimiento','🔧 Mantenimiento',bc('kit')+bc('comprador')]];
     const DCAJ=[...DCAJ1,...DCAJ2];
     const canal=this._crmCanal||'prospectos'; this._crmCanal=canal;
@@ -263,8 +276,9 @@ const App = {
       if(!bot.length) return head+'<div class="empty">Sin personas en este grupo todavía.</div>';
       return head+bot.map(l=>this._crmCampCard(l)).join('');
     }
-    const stages=cajon==='todos'?['curioso','interesado','kit']:[cajon];
-    const bot=(this._crmBot||[]).filter(l=>stages.includes(l.etiqueta));
+    // usa el EMBUDO REAL: kit = llegó a cotización · con pedido = ya salió del lead
+    const cd=this._crmCajonDe||(l=>l.etiqueta);
+    const bot=(this._crmBot||[]).filter(l=>{ const c=cd(l); return cajon==='todos'?!!c:(c===cajon); });
     if(!bot.length) return '<div class="empty">Sin leads en este cajón.</div>';
     const dots=cajon==='interesado'?'seg':'none';   // interesado: círculo de seguimiento · resto: liviano
     return bot.map(l=>this._crmCard({key:'d'+((l.telefono||l.id)+'').replace(/\D/g,'').slice(0,18),nombre:l.nombre||l.telefono,telefono:l.telefono,ciudad:l.ciudad,sub:(l.ultimo_mensaje||'').slice(0,46),canal:'digital',base:this._baseEtapa('digital',l.etiqueta),noWa:true,dots})).join('');
