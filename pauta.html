@@ -1,0 +1,85 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pauta semanal · NC</title>
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--line:#334155;--tx:#e2e8f0;--mut:#94a3b8;--pri:#f59e0b;--ok:#22c55e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,Segoe UI,Roboto,sans-serif;padding:16px}
+  .wrap{max-width:620px;margin:0 auto}
+  h1{font-size:20px;margin:4px 0}
+  .mut{color:var(--mut);font-size:13px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+  .ad{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .ad .nm{font-weight:700;font-size:15px}
+  .ad .sub{font-size:12px;color:var(--mut)}
+  .lead{background:#0b1220;border:1px solid var(--line);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:700;color:var(--ok)}
+  input{background:#0b1220;color:var(--tx);border:1px solid var(--line);border-radius:9px;padding:10px;font-size:16px;width:100%}
+  label{font-size:11px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .g3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px;margin-top:8px}
+  .btn{width:100%;padding:15px;border:none;border-radius:12px;background:var(--pri);color:#111;font-weight:800;font-size:16px;cursor:pointer;margin-top:10px}
+  .btn.sec{background:#334155;color:#fff}
+  .tabs{display:flex;gap:8px;margin:10px 0}
+  .tabs button{flex:1;padding:11px;border:none;border-radius:10px;font-weight:800;cursor:pointer;background:#334155;color:#cbd5e1}
+  .tabs button.on{background:var(--pri);color:#111}
+  .ok{background:#052e1a;border:1px solid var(--ok);color:#86efac;border-radius:10px;padding:10px;margin-top:10px;font-size:14px}
+</style>
+<div class="wrap">
+  <h1>📢 Pauta semanal</h1>
+  <p class="mut">Sube el <b>gasto de cada anuncio</b> de la semana. El analista lo cruza con los contactos reales y te dice qué subir y qué apagar.</p>
+  <div class="card" style="border-left:4px solid var(--pri);padding:10px 13px">
+    <div style="font-size:13px">Semana: <b id="sem"></b> <span class="mut" id="rango"></span></div>
+  </div>
+  <div class="tabs">
+    <button id="tSmart" class="on" onclick="setEmp('smart')">🩷 Smart</button>
+    <button id="tFeroz" onclick="setEmp('feroz')">🛡️ Feroz</button>
+  </div>
+  <div id="lista"></div>
+  <button class="btn" onclick="guardar()">💾 Guardar gasto de la semana</button>
+  <div id="msg"></div>
+</div>
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+let EMP='smart', ADS=[];
+function isoSem(d){const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-dn);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));const w=Math.ceil(((t-y0)/86400000+1)/7);return t.getUTCFullYear()+'-W'+String(w).padStart(2,'0');}
+const hoy=new Date(); const lun=new Date(hoy); lun.setDate(hoy.getDate()-((hoy.getDay()+6)%7));
+const SEM=isoSem(lun); const dom=new Date(lun); dom.setDate(lun.getDate()+6);
+const f=d=>d.toLocaleDateString('es-CO',{day:'2-digit',month:'short'});
+document.getElementById('sem').textContent=SEM;
+document.getElementById('rango').textContent='('+f(lun)+' → '+f(dom)+')';
+function setEmp(e){EMP=e;document.getElementById('tSmart').className=e==='smart'?'on':'';document.getElementById('tFeroz').className=e==='feroz'?'on':'';cargar();}
+async function cargar(){
+  const L=document.getElementById('lista'); L.innerHTML='<p class="mut">Cargando anuncios…</p>';
+  const tabla=EMP==='smart'?'nc_bot_leads?empresa=eq.smart&':'nc_bot_leads_feroz?';
+  const desde=lun.toISOString().slice(0,10);
+  const r=await (await fetch(SB+'/rest/v1/'+tabla+'fuente_ad_id=not.is.null&creado_en=gte.'+desde+'&select=fuente_ad_id,fuente_anuncio&limit=2000',{headers:H})).json();
+  const c={}; (r||[]).forEach(x=>{const k=x.fuente_ad_id; (c[k]=c[k]||{n:0,head:x.fuente_anuncio||''}).n++;});
+  // también los anuncios históricos (por si esta semana aún no traen)
+  const r2=await (await fetch(SB+'/rest/v1/'+tabla+'fuente_ad_id=not.is.null&select=fuente_ad_id,fuente_anuncio&limit=2000',{headers:H})).json();
+  (r2||[]).forEach(x=>{const k=x.fuente_ad_id; if(!c[k]) c[k]={n:0,head:x.fuente_anuncio||''};});
+  // gasto ya guardado
+  const g=await (await fetch(SB+'/rest/v1/nc_pauta_semana?empresa=eq.'+EMP+'&semana=eq.'+SEM+'&select=ad_id,gasto,impresiones,clics',{headers:H})).json();
+  const gm={}; (g||[]).forEach(x=>gm[x.ad_id]=x);
+  ADS=Object.entries(c).sort((a,b)=>b[1].n-a[1].n);
+  if(!ADS.length){ L.innerHTML='<div class="card"><p class="mut">Aún no hay anuncios con leads en esta empresa.</p></div>'; return; }
+  L.innerHTML=ADS.map(([id,a])=>{const v=gm[id]||{};
+    return `<div class="card"><div class="ad"><div><div class="nm">${a.head||'(sin titular)'}</div><div class="sub">ad ${id}</div></div><span class="lead">${a.n} contactos</span></div>
+    <div class="g3">
+      <div><label>Gasto ($)</label><input id="g_${id}" inputmode="numeric" value="${v.gasto||''}" placeholder="0"></div>
+      <div><label>Impresiones</label><input id="i_${id}" inputmode="numeric" value="${v.impresiones||''}" placeholder="—"></div>
+      <div><label>Clics</label><input id="c_${id}" inputmode="numeric" value="${v.clics||''}" placeholder="—"></div>
+    </div></div>`;}).join('');
+}
+async function guardar(){
+  const filas=ADS.map(([id,a])=>({empresa:EMP,semana:SEM,ad_id:id,ad_nombre:a.head||null,
+    gasto:+(document.getElementById('g_'+id).value||'').replace(/\D/g,'')||0,
+    impresiones:+(document.getElementById('i_'+id).value||'').replace(/\D/g,'')||0,
+    clics:+(document.getElementById('c_'+id).value||'').replace(/\D/g,'')||0})).filter(x=>x.gasto>0);
+  if(!filas.length){ document.getElementById('msg').innerHTML='<div class="ok" style="background:#3b0d0d;border-color:#ef4444;color:#fca5a5">Escribe al menos un gasto.</div>'; return; }
+  const r=await fetch(SB+'/rest/v1/nc_pauta_semana?on_conflict=empresa,semana,ad_id',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(filas)});
+  document.getElementById('msg').innerHTML=r.ok
+    ? '<div class="ok">✅ Guardado. El analista lo usa el lunes y te manda el informe por Telegram.</div>'
+    : '<div class="ok" style="background:#3b0d0d;border-color:#ef4444;color:#fca5a5">Error guardando.</div>';
+}
+cargar();
+</script>
