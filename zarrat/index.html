@@ -94,7 +94,8 @@ const hoy=()=>new Date().toISOString().slice(0,10);
 const mesAct=()=>new Date().toISOString().slice(0,7);
 async function api(p,o={}){const r=await fetch(SB+'/rest/v1/'+p,{headers:H,...o});const t=await r.text();return t?JSON.parse(t):[];}
 const get=p=>api(p);
-const post=(t,b,pref)=>fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:pref||'return=representation'},body:JSON.stringify(b)}).then(r=>r.json());
+const post=(t,b,pref)=>fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:pref||'return=representation'},body:JSON.stringify(b)})
+  .then(async r=>{ const x=await r.text(); if(!r.ok){ alert('No se pudo guardar: '+x.slice(0,120)); throw new Error(x); } return x?JSON.parse(x):null; });
 const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)});
 const del=(t,q)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'DELETE',headers:H});
 
