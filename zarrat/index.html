@@ -92,8 +92,17 @@ const esc=s=>String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&am
 const $$=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const hoy=()=>new Date().toISOString().slice(0,10);
 const mesAct=()=>new Date().toISOString().slice(0,7);
-async function api(p,o={}){const r=await fetch(SB+'/rest/v1/'+p,{headers:H,...o});const t=await r.text();return t?JSON.parse(t):[];}
+async function api(p,o={}){
+  try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H,...o}); const t=await r.text();
+    if(!r.ok){ console.warn('API',p,t.slice(0,120)); return []; }
+    const d=t?JSON.parse(t):[]; return Array.isArray(d)?d:[]; }   // siempre array: nunca tumba la vista
+  catch(e){ console.warn('API',p,e.message); return []; }
+}
 const get=p=>api(p);
+// si una vista revienta, se avisa en pantalla en vez de dejarla en blanco
+function safe(fn,nom){ return async()=>{ try{ await fn(); }catch(e){ console.error(nom,e);
+  $('main').innerHTML=`<div class="card" style="border-left:4px solid var(--bad)"><b>No pude cargar ${nom}</b><div class="hint">${esc(e.message)}</div>
+  <button class="btn gh full" onclick="go('${nom}')">Reintentar</button></div>`; } }; }
 const post=(t,b,pref)=>fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:pref||'return=representation'},body:JSON.stringify(b)})
   .then(async r=>{ const x=await r.text(); if(!r.ok){ alert('No se pudo guardar: '+x.slice(0,120)); throw new Error(x); } return x?JSON.parse(x):null; });
 const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)});
@@ -103,7 +112,11 @@ const TABS=[['pend','🏗️ Estructuración'],['gastos','💰 Gastos'],['client
             ['catalogo','🖼️ Catálogo'],['cotiz','📋 Cotizaciones'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
 let TAB='pend', CLI=[], PRENDAS=[], CAT=[];
 $('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('');
-function go(t){TAB=t;TABS.forEach(([v])=>$('t_'+v).className=(v===t?'on':''));({pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,cotiz:vCotiz,ventas:vVentas,crm:vCrm})[t]();}
+function go(t){
+  TAB=t; TABS.forEach(([v])=>{const b=$('t_'+v); if(b)b.className=(v===t?'on':'');});
+  const V={pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,cotiz:vCotiz,ventas:vVentas,crm:vCrm}[t];
+  if(V) safe(V,t)();
+}
 
 /* ═══════ 1 · ESTRUCTURACIÓN ═══════ */
 const CATS=['Pendientes','Investigación','Directorio proveedores','Herramientas'];
