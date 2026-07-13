@@ -436,14 +436,14 @@ async function vCotiz(){
   $('main').innerHTML=`<h1>Cotizaciones</h1><div class="sub">Del catálogo o a la medida · calcula el margen de contribución</div>
   <div class="card">
     <div class="g2"><div><label>Cliente</label><select id="q_c" onchange="cargaFicha()"><option value="">— elige —</option>${CLI.map(x=>`<option value="${x.id}">${esc(x.nombre)}</option>`).join('')}</select></div>
-      <div><label>Tipo</label><select id="q_t"><option value="catalogo">Del catálogo</option><option value="medida">Hecho a la medida</option></select></div></div>
+      <div><label>Tipo</label><select id="q_t"><option value="medida" selected>Hecho a la medida</option><option value="catalogo">Del catálogo</option></select></div></div>
     <div id="q_ficha"></div>
-    <label>Agregar pieza (precio de venta)</label>
-    <div class="g3">
-      <select id="q_p"><option value="">— del catálogo —</option>${CAT.map(p=>`<option value="${p.id}" data-v="${p.valor}">${esc(p.nombre)} · ${$$(p.valor)}</option>`).join('')}</select>
-      <input id="q_pn" placeholder="…o descríbela (a la medida)">
-      <input id="q_pv" inputmode="numeric" placeholder="Valor">
+    <label>Agregar pieza · <span style="color:var(--acc);text-transform:none;letter-spacing:0;font-weight:800">¿cuánto vas a COBRAR?</span></label>
+    <div class="g2" style="grid-template-columns:2fr 1fr">
+      <input id="q_pn" placeholder="Qué prenda (ej: Pantalón a la medida)">
+      <input id="q_pv" inputmode="numeric" placeholder="Lo que cobras ($)">
     </div>
+    <select id="q_p" onchange="delCat()" style="margin-top:8px"><option value="">…o tráela del catálogo</option>${CAT.map(p=>`<option value="${p.id}" data-v="${p.valor}" data-n="${esc(p.nombre)}">${esc(p.nombre)} · ${$$(p.valor)}</option>`).join('')}</select>
     <button class="btn gh full" onclick="addItem()">+ Agregar pieza</button>
     <div id="q_items" style="margin-top:10px"></div>
 
@@ -487,12 +487,18 @@ function cargaFicha(){
   th.innerHTML = cliente?'✦ La trae el cliente → no cuesta':'Traído de la ficha técnica';
   calcMargen();
 }
+function delCat(){   // si elige del catálogo, llena nombre y precio (y los puede cambiar)
+  const s=$('q_p'), o=s.options[s.selectedIndex];
+  if(!s.value) return;
+  $('q_pn').value=o.dataset.n||''; $('q_pv').value=o.dataset.v||'';
+  $('q_t').value='catalogo'; s.value='';
+}
 function addItem(){
-  const s=$('q_p'), o=s.options[s.selectedIndex]; let n,v;
-  if(s.value){ n=o.text.split(' · ')[0]; v=+o.dataset.v||0; }
-  else { n=$('q_pn').value.trim(); v=+($('q_pv').value||'').replace(/\D/g,'')||0; }
-  if(!n)return alert('Elige una pieza del catálogo o descríbela.');
-  ITEMS.push({n,v}); s.value=''; $('q_pn').value=''; $('q_pv').value=''; pintaItems(); calcMargen();
+  const n=$('q_pn').value.trim();
+  const v=+($('q_pv').value||'').replace(/\D/g,'')||0;
+  if(!n)return alert('Escribe qué prenda es.');
+  if(!v)return alert('Escribe cuánto vas a cobrar.');
+  ITEMS.push({n,v}); $('q_pn').value=''; $('q_pv').value=''; pintaItems(); calcMargen();
 }
 function pintaItems(){
   const t=ITEMS.reduce((s,i)=>s+i.v,0);
