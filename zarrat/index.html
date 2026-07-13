@@ -106,49 +106,60 @@ $('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">$
 function go(t){TAB=t;TABS.forEach(([v])=>$('t_'+v).className=(v===t?'on':''));({pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,cotiz:vCotiz,ventas:vVentas,crm:vCrm})[t]();}
 
 /* ═══════ 1 · ESTRUCTURACIÓN ═══════ */
-const CATS=['Pendientes','Directorio proveedores','Herramientas'];
+const CATS=['Pendientes','Investigación','Directorio proveedores','Herramientas'];
 const RESP=['María Zarrate','Claudia Ruiz','José Calderón'];
-let FCAT='Pendientes';
+let FCAT='Pendientes', EDIT=null, ROWS=[];
 async function vPend(){
-  const d=await get('zarrat_pendientes?order=fecha.asc&limit=300');
-  const dc=d.filter(x=>(x.categoria||'Pendientes')===FCAT);
+  ROWS=await get('zarrat_pendientes?order=fecha.asc&limit=400');
+  const n=c=>ROWS.filter(x=>(x.categoria||'Pendientes')===c).length;
+  const dc=ROWS.filter(x=>(x.categoria||'Pendientes')===FCAT);
   const pen=dc.filter(x=>x.estado!=='hecho'), hech=dc.filter(x=>x.estado==='hecho');
-  const n=c=>d.filter(x=>(x.categoria||'Pendientes')===c).length;
-  $('main').innerHTML=`<h1>Estructuración</h1><div class="sub">Pendientes, proveedores y herramientas — con su responsable</div>
-  <div class="card" style="padding:12px 14px">
-    <label style="margin-top:0">Ver</label>
-    <select id="f_cat" onchange="FCAT=this.value;vPend()">${CATS.map(c=>`<option ${c===FCAT?'selected':''}>${c} (${n(c)})</option>`).join('')}</select>
+  const e=EDIT||{};
+  $('main').innerHTML=`<h1>Estructuración</h1><div class="sub">Elige el cajón, llena el formulario y toca cualquier registro para editarlo</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+    ${CATS.map(c=>`<button class="btn ${c===FCAT?'acc':'gh'}" style="flex:1;min-width:130px;padding:14px 10px;font-size:13px" onclick="setCat('${c}')">
+      ${c}<div style="font-family:Georgia,serif;font-size:19px;margin-top:2px">${n(c)}</div></button>`).join('')}
   </div>
-  <div class="card">
+  <div class="card" ${EDIT?'style="border-color:var(--acc);border-width:2px"':''}>
+    ${EDIT?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <b style="color:var(--acc);font-size:13px">✎ Editando registro</b>
+      <button class="btn sm gh" onclick="EDIT=null;vPend()">Cancelar</button></div>`:''}
     <div class="g2">
-      <div><label>Categoría</label><select id="p_c">${CATS.map(c=>`<option ${c===FCAT?'selected':''}>${c}</option>`).join('')}</select></div>
-      <div><label>Responsable</label><select id="p_r"><option value="">— sin asignar —</option>${RESP.map(r=>`<option>${r}</option>`).join('')}</select></div>
+      <div><label>Cajón</label><select id="p_c">${CATS.map(c=>`<option ${c===(e.categoria||FCAT)?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div><label>Responsable</label><select id="p_r"><option value="">— sin asignar —</option>${RESP.map(r=>`<option ${r===e.responsable?'selected':''}>${r}</option>`).join('')}</select></div>
     </div>
-    <div class="g2"><div><label>Fecha</label><input type="date" id="p_f" value="${hoy()}"></div>
-      <div><label>Teléfono</label><input id="p_t" inputmode="tel" placeholder="Contacto"></div></div>
-    <label>¿Qué es / qué se necesita?</label><input id="p_ti" placeholder="Ej: entregar vestido · proveedor de telas · máquina fileteadora">
-    <label>Dirección</label><input id="p_d" placeholder="Dónde">
-    <label>Página web / enlace</label><input id="p_w" placeholder="https://…">
-    <label>Notas</label><textarea id="p_n" placeholder="Detalle…"></textarea>
-    <button class="btn full" onclick="addPend()">+ Agregar</button>
+    <div class="g2"><div><label>Fecha</label><input type="date" id="p_f" value="${esc(e.fecha||hoy())}"></div>
+      <div><label>Teléfono</label><input id="p_t" inputmode="tel" placeholder="Contacto" value="${esc(e.telefono||'')}"></div></div>
+    <label>¿Qué es / qué se necesita?</label><input id="p_ti" placeholder="Ej: entregar vestido · proveedor de telas · investigar bordadoras" value="${esc(e.titulo||'')}">
+    <label>Dirección</label><input id="p_d" placeholder="Dónde" value="${esc(e.direccion||'')}">
+    <label>Página web / enlace</label><input id="p_w" placeholder="https://…" value="${esc(e.web||'')}">
+    <label>Notas</label><textarea id="p_n" placeholder="Detalle…">${esc(e.notas||'')}</textarea>
+    <button class="btn full ${EDIT?'acc':''}" onclick="addPend()">${EDIT?'💾 Guardar cambios':'+ Agregar'}</button>
   </div>
   <h1 style="font-size:18px">${esc(FCAT)} · ${pen.length}</h1>
-  ${pen.length?pen.map(it).join(''):'<div class="empty">Nada en esta categoría ✦</div>'}
-  ${hech.length?`<h1 style="font-size:18px;margin-top:22px">Cerrados · ${hech.length}</h1>${hech.slice(0,20).map(it).join('')}`:''}`;
+  ${pen.length?pen.map(it).join(''):'<div class="empty">Nada en este cajón ✦</div>'}
+  ${hech.length?`<h1 style="font-size:18px;margin-top:22px">Cerrados · ${hech.length}</h1>${hech.slice(0,25).map(it).join('')}`:''}`;
+  if(EDIT) window.scrollTo({top:0,behavior:'smooth'});
   function it(x){const done=x.estado==='hecho';
-    return `<div class="item ${done?'done':''}"><div>
+    return `<div class="item ${done?'done':''}" style="cursor:pointer" onclick="editar(${x.id})" title="Toca para editar"><div>
       <div class="nm">${esc(x.titulo)}</div>
       <div class="mt">${x.responsable?`<span class="tag a">👤 ${esc(x.responsable)}</span> `:''}📅 ${esc(x.fecha||'')}${x.telefono?' · 📱 '+esc(x.telefono):''}${x.direccion?' · 📍 '+esc(x.direccion):''}</div>
-      ${x.web?`<div class="mt">🔗 <a href="${esc(x.web)}" target="_blank" rel="noopener" style="color:var(--acc);font-weight:700">${esc(String(x.web).replace(/^https?:\/\//,'').slice(0,44))}</a></div>`:''}
+      ${x.web?`<div class="mt">🔗 <a href="${esc(x.web)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--acc);font-weight:700">${esc(String(x.web).replace(/^https?:\/\//,'').slice(0,44))}</a></div>`:''}
       ${x.notas?`<div class="mt">📝 ${esc(x.notas)}</div>`:''}</div>
-      <div style="display:flex;gap:5px;flex-direction:column">
+      <div style="display:flex;gap:5px;flex-direction:column" onclick="event.stopPropagation()">
         <button class="btn sm ${done?'gh':'acc'}" onclick="togPend(${x.id},'${done?'pendiente':'hecho'}')">${done?'↩︎':'✓'}</button>
         <button class="btn sm gh" onclick="delRow('zarrat_pendientes',${x.id},vPend)">✕</button></div></div>`;}
 }
-async function addPend(){const t=$('p_ti').value.trim(); if(!t)return alert('Escribe qué es o qué se necesita.');
-  await post('zarrat_pendientes',{fecha:$('p_f').value||hoy(),titulo:t,categoria:$('p_c').value,responsable:$('p_r').value||null,
-    telefono:$('p_t').value.trim(),direccion:$('p_d').value.trim(),web:$('p_w').value.trim()||null,notas:$('p_n').value.trim()},'return=minimal');
-  FCAT=$('p_c').value; vPend();}
+function setCat(c){ FCAT=c; EDIT=null; vPend(); }
+function editar(id){ EDIT=ROWS.find(x=>x.id===id)||null; vPend(); }
+async function addPend(){
+  const t=$('p_ti').value.trim(); if(!t)return alert('Escribe qué es o qué se necesita.');
+  const b={fecha:$('p_f').value||hoy(),titulo:t,categoria:$('p_c').value,responsable:$('p_r').value||null,
+    telefono:$('p_t').value.trim(),direccion:$('p_d').value.trim(),web:$('p_w').value.trim()||null,notas:$('p_n').value.trim()};
+  if(EDIT){ await patch('zarrat_pendientes','id=eq.'+EDIT.id,b); EDIT=null; }
+  else await post('zarrat_pendientes',b,'return=minimal');
+  FCAT=b.categoria; vPend();
+}
 const togPend=(id,e)=>patch('zarrat_pendientes','id=eq.'+id,{estado:e}).then(vPend);
 const delRow=(t,id,cb)=>{ if(confirm('¿Eliminar?')) del(t,'id=eq.'+id).then(cb); };
 
