@@ -687,21 +687,57 @@ async function vVentas(){
 }
 const pagada=id=>patch('zarrat_ventas','id=eq.'+id,{estado_pago:'pagado'}).then(vVentas);
 
-/* ═══════ 8 · CRM ═══════ */
+/* ═══════ 8 · CRM (por canal de origen) ═══════ */
 const ETAPAS=['contacto','interesado','medidas','cotizado','cliente'];
+const CANALES=[
+  ['instagram','📷 Instagram','Los que escriben por Instagram · <b>se alimenta solo</b> (automatizable)'],
+  ['digital','💬 Digital','Los que responden a la <b>pauta</b> · <b>se alimenta solo</b> (como Feroz y Smart)'],
+  ['referido','⭐ Referidos','Los que llegaron <b>recomendados</b> · se registran aquí'],
+  ['local','🏠 Local','Los que llegaron <b>por su cuenta</b> al local · se registran aquí'],
+];
+let FCAN='local';
 async function vCrm(){
   const [cl,cr]=await Promise.all([get('zarrat_clientes?order=creado_en.desc&limit=500'),get('zarrat_crm?limit=500')]);
   const map={}; cr.forEach(x=>map[x.cliente_id]=x.etapa);
-  const cnt=e=>cl.filter(c=>(map[c.id]||'contacto')===e).length;
-  $('main').innerHTML=`<h1>CRM</h1><div class="sub">Contacto → Interesado → Medidas → Cotizado → Cliente</div>
-  <div class="kpis" style="grid-template-columns:repeat(5,1fr)">
-    ${ETAPAS.map(e=>`<div class="kpi" style="padding:10px"><b style="font-size:19px">${cnt(e)}</b><span style="font-size:9.5px">${e.toUpperCase()}</span></div>`).join('')}
+  const n=k=>cl.filter(c=>(c.canal||'local')===k).length;
+  const arr=cl.filter(c=>(c.canal||'local')===FCAN);
+  const auto=(FCAN==='digital'||FCAN==='instagram');
+  const info=(CANALES.find(x=>x[0]===FCAN)||[])[2]||'';
+  $('main').innerHTML=`<h1>CRM</h1><div class="sub">Por canal de origen · Contacto → Interesado → Medidas → Cotizado → Cliente</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    ${CANALES.map(([k,nm])=>`<button class="btn ${k===FCAN?'acc':'gh'}" style="flex:1;min-width:120px;padding:13px 8px;font-size:12.5px" onclick="FCAN='${k}';vCrm()">
+      ${nm}<div style="font-family:Georgia,serif;font-size:19px;margin-top:2px">${n(k)}</div></button>`).join('')}
   </div>
-  ${cl.length?cl.map(c=>{const et=map[c.id]||'contacto';
+  <div class="card" style="border-left:4px solid ${auto?'var(--ok)':'var(--acc)'};padding:10px 13px">
+    <div style="font-size:12.5px;color:var(--ink2)">${auto?'⚙️':'✎'} ${info}</div>
+  </div>
+  ${auto?`<div class="card" style="background:#faf7f1;padding:12px 14px">
+      <div style="font-size:12.5px;color:var(--mut)">Este cajón <b>se llena automáticamente</b> cuando conectemos ${FCAN==='digital'?'la pauta (Meta Ads → WhatsApp)':'Instagram'}.
+      Igual que en Feroz y Smart, cada persona que llegue por ahí <b>entra sola</b> con su origen marcado.</div></div>`
+    :`<div class="card">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:2px">REGISTRAR ${FCAN==='referido'?'REFERIDO':'CLIENTE DEL LOCAL'}</div>
+      <div class="g2"><div><label>Nombre *</label><input id="r_n" placeholder="Nombre completo"></div>
+        <div><label>Teléfono / WhatsApp</label><input id="r_t" inputmode="tel"></div></div>
+      <div class="g2"><div><label>Instagram</label><input id="r_i" placeholder="@usuario"></div>
+        <div><label>${FCAN==='referido'?'¿Quién lo refirió?':'Cómo nos conoció'}</label><input id="r_r" placeholder="${FCAN==='referido'?'Nombre de quien lo recomendó':'Vitrina, voz a voz…'}"></div></div>
+      <label>Qué busca / notas</label><textarea id="r_no" placeholder="Prenda, ocasión, fecha…"></textarea>
+      <button class="btn acc full" onclick="addLead()">+ Registrar en ${FCAN==='referido'?'Referidos':'Local'}</button>
+      <div class="hint">Queda también en <b>Clientes</b>, listo para tomarle medidas y cotizar.</div>
+    </div>`}
+  <h1 style="font-size:18px">${(CANALES.find(x=>x[0]===FCAN)||[])[1]} · ${arr.length}</h1>
+  ${arr.length?arr.map(c=>{const et=map[c.id]||'contacto';
     return `<div class="item" style="display:block"><div class="nm">${esc(c.nombre)}</div>
-      <div class="mt">${c.telefono?'📱 '+esc(c.telefono):''}${c.instagram?' · 📷 '+esc(c.instagram):''}</div>
+      <div class="mt">${c.telefono?'📱 '+esc(c.telefono):''}${c.instagram?' · 📷 '+esc(c.instagram):''}${c.referido_por?' · ⭐ por '+esc(c.referido_por):''}</div>
+      ${c.notas?`<div class="mt">📝 ${esc(c.notas)}</div>`:''}
       <div class="etapas">${ETAPAS.map(e=>`<span class="et ${e===et?'on':''}" onclick="setEtapa(${c.id},'${e}')">${e}</span>`).join('')}</div></div>`;}).join('')
-    :'<div class="empty">Registra clientes para verlos aquí.</div>'}`;
+    :`<div class="empty">Sin personas en este canal aún.</div>`}`;
+}
+async function addLead(){
+  const n=$('r_n').value.trim(); if(!n)return alert('El nombre es obligatorio.');
+  const c=await post('zarrat_clientes',{nombre:n,telefono:$('r_t').value.trim(),whatsapp:$('r_t').value.trim(),
+    instagram:$('r_i').value.trim(),referido_por:$('r_r').value.trim()||null,notas:$('r_no').value.trim(),canal:FCAN});
+  if(c&&c[0]) await post('zarrat_crm?on_conflict=cliente_id',{cliente_id:c[0].id,etapa:'contacto'},'resolution=merge-duplicates,return=minimal');
+  vCrm();
 }
 async function setEtapa(id,e){await post('zarrat_crm?on_conflict=cliente_id',{cliente_id:id,etapa:e},'resolution=merge-duplicates,return=minimal');vCrm();}
 
