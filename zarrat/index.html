@@ -106,7 +106,7 @@ $('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">$
 function go(t){TAB=t;TABS.forEach(([v])=>$('t_'+v).className=(v===t?'on':''));({pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,cotiz:vCotiz,ventas:vVentas,crm:vCrm})[t]();}
 
 /* ═══════ 1 · ESTRUCTURACIÓN ═══════ */
-const CATS=['Pendientes','Directorio proveedores','Herramientas'];
+const CATS=['Pendientes','Directorio proveedores','Herramientas','Página web'];
 const RESP=['María Zarrate','Claudia Ruiz','José Calderón'];
 let FCAT='Pendientes';
 async function vPend(){
@@ -128,6 +128,7 @@ async function vPend(){
       <div><label>Teléfono</label><input id="p_t" inputmode="tel" placeholder="Contacto"></div></div>
     <label>¿Qué es / qué se necesita?</label><input id="p_ti" placeholder="Ej: entregar vestido · proveedor de telas · máquina fileteadora">
     <label>Dirección</label><input id="p_d" placeholder="Dónde">
+    <label>Página web / enlace</label><input id="p_w" placeholder="https://…">
     <label>Notas</label><textarea id="p_n" placeholder="Detalle…"></textarea>
     <button class="btn full" onclick="addPend()">+ Agregar</button>
   </div>
@@ -138,6 +139,7 @@ async function vPend(){
     return `<div class="item ${done?'done':''}"><div>
       <div class="nm">${esc(x.titulo)}</div>
       <div class="mt">${x.responsable?`<span class="tag a">👤 ${esc(x.responsable)}</span> `:''}📅 ${esc(x.fecha||'')}${x.telefono?' · 📱 '+esc(x.telefono):''}${x.direccion?' · 📍 '+esc(x.direccion):''}</div>
+      ${x.web?`<div class="mt">🔗 <a href="${esc(x.web)}" target="_blank" rel="noopener" style="color:var(--acc);font-weight:700">${esc(String(x.web).replace(/^https?:\/\//,'').slice(0,44))}</a></div>`:''}
       ${x.notas?`<div class="mt">📝 ${esc(x.notas)}</div>`:''}</div>
       <div style="display:flex;gap:5px;flex-direction:column">
         <button class="btn sm ${done?'gh':'acc'}" onclick="togPend(${x.id},'${done?'pendiente':'hecho'}')">${done?'↩︎':'✓'}</button>
@@ -145,7 +147,7 @@ async function vPend(){
 }
 async function addPend(){const t=$('p_ti').value.trim(); if(!t)return alert('Escribe qué es o qué se necesita.');
   await post('zarrat_pendientes',{fecha:$('p_f').value||hoy(),titulo:t,categoria:$('p_c').value,responsable:$('p_r').value||null,
-    telefono:$('p_t').value.trim(),direccion:$('p_d').value.trim(),notas:$('p_n').value.trim()},'return=minimal');
+    telefono:$('p_t').value.trim(),direccion:$('p_d').value.trim(),web:$('p_w').value.trim()||null,notas:$('p_n').value.trim()},'return=minimal');
   FCAT=$('p_c').value; vPend();}
 const togPend=(id,e)=>patch('zarrat_pendientes','id=eq.'+id,{estado:e}).then(vPend);
 const delRow=(t,id,cb)=>{ if(confirm('¿Eliminar?')) del(t,'id=eq.'+id).then(cb); };
@@ -272,34 +274,93 @@ async function addPrenda(){
   await post('zarrat_tipos_prenda',{nombre:n,campos:c},'return=minimal'); vMedidas();
 }
 
-/* ═══════ 5 · CATÁLOGO ═══════ */
+/* ═══════ 5 · CATÁLOGO (con color, SKU y código de barras) ═══════ */
+// SKU automático: ZR-{3 letras del nombre}-{color 2 letras}-{consecutivo 3 dígitos}
+function genSKU(nombre,color,n){
+  const cl=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z]/g,'');
+  const a=(cl(nombre)+'XXX').slice(0,3), b=(cl(color)+'XX').slice(0,2);
+  return `ZR-${a}-${b}-${String(n).padStart(3,'0')}`;
+}
 async function vCatalogo(){
-  CAT=await get('zarrat_catalogo?order=fecha_creacion.desc&limit=200');
-  $('main').innerHTML=`<h1>Catálogo</h1><div class="sub">${CAT.length} piezas · con el sello ZARRAT</div>
+  CAT=await get('zarrat_catalogo?order=fecha_creacion.desc&limit=300');
+  $('main').innerHTML=`<h1>Catálogo</h1><div class="sub">${CAT.length} piezas · SKU y código de barras automáticos</div>
   <div class="card">
-    <div class="g2"><div><label>Nombre de la pieza</label><input id="k_n" placeholder="Ej: Vestido Aurora"></div>
-      <div><label>Valor</label><input id="k_v" inputmode="numeric" placeholder="0"></div></div>
-    <label>Descripción</label><input id="k_d" placeholder="Tela, corte, ocasión…">
+    <div class="g2"><div><label>Nombre de la pieza</label><input id="k_n" placeholder="Ej: Vestido Aurora" oninput="preSKU()"></div>
+      <div><label>Color</label><input id="k_c" placeholder="Ej: Negro" oninput="preSKU()"></div></div>
+    <div class="g3"><div><label>Valor</label><input id="k_v" inputmode="numeric" placeholder="0"></div>
+      <div><label>Talla</label><input id="k_t" placeholder="Ej: M / única"></div>
+      <div><label>Tela</label><input id="k_te" placeholder="Ej: Seda"></div></div>
+    <label>Descripción</label><input id="k_d" placeholder="Corte, ocasión, detalles…">
     <label>Foto</label><input type="file" id="k_f" accept="image/*">
+    <div class="card" style="background:#faf7f1;margin:12px 0 0;padding:11px 13px">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)">SKU QUE SE VA A GENERAR</div>
+      <div id="k_sku" style="font-family:Consolas,monospace;font-size:17px;font-weight:800;color:var(--acc);margin-top:3px">ZR-XXX-XX-001</div>
+      <div class="hint">Se arma solo con el nombre + el color + un consecutivo. El código de barras sale de este SKU.</div>
+    </div>
     <button class="btn acc full" onclick="addPieza()">+ Agregar al catálogo</button>
     <div class="hint" id="k_msg"></div>
   </div>
   <div class="grid">${CAT.map(p=>`<div class="pz">
     <div class="img" style="${p.foto_url?`background-image:url('${p.foto_url}')`:''}"></div>
-    <div class="in"><div class="n">${esc(p.nombre)}</div><div class="v">${$$(p.valor)}</div>
+    <div class="in"><div class="n">${esc(p.nombre)}</div>
+      ${p.color?`<div class="f">${esc(p.color)}${p.talla?' · T '+esc(p.talla):''}${p.tela?' · '+esc(p.tela):''}</div>`:''}
+      <div class="v">${$$(p.valor)}</div>
+      ${p.sku?`<div style="font-family:Consolas,monospace;font-size:10.5px;color:var(--ink2);margin-top:3px">${esc(p.sku)}</div>
+        <svg class="bc" data-sku="${esc(p.sku)}" style="width:100%;height:38px;margin-top:2px"></svg>`:''}
       <div class="f">${esc(p.fecha_creacion||'')}</div>
-      <button class="btn sm gh" style="width:100%;margin-top:6px" onclick="delRow('zarrat_catalogo',${p.id},vCatalogo)">✕</button></div>
-    </div>`).join('')||'<div class="empty">Sube tu primera pieza.</div>'}</div>`;
+      <div style="display:flex;gap:4px;margin-top:6px">
+        ${p.sku?`<button class="btn sm gh" style="flex:1" onclick="etiqueta(${p.id})">🏷️</button>`:''}
+        <button class="btn sm gh" style="flex:1" onclick="delRow('zarrat_catalogo',${p.id},vCatalogo)">✕</button></div>
+    </div></div>`).join('')||'<div class="empty">Sube tu primera pieza.</div>'}</div>`;
+  pintaBarras();
 }
+function preSKU(){ const el=$('k_sku'); if(el) el.textContent=genSKU($('k_n').value,$('k_c').value,(CAT.length||0)+1); }
 async function addPieza(){
   const n=$('k_n').value.trim(); if(!n)return alert('Ponle nombre a la pieza.');
+  const color=$('k_c').value.trim();
   const f=$('k_f').files[0]; let url=null;
-  $('k_msg').textContent='Subiendo…';
+  $('k_msg').textContent='Guardando…';
   if(f){ const path='zarrat/cat_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9.]/g,'');
     const r=await fetch(SB+'/storage/v1/object/documentos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K},body:f});
     if(r.ok) url=SB+'/storage/v1/object/public/documentos/'+path; }
-  await post('zarrat_catalogo',{nombre:n,descripcion:$('k_d').value.trim(),valor:+($('k_v').value||'').replace(/\D/g,'')||0,foto_url:url},'return=minimal');
+  // consecutivo real: cuántas piezas hay + 1 (y si el SKU choca, suma)
+  let n2=(CAT.length||0)+1, sku=genSKU(n,color,n2);
+  while(CAT.some(x=>x.sku===sku)){ n2++; sku=genSKU(n,color,n2); }
+  await post('zarrat_catalogo',{nombre:n,color:color||null,talla:$('k_t').value.trim()||null,tela:$('k_te').value.trim()||null,
+    descripcion:$('k_d').value.trim(),valor:+($('k_v').value||'').replace(/\D/g,'')||0,foto_url:url,sku},'return=minimal');
   vCatalogo();
+}
+/* ---- Código de barras Code128 (dibujado a mano, sin librerías externas) ---- */
+const C128=["212222","222122","222221","121223","121322","131222","122213","122312","132212","221213","221312","231212","112232","122132","122231","113222","123122","123221","223211","221132","221231","213212","223112","312131","311222","321122","321221","312212","322112","322211","212123","212321","232121","111323","131123","131321","112313","132113","132311","211313","231113","231311","112133","112331","132131","113123","113321","133121","313121","211331","231131","213113","213311","213131","311123","311321","331121","312113","312311","332111","314111","221411","431111","111224","111422","121124","121421","141122","141221","112214","112412","122114","122411","142112","142211","241211","221114","413111","241112","134111","111242","121142","121241","114212","124112","124211","411212","421112","421211","212141","214121","412121","111143","111341","131141","114113","114311","411113","411311","113141","114131","311141","411131","211412","211214","211232","2331112"];
+function code128B(txt){
+  let cs=104, bars=C128[104], w=104;   // start B
+  for(let i=0;i<txt.length;i++){ const v=txt.charCodeAt(i)-32; bars+=C128[v]; cs+=v*(i+1); }
+  bars+=C128[cs%103]+C128[106];        // checksum + stop
+  return bars;
+}
+function pintaBarras(){
+  document.querySelectorAll('svg.bc').forEach(svg=>{
+    const pat=code128B(svg.dataset.sku); let x=0, out='';
+    for(let i=0;i<pat.length;i++){ const w=+pat[i]; if(i%2===0) out+=`<rect x="${x}" y="0" width="${w}" height="100" fill="#17150f"/>`; x+=w; }
+    svg.setAttribute('viewBox',`0 0 ${x} 100`); svg.setAttribute('preserveAspectRatio','none'); svg.innerHTML=out;
+  });
+}
+function etiqueta(id){
+  const p=CAT.find(x=>x.id===id); if(!p) return;
+  const pat=code128B(p.sku); let x=0,out='';
+  for(let i=0;i<pat.length;i++){ const w=+pat[i]; if(i%2===0) out+=`<rect x="${x}" y="0" width="${w}" height="100" fill="#000"/>`; x+=w; }
+  const w=window.open('','_blank','width=420,height=560');
+  w.document.write(`<title>${p.sku}</title><style>body{font-family:Georgia,serif;text-align:center;padding:26px}
+    .b{font-size:20px;letter-spacing:.3em;margin-bottom:2px}.t{font-size:9px;letter-spacing:.2em;color:#8a6a3d;margin-bottom:14px}
+    .n{font-size:15px;font-weight:700;font-family:Segoe UI,sans-serif}.c{font-size:12px;color:#555;font-family:Segoe UI,sans-serif}
+    .v{font-size:17px;font-weight:800;margin:6px 0;font-family:Segoe UI,sans-serif}
+    svg{width:230px;height:56px;margin-top:8px}.s{font-family:Consolas,monospace;font-size:12px;letter-spacing:.08em;margin-top:2px}</style>
+    <div class="b">ZARRAT</div><div class="t">MAESTROS DEL ESTILO</div>
+    <div class="n">${p.nombre}</div><div class="c">${[p.color,p.talla?'T '+p.talla:'',p.tela].filter(Boolean).join(' · ')}</div>
+    <div class="v">$${Math.round(p.valor||0).toLocaleString('es-CO')}</div>
+    <svg viewBox="0 0 ${x} 100" preserveAspectRatio="none">${out}</svg>
+    <div class="s">${p.sku}</div><script>window.print()<\/script>`);
+  w.document.close();
 }
 
 /* ═══════ 6 · COTIZACIONES ═══════ */
