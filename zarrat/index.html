@@ -106,7 +106,7 @@ $('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">$
 function go(t){TAB=t;TABS.forEach(([v])=>$('t_'+v).className=(v===t?'on':''));({pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,cotiz:vCotiz,ventas:vVentas,crm:vCrm})[t]();}
 
 /* ═══════ 1 · ESTRUCTURACIÓN ═══════ */
-const CATS=['Pendientes','Directorio proveedores','Herramientas','Página web'];
+const CATS=['Pendientes','Directorio proveedores','Herramientas'];
 const RESP=['María Zarrate','Claudia Ruiz','José Calderón'];
 let FCAT='Pendientes';
 async function vPend(){
