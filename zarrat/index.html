@@ -462,32 +462,38 @@ async function vCotiz(){
   const [c,cl,ct,fi,cb]=await Promise.all([get('zarrat_cotizaciones?order=creado_en.desc&limit=100'),get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_catalogo?activo=eq.true&order=nombre.asc'),get('zarrat_medidas?order=creado_en.desc&limit=300'),get('zarrat_costos_base?activo=eq.true&order=orden.asc')]);
   CLI=cl; CAT=ct; FICHAS=fi;
   BASE_COSTOS=cb.map(x=>({n:x.concepto,v:+x.valor||0}));   // la plantilla guardada
-  $('main').innerHTML=`<h1>Cotizaciones</h1><div class="sub">Del catálogo o a la medida · calcula el margen de contribución</div>
+  $('main').innerHTML=`<h1>Cotizaciones</h1><div class="sub">Tela + mano de obra = lo que cobras · los costos internos definen tu margen</div>
   <div class="card">
     <div class="g2"><div><label>Cliente</label><select id="q_c" onchange="cargaFicha()"><option value="">— elige —</option>${CLI.map(x=>`<option value="${x.id}">${esc(x.nombre)}</option>`).join('')}</select></div>
       <div><label>Tipo</label><select id="q_t"><option value="medida" selected>Hecho a la medida</option><option value="catalogo">Del catálogo</option></select></div></div>
     <div id="q_ficha"></div>
-    <label>Agregar pieza · <span style="color:var(--acc);text-transform:none;letter-spacing:0;font-weight:800">¿cuánto vas a COBRAR?</span></label>
-    <div class="g2" style="grid-template-columns:2fr 1fr">
-      <input id="q_pn" placeholder="Qué prenda (ej: Pantalón a la medida)">
-      <input id="q_pv" inputmode="numeric" placeholder="Lo que cobras ($)">
-    </div>
+    <label>Prenda</label>
+    <input id="q_pn" placeholder="Ej: Pantalón a la medida">
     <select id="q_p" onchange="delCat()" style="margin-top:8px"><option value="">…o tráela del catálogo</option>${CAT.map(p=>`<option value="${p.id}" data-v="${p.valor}" data-n="${esc(p.nombre)}">${esc(p.nombre)} · ${$$(p.valor)}</option>`).join('')}</select>
-    <button class="btn gh full" onclick="addItem()">+ Agregar pieza</button>
-    <div id="q_items" style="margin-top:10px"></div>
 
     <div class="card" style="background:#faf7f1;margin:14px 0 0;padding:13px 15px">
-      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:4px">COSTOS DE LA PRENDA</div>
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:4px">① LA TELA</div>
       <div class="g2">
-        <div><label>🧵 Tela</label><input id="q_tela" inputmode="numeric" placeholder="0" oninput="calcMargen()"><div class="hint" id="q_telah"></div></div>
-        <div><label>✂️ Mano de obra</label><input id="q_mo" inputmode="numeric" placeholder="0" oninput="calcMargen()"></div>
+        <div><label>¿Quién la provee?</label><select id="q_tprov" onchange="telaCot()">
+          <option value="nosotros">La ponemos nosotros</option><option value="cliente">La trae el cliente</option></select></div>
+        <div id="q_telabox"><label>Valor de la tela ($)</label><input id="q_tela" inputmode="numeric" placeholder="0" oninput="calcMargen()"></div>
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
-        <label style="margin:0">🏭 Centro de costos internos</label>
-        <button class="btn sm gh" onclick="guardarPlantilla()" title="Guarda esta lista para que salga sola la próxima vez">💾 Guardar plantilla</button>
+      <div class="hint" id="q_telah">Si la ponemos nosotros, se la cobramos al cliente y también nos cuesta.</div>
+
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin:14px 0 0">② MANO DE OBRA</div>
+      <label>¿Cuánto cobras por hacer la prenda?</label>
+      <input id="q_mo" inputmode="numeric" placeholder="0" oninput="calcMargen()">
+
+      <div id="q_precio" style="background:var(--card);border:1px solid var(--acc);border-radius:10px;padding:11px 13px;margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="background:#faf7f1;margin:10px 0 0;padding:13px 15px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)">③ CENTRO DE COSTOS INTERNOS</div>
+        <button class="btn sm gh" onclick="guardarPlantilla()" title="Guarda esta lista para que salga sola la próxima vez">💾 Plantilla</button>
       </div>
-      <div id="q_costos"></div>
-      <div class="g3" style="margin-top:8px"><input id="q_cn" placeholder="Concepto (ej: bordado)"><input id="q_cv" inputmode="numeric" placeholder="Valor">
+      <div id="q_costos" style="margin-top:6px"></div>
+      <div class="g3" style="margin-top:8px"><input id="q_cn" placeholder="Concepto"><input id="q_cv" inputmode="numeric" placeholder="Valor">
         <button class="btn gh" onclick="addCosto()">+ Agregar</button></div>
     </div>
 
@@ -510,35 +516,31 @@ async function vCotiz(){
 }
 function cargaFicha(){
   const ci=+$('q_c').value; const f=FICHAS.filter(x=>x.cliente_id===ci)[0];
-  const box=$('q_ficha'), th=$('q_telah');
-  if(!f){ box.innerHTML=''; th.textContent=''; return; }
+  const box=$('q_ficha');
+  if(!f){ box.innerHTML=''; return; }
   const cliente=f.tela_provee==='cliente';
   box.innerHTML=`<div class="card" style="background:#faf7f1;padding:10px 13px;margin:8px 0 0">
     <div style="font-size:12.5px">📐 Ficha: <b>${esc(f.tipo_prenda)}</b>${f.tipo_tela?` · 🧵 ${esc(f.tipo_tela)}`:''}
-    ${cliente?' · <b style="color:var(--ok)">tela del cliente (costo $0)</b>':(f.valor_tela?` · tela <b>${$$(f.valor_tela)}</b>`:'')}</div></div>`;
-  $('q_tela').value = cliente?0:(+f.valor_tela||0);
-  th.innerHTML = cliente?'✦ La trae el cliente → no cuesta':'Traído de la ficha técnica';
+    ${cliente?' · <b style="color:var(--ok)">tela del cliente</b>':(f.valor_tela?` · tela <b>${$$(f.valor_tela)}</b>`:'')}</div></div>`;
+  if(!$('q_pn').value) $('q_pn').value=f.tipo_prenda+' a la medida';
+  $('q_tprov').value = cliente?'cliente':'nosotros';
+  $('q_tela').value = cliente?'':(+f.valor_tela||'');
+  telaCot();
+}
+function telaCot(){
+  const cl=$('q_tprov').value==='cliente';
+  $('q_telabox').style.display=cl?'none':'block';
+  $('q_telah').innerHTML=cl?'✦ La trae el cliente → <b>no se le cobra y no cuesta</b>.':'Si la ponemos nosotros, se la cobramos al cliente y también nos cuesta.';
+  if(cl) $('q_tela').value='';
   calcMargen();
 }
-function delCat(){   // si elige del catálogo, llena nombre y precio (y los puede cambiar)
+function delCat(){
   const s=$('q_p'), o=s.options[s.selectedIndex];
   if(!s.value) return;
-  $('q_pn').value=o.dataset.n||''; $('q_pv').value=o.dataset.v||'';
-  $('q_t').value='catalogo'; s.value='';
+  $('q_pn').value=o.dataset.n||''; $('q_mo').value=o.dataset.v||'';
+  $('q_t').value='catalogo'; s.value=''; calcMargen();
 }
-function addItem(){
-  const n=$('q_pn').value.trim();
-  const v=+($('q_pv').value||'').replace(/\D/g,'')||0;
-  if(!n)return alert('Escribe qué prenda es.');
-  if(!v)return alert('Escribe cuánto vas a cobrar.');
-  ITEMS.push({n,v}); $('q_pn').value=''; $('q_pv').value=''; pintaItems(); calcMargen();
-}
-function pintaItems(){
-  const t=ITEMS.reduce((s,i)=>s+i.v,0);
-  $('q_items').innerHTML=ITEMS.length?ITEMS.map((i,k)=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line2);font-size:14px">
-    <span>${esc(i.n)}</span><span><b>${$$(i.v)}</b> <button class="btn sm gh" onclick="ITEMS.splice(${k},1);pintaItems();calcMargen()">✕</button></span></div>`).join('')
-    +`<div style="display:flex;justify-content:space-between;padding:9px 0;font-weight:800"><span>PRECIO DE VENTA</span><span style="color:var(--acc)">${$$(t)}</span></div>`:'';
-}
+function pintaItems(){}   // (ya no hay lista de piezas: es una prenda por cotización)
 function addCosto(){
   const n=$('q_cn').value.trim(), v=+($('q_cv').value||'').replace(/\D/g,'')||0;
   if(!n||!v)return alert('Escribe el concepto y el valor.');
@@ -562,46 +564,73 @@ async function guardarPlantilla(){
   alert('✦ Plantilla guardada. La próxima cotización ya sale con estos costos.');
 }
 function calcMargen(){
-  const pv=ITEMS.reduce((s,i)=>s+i.v,0);
-  const tela=+($('q_tela')?.value||'').toString().replace(/\D/g,'')||0;
+  const cl=$('q_tprov')?.value==='cliente';
+  const tela=cl?0:(+($('q_tela')?.value||'').toString().replace(/\D/g,'')||0);
   const mo=+($('q_mo')?.value||'').toString().replace(/\D/g,'')||0;
   const ci=COSTOS.reduce((s,c)=>s+c.v,0);
-  const costo=tela+mo+ci, mc=pv-costo, pct=pv?Math.round(mc/pv*100):0;
+  const pv=tela+mo;                       // ✦ LO QUE SE COBRA = tela + mano de obra
+  const mc=pv-tela-ci;                    // margen = mano de obra − costos internos
+  const pct=pv?Math.round(mc/pv*100):0;
+  const p=$('q_precio');
+  if(p) p.innerHTML=`<div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)">LO QUE LE COBRAS AL CLIENTE</div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);margin-top:4px"><span>🧵 Tela</span><span>${$$(tela)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink2)"><span>✂️ Mano de obra</span><span>${$$(mo)}</span></div>
+    <div style="border-top:1px solid var(--line);margin-top:5px;padding-top:5px;display:flex;justify-content:space-between;align-items:baseline">
+      <b style="font-size:13px">PRECIO TOTAL</b><b style="font-family:Georgia,serif;font-size:23px;color:var(--acc)">${$$(pv)}</b></div>`;
   const r=$('q_res'); if(!r) return;
-  r.innerHTML=`<div style="font-size:10.5px;letter-spacing:.08em;color:#a49a86">RESULTADO DE LA PIEZA</div>
-    <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:6px"><span>Precio de venta</span><b>${$$(pv)}</b></div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;color:#c9c0ae"><span>− Tela</span><span>${$$(tela)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;color:#c9c0ae"><span>− Mano de obra</span><span>${$$(mo)}</span></div>
+  r.innerHTML=`<div style="font-size:10.5px;letter-spacing:.08em;color:#a49a86">④ RESULTADO DE LA PRENDA</div>
+    <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:6px"><span>Precio cobrado</span><b>${$$(pv)}</b></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:#c9c0ae"><span>− Tela (lo que te cuesta)</span><span>${$$(tela)}</span></div>
     <div style="display:flex;justify-content:space-between;font-size:13px;color:#c9c0ae"><span>− Costos internos</span><span>${$$(ci)}</span></div>
     <div style="border-top:1px solid #3a352a;margin-top:7px;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline">
       <span style="font-size:12px;letter-spacing:.06em">MARGEN DE CONTRIBUCIÓN</span>
       <b style="font-family:Georgia,serif;font-size:24px;color:${mc>0?'var(--acc2)':'#e07a6a'}">${$$(mc)} <span style="font-size:14px">(${pct}%)</span></b></div>
-    <div style="font-size:11px;color:#a49a86;margin-top:4px">${mc>0?'✦ Esto es lo que esta pieza APORTA a cubrir tus gastos fijos.':'⚠ Esta pieza no aporta nada: el costo se come el precio.'}</div>`;
+    <div style="font-size:11px;color:#a49a86;margin-top:4px">${mc>0?'✦ Esto APORTA a cubrir tus gastos fijos. (Mano de obra − costos internos)':'⚠ No aporta nada: los costos internos se comen la mano de obra.'}</div>`;
 }
 async function saveCotiz(){
   const ci=$('q_c').value; if(!ci)return alert('Elige el cliente.');
-  if(!ITEMS.length)return alert('Agrega al menos una pieza.');
-  const c=CLI.find(x=>x.id==ci)||{}; const pv=ITEMS.reduce((s,i)=>s+i.v,0);
-  const tela=+($('q_tela').value||'').replace(/\D/g,'')||0, mo=+($('q_mo').value||'').replace(/\D/g,'')||0;
-  const cin=COSTOS.reduce((s,x)=>s+x.v,0); const mc=pv-(tela+mo+cin);
+  const prenda=$('q_pn').value.trim(); if(!prenda)return alert('Escribe qué prenda es.');
+  const cl=$('q_tprov').value==='cliente';
+  const tela=cl?0:(+($('q_tela').value||'').replace(/\D/g,'')||0);
+  const mo=+($('q_mo').value||'').replace(/\D/g,'')||0;
+  if(!mo)return alert('Escribe cuánto cobras de mano de obra.');
+  const cin=COSTOS.reduce((s,x)=>s+x.v,0);
+  const pv=tela+mo, mc=pv-tela-cin;
+  const c=CLI.find(x=>x.id==ci)||{};
   const folio='ZR-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+String(Date.now()).slice(-4);
-  await post('zarrat_cotizaciones',{folio,cliente_id:+ci,cliente_nombre:c.nombre,tipo:$('q_t').value,items:ITEMS,
-    subtotal:pv,total:pv,costo_tela:tela,costo_mo:mo,costo_interno:cin,costos_detalle:COSTOS,margen_contrib:mc,
-    notas:$('q_n').value.trim()},'return=minimal');
+  await post('zarrat_cotizaciones',{folio,cliente_id:+ci,cliente_nombre:c.nombre,tipo:$('q_t').value,prenda,
+    items:[{n:prenda,v:pv}],subtotal:pv,total:pv,costo_tela:tela,costo_mo:mo,costo_interno:cin,costos_detalle:COSTOS,
+    margen_contrib:mc,notas:$('q_n').value.trim()},'return=minimal');
   vCotiz();
 }
 async function aVenta(id){
   const c=(await get('zarrat_cotizaciones?id=eq.'+id))[0]; if(!c)return;
-  if(!confirm('¿Pasar a VENTA?\n'+c.cliente_nombre+' · '+$$(c.total)+'\nAporte a gastos fijos: '+$$(c.margen_contrib)))return;
+  if(!confirm('✓ APROBAR y pasar a VENTA\n\n'+c.cliente_nombre+' · '+$$(c.total)+'\nAporta a gastos fijos: '+$$(c.margen_contrib)+'\n\nEn Ventas registras la forma de pago.'))return;
   await post('zarrat_ventas',{folio:c.folio,cliente_id:c.cliente_id,cliente_nombre:c.cliente_nombre,total:c.total,
-    margen_contrib:c.margen_contrib||0, costo_total:(+c.costo_tela||0)+(+c.costo_mo||0)+(+c.costo_interno||0)},'return=minimal');
-  await patch('zarrat_cotizaciones','id=eq.'+id,{estado:'vendida'});
+    margen_contrib:c.margen_contrib||0, costo_total:(+c.costo_tela||0)+(+c.costo_interno||0)},'return=minimal');
+  await patch('zarrat_cotizaciones','id=eq.'+id,{estado:'aprobada'});
   go('ventas');
 }
 
 /* ═══════ 7 · VENTAS ═══════ */
+const MPAGO={'Nequi':'📲','Consignación':'🏦','Efectivo':'💵','Tarjeta de crédito':'💳'};
+let PAGOS=[];
+function vch(id){ const t=$('pm_'+id).value==='Tarjeta de crédito'; $('pn_'+id).style.display=t?'block':'none'; }
+async function addPago(id){
+  const met=$('pm_'+id).value, val=+($('pv_'+id).value||'').replace(/\D/g,'')||0;
+  const vou=($('pn_'+id).value||'').trim();
+  if(!val) return alert('Escribe el valor del pago.');
+  if(met==='Tarjeta de crédito' && !vou) return alert('La tarjeta necesita el N° de voucher.');
+  await post('zarrat_pagos',{venta_id:id,metodo:met,valor:val,voucher:vou||null},'return=minimal');
+  const pg=await get('zarrat_pagos?venta_id=eq.'+id);
+  const vt=(await get('zarrat_ventas?id=eq.'+id))[0]||{};
+  const pagado=pg.reduce((s,p)=>s+(+p.valor||0),0);
+  await patch('zarrat_ventas','id=eq.'+id,{pagado, estado_pago: pagado>=(+vt.total||0)?'pagado':'parcial'});
+  vVentas();
+}
 async function vVentas(){
-  const v=await get('zarrat_ventas?order=fecha.desc&limit=200');
+  const [v,pg]=await Promise.all([get('zarrat_ventas?order=fecha.desc&limit=200'),get('zarrat_pagos?limit=500')]);
+  PAGOS=pg;
   const m=mesAct();
   const mes=v.filter(x=>(x.fecha||'').startsWith(m));
   const tm=mes.reduce((s,x)=>s+(+x.total||0),0), ta=v.reduce((s,x)=>s+(+x.total||0),0);
@@ -629,12 +658,31 @@ async function vVentas(){
       <b style="font-family:Georgia,serif;font-size:22px;color:var(--ok)">${(aportes/tm*100).toFixed(1)}%</b></div>
       <div class="hint">Sale de las ventas de este mes: aportaron ${$$(aportes)} sobre ${$$(tm)} vendidos.</div>`:''}
   </div>
-  ${v.length?v.map(x=>{const mc=+x.margen_contrib||0;
-    return `<div class="item"><div><div class="nm">${esc(x.cliente_nombre||'—')}</div>
-    <div class="mt">${esc(x.folio||'')} · 📅 ${esc(x.fecha||'')} · <span class="tag ${x.estado_pago==='pagado'?'a':''}">${esc(x.estado_pago)}</span></div>
-    <div class="mt">Costo ${$$(x.costo_total)} → <b style="color:var(--ok)">aporta ${$$(mc)}</b></div></div>
-    <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.total)}</div>
-    ${x.estado_pago!=='pagado'?`<button class="btn sm acc" style="margin-top:5px" onclick="pagada(${x.id})">✓ Pagada</button>`:''}</div></div>`;}).join('')
+  ${v.length?v.map(x=>{const mc=+x.margen_contrib||0; const pg=PAGOS.filter(p=>p.venta_id===x.id);
+    const pagado=pg.reduce((s,p)=>s+(+p.valor||0),0); const saldo=(+x.total||0)-pagado;
+    return `<div class="item" style="display:block">
+    <div style="display:flex;justify-content:space-between;gap:10px">
+      <div><div class="nm">${esc(x.cliente_nombre||'—')}</div>
+      <div class="mt">${esc(x.folio||'')} · 📅 ${esc(x.fecha||'')}</div>
+      <div class="mt">Costo ${$$(x.costo_total)} → <b style="color:var(--ok)">aporta ${$$(mc)}</b></div></div>
+      <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.total)}</div>
+        <span class="tag ${saldo<=0?'a':''}">${saldo<=0?'✓ pagada':'saldo '+$$(saldo)}</span></div>
+    </div>
+    ${pg.length?`<div style="margin-top:8px;border-top:1px solid var(--line2);padding-top:7px">
+      ${pg.map(p=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0">
+        <span>${MPAGO[p.metodo]||''} ${esc(p.metodo)}${p.voucher?` · voucher ${esc(p.voucher)}`:''}</span>
+        <span><b>${$$(p.valor)}</b> <button class="btn sm gh" onclick="delRow('zarrat_pagos',${p.id},vVentas)">✕</button></span></div>`).join('')}
+    </div>`:''}
+    ${saldo>0?`<div style="margin-top:8px;background:#faf7f1;border-radius:9px;padding:9px 11px">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:5px">REGISTRAR PAGO</div>
+      <div class="g3">
+        <select id="pm_${x.id}" onchange="vch(${x.id})">${Object.keys(MPAGO).map(k=>`<option value="${k}">${MPAGO[k]} ${k}</option>`).join('')}</select>
+        <input id="pv_${x.id}" inputmode="numeric" placeholder="Valor" value="${saldo}">
+        <button class="btn acc" onclick="addPago(${x.id})">+ Pago</button>
+      </div>
+      <input id="pn_${x.id}" placeholder="N° de voucher" style="margin-top:7px;display:none">
+    </div>`:''}
+    </div>`;}).join('')
     :'<div class="empty">Sin ventas aún.</div>'}`;
 }
 const pagada=id=>patch('zarrat_ventas','id=eq.'+id,{estado_pago:'pagado'}).then(vVentas);
