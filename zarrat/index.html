@@ -443,10 +443,11 @@ function etiqueta(id){
 }
 
 /* ═══════ 6 · COTIZACIONES (con costos y margen de contribución) ═══════ */
-let ITEMS=[], COSTOS=[], FICHAS=[];
+let ITEMS=[], COSTOS=[], FICHAS=[], BASE_COSTOS=[];
 async function vCotiz(){
-  const [c,cl,ct,fi]=await Promise.all([get('zarrat_cotizaciones?order=creado_en.desc&limit=100'),get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_catalogo?activo=eq.true&order=nombre.asc'),get('zarrat_medidas?order=creado_en.desc&limit=300')]);
+  const [c,cl,ct,fi,cb]=await Promise.all([get('zarrat_cotizaciones?order=creado_en.desc&limit=100'),get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_catalogo?activo=eq.true&order=nombre.asc'),get('zarrat_medidas?order=creado_en.desc&limit=300'),get('zarrat_costos_base?activo=eq.true&order=orden.asc')]);
   CLI=cl; CAT=ct; FICHAS=fi;
+  BASE_COSTOS=cb.map(x=>({n:x.concepto,v:+x.valor||0}));   // la plantilla guardada
   $('main').innerHTML=`<h1>Cotizaciones</h1><div class="sub">Del catálogo o a la medida · calcula el margen de contribución</div>
   <div class="card">
     <div class="g2"><div><label>Cliente</label><select id="q_c" onchange="cargaFicha()"><option value="">— elige —</option>${CLI.map(x=>`<option value="${x.id}">${esc(x.nombre)}</option>`).join('')}</select></div>
@@ -467,10 +468,13 @@ async function vCotiz(){
         <div><label>🧵 Tela</label><input id="q_tela" inputmode="numeric" placeholder="0" oninput="calcMargen()"><div class="hint" id="q_telah"></div></div>
         <div><label>✂️ Mano de obra</label><input id="q_mo" inputmode="numeric" placeholder="0" oninput="calcMargen()"></div>
       </div>
-      <label>🏭 Centro de costos internos</label>
-      <div class="g3"><input id="q_cn" placeholder="Concepto (ej: bordado)"><input id="q_cv" inputmode="numeric" placeholder="Valor">
-        <button class="btn gh" onclick="addCosto()">+ Agregar</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+        <label style="margin:0">🏭 Centro de costos internos</label>
+        <button class="btn sm gh" onclick="guardarPlantilla()" title="Guarda esta lista para que salga sola la próxima vez">💾 Guardar plantilla</button>
+      </div>
       <div id="q_costos"></div>
+      <div class="g3" style="margin-top:8px"><input id="q_cn" placeholder="Concepto (ej: bordado)"><input id="q_cv" inputmode="numeric" placeholder="Valor">
+        <button class="btn gh" onclick="addCosto()">+ Agregar</button></div>
     </div>
 
     <div class="card" id="q_res" style="background:var(--ink);color:var(--paper);border-color:var(--ink);margin-top:10px;padding:14px 16px"></div>
@@ -487,7 +491,8 @@ async function vCotiz(){
       ${x.estado!=='vendida'?`<button class="btn sm acc" style="margin-top:5px" onclick="aVenta(${x.id})">→ Venta</button>`:''}
       <button class="btn sm gh" style="margin-top:5px" onclick="delRow('zarrat_cotizaciones',${x.id},vCotiz)">✕</button></div></div>`;}).join('')
     :'<div class="empty">Sin cotizaciones.</div>'}`;
-  ITEMS=[]; COSTOS=[]; pintaItems(); pintaCostos(); calcMargen();
+  ITEMS=[]; COSTOS=BASE_COSTOS.map(x=>({...x}));   // ✦ salen solos con la plantilla guardada
+  pintaItems(); pintaCostos(); calcMargen();
 }
 function cargaFicha(){
   const ci=+$('q_c').value; const f=FICHAS.filter(x=>x.cliente_id===ci)[0];
@@ -526,8 +531,21 @@ function addCosto(){
   COSTOS.push({n,v}); $('q_cn').value=''; $('q_cv').value=''; pintaCostos(); calcMargen();
 }
 function pintaCostos(){
-  $('q_costos').innerHTML=COSTOS.length?COSTOS.map((c,k)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13.5px;border-bottom:1px solid var(--line2)">
-    <span>${esc(c.n)}</span><span><b>${$$(c.v)}</b> <button class="btn sm gh" onclick="COSTOS.splice(${k},1);pintaCostos();calcMargen()">✕</button></span></div>`).join(''):'';
+  const t=COSTOS.reduce((s,c)=>s+c.v,0);
+  $('q_costos').innerHTML=COSTOS.length?COSTOS.map((c,k)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13.5px;border-bottom:1px solid var(--line2)">
+    <span style="flex:1">${esc(c.n)}</span>
+    <input value="${c.v}" inputmode="numeric" onchange="editCosto(${k},this.value)" style="width:110px;text-align:right;padding:6px 8px;font-weight:700;font-size:13.5px">
+    <button class="btn sm gh" onclick="COSTOS.splice(${k},1);pintaCostos();calcMargen()">✕</button></div>`).join('')
+    +`<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-weight:800;font-size:13.5px"><span>Total costos internos</span><span style="color:var(--acc)">${$$(t)}</span></div>`
+    :'<div class="hint">Sin costos internos. Agrégalos abajo o guárdalos como plantilla.</div>';
+}
+function editCosto(k,v){ COSTOS[k].v=+String(v).replace(/\D/g,'')||0; pintaCostos(); calcMargen(); }
+async function guardarPlantilla(){
+  if(!COSTOS.length) return alert('No hay costos que guardar.');
+  if(!confirm('¿Guardar estos '+COSTOS.length+' costos como plantilla?\n\nLa próxima vez que cotices salen solos con estos valores.')) return;
+  await del('zarrat_costos_base','id=gt.0');
+  await post('zarrat_costos_base',COSTOS.map((c,i)=>({concepto:c.n,valor:c.v,orden:i+1})),'return=minimal');
+  alert('✦ Plantilla guardada. La próxima cotización ya sale con estos costos.');
 }
 function calcMargen(){
   const pv=ITEMS.reduce((s,i)=>s+i.v,0);
