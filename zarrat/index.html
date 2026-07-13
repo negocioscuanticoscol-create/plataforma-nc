@@ -99,39 +99,54 @@ const post=(t,b,pref)=>fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefe
 const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)});
 const del=(t,q)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'DELETE',headers:H});
 
-const TABS=[['pend','📌 Pendientes'],['gastos','💰 Gastos'],['clientes','👥 Clientes'],['medidas','📐 Medidas'],
+const TABS=[['pend','🏗️ Estructuración'],['gastos','💰 Gastos'],['clientes','👥 Clientes'],['medidas','📐 Medidas'],
             ['catalogo','🖼️ Catálogo'],['cotiz','📋 Cotizaciones'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
 let TAB='pend', CLI=[], PRENDAS=[], CAT=[];
 $('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('');
 function go(t){TAB=t;TABS.forEach(([v])=>$('t_'+v).className=(v===t?'on':''));({pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,cotiz:vCotiz,ventas:vVentas,crm:vCrm})[t]();}
 
-/* ═══════ 1 · PENDIENTES ═══════ */
+/* ═══════ 1 · ESTRUCTURACIÓN ═══════ */
+const CATS=['Pendientes','Directorio proveedores','Herramientas'];
+const RESP=['María Zarrate','Claudia Ruiz','José Calderón'];
+let FCAT='Pendientes';
 async function vPend(){
-  const d=await get('zarrat_pendientes?order=fecha.asc&limit=200');
-  const pen=d.filter(x=>x.estado!=='hecho'), hech=d.filter(x=>x.estado==='hecho');
-  $('main').innerHTML=`<h1>Pendientes</h1><div class="sub">Lo que hay que hacer, con su fecha y contacto</div>
+  const d=await get('zarrat_pendientes?order=fecha.asc&limit=300');
+  const dc=d.filter(x=>(x.categoria||'Pendientes')===FCAT);
+  const pen=dc.filter(x=>x.estado!=='hecho'), hech=dc.filter(x=>x.estado==='hecho');
+  const n=c=>d.filter(x=>(x.categoria||'Pendientes')===c).length;
+  $('main').innerHTML=`<h1>Estructuración</h1><div class="sub">Pendientes, proveedores y herramientas — con su responsable</div>
+  <div class="card" style="padding:12px 14px">
+    <label style="margin-top:0">Ver</label>
+    <select id="f_cat" onchange="FCAT=this.value;vPend()">${CATS.map(c=>`<option ${c===FCAT?'selected':''}>${c} (${n(c)})</option>`).join('')}</select>
+  </div>
   <div class="card">
+    <div class="g2">
+      <div><label>Categoría</label><select id="p_c">${CATS.map(c=>`<option ${c===FCAT?'selected':''}>${c}</option>`).join('')}</select></div>
+      <div><label>Responsable</label><select id="p_r"><option value="">— sin asignar —</option>${RESP.map(r=>`<option>${r}</option>`).join('')}</select></div>
+    </div>
     <div class="g2"><div><label>Fecha</label><input type="date" id="p_f" value="${hoy()}"></div>
       <div><label>Teléfono</label><input id="p_t" inputmode="tel" placeholder="Contacto"></div></div>
-    <label>¿Qué se necesita?</label><input id="p_ti" placeholder="Ej: entregar vestido de novia · tomar medidas">
+    <label>¿Qué es / qué se necesita?</label><input id="p_ti" placeholder="Ej: entregar vestido · proveedor de telas · máquina fileteadora">
     <label>Dirección</label><input id="p_d" placeholder="Dónde">
     <label>Notas</label><textarea id="p_n" placeholder="Detalle…"></textarea>
-    <button class="btn full" onclick="addPend()">+ Agregar pendiente</button>
+    <button class="btn full" onclick="addPend()">+ Agregar</button>
   </div>
-  <h1 style="font-size:18px">Por hacer · ${pen.length}</h1>
-  ${pen.length?pen.map(it).join(''):'<div class="empty">Nada pendiente ✦</div>'}
-  ${hech.length?`<h1 style="font-size:18px;margin-top:22px">Hechos · ${hech.length}</h1>${hech.slice(0,20).map(it).join('')}`:''}`;
+  <h1 style="font-size:18px">${esc(FCAT)} · ${pen.length}</h1>
+  ${pen.length?pen.map(it).join(''):'<div class="empty">Nada en esta categoría ✦</div>'}
+  ${hech.length?`<h1 style="font-size:18px;margin-top:22px">Cerrados · ${hech.length}</h1>${hech.slice(0,20).map(it).join('')}`:''}`;
   function it(x){const done=x.estado==='hecho';
     return `<div class="item ${done?'done':''}"><div>
       <div class="nm">${esc(x.titulo)}</div>
-      <div class="mt">📅 ${esc(x.fecha||'')}${x.telefono?' · 📱 '+esc(x.telefono):''}${x.direccion?' · 📍 '+esc(x.direccion):''}</div>
+      <div class="mt">${x.responsable?`<span class="tag a">👤 ${esc(x.responsable)}</span> `:''}📅 ${esc(x.fecha||'')}${x.telefono?' · 📱 '+esc(x.telefono):''}${x.direccion?' · 📍 '+esc(x.direccion):''}</div>
       ${x.notas?`<div class="mt">📝 ${esc(x.notas)}</div>`:''}</div>
       <div style="display:flex;gap:5px;flex-direction:column">
         <button class="btn sm ${done?'gh':'acc'}" onclick="togPend(${x.id},'${done?'pendiente':'hecho'}')">${done?'↩︎':'✓'}</button>
         <button class="btn sm gh" onclick="delRow('zarrat_pendientes',${x.id},vPend)">✕</button></div></div>`;}
 }
-async function addPend(){const t=$('p_ti').value.trim(); if(!t)return alert('Escribe qué se necesita.');
-  await post('zarrat_pendientes',{fecha:$('p_f').value||hoy(),titulo:t,telefono:$('p_t').value.trim(),direccion:$('p_d').value.trim(),notas:$('p_n').value.trim()},'return=minimal'); vPend();}
+async function addPend(){const t=$('p_ti').value.trim(); if(!t)return alert('Escribe qué es o qué se necesita.');
+  await post('zarrat_pendientes',{fecha:$('p_f').value||hoy(),titulo:t,categoria:$('p_c').value,responsable:$('p_r').value||null,
+    telefono:$('p_t').value.trim(),direccion:$('p_d').value.trim(),notas:$('p_n').value.trim()},'return=minimal');
+  FCAT=$('p_c').value; vPend();}
 const togPend=(id,e)=>patch('zarrat_pendientes','id=eq.'+id,{estado:e}).then(vPend);
 const delRow=(t,id,cb)=>{ if(confirm('¿Eliminar?')) del(t,'id=eq.'+id).then(cb); };
 
