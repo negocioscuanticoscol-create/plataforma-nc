@@ -173,23 +173,40 @@ const delRow=(t,id,cb)=>{ if(confirm('¿Eliminar?')) del(t,'id=eq.'+id).then(cb)
 /* ═══════ 2 · GASTOS + PUNTO DE EQUILIBRIO ═══════ */
 async function vGastos(){
   const m=mesAct();
-  const [g,cf]=await Promise.all([get('zarrat_gastos?mes=eq.'+m+'&order=valor.desc'),get('zarrat_config?clave=eq.margen')]);
-  const margen=+((cf[0]||{}).valor||40);
+  const [g,cf,vt]=await Promise.all([get('zarrat_gastos?mes=eq.'+m+'&order=valor.desc'),get('zarrat_config?clave=eq.margen'),get('zarrat_ventas?limit=500')]);
+  const metaMargen=+((cf[0]||{}).valor||40);           // la META que ella se pone
   const fijos=g.filter(x=>x.tipo==='fijo').reduce((s,x)=>s+(+x.valor||0),0);
   const varia=g.filter(x=>x.tipo!=='fijo').reduce((s,x)=>s+(+x.valor||0),0);
-  const tot=fijos+varia;
-  const pe=margen>0?fijos/(margen/100):0;                       // punto de equilibrio en VENTAS
-  $('main').innerHTML=`<h1>Gastos del mes</h1><div class="sub">${m} · agrega cada rubro y calcula tu punto de equilibrio</div>
+  // ✦ MARGEN REAL: sale de las ventas que YA hizo (no de un número inventado)
+  const vTot=vt.reduce((s,x)=>s+(+x.total||0),0);
+  const vMar=vt.reduce((s,x)=>s+(+x.margen_contrib||0),0);
+  const real=vTot>0?(vMar/vTot*100):0;
+  const usa=real>0?real:metaMargen;                     // si aún no hay ventas, usa la meta
+  const pe=usa>0?fijos/(usa/100):0;                     // punto de equilibrio con el margen REAL
+  const dif=real-metaMargen;
+  $('main').innerHTML=`<h1>Gastos y rentabilidad</h1><div class="sub">${m} · el % sale de tus ventas reales, no de un estimado</div>
   <div class="kpis">
     <div class="kpi"><b>${$$(fijos)}</b><span>GASTOS FIJOS</span></div>
     <div class="kpi"><b>${$$(varia)}</b><span>VARIABLES</span></div>
-    <div class="kpi eq"><b>${$$(pe)}</b><span>PUNTO DE EQUILIBRIO — hay que vender esto al mes para no perder (con ${margen}% de margen)</span></div>
+    <div class="kpi eq"><b>${$$(pe)}</b><span>PUNTO DE EQUILIBRIO — hay que vender esto al mes para no perder</span></div>
+  </div>
+  <div class="card" style="border-left:4px solid ${real>0?(dif>=0?'var(--ok)':'var(--warn)'):'var(--line)'}">
+    <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)">TU RENTABILIDAD REAL</div>
+    ${vTot>0?`
+      <div style="display:flex;align-items:baseline;gap:10px;margin-top:3px">
+        <b style="font-family:Georgia,serif;font-size:32px;color:${dif>=0?'var(--ok)':'var(--warn)'}">${real.toFixed(1)}%</b>
+        <span style="font-size:13px;color:var(--mut)">de margen de contribución</span></div>
+      <div class="hint">Calculado con <b>${vt.length}</b> venta(s): aportaron <b>${$$(vMar)}</b> sobre <b>${$$(vTot)}</b> vendidos.</div>
+      <div class="hint" style="color:${dif>=0?'var(--ok)':'var(--warn)'};font-weight:700">
+        ${dif>=0?`✦ Vas ${dif.toFixed(1)} puntos POR ENCIMA de tu meta (${metaMargen}%).`:`⚠ Vas ${(-dif).toFixed(1)} puntos POR DEBAJO de tu meta (${metaMargen}%). Sube precios o baja costos.`}</div>
+    `:`<div style="font-family:Georgia,serif;font-size:26px;color:var(--mut);margin-top:3px">— sin ventas aún —</div>
+      <div class="hint">Cuando registres ventas, aquí sale tu margen REAL (no un estimado). Por ahora uso tu meta del ${metaMargen}%.</div>`}
   </div>
   <div class="card">
-    <label>Margen de ganancia (%)</label>
-    <div style="display:flex;gap:8px"><input id="g_m" type="number" value="${margen}" min="1" max="99" style="flex:1">
-      <button class="btn acc" onclick="setMargen()">Guardar</button></div>
-    <div class="hint">Punto de equilibrio = Gastos fijos ÷ margen. Con ${margen}% necesitas vender <b>${$$(pe)}</b> al mes.</div>
+    <label>Meta de margen (%) — solo para comparar</label>
+    <div style="display:flex;gap:8px"><input id="g_m" type="number" value="${metaMargen}" min="1" max="99" style="flex:1">
+      <button class="btn acc" onclick="setMargen()">Guardar meta</button></div>
+    <div class="hint">Punto de equilibrio = Gastos fijos ÷ margen real (<b>${usa.toFixed(1)}%</b>) = <b>${$$(pe)}</b> al mes.</div>
   </div>
   <div class="card">
     <div class="g3">
@@ -555,6 +572,10 @@ async function vVentas(){
     <div style="height:14px;background:var(--line2);border-radius:7px;overflow:hidden">
       <div style="height:100%;width:${pct}%;background:${utilidad>=0?'var(--ok)':'var(--acc)'};transition:width .4s"></div></div>
     <div class="hint">${pct}% de tus gastos fijos cubiertos con el margen de las piezas vendidas este mes.</div>
+    ${tm>0?`<div style="border-top:1px solid var(--line2);margin-top:9px;padding-top:9px;display:flex;justify-content:space-between;align-items:baseline">
+      <span style="font-size:12px;color:var(--mut);letter-spacing:.05em">MARGEN REAL DEL MES</span>
+      <b style="font-family:Georgia,serif;font-size:22px;color:var(--ok)">${(aportes/tm*100).toFixed(1)}%</b></div>
+      <div class="hint">Sale de las ventas de este mes: aportaron ${$$(aportes)} sobre ${$$(tm)} vendidos.</div>`:''}
   </div>
   ${v.length?v.map(x=>{const mc=+x.margen_contrib||0;
     return `<div class="item"><div><div class="nm">${esc(x.cliente_nombre||'—')}</div>
