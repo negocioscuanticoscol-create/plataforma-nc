@@ -190,6 +190,7 @@ async function vGastos(){
   const metaMargen=+((cf[0]||{}).valor||40);           // la META que ella se pone
   const fijos=g.filter(x=>x.tipo==='fijo').reduce((s,x)=>s+(+x.valor||0),0);
   const varia=g.filter(x=>x.tipo!=='fijo').reduce((s,x)=>s+(+x.valor||0),0);
+  const tot=fijos+varia;
   // ✦ MARGEN REAL: sale de las ventas que YA hizo (no de un número inventado)
   const vTot=vt.reduce((s,x)=>s+(+x.total||0),0);
   const vMar=vt.reduce((s,x)=>s+(+x.margen_contrib||0),0);
