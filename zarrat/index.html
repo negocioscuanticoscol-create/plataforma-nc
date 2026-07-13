@@ -1,0 +1,393 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZARRAT · Atelier</title>
+<style>
+  :root{
+    --paper:#f5f2ec; --card:#fffdf9; --ink:#17150f; --ink2:#4a463c; --mut:#918a7a;
+    --line:#e2dbcd; --line2:#efe9dd; --acc:#8a6a3d; --acc2:#b08c56;
+    --ok:#4a7a52; --warn:#b4622e; --bad:#a33b30;
+    --sh:0 1px 2px rgba(30,24,10,.04),0 10px 30px -16px rgba(30,24,10,.22);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:900px;margin:0 auto;padding:0 16px 90px}
+  /* ---- header ---- */
+  header{background:var(--ink);color:var(--paper);padding:16px 0;margin-bottom:0}
+  .hd{max-width:900px;margin:0 auto;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{font-family:Georgia,"Times New Roman",serif;font-size:26px;letter-spacing:.34em;font-weight:400;text-indent:.34em}
+  .brand small{display:block;font-family:"Segoe UI",sans-serif;font-size:9.5px;letter-spacing:.28em;color:var(--acc2);text-indent:.28em;margin-top:2px}
+  .hd .quien{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a49a86}
+  /* ---- nav ---- */
+  nav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;overflow-x:auto}
+  .nv{max-width:900px;margin:0 auto;display:flex;gap:2px;padding:0 10px}
+  nav button{flex:0 0 auto;background:none;border:none;padding:13px 12px;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap;font-family:inherit}
+  nav button.on{color:var(--ink);border-bottom-color:var(--acc)}
+  /* ---- generales ---- */
+  h1{font-family:Georgia,serif;font-size:24px;font-weight:400;letter-spacing:.01em;margin:22px 0 3px}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:var(--sh)}
+  label{display:block;font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);margin:9px 0 4px}
+  input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font-size:15px;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
+  textarea{min-height:64px;resize:vertical}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .btn{padding:12px 18px;border:none;border-radius:8px;background:var(--ink);color:var(--paper);font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
+  .btn.acc{background:var(--acc)}
+  .btn.gh{background:transparent;border:1px solid var(--line);color:var(--ink2)}
+  .btn.full{width:100%;margin-top:12px}
+  .btn.sm{padding:7px 12px;font-size:12px;border-radius:7px}
+  /* ---- items ---- */
+  .item{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:13px 15px;margin-bottom:9px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+  .item .nm{font-weight:700;font-size:15px}
+  .item .mt{font-size:12.5px;color:var(--mut);margin-top:2px}
+  .item.done{opacity:.5}
+  .item.done .nm{text-decoration:line-through}
+  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;background:var(--line2);color:var(--ink2)}
+  .tag.a{background:#f0e6d6;color:var(--acc)}
+  .empty{text-align:center;color:var(--mut);padding:34px 12px;font-size:14px}
+  /* ---- KPIs ---- */
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--sh)}
+  .kpi b{display:block;font-size:22px;font-family:Georgia,serif;font-weight:400;letter-spacing:-.01em}
+  .kpi span{font-size:11px;color:var(--mut);letter-spacing:.05em}
+  .kpi.eq{grid-column:1/-1;background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .kpi.eq b{color:var(--acc2);font-size:28px}
+  .kpi.eq span{color:#a49a86}
+  /* ---- catalogo ---- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+  .pz{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--sh)}
+  .pz .img{aspect-ratio:3/4;background:#efeae0 center/cover no-repeat;position:relative}
+  .pz .img::after{content:"ZARRAT";position:absolute;bottom:6px;right:8px;font-family:Georgia,serif;font-size:9px;letter-spacing:.22em;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+  .pz .in{padding:9px 11px}
+  .pz .n{font-weight:700;font-size:13.5px;line-height:1.25}
+  .pz .v{color:var(--acc);font-weight:800;font-size:14px;margin-top:2px}
+  .pz .f{font-size:10.5px;color:var(--mut);margin-top:1px}
+  /* ---- medidas ---- */
+  .med{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:9px}
+  .med .m label{margin-top:0}
+  .med input{text-align:center;font-weight:700}
+  /* ---- crm ---- */
+  .etapas{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+  .et{font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;background:#fff;color:var(--mut)}
+  .et.on{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:700}
+  .hint{font-size:12px;color:var(--mut);margin-top:5px}
+  @media(max-width:640px){.g2,.g3{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}}
+</style>
+
+<header><div class="hd">
+  <div class="brand">ZARRAT<small>ATELIER · MODA A LA MEDIDA</small></div>
+  <div class="quien">Sistema de gestión</div>
+</div></header>
+
+<nav><div class="nv" id="nav"></div></nav>
+
+<div class="wrap"><div id="main"></div></div>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const $$=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+const hoy=()=>new Date().toISOString().slice(0,10);
+const mesAct=()=>new Date().toISOString().slice(0,7);
+async function api(p,o={}){const r=await fetch(SB+'/rest/v1/'+p,{headers:H,...o});const t=await r.text();return t?JSON.parse(t):[];}
+const get=p=>api(p);
+const post=(t,b,pref)=>fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:pref||'return=representation'},body:JSON.stringify(b)}).then(r=>r.json());
+const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)});
+const del=(t,q)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'DELETE',headers:H});
+
+const TABS=[['pend','📌 Pendientes'],['gastos','💰 Gastos'],['clientes','👥 Clientes'],['medidas','📐 Medidas'],
+            ['catalogo','🖼️ Catálogo'],['cotiz','📋 Cotizaciones'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
+let TAB='pend', CLI=[], PRENDAS=[], CAT=[];
+$('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('');
+function go(t){TAB=t;TABS.forEach(([v])=>$('t_'+v).className=(v===t?'on':''));({pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,cotiz:vCotiz,ventas:vVentas,crm:vCrm})[t]();}
+
+/* ═══════ 1 · PENDIENTES ═══════ */
+async function vPend(){
+  const d=await get('zarrat_pendientes?order=fecha.asc&limit=200');
+  const pen=d.filter(x=>x.estado!=='hecho'), hech=d.filter(x=>x.estado==='hecho');
+  $('main').innerHTML=`<h1>Pendientes</h1><div class="sub">Lo que hay que hacer, con su fecha y contacto</div>
+  <div class="card">
+    <div class="g2"><div><label>Fecha</label><input type="date" id="p_f" value="${hoy()}"></div>
+      <div><label>Teléfono</label><input id="p_t" inputmode="tel" placeholder="Contacto"></div></div>
+    <label>¿Qué se necesita?</label><input id="p_ti" placeholder="Ej: entregar vestido de novia · tomar medidas">
+    <label>Dirección</label><input id="p_d" placeholder="Dónde">
+    <label>Notas</label><textarea id="p_n" placeholder="Detalle…"></textarea>
+    <button class="btn full" onclick="addPend()">+ Agregar pendiente</button>
+  </div>
+  <h1 style="font-size:18px">Por hacer · ${pen.length}</h1>
+  ${pen.length?pen.map(it).join(''):'<div class="empty">Nada pendiente ✦</div>'}
+  ${hech.length?`<h1 style="font-size:18px;margin-top:22px">Hechos · ${hech.length}</h1>${hech.slice(0,20).map(it).join('')}`:''}`;
+  function it(x){const done=x.estado==='hecho';
+    return `<div class="item ${done?'done':''}"><div>
+      <div class="nm">${esc(x.titulo)}</div>
+      <div class="mt">📅 ${esc(x.fecha||'')}${x.telefono?' · 📱 '+esc(x.telefono):''}${x.direccion?' · 📍 '+esc(x.direccion):''}</div>
+      ${x.notas?`<div class="mt">📝 ${esc(x.notas)}</div>`:''}</div>
+      <div style="display:flex;gap:5px;flex-direction:column">
+        <button class="btn sm ${done?'gh':'acc'}" onclick="togPend(${x.id},'${done?'pendiente':'hecho'}')">${done?'↩︎':'✓'}</button>
+        <button class="btn sm gh" onclick="delRow('zarrat_pendientes',${x.id},vPend)">✕</button></div></div>`;}
+}
+async function addPend(){const t=$('p_ti').value.trim(); if(!t)return alert('Escribe qué se necesita.');
+  await post('zarrat_pendientes',{fecha:$('p_f').value||hoy(),titulo:t,telefono:$('p_t').value.trim(),direccion:$('p_d').value.trim(),notas:$('p_n').value.trim()},'return=minimal'); vPend();}
+const togPend=(id,e)=>patch('zarrat_pendientes','id=eq.'+id,{estado:e}).then(vPend);
+const delRow=(t,id,cb)=>{ if(confirm('¿Eliminar?')) del(t,'id=eq.'+id).then(cb); };
+
+/* ═══════ 2 · GASTOS + PUNTO DE EQUILIBRIO ═══════ */
+async function vGastos(){
+  const m=mesAct();
+  const [g,cf]=await Promise.all([get('zarrat_gastos?mes=eq.'+m+'&order=valor.desc'),get('zarrat_config?clave=eq.margen')]);
+  const margen=+((cf[0]||{}).valor||40);
+  const fijos=g.filter(x=>x.tipo==='fijo').reduce((s,x)=>s+(+x.valor||0),0);
+  const varia=g.filter(x=>x.tipo!=='fijo').reduce((s,x)=>s+(+x.valor||0),0);
+  const tot=fijos+varia;
+  const pe=margen>0?fijos/(margen/100):0;                       // punto de equilibrio en VENTAS
+  $('main').innerHTML=`<h1>Gastos del mes</h1><div class="sub">${m} · agrega cada rubro y calcula tu punto de equilibrio</div>
+  <div class="kpis">
+    <div class="kpi"><b>${$$(fijos)}</b><span>GASTOS FIJOS</span></div>
+    <div class="kpi"><b>${$$(varia)}</b><span>VARIABLES</span></div>
+    <div class="kpi eq"><b>${$$(pe)}</b><span>PUNTO DE EQUILIBRIO — hay que vender esto al mes para no perder (con ${margen}% de margen)</span></div>
+  </div>
+  <div class="card">
+    <label>Margen de ganancia (%)</label>
+    <div style="display:flex;gap:8px"><input id="g_m" type="number" value="${margen}" min="1" max="99" style="flex:1">
+      <button class="btn acc" onclick="setMargen()">Guardar</button></div>
+    <div class="hint">Punto de equilibrio = Gastos fijos ÷ margen. Con ${margen}% necesitas vender <b>${$$(pe)}</b> al mes.</div>
+  </div>
+  <div class="card">
+    <div class="g3">
+      <div><label>Rubro</label><input id="g_r" placeholder="Ej: Arriendo local"></div>
+      <div><label>Valor</label><input id="g_v" inputmode="numeric" placeholder="0"></div>
+      <div><label>Tipo</label><select id="g_t"><option value="fijo">Fijo</option><option value="variable">Variable</option></select></div>
+    </div>
+    <label>Categoría</label>
+    <select id="g_c">${['Local','Taller de costura','Servicios (luz/agua)','Teléfono/Internet','Empleados','Materia prima','Transporte','Publicidad','Otros'].map(c=>`<option>${c}</option>`).join('')}</select>
+    <button class="btn full" onclick="addGasto()">+ Agregar gasto</button>
+  </div>
+  <h1 style="font-size:18px">Gastos cargados · ${g.length} <span style="font-size:13px;color:var(--mut)">(total ${$$(tot)})</span></h1>
+  ${g.length?g.map(x=>`<div class="item"><div><div class="nm">${esc(x.rubro)}</div>
+    <div class="mt"><span class="tag ${x.tipo==='fijo'?'a':''}">${esc(x.tipo)}</span> ${esc(x.categoria||'')}</div></div>
+    <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.valor)}</div>
+    <button class="btn sm gh" style="margin-top:5px" onclick="delRow('zarrat_gastos',${x.id},vGastos)">✕</button></div></div>`).join('')
+    :'<div class="empty">Aún no has cargado gastos de este mes.</div>'}`;
+}
+async function setMargen(){await post('zarrat_config?on_conflict=clave',{clave:'margen',valor:$('g_m').value},'resolution=merge-duplicates,return=minimal');vGastos();}
+async function addGasto(){const r=$('g_r').value.trim(),v=+($('g_v').value||'').replace(/\D/g,'');
+  if(!r||!v)return alert('Escribe el rubro y el valor.');
+  await post('zarrat_gastos',{mes:mesAct(),rubro:r,valor:v,tipo:$('g_t').value,categoria:$('g_c').value},'return=minimal');vGastos();}
+
+/* ═══════ 3 · CLIENTES ═══════ */
+async function vClientes(){
+  CLI=await get('zarrat_clientes?order=creado_en.desc&limit=500');
+  $('main').innerHTML=`<h1>Clientes</h1><div class="sub">${CLI.length} registrados</div>
+  <div class="card">
+    <div class="g2"><div><label>Nombre *</label><input id="c_n" placeholder="Nombre completo"></div>
+      <div><label>Teléfono</label><input id="c_t" inputmode="tel"></div></div>
+    <div class="g2"><div><label>WhatsApp</label><input id="c_w" inputmode="tel"></div>
+      <div><label>Email</label><input id="c_e" inputmode="email"></div></div>
+    <div class="g2"><div><label>Instagram</label><input id="c_i" placeholder="@usuario"></div>
+      <div><label>Dirección</label><input id="c_d"></div></div>
+    <label>Notas</label><textarea id="c_no" placeholder="Preferencias, tallas, ocasión…"></textarea>
+    <button class="btn full" onclick="addCli()">+ Registrar cliente</button>
+  </div>
+  <input id="c_q" placeholder="🔎 Buscar…" oninput="filtCli()" style="margin-bottom:10px">
+  <div id="c_list">${CLI.map(cliCard).join('')||'<div class="empty">Sin clientes aún.</div>'}</div>`;
+}
+const cliCard=c=>`<div class="item cli" data-t="${esc((c.nombre||'')+' '+(c.telefono||'')+' '+(c.instagram||''))?.toLowerCase()}"><div>
+  <div class="nm">${esc(c.nombre)}</div>
+  <div class="mt">${c.telefono?'📱 '+esc(c.telefono):''}${c.whatsapp?' · 💬 '+esc(c.whatsapp):''}${c.instagram?' · 📷 '+esc(c.instagram):''}</div>
+  <div class="mt">${c.email?'✉️ '+esc(c.email):''}${c.direccion?' · 📍 '+esc(c.direccion):''}</div>
+  ${c.notas?`<div class="mt">📝 ${esc(c.notas)}</div>`:''}</div>
+  <div style="display:flex;flex-direction:column;gap:5px">
+    ${c.whatsapp||c.telefono?`<a class="btn sm acc" style="text-decoration:none;text-align:center" href="https://wa.me/57${String(c.whatsapp||c.telefono).replace(/\D/g,'')}" target="_blank">💬</a>`:''}
+    <button class="btn sm gh" onclick="delRow('zarrat_clientes',${c.id},vClientes)">✕</button></div></div>`;
+function filtCli(){const q=$('c_q').value.toLowerCase();document.querySelectorAll('.cli').forEach(e=>{e.style.display=(!q||e.dataset.t.includes(q))?'':'none';});}
+async function addCli(){const n=$('c_n').value.trim(); if(!n)return alert('El nombre es obligatorio.');
+  await post('zarrat_clientes',{nombre:n,telefono:$('c_t').value.trim(),whatsapp:$('c_w').value.trim(),email:$('c_e').value.trim(),instagram:$('c_i').value.trim(),direccion:$('c_d').value.trim(),notas:$('c_no').value.trim()},'return=minimal');
+  vClientes();}
+
+/* ═══════ 4 · MEDIDAS (ficha técnica) ═══════ */
+async function vMedidas(){
+  [CLI,PRENDAS]=await Promise.all([get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_tipos_prenda?order=nombre.asc')]);
+  const hist=await get('zarrat_medidas?order=creado_en.desc&limit=40');
+  $('main').innerHTML=`<h1>Medidas · Ficha técnica</h1><div class="sub">Elige el cliente y el tipo de prenda — salen sus medidas</div>
+  <div class="card">
+    <div class="g2">
+      <div><label>Cliente</label><select id="m_c"><option value="">— elige —</option>${CLI.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}</select></div>
+      <div><label>Tipo de prenda</label><select id="m_p" onchange="camposPrenda()"><option value="">— elige —</option>${PRENDAS.map(p=>`<option value="${esc(p.nombre)}">${esc(p.nombre)}</option>`).join('')}</select></div>
+    </div>
+    <div id="m_campos"></div>
+  </div>
+  <div class="card">
+    <div style="font-weight:700;font-size:13px;margin-bottom:6px">➕ ¿Otra prenda? Créala con sus medidas</div>
+    <div class="g2"><div><label>Nombre de la prenda</label><input id="np_n" placeholder="Ej: Chaleco"></div>
+      <div><label>Medidas (separadas por coma)</label><input id="np_c" placeholder="Pecho, Cintura, Largo…"></div></div>
+    <button class="btn gh full" onclick="addPrenda()">Crear tipo de prenda</button>
+  </div>
+  <h1 style="font-size:18px">Fichas guardadas</h1>
+  ${hist.length?hist.map(m=>{const c=CLI.find(x=>x.id===m.cliente_id)||{};const ks=Object.entries(m.medidas||{}).filter(([,v])=>v);
+    return `<div class="item"><div><div class="nm">${esc(c.nombre||'Cliente')} · <span class="tag a">${esc(m.tipo_prenda)}</span></div>
+      <div class="mt">📅 ${esc(m.fecha||'')}</div>
+      <div class="mt">${ks.map(([k,v])=>`<b>${esc(k)}</b> ${esc(v)}`).join(' · ')||'—'}</div>
+      ${m.notas?`<div class="mt">📝 ${esc(m.notas)}</div>`:''}</div>
+      <button class="btn sm gh" onclick="delRow('zarrat_medidas',${m.id},vMedidas)">✕</button></div>`;}).join('')
+    :'<div class="empty">Aún no hay fichas de medidas.</div>'}`;
+}
+function camposPrenda(){
+  const p=PRENDAS.find(x=>x.nombre===$('m_p').value);
+  if(!p){$('m_campos').innerHTML='';return;}
+  $('m_campos').innerHTML=`<label style="margin-top:14px">Medidas · ${esc(p.nombre)} (cm)</label>
+    <div class="med">${(p.campos||[]).map((c,i)=>`<div class="m"><label>${esc(c)}</label><input id="md_${i}" data-k="${esc(c)}" inputmode="decimal" placeholder="—"></div>`).join('')}</div>
+    <label>Notas de la prenda</label><textarea id="m_n" placeholder="Tela, color, detalles, fecha de entrega…"></textarea>
+    <button class="btn acc full" onclick="saveMedidas()">💾 Guardar ficha</button>`;
+}
+async function saveMedidas(){
+  const ci=$('m_c').value, tp=$('m_p').value;
+  if(!ci||!tp)return alert('Elige cliente y tipo de prenda.');
+  const med={}; document.querySelectorAll('[id^=md_]').forEach(i=>{if(i.value.trim())med[i.dataset.k]=i.value.trim();});
+  if(!Object.keys(med).length)return alert('Escribe al menos una medida.');
+  await post('zarrat_medidas',{cliente_id:+ci,tipo_prenda:tp,medidas:med,notas:$('m_n').value.trim()},'return=minimal');
+  vMedidas();
+}
+async function addPrenda(){
+  const n=$('np_n').value.trim(), c=$('np_c').value.split(',').map(x=>x.trim()).filter(Boolean);
+  if(!n||!c.length)return alert('Escribe el nombre y sus medidas.');
+  await post('zarrat_tipos_prenda',{nombre:n,campos:c},'return=minimal'); vMedidas();
+}
+
+/* ═══════ 5 · CATÁLOGO ═══════ */
+async function vCatalogo(){
+  CAT=await get('zarrat_catalogo?order=fecha_creacion.desc&limit=200');
+  $('main').innerHTML=`<h1>Catálogo</h1><div class="sub">${CAT.length} piezas · con el sello ZARRAT</div>
+  <div class="card">
+    <div class="g2"><div><label>Nombre de la pieza</label><input id="k_n" placeholder="Ej: Vestido Aurora"></div>
+      <div><label>Valor</label><input id="k_v" inputmode="numeric" placeholder="0"></div></div>
+    <label>Descripción</label><input id="k_d" placeholder="Tela, corte, ocasión…">
+    <label>Foto</label><input type="file" id="k_f" accept="image/*">
+    <button class="btn acc full" onclick="addPieza()">+ Agregar al catálogo</button>
+    <div class="hint" id="k_msg"></div>
+  </div>
+  <div class="grid">${CAT.map(p=>`<div class="pz">
+    <div class="img" style="${p.foto_url?`background-image:url('${p.foto_url}')`:''}"></div>
+    <div class="in"><div class="n">${esc(p.nombre)}</div><div class="v">${$$(p.valor)}</div>
+      <div class="f">${esc(p.fecha_creacion||'')}</div>
+      <button class="btn sm gh" style="width:100%;margin-top:6px" onclick="delRow('zarrat_catalogo',${p.id},vCatalogo)">✕</button></div>
+    </div>`).join('')||'<div class="empty">Sube tu primera pieza.</div>'}</div>`;
+}
+async function addPieza(){
+  const n=$('k_n').value.trim(); if(!n)return alert('Ponle nombre a la pieza.');
+  const f=$('k_f').files[0]; let url=null;
+  $('k_msg').textContent='Subiendo…';
+  if(f){ const path='zarrat/cat_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9.]/g,'');
+    const r=await fetch(SB+'/storage/v1/object/documentos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K},body:f});
+    if(r.ok) url=SB+'/storage/v1/object/public/documentos/'+path; }
+  await post('zarrat_catalogo',{nombre:n,descripcion:$('k_d').value.trim(),valor:+($('k_v').value||'').replace(/\D/g,'')||0,foto_url:url},'return=minimal');
+  vCatalogo();
+}
+
+/* ═══════ 6 · COTIZACIONES ═══════ */
+let ITEMS=[];
+async function vCotiz(){
+  const [c,cl,ct]=await Promise.all([get('zarrat_cotizaciones?order=creado_en.desc&limit=100'),get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_catalogo?activo=eq.true&order=nombre.asc')]);
+  CLI=cl; CAT=ct;
+  $('main').innerHTML=`<h1>Cotizaciones</h1><div class="sub">Del catálogo o hecho a la medida</div>
+  <div class="card">
+    <div class="g2"><div><label>Cliente</label><select id="q_c"><option value="">— elige —</option>${CLI.map(x=>`<option value="${x.id}">${esc(x.nombre)}</option>`).join('')}</select></div>
+      <div><label>Tipo</label><select id="q_t"><option value="catalogo">Del catálogo</option><option value="medida">Hecho a la medida</option></select></div></div>
+    <label>Agregar pieza</label>
+    <div class="g3">
+      <select id="q_p"><option value="">— del catálogo —</option>${CAT.map(p=>`<option value="${p.id}" data-v="${p.valor}">${esc(p.nombre)} · ${$$(p.valor)}</option>`).join('')}</select>
+      <input id="q_pn" placeholder="…o descríbela (a la medida)">
+      <input id="q_pv" inputmode="numeric" placeholder="Valor">
+    </div>
+    <button class="btn gh full" onclick="addItem()">+ Agregar pieza</button>
+    <div id="q_items" style="margin-top:10px"></div>
+    <label>Notas</label><textarea id="q_n" placeholder="Entrega, telas, ajustes…"></textarea>
+    <button class="btn acc full" onclick="saveCotiz()">💾 Guardar cotización</button>
+  </div>
+  <h1 style="font-size:18px">Cotizaciones · ${c.length}</h1>
+  ${c.length?c.map(x=>`<div class="item"><div><div class="nm">${esc(x.cliente_nombre||'—')} <span class="tag ${x.estado==='vendida'?'a':''}">${esc(x.estado)}</span></div>
+    <div class="mt">${esc(x.folio)} · ${esc(x.tipo)} · 📅 ${(x.creado_en||'').slice(0,10)}</div>
+    <div class="mt">${(x.items||[]).map(i=>esc(i.n)+' '+$$(i.v)).join(' · ')}</div></div>
+    <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.total)}</div>
+      ${x.estado!=='vendida'?`<button class="btn sm acc" style="margin-top:5px" onclick="aVenta(${x.id})">→ Venta</button>`:''}
+      <button class="btn sm gh" style="margin-top:5px" onclick="delRow('zarrat_cotizaciones',${x.id},vCotiz)">✕</button></div></div>`).join('')
+    :'<div class="empty">Sin cotizaciones.</div>'}`;
+  ITEMS=[]; pintaItems();
+}
+function addItem(){
+  const s=$('q_p'), o=s.options[s.selectedIndex];
+  let n,v;
+  if(s.value){ n=o.text.split(' · ')[0]; v=+o.dataset.v||0; }
+  else { n=$('q_pn').value.trim(); v=+($('q_pv').value||'').replace(/\D/g,'')||0; }
+  if(!n)return alert('Elige una pieza del catálogo o descríbela.');
+  ITEMS.push({n,v}); s.value=''; $('q_pn').value=''; $('q_pv').value=''; pintaItems();
+}
+function pintaItems(){
+  const t=ITEMS.reduce((s,i)=>s+i.v,0);
+  $('q_items').innerHTML=ITEMS.length?ITEMS.map((i,k)=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line2);font-size:14px">
+    <span>${esc(i.n)}</span><span><b>${$$(i.v)}</b> <button class="btn sm gh" onclick="ITEMS.splice(${k},1);pintaItems()">✕</button></span></div>`).join('')
+    +`<div style="display:flex;justify-content:space-between;padding:9px 0;font-weight:800"><span>TOTAL</span><span style="color:var(--acc)">${$$(t)}</span></div>`:'';
+}
+async function saveCotiz(){
+  const ci=$('q_c').value; if(!ci)return alert('Elige el cliente.');
+  if(!ITEMS.length)return alert('Agrega al menos una pieza.');
+  const c=CLI.find(x=>x.id==ci)||{}; const tot=ITEMS.reduce((s,i)=>s+i.v,0);
+  const folio='ZR-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+String(Date.now()).slice(-4);
+  await post('zarrat_cotizaciones',{folio,cliente_id:+ci,cliente_nombre:c.nombre,tipo:$('q_t').value,items:ITEMS,subtotal:tot,total:tot,notas:$('q_n').value.trim()},'return=minimal');
+  vCotiz();
+}
+async function aVenta(id){
+  const c=(await get('zarrat_cotizaciones?id=eq.'+id))[0]; if(!c)return;
+  if(!confirm('¿Pasar a VENTA?\n'+c.cliente_nombre+' · '+$$(c.total)))return;
+  await post('zarrat_ventas',{folio:c.folio,cliente_id:c.cliente_id,cliente_nombre:c.cliente_nombre,total:c.total},'return=minimal');
+  await patch('zarrat_cotizaciones','id=eq.'+id,{estado:'vendida'});
+  go('ventas');
+}
+
+/* ═══════ 7 · VENTAS ═══════ */
+async function vVentas(){
+  const v=await get('zarrat_ventas?order=fecha.desc&limit=200');
+  const m=mesAct();
+  const mes=v.filter(x=>(x.fecha||'').startsWith(m));
+  const tm=mes.reduce((s,x)=>s+(+x.total||0),0), ta=v.reduce((s,x)=>s+(+x.total||0),0);
+  const g=await get('zarrat_gastos?mes=eq.'+m); const cf=await get('zarrat_config?clave=eq.margen');
+  const margen=+((cf[0]||{}).valor||40);
+  const fijos=g.filter(x=>x.tipo==='fijo').reduce((s,x)=>s+(+x.valor||0),0);
+  const pe=margen>0?fijos/(margen/100):0;
+  const falta=Math.max(0,pe-tm);
+  $('main').innerHTML=`<h1>Ventas</h1><div class="sub">${m} · vs tu punto de equilibrio</div>
+  <div class="kpis">
+    <div class="kpi"><b>${$$(tm)}</b><span>VENDIDO ESTE MES</span></div>
+    <div class="kpi"><b>${$$(ta)}</b><span>TOTAL ACUMULADO</span></div>
+    <div class="kpi eq"><b>${falta>0?$$(falta):'✦ CUBIERTO'}</b><span>${falta>0?`FALTA PARA EL PUNTO DE EQUILIBRIO (${$$(pe)})`:`Ya cubriste tus gastos fijos. Todo lo demás es ganancia.`}</span></div>
+  </div>
+  ${v.length?v.map(x=>`<div class="item"><div><div class="nm">${esc(x.cliente_nombre||'—')}</div>
+    <div class="mt">${esc(x.folio||'')} · 📅 ${esc(x.fecha||'')} · <span class="tag ${x.estado_pago==='pagado'?'a':''}">${esc(x.estado_pago)}</span></div></div>
+    <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.total)}</div>
+    ${x.estado_pago!=='pagado'?`<button class="btn sm acc" style="margin-top:5px" onclick="pagada(${x.id})">✓ Pagada</button>`:''}</div></div>`).join('')
+    :'<div class="empty">Sin ventas aún.</div>'}`;
+}
+const pagada=id=>patch('zarrat_ventas','id=eq.'+id,{estado_pago:'pagado'}).then(vVentas);
+
+/* ═══════ 8 · CRM ═══════ */
+const ETAPAS=['contacto','interesado','medidas','cotizado','cliente'];
+async function vCrm(){
+  const [cl,cr]=await Promise.all([get('zarrat_clientes?order=creado_en.desc&limit=500'),get('zarrat_crm?limit=500')]);
+  const map={}; cr.forEach(x=>map[x.cliente_id]=x.etapa);
+  const cnt=e=>cl.filter(c=>(map[c.id]||'contacto')===e).length;
+  $('main').innerHTML=`<h1>CRM</h1><div class="sub">Contacto → Interesado → Medidas → Cotizado → Cliente</div>
+  <div class="kpis" style="grid-template-columns:repeat(5,1fr)">
+    ${ETAPAS.map(e=>`<div class="kpi" style="padding:10px"><b style="font-size:19px">${cnt(e)}</b><span style="font-size:9.5px">${e.toUpperCase()}</span></div>`).join('')}
+  </div>
+  ${cl.length?cl.map(c=>{const et=map[c.id]||'contacto';
+    return `<div class="item" style="display:block"><div class="nm">${esc(c.nombre)}</div>
+      <div class="mt">${c.telefono?'📱 '+esc(c.telefono):''}${c.instagram?' · 📷 '+esc(c.instagram):''}</div>
+      <div class="etapas">${ETAPAS.map(e=>`<span class="et ${e===et?'on':''}" onclick="setEtapa(${c.id},'${e}')">${e}</span>`).join('')}</div></div>`;}).join('')
+    :'<div class="empty">Registra clientes para verlos aquí.</div>'}`;
+}
+async function setEtapa(id,e){await post('zarrat_crm?on_conflict=cliente_id',{cliente_id:id,etapa:e},'resolution=merge-duplicates,return=minimal');vCrm();}
+
+go('pend');
+</script>
