@@ -213,34 +213,43 @@ async function addGasto(){const r=$('g_r').value.trim(),v=+($('g_v').value||'').
   if(!r||!v)return alert('Escribe el rubro y el valor.');
   await post('zarrat_gastos',{mes:mesAct(),rubro:r,valor:v,tipo:$('g_t').value,categoria:$('g_c').value},'return=minimal');vGastos();}
 
-/* ═══════ 3 · CLIENTES ═══════ */
+/* ═══════ 3 · CLIENTES (con edición) ═══════ */
+let ECLI=null;
 async function vClientes(){
   CLI=await get('zarrat_clientes?order=creado_en.desc&limit=500');
-  $('main').innerHTML=`<h1>Clientes</h1><div class="sub">${CLI.length} registrados</div>
-  <div class="card">
-    <div class="g2"><div><label>Nombre *</label><input id="c_n" placeholder="Nombre completo"></div>
-      <div><label>Teléfono</label><input id="c_t" inputmode="tel"></div></div>
-    <div class="g2"><div><label>WhatsApp</label><input id="c_w" inputmode="tel"></div>
-      <div><label>Email</label><input id="c_e" inputmode="email"></div></div>
-    <div class="g2"><div><label>Instagram</label><input id="c_i" placeholder="@usuario"></div>
-      <div><label>Dirección</label><input id="c_d"></div></div>
-    <label>Notas</label><textarea id="c_no" placeholder="Preferencias, tallas, ocasión…"></textarea>
-    <button class="btn full" onclick="addCli()">+ Registrar cliente</button>
+  const e=ECLI||{};
+  $('main').innerHTML=`<h1>Clientes</h1><div class="sub">${CLI.length} registrados · toca uno para editarlo</div>
+  <div class="card" ${ECLI?'style="border-color:var(--acc);border-width:2px"':''}>
+    ${ECLI?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <b style="color:var(--acc);font-size:13px">✎ Editando cliente</b>
+      <button class="btn sm gh" onclick="ECLI=null;vClientes()">Cancelar</button></div>`:''}
+    <div class="g2"><div><label>Nombre *</label><input id="c_n" placeholder="Nombre completo" value="${esc(e.nombre||'')}"></div>
+      <div><label>Teléfono</label><input id="c_t" inputmode="tel" value="${esc(e.telefono||'')}"></div></div>
+    <div class="g2"><div><label>WhatsApp</label><input id="c_w" inputmode="tel" value="${esc(e.whatsapp||'')}"></div>
+      <div><label>Email</label><input id="c_e" inputmode="email" value="${esc(e.email||'')}"></div></div>
+    <div class="g2"><div><label>Instagram</label><input id="c_i" placeholder="@usuario" value="${esc(e.instagram||'')}"></div>
+      <div><label>Dirección</label><input id="c_d" value="${esc(e.direccion||'')}"></div></div>
+    <label>Notas</label><textarea id="c_no" placeholder="Preferencias, tallas, ocasión…">${esc(e.notas||'')}</textarea>
+    <button class="btn full ${ECLI?'acc':''}" onclick="addCli()">${ECLI?'💾 Guardar cambios':'+ Registrar cliente'}</button>
   </div>
   <input id="c_q" placeholder="🔎 Buscar…" oninput="filtCli()" style="margin-bottom:10px">
   <div id="c_list">${CLI.map(cliCard).join('')||'<div class="empty">Sin clientes aún.</div>'}</div>`;
+  if(ECLI) window.scrollTo({top:0,behavior:'smooth'});
 }
-const cliCard=c=>`<div class="item cli" data-t="${esc((c.nombre||'')+' '+(c.telefono||'')+' '+(c.instagram||''))?.toLowerCase()}"><div>
+const cliCard=c=>`<div class="item cli" style="cursor:pointer" title="Toca para editar" onclick="editCli(${c.id})" data-t="${esc(((c.nombre||'')+' '+(c.telefono||'')+' '+(c.instagram||'')).toLowerCase())}"><div>
   <div class="nm">${esc(c.nombre)}</div>
   <div class="mt">${c.telefono?'📱 '+esc(c.telefono):''}${c.whatsapp?' · 💬 '+esc(c.whatsapp):''}${c.instagram?' · 📷 '+esc(c.instagram):''}</div>
   <div class="mt">${c.email?'✉️ '+esc(c.email):''}${c.direccion?' · 📍 '+esc(c.direccion):''}</div>
   ${c.notas?`<div class="mt">📝 ${esc(c.notas)}</div>`:''}</div>
-  <div style="display:flex;flex-direction:column;gap:5px">
+  <div style="display:flex;flex-direction:column;gap:5px" onclick="event.stopPropagation()">
     ${c.whatsapp||c.telefono?`<a class="btn sm acc" style="text-decoration:none;text-align:center" href="https://wa.me/57${String(c.whatsapp||c.telefono).replace(/\D/g,'')}" target="_blank">💬</a>`:''}
     <button class="btn sm gh" onclick="delRow('zarrat_clientes',${c.id},vClientes)">✕</button></div></div>`;
+function editCli(id){ ECLI=CLI.find(x=>x.id===id)||null; vClientes(); }
 function filtCli(){const q=$('c_q').value.toLowerCase();document.querySelectorAll('.cli').forEach(e=>{e.style.display=(!q||e.dataset.t.includes(q))?'':'none';});}
 async function addCli(){const n=$('c_n').value.trim(); if(!n)return alert('El nombre es obligatorio.');
-  await post('zarrat_clientes',{nombre:n,telefono:$('c_t').value.trim(),whatsapp:$('c_w').value.trim(),email:$('c_e').value.trim(),instagram:$('c_i').value.trim(),direccion:$('c_d').value.trim(),notas:$('c_no').value.trim()},'return=minimal');
+  const b={nombre:n,telefono:$('c_t').value.trim(),whatsapp:$('c_w').value.trim(),email:$('c_e').value.trim(),instagram:$('c_i').value.trim(),direccion:$('c_d').value.trim(),notas:$('c_no').value.trim()};
+  if(ECLI){ await patch('zarrat_clientes','id=eq.'+ECLI.id,b); ECLI=null; }
+  else await post('zarrat_clientes',b,'return=minimal');
   vClientes();}
 
 /* ═══════ 4 · MEDIDAS (ficha técnica) ═══════ */
@@ -263,9 +272,11 @@ async function vMedidas(){
   </div>
   <h1 style="font-size:18px">Fichas guardadas</h1>
   ${hist.length?hist.map(m=>{const c=CLI.find(x=>x.id===m.cliente_id)||{};const ks=Object.entries(m.medidas||{}).filter(([,v])=>v);
+    const tc=m.tela_provee==='cliente';
     return `<div class="item"><div><div class="nm">${esc(c.nombre||'Cliente')} · <span class="tag a">${esc(m.tipo_prenda)}</span></div>
       <div class="mt">📅 ${esc(m.fecha||'')}</div>
       <div class="mt">${ks.map(([k,v])=>`<b>${esc(k)}</b> ${esc(v)}`).join(' · ')||'—'}</div>
+      ${m.tipo_tela||m.valor_tela?`<div class="mt">🧵 ${esc(m.tipo_tela||'Tela')}${m.metros_tela?` · ${m.metros_tela} m`:''} · ${tc?'<b>la trae el cliente</b> (costo $0)':`<b style="color:var(--acc)">${$$(m.valor_tela)}</b>`}</div>`:''}
       ${m.notas?`<div class="mt">📝 ${esc(m.notas)}</div>`:''}</div>
       <button class="btn sm gh" onclick="delRow('zarrat_medidas',${m.id},vMedidas)">✕</button></div>`;}).join('')
     :'<div class="empty">Aún no hay fichas de medidas.</div>'}`;
@@ -275,15 +286,34 @@ function camposPrenda(){
   if(!p){$('m_campos').innerHTML='';return;}
   $('m_campos').innerHTML=`<label style="margin-top:14px">Medidas · ${esc(p.nombre)} (cm)</label>
     <div class="med">${(p.campos||[]).map((c,i)=>`<div class="m"><label>${esc(c)}</label><input id="md_${i}" data-k="${esc(c)}" inputmode="decimal" placeholder="—"></div>`).join('')}</div>
-    <label>Notas de la prenda</label><textarea id="m_n" placeholder="Tela, color, detalles, fecha de entrega…"></textarea>
+    <div class="card" style="background:#faf7f1;margin:14px 0 0;padding:12px 14px">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:2px">LA TELA</div>
+      <div class="g2"><div><label>Tipo de tela</label><input id="m_tt" placeholder="Ej: Paño, seda, lino"></div>
+        <div><label>¿Quién la provee?</label><select id="m_tp" onchange="telaProv()">
+          <option value="nosotros">La proveemos nosotros</option><option value="cliente">La provee el cliente</option></select></div></div>
+      <div class="g2" id="m_telabox"><div><label>Metros</label><input id="m_tm" inputmode="decimal" placeholder="0"></div>
+        <div><label>Valor de la tela ($)</label><input id="m_tv" inputmode="numeric" placeholder="0"></div></div>
+      <div class="hint" id="m_th">Este valor entra como <b>costo</b> al cotizar la prenda.</div>
+    </div>
+    <label>Notas de la prenda</label><textarea id="m_n" placeholder="Color, detalles, fecha de entrega…"></textarea>
     <button class="btn acc full" onclick="saveMedidas()">💾 Guardar ficha</button>`;
+}
+function telaProv(){
+  const c=$('m_tp').value==='cliente';
+  $('m_telabox').style.display=c?'none':'grid';
+  $('m_th').innerHTML=c?'✦ La tela la trae el cliente → <b>no cuesta</b> (no entra al costo de la prenda).':'Este valor entra como <b>costo</b> al cotizar la prenda.';
+  if(c){$('m_tv').value='';$('m_tm').value='';}
 }
 async function saveMedidas(){
   const ci=$('m_c').value, tp=$('m_p').value;
   if(!ci||!tp)return alert('Elige cliente y tipo de prenda.');
   const med={}; document.querySelectorAll('[id^=md_]').forEach(i=>{if(i.value.trim())med[i.dataset.k]=i.value.trim();});
   if(!Object.keys(med).length)return alert('Escribe al menos una medida.');
-  await post('zarrat_medidas',{cliente_id:+ci,tipo_prenda:tp,medidas:med,notas:$('m_n').value.trim()},'return=minimal');
+  const prov=$('m_tp').value;
+  await post('zarrat_medidas',{cliente_id:+ci,tipo_prenda:tp,medidas:med,notas:$('m_n').value.trim(),
+    tipo_tela:$('m_tt').value.trim()||null, tela_provee:prov,
+    metros_tela:prov==='cliente'?0:(+($('m_tm').value||0)||0),
+    valor_tela:prov==='cliente'?0:(+($('m_tv').value||'').replace(/\D/g,'')||0)},'return=minimal');
   vMedidas();
 }
 async function addPrenda(){
@@ -381,16 +411,17 @@ function etiqueta(id){
   w.document.close();
 }
 
-/* ═══════ 6 · COTIZACIONES ═══════ */
-let ITEMS=[];
+/* ═══════ 6 · COTIZACIONES (con costos y margen de contribución) ═══════ */
+let ITEMS=[], COSTOS=[], FICHAS=[];
 async function vCotiz(){
-  const [c,cl,ct]=await Promise.all([get('zarrat_cotizaciones?order=creado_en.desc&limit=100'),get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_catalogo?activo=eq.true&order=nombre.asc')]);
-  CLI=cl; CAT=ct;
-  $('main').innerHTML=`<h1>Cotizaciones</h1><div class="sub">Del catálogo o hecho a la medida</div>
+  const [c,cl,ct,fi]=await Promise.all([get('zarrat_cotizaciones?order=creado_en.desc&limit=100'),get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_catalogo?activo=eq.true&order=nombre.asc'),get('zarrat_medidas?order=creado_en.desc&limit=300')]);
+  CLI=cl; CAT=ct; FICHAS=fi;
+  $('main').innerHTML=`<h1>Cotizaciones</h1><div class="sub">Del catálogo o a la medida · calcula el margen de contribución</div>
   <div class="card">
-    <div class="g2"><div><label>Cliente</label><select id="q_c"><option value="">— elige —</option>${CLI.map(x=>`<option value="${x.id}">${esc(x.nombre)}</option>`).join('')}</select></div>
+    <div class="g2"><div><label>Cliente</label><select id="q_c" onchange="cargaFicha()"><option value="">— elige —</option>${CLI.map(x=>`<option value="${x.id}">${esc(x.nombre)}</option>`).join('')}</select></div>
       <div><label>Tipo</label><select id="q_t"><option value="catalogo">Del catálogo</option><option value="medida">Hecho a la medida</option></select></div></div>
-    <label>Agregar pieza</label>
+    <div id="q_ficha"></div>
+    <label>Agregar pieza (precio de venta)</label>
     <div class="g3">
       <select id="q_p"><option value="">— del catálogo —</option>${CAT.map(p=>`<option value="${p.id}" data-v="${p.valor}">${esc(p.nombre)} · ${$$(p.valor)}</option>`).join('')}</select>
       <input id="q_pn" placeholder="…o descríbela (a la medida)">
@@ -398,45 +429,103 @@ async function vCotiz(){
     </div>
     <button class="btn gh full" onclick="addItem()">+ Agregar pieza</button>
     <div id="q_items" style="margin-top:10px"></div>
-    <label>Notas</label><textarea id="q_n" placeholder="Entrega, telas, ajustes…"></textarea>
+
+    <div class="card" style="background:#faf7f1;margin:14px 0 0;padding:13px 15px">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:4px">COSTOS DE LA PRENDA</div>
+      <div class="g2">
+        <div><label>🧵 Tela</label><input id="q_tela" inputmode="numeric" placeholder="0" oninput="calcMargen()"><div class="hint" id="q_telah"></div></div>
+        <div><label>✂️ Mano de obra</label><input id="q_mo" inputmode="numeric" placeholder="0" oninput="calcMargen()"></div>
+      </div>
+      <label>🏭 Centro de costos internos</label>
+      <div class="g3"><input id="q_cn" placeholder="Concepto (ej: bordado)"><input id="q_cv" inputmode="numeric" placeholder="Valor">
+        <button class="btn gh" onclick="addCosto()">+ Agregar</button></div>
+      <div id="q_costos"></div>
+    </div>
+
+    <div class="card" id="q_res" style="background:var(--ink);color:var(--paper);border-color:var(--ink);margin-top:10px;padding:14px 16px"></div>
+    <label>Notas</label><textarea id="q_n" placeholder="Entrega, ajustes…"></textarea>
     <button class="btn acc full" onclick="saveCotiz()">💾 Guardar cotización</button>
   </div>
   <h1 style="font-size:18px">Cotizaciones · ${c.length}</h1>
-  ${c.length?c.map(x=>`<div class="item"><div><div class="nm">${esc(x.cliente_nombre||'—')} <span class="tag ${x.estado==='vendida'?'a':''}">${esc(x.estado)}</span></div>
+  ${c.length?c.map(x=>{const mc=+x.margen_contrib||0, pct=x.total?Math.round(mc/x.total*100):0;
+    return `<div class="item"><div><div class="nm">${esc(x.cliente_nombre||'—')} <span class="tag ${x.estado==='vendida'?'a':''}">${esc(x.estado)}</span></div>
     <div class="mt">${esc(x.folio)} · ${esc(x.tipo)} · 📅 ${(x.creado_en||'').slice(0,10)}</div>
-    <div class="mt">${(x.items||[]).map(i=>esc(i.n)+' '+$$(i.v)).join(' · ')}</div></div>
+    <div class="mt">${(x.items||[]).map(i=>esc(i.n)+' '+$$(i.v)).join(' · ')}</div>
+    <div class="mt">🧵 ${$$(x.costo_tela)} · ✂️ ${$$(x.costo_mo)} · 🏭 ${$$(x.costo_interno)} → <b style="color:var(--ok)">margen ${$$(mc)} (${pct}%)</b></div></div>
     <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.total)}</div>
       ${x.estado!=='vendida'?`<button class="btn sm acc" style="margin-top:5px" onclick="aVenta(${x.id})">→ Venta</button>`:''}
-      <button class="btn sm gh" style="margin-top:5px" onclick="delRow('zarrat_cotizaciones',${x.id},vCotiz)">✕</button></div></div>`).join('')
+      <button class="btn sm gh" style="margin-top:5px" onclick="delRow('zarrat_cotizaciones',${x.id},vCotiz)">✕</button></div></div>`;}).join('')
     :'<div class="empty">Sin cotizaciones.</div>'}`;
-  ITEMS=[]; pintaItems();
+  ITEMS=[]; COSTOS=[]; pintaItems(); pintaCostos(); calcMargen();
+}
+function cargaFicha(){
+  const ci=+$('q_c').value; const f=FICHAS.filter(x=>x.cliente_id===ci)[0];
+  const box=$('q_ficha'), th=$('q_telah');
+  if(!f){ box.innerHTML=''; th.textContent=''; return; }
+  const cliente=f.tela_provee==='cliente';
+  box.innerHTML=`<div class="card" style="background:#faf7f1;padding:10px 13px;margin:8px 0 0">
+    <div style="font-size:12.5px">📐 Ficha: <b>${esc(f.tipo_prenda)}</b>${f.tipo_tela?` · 🧵 ${esc(f.tipo_tela)}`:''}
+    ${cliente?' · <b style="color:var(--ok)">tela del cliente (costo $0)</b>':(f.valor_tela?` · tela <b>${$$(f.valor_tela)}</b>`:'')}</div></div>`;
+  $('q_tela').value = cliente?0:(+f.valor_tela||0);
+  th.innerHTML = cliente?'✦ La trae el cliente → no cuesta':'Traído de la ficha técnica';
+  calcMargen();
 }
 function addItem(){
-  const s=$('q_p'), o=s.options[s.selectedIndex];
-  let n,v;
+  const s=$('q_p'), o=s.options[s.selectedIndex]; let n,v;
   if(s.value){ n=o.text.split(' · ')[0]; v=+o.dataset.v||0; }
   else { n=$('q_pn').value.trim(); v=+($('q_pv').value||'').replace(/\D/g,'')||0; }
   if(!n)return alert('Elige una pieza del catálogo o descríbela.');
-  ITEMS.push({n,v}); s.value=''; $('q_pn').value=''; $('q_pv').value=''; pintaItems();
+  ITEMS.push({n,v}); s.value=''; $('q_pn').value=''; $('q_pv').value=''; pintaItems(); calcMargen();
 }
 function pintaItems(){
   const t=ITEMS.reduce((s,i)=>s+i.v,0);
   $('q_items').innerHTML=ITEMS.length?ITEMS.map((i,k)=>`<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line2);font-size:14px">
-    <span>${esc(i.n)}</span><span><b>${$$(i.v)}</b> <button class="btn sm gh" onclick="ITEMS.splice(${k},1);pintaItems()">✕</button></span></div>`).join('')
-    +`<div style="display:flex;justify-content:space-between;padding:9px 0;font-weight:800"><span>TOTAL</span><span style="color:var(--acc)">${$$(t)}</span></div>`:'';
+    <span>${esc(i.n)}</span><span><b>${$$(i.v)}</b> <button class="btn sm gh" onclick="ITEMS.splice(${k},1);pintaItems();calcMargen()">✕</button></span></div>`).join('')
+    +`<div style="display:flex;justify-content:space-between;padding:9px 0;font-weight:800"><span>PRECIO DE VENTA</span><span style="color:var(--acc)">${$$(t)}</span></div>`:'';
+}
+function addCosto(){
+  const n=$('q_cn').value.trim(), v=+($('q_cv').value||'').replace(/\D/g,'')||0;
+  if(!n||!v)return alert('Escribe el concepto y el valor.');
+  COSTOS.push({n,v}); $('q_cn').value=''; $('q_cv').value=''; pintaCostos(); calcMargen();
+}
+function pintaCostos(){
+  $('q_costos').innerHTML=COSTOS.length?COSTOS.map((c,k)=>`<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13.5px;border-bottom:1px solid var(--line2)">
+    <span>${esc(c.n)}</span><span><b>${$$(c.v)}</b> <button class="btn sm gh" onclick="COSTOS.splice(${k},1);pintaCostos();calcMargen()">✕</button></span></div>`).join(''):'';
+}
+function calcMargen(){
+  const pv=ITEMS.reduce((s,i)=>s+i.v,0);
+  const tela=+($('q_tela')?.value||'').toString().replace(/\D/g,'')||0;
+  const mo=+($('q_mo')?.value||'').toString().replace(/\D/g,'')||0;
+  const ci=COSTOS.reduce((s,c)=>s+c.v,0);
+  const costo=tela+mo+ci, mc=pv-costo, pct=pv?Math.round(mc/pv*100):0;
+  const r=$('q_res'); if(!r) return;
+  r.innerHTML=`<div style="font-size:10.5px;letter-spacing:.08em;color:#a49a86">RESULTADO DE LA PIEZA</div>
+    <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:6px"><span>Precio de venta</span><b>${$$(pv)}</b></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:#c9c0ae"><span>− Tela</span><span>${$$(tela)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:#c9c0ae"><span>− Mano de obra</span><span>${$$(mo)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:#c9c0ae"><span>− Costos internos</span><span>${$$(ci)}</span></div>
+    <div style="border-top:1px solid #3a352a;margin-top:7px;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline">
+      <span style="font-size:12px;letter-spacing:.06em">MARGEN DE CONTRIBUCIÓN</span>
+      <b style="font-family:Georgia,serif;font-size:24px;color:${mc>0?'var(--acc2)':'#e07a6a'}">${$$(mc)} <span style="font-size:14px">(${pct}%)</span></b></div>
+    <div style="font-size:11px;color:#a49a86;margin-top:4px">${mc>0?'✦ Esto es lo que esta pieza APORTA a cubrir tus gastos fijos.':'⚠ Esta pieza no aporta nada: el costo se come el precio.'}</div>`;
 }
 async function saveCotiz(){
   const ci=$('q_c').value; if(!ci)return alert('Elige el cliente.');
   if(!ITEMS.length)return alert('Agrega al menos una pieza.');
-  const c=CLI.find(x=>x.id==ci)||{}; const tot=ITEMS.reduce((s,i)=>s+i.v,0);
+  const c=CLI.find(x=>x.id==ci)||{}; const pv=ITEMS.reduce((s,i)=>s+i.v,0);
+  const tela=+($('q_tela').value||'').replace(/\D/g,'')||0, mo=+($('q_mo').value||'').replace(/\D/g,'')||0;
+  const cin=COSTOS.reduce((s,x)=>s+x.v,0); const mc=pv-(tela+mo+cin);
   const folio='ZR-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+String(Date.now()).slice(-4);
-  await post('zarrat_cotizaciones',{folio,cliente_id:+ci,cliente_nombre:c.nombre,tipo:$('q_t').value,items:ITEMS,subtotal:tot,total:tot,notas:$('q_n').value.trim()},'return=minimal');
+  await post('zarrat_cotizaciones',{folio,cliente_id:+ci,cliente_nombre:c.nombre,tipo:$('q_t').value,items:ITEMS,
+    subtotal:pv,total:pv,costo_tela:tela,costo_mo:mo,costo_interno:cin,costos_detalle:COSTOS,margen_contrib:mc,
+    notas:$('q_n').value.trim()},'return=minimal');
   vCotiz();
 }
 async function aVenta(id){
   const c=(await get('zarrat_cotizaciones?id=eq.'+id))[0]; if(!c)return;
-  if(!confirm('¿Pasar a VENTA?\n'+c.cliente_nombre+' · '+$$(c.total)))return;
-  await post('zarrat_ventas',{folio:c.folio,cliente_id:c.cliente_id,cliente_nombre:c.cliente_nombre,total:c.total},'return=minimal');
+  if(!confirm('¿Pasar a VENTA?\n'+c.cliente_nombre+' · '+$$(c.total)+'\nAporte a gastos fijos: '+$$(c.margen_contrib)))return;
+  await post('zarrat_ventas',{folio:c.folio,cliente_id:c.cliente_id,cliente_nombre:c.cliente_nombre,total:c.total,
+    margen_contrib:c.margen_contrib||0, costo_total:(+c.costo_tela||0)+(+c.costo_mo||0)+(+c.costo_interno||0)},'return=minimal');
   await patch('zarrat_cotizaciones','id=eq.'+id,{estado:'vendida'});
   go('ventas');
 }
@@ -447,21 +536,32 @@ async function vVentas(){
   const m=mesAct();
   const mes=v.filter(x=>(x.fecha||'').startsWith(m));
   const tm=mes.reduce((s,x)=>s+(+x.total||0),0), ta=v.reduce((s,x)=>s+(+x.total||0),0);
-  const g=await get('zarrat_gastos?mes=eq.'+m); const cf=await get('zarrat_config?clave=eq.margen');
-  const margen=+((cf[0]||{}).valor||40);
+  const g=await get('zarrat_gastos?mes=eq.'+m);
   const fijos=g.filter(x=>x.tipo==='fijo').reduce((s,x)=>s+(+x.valor||0),0);
-  const pe=margen>0?fijos/(margen/100):0;
-  const falta=Math.max(0,pe-tm);
-  $('main').innerHTML=`<h1>Ventas</h1><div class="sub">${m} · vs tu punto de equilibrio</div>
+  const aportes=mes.reduce((s,x)=>s+(+x.margen_contrib||0),0);   // lo que las piezas aportan a gastos fijos
+  const utilidad=aportes-fijos;
+  const falta=Math.max(0,fijos-aportes);
+  const pct=fijos?Math.min(100,Math.round(aportes/fijos*100)):0;
+  $('main').innerHTML=`<h1>Ventas y utilidad</h1><div class="sub">${m} · los márgenes de cada pieza cubriendo los gastos fijos</div>
   <div class="kpis">
     <div class="kpi"><b>${$$(tm)}</b><span>VENDIDO ESTE MES</span></div>
-    <div class="kpi"><b>${$$(ta)}</b><span>TOTAL ACUMULADO</span></div>
-    <div class="kpi eq"><b>${falta>0?$$(falta):'✦ CUBIERTO'}</b><span>${falta>0?`FALTA PARA EL PUNTO DE EQUILIBRIO (${$$(pe)})`:`Ya cubriste tus gastos fijos. Todo lo demás es ganancia.`}</span></div>
+    <div class="kpi"><b style="color:var(--ok)">${$$(aportes)}</b><span>APORTE A GASTOS FIJOS (margen)</span></div>
+    <div class="kpi eq"><b style="color:${utilidad>=0?'var(--acc2)':'#e07a6a'}">${utilidad>=0?$$(utilidad):'−'+$$(-utilidad)}</b>
+      <span>${utilidad>=0?'✦ UTILIDAD DEL MES (ya cubriste los gastos fijos)':`AÚN EN PÉRDIDA · faltan ${$$(falta)} de aporte para cubrir los ${$$(fijos)} de gastos fijos`}</span></div>
   </div>
-  ${v.length?v.map(x=>`<div class="item"><div><div class="nm">${esc(x.cliente_nombre||'—')}</div>
-    <div class="mt">${esc(x.folio||'')} · 📅 ${esc(x.fecha||'')} · <span class="tag ${x.estado_pago==='pagado'?'a':''}">${esc(x.estado_pago)}</span></div></div>
+  <div class="card" style="padding:12px 15px">
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:5px">
+      <span>APORTES ${$$(aportes)}</span><span>GASTOS FIJOS ${$$(fijos)}</span></div>
+    <div style="height:14px;background:var(--line2);border-radius:7px;overflow:hidden">
+      <div style="height:100%;width:${pct}%;background:${utilidad>=0?'var(--ok)':'var(--acc)'};transition:width .4s"></div></div>
+    <div class="hint">${pct}% de tus gastos fijos cubiertos con el margen de las piezas vendidas este mes.</div>
+  </div>
+  ${v.length?v.map(x=>{const mc=+x.margen_contrib||0;
+    return `<div class="item"><div><div class="nm">${esc(x.cliente_nombre||'—')}</div>
+    <div class="mt">${esc(x.folio||'')} · 📅 ${esc(x.fecha||'')} · <span class="tag ${x.estado_pago==='pagado'?'a':''}">${esc(x.estado_pago)}</span></div>
+    <div class="mt">Costo ${$$(x.costo_total)} → <b style="color:var(--ok)">aporta ${$$(mc)}</b></div></div>
     <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.total)}</div>
-    ${x.estado_pago!=='pagado'?`<button class="btn sm acc" style="margin-top:5px" onclick="pagada(${x.id})">✓ Pagada</button>`:''}</div></div>`).join('')
+    ${x.estado_pago!=='pagado'?`<button class="btn sm acc" style="margin-top:5px" onclick="pagada(${x.id})">✓ Pagada</button>`:''}</div></div>`;}).join('')
     :'<div class="empty">Sin ventas aún.</div>'}`;
 }
 const pagada=id=>patch('zarrat_ventas','id=eq.'+id,{estado_pago:'pagado'}).then(vVentas);
