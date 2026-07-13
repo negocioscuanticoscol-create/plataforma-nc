@@ -284,14 +284,19 @@ async function addCli(){const n=$('c_n').value.trim(); if(!n)return alert('El no
   vClientes();}
 
 /* ═══════ 4 · MEDIDAS (ficha técnica) ═══════ */
+let EFICHA=null, HIST=[];
 async function vMedidas(){
   [CLI,PRENDAS]=await Promise.all([get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_tipos_prenda?order=nombre.asc')]);
-  const hist=await get('zarrat_medidas?order=creado_en.desc&limit=40');
-  $('main').innerHTML=`<h1>Medidas · Ficha técnica</h1><div class="sub">Elige el cliente y el tipo de prenda — salen sus medidas</div>
-  <div class="card">
+  HIST=await get('zarrat_medidas?order=creado_en.desc&limit=60');
+  const hist=HIST; const e=EFICHA||{};
+  $('main').innerHTML=`<h1>Medidas · Ficha técnica</h1><div class="sub">Elige el cliente y la prenda — o toca una ficha guardada para editarla</div>
+  <div class="card" ${EFICHA?'style="border-color:var(--acc);border-width:2px"':''}>
+    ${EFICHA?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <b style="color:var(--acc);font-size:13px">✎ Editando ficha</b>
+      <button class="btn sm gh" onclick="EFICHA=null;vMedidas()">Cancelar</button></div>`:''}
     <div class="g2">
-      <div><label>Cliente</label><select id="m_c"><option value="">— elige —</option>${CLI.map(c=>`<option value="${c.id}">${esc(c.nombre)}</option>`).join('')}</select></div>
-      <div><label>Tipo de prenda</label><select id="m_p" onchange="camposPrenda()"><option value="">— elige —</option>${PRENDAS.map(p=>`<option value="${esc(p.nombre)}">${esc(p.nombre)}</option>`).join('')}</select></div>
+      <div><label>Cliente</label><select id="m_c"><option value="">— elige —</option>${CLI.map(c=>`<option value="${c.id}" ${c.id===e.cliente_id?'selected':''}>${esc(c.nombre)}</option>`).join('')}</select></div>
+      <div><label>Tipo de prenda</label><select id="m_p" onchange="camposPrenda()"><option value="">— elige —</option>${PRENDAS.map(p=>`<option value="${esc(p.nombre)}" ${p.nombre===e.tipo_prenda?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select></div>
     </div>
     <div id="m_campos"></div>
   </div>
@@ -304,30 +309,32 @@ async function vMedidas(){
   <h1 style="font-size:18px">Fichas guardadas</h1>
   ${hist.length?hist.map(m=>{const c=CLI.find(x=>x.id===m.cliente_id)||{};const ks=Object.entries(m.medidas||{}).filter(([,v])=>v);
     const tc=m.tela_provee==='cliente';
-    return `<div class="item"><div><div class="nm">${esc(c.nombre||'Cliente')} · <span class="tag a">${esc(m.tipo_prenda)}</span></div>
+    return `<div class="item" style="cursor:pointer" title="Toca para editar la ficha" onclick="editFicha(${m.id})"><div><div class="nm">${esc(c.nombre||'Cliente')} · <span class="tag a">${esc(m.tipo_prenda)}</span></div>
       <div class="mt">📅 ${esc(m.fecha||'')}</div>
       <div class="mt">${ks.map(([k,v])=>`<b>${esc(k)}</b> ${esc(v)}`).join(' · ')||'—'}</div>
       ${m.tipo_tela||m.valor_tela?`<div class="mt">🧵 ${esc(m.tipo_tela||'Tela')}${m.metros_tela?` · ${m.metros_tela} m`:''} · ${tc?'<b>la trae el cliente</b> (costo $0)':`<b style="color:var(--acc)">${$$(m.valor_tela)}</b>`}</div>`:''}
       ${m.notas?`<div class="mt">📝 ${esc(m.notas)}</div>`:''}</div>
-      <button class="btn sm gh" onclick="delRow('zarrat_medidas',${m.id},vMedidas)">✕</button></div>`;}).join('')
+      <button class="btn sm gh" onclick="event.stopPropagation();delRow('zarrat_medidas',${m.id},vMedidas)">✕</button></div>`;}).join('')
     :'<div class="empty">Aún no hay fichas de medidas.</div>'}`;
 }
 function camposPrenda(){
   const p=PRENDAS.find(x=>x.nombre===$('m_p').value);
   if(!p){$('m_campos').innerHTML='';return;}
+  const e=EFICHA||{}, mv=e.medidas||{}, cl=e.tela_provee==='cliente';
   $('m_campos').innerHTML=`<label style="margin-top:14px">Medidas · ${esc(p.nombre)} (cm)</label>
-    <div class="med">${(p.campos||[]).map((c,i)=>`<div class="m"><label>${esc(c)}</label><input id="md_${i}" data-k="${esc(c)}" inputmode="decimal" placeholder="—"></div>`).join('')}</div>
+    <div class="med">${(p.campos||[]).map((c,i)=>`<div class="m"><label>${esc(c)}</label><input id="md_${i}" data-k="${esc(c)}" inputmode="decimal" placeholder="—" value="${esc(mv[c]||'')}"></div>`).join('')}</div>
     <div class="card" style="background:#faf7f1;margin:14px 0 0;padding:12px 14px">
       <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:2px">LA TELA</div>
-      <div class="g2"><div><label>Tipo de tela</label><input id="m_tt" placeholder="Ej: Paño, seda, lino"></div>
+      <div class="g2"><div><label>Tipo de tela</label><input id="m_tt" placeholder="Ej: Paño, seda, lino" value="${esc(e.tipo_tela||'')}"></div>
         <div><label>¿Quién la provee?</label><select id="m_tp" onchange="telaProv()">
-          <option value="nosotros">La proveemos nosotros</option><option value="cliente">La provee el cliente</option></select></div></div>
-      <div class="g2" id="m_telabox"><div><label>Metros</label><input id="m_tm" inputmode="decimal" placeholder="0"></div>
-        <div><label>Valor de la tela ($)</label><input id="m_tv" inputmode="numeric" placeholder="0"></div></div>
-      <div class="hint" id="m_th">Este valor entra como <b>costo</b> al cotizar la prenda.</div>
+          <option value="nosotros" ${!cl?'selected':''}>La proveemos nosotros</option>
+          <option value="cliente" ${cl?'selected':''}>La provee el cliente</option></select></div></div>
+      <div class="g2" id="m_telabox" style="${cl?'display:none':''}"><div><label>Metros</label><input id="m_tm" inputmode="decimal" placeholder="0" value="${e.metros_tela||''}"></div>
+        <div><label>Valor de la tela ($)</label><input id="m_tv" inputmode="numeric" placeholder="0" value="${e.valor_tela||''}"></div></div>
+      <div class="hint" id="m_th">${cl?'✦ La tela la trae el cliente → <b>no cuesta</b>.':'Este valor entra como <b>costo</b> al cotizar la prenda.'}</div>
     </div>
-    <label>Notas de la prenda</label><textarea id="m_n" placeholder="Color, detalles, fecha de entrega…"></textarea>
-    <button class="btn acc full" onclick="saveMedidas()">💾 Guardar ficha</button>`;
+    <label>Notas de la prenda</label><textarea id="m_n" placeholder="Color, detalles, fecha de entrega…">${esc(e.notas||'')}</textarea>
+    <button class="btn acc full" onclick="saveMedidas()">${EFICHA?'💾 Guardar cambios':'💾 Guardar ficha'}</button>`;
 }
 function telaProv(){
   const c=$('m_tp').value==='cliente';
@@ -341,11 +348,18 @@ async function saveMedidas(){
   const med={}; document.querySelectorAll('[id^=md_]').forEach(i=>{if(i.value.trim())med[i.dataset.k]=i.value.trim();});
   if(!Object.keys(med).length)return alert('Escribe al menos una medida.');
   const prov=$('m_tp').value;
-  await post('zarrat_medidas',{cliente_id:+ci,tipo_prenda:tp,medidas:med,notas:$('m_n').value.trim(),
+  const b={cliente_id:+ci,tipo_prenda:tp,medidas:med,notas:$('m_n').value.trim(),
     tipo_tela:$('m_tt').value.trim()||null, tela_provee:prov,
     metros_tela:prov==='cliente'?0:(+($('m_tm').value||0)||0),
-    valor_tela:prov==='cliente'?0:(+($('m_tv').value||'').replace(/\D/g,'')||0)},'return=minimal');
+    valor_tela:prov==='cliente'?0:(+($('m_tv').value||'').replace(/\D/g,'')||0)};
+  if(EFICHA){ await patch('zarrat_medidas','id=eq.'+EFICHA.id,b); EFICHA=null; }
+  else await post('zarrat_medidas',b,'return=minimal');
   vMedidas();
+}
+function editFicha(id){
+  EFICHA=HIST.find(x=>x.id===id)||null;
+  vMedidas();
+  setTimeout(()=>{ camposPrenda(); window.scrollTo({top:0,behavior:'smooth'}); },60);
 }
 async function addPrenda(){
   const n=$('np_n').value.trim(), c=$('np_c').value.split(',').map(x=>x.trim()).filter(Boolean);
