@@ -2743,10 +2743,13 @@ const App = {
     const etOf=b=>{ const v=(b.etiqueta||'').toLowerCase(); return /distribu/.test(v)?'distribuidor':/interes/.test(v)?'interesado':'curioso'; };
     const arr=bot.filter(b=>etOf(b)===cajon);
     if(!arr.length) return '';
-    const norm=s=>{ let t=String(s||'').trim().replace(/\s+/g,' '); if(!t) return ''; return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase(); };
+    // normaliza: quita el depto ("Sogamoso, Boyacá"→"Sogamoso") y agrupa sin tildes ("Bogota"="Bogotá")
+    const label=s=>{ let t=String(s||'').split(',')[0].trim().replace(/\s+/g,' ').replace(/\s+d\.?\s*c\.?$/i,''); if(!t) return '';
+      return t.split(' ').map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(' '); };
+    const clave=s=>label(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
     const m={}; let sin=0;
-    arr.forEach(b=>{ const c=norm(b.ciudad); if(!c){ sin++; return; } m[c]=(m[c]||0)+1; });
-    const top=Object.entries(m).sort((a,b)=>b[1]-a[1]);
+    arr.forEach(b=>{ const k=clave(b.ciudad); if(!k){ sin++; return; } if(!m[k]) m[k]={l:label(b.ciudad),n:0}; m[k].n++; });
+    const top=Object.values(m).sort((a,b)=>b.n-a.n).map(x=>[x.l,x.n]);
     const chip=(txt,n,bg,col)=>`<span style="background:${bg};color:${col};border-radius:20px;padding:5px 11px;font-size:12.5px;font-weight:600;white-space:nowrap">${txt} <b>${n}</b></span>`;
     const chips=top.map(([c,n])=>chip('📍 '+esc(c),n,'#e7f6f0','#0b6b4f')).join('');
     const sinChip=sin?chip('❓ sin ciudad',sin,'#fff3e0','#b45309'):'';
