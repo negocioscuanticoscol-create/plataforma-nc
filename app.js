@@ -2582,6 +2582,7 @@ const App = {
       <button class="btn-sm" style="width:100%;background:var(--verde);color:#fff;padding:12px;margin-bottom:10px;font-size:14px;font-weight:700" onclick="App.modalCliente(()=>App.vCrm())">🔎 Registrar / Editar contacto · valida en tus bases</button>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">${cajones.map(([v,n])=>`<button class="btn-sm" style="background:${v===cajon?'#0b1f2a;color:#fff':'#eef2ff;color:#3a48b3'}" onclick="App.crmFCajon('${v}')">${n}</button>`).join('')}</div>
       ${canal==='prospectos'&&cajon!=='inter'?`<button class="btn-sm" style="width:100%;background:#0b1f2a;color:#fff;padding:11px;margin-bottom:10px;font-weight:700" onclick="App.crmInforme('${cajon}')">📄 Generar informe de ${String(cajon).toUpperCase()} (para WhatsApp)</button>`:''}
+      ${canal==='digital'?this._ciudBar(cajon):''}
       ${this._crmFItems(canal,cajon)}`);
   },
   crmFCanal(c){ this._crmFCanal=c; this._crmFCajon=null; this._crmMarcCat=null; this.vCrm(); },
@@ -2731,7 +2732,28 @@ const App = {
     const c=/interes/.test(v)?'b-aceptada':/cotiz/.test(v)?'b-cotizada':'b-entregado';
     const mode=cajon==='distribuidor'?'full':cajon==='interesado'?'seg':'none';   // distribuidor: 3 círculos · interesado: seguimiento · resto: liviano
     const anular=(cajon&&cajon!=='curioso')?`<div style="text-align:right;margin-top:6px"><button class="btn-sm" style="background:#fde8e8;color:#b3261e;padding:4px 11px;font-size:12px" onclick="App.crmLeadAnular('${(b.telefono||'').toString().replace(/\D/g,'')}')">↩️ Anular → Curioso</button></div>`:'';
-    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(b.nombre||b.telefono||'—')}${b.telefono?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(b.telefono)}</span>`:''}</div><div class="meta">${b.ciudad?esc(b.ciudad):''}${b.producto?(b.ciudad?' · ':'')+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono,mode)}${anular}</div>`;
+    const ciu=String(b.ciudad||'').trim();
+    const ciuHTML = ciu ? `<span style="font-weight:700;color:#0b6b4f">📍 ${esc(ciu)}</span>`
+                        : `<span style="color:#b45309">📍 sin ciudad</span>`;
+    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(b.nombre||b.telefono||'—')}${b.telefono?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(b.telefono)}</span>`:''}</div><div class="meta">${ciuHTML}${b.producto?' · '+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono,mode)}${anular}</div>`;
+  },
+  /* 📍 DE DÓNDE NOS ESCRIBEN — ciudades del cajón (curiosos / interesados / distribuidores) */
+  _ciudBar(cajon){
+    const bot=this._crmFBot||[];
+    const etOf=b=>{ const v=(b.etiqueta||'').toLowerCase(); return /distribu/.test(v)?'distribuidor':/interes/.test(v)?'interesado':'curioso'; };
+    const arr=bot.filter(b=>etOf(b)===cajon);
+    if(!arr.length) return '';
+    const norm=s=>{ let t=String(s||'').trim().replace(/\s+/g,' '); if(!t) return ''; return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase(); };
+    const m={}; let sin=0;
+    arr.forEach(b=>{ const c=norm(b.ciudad); if(!c){ sin++; return; } m[c]=(m[c]||0)+1; });
+    const top=Object.entries(m).sort((a,b)=>b[1]-a[1]);
+    const chip=(txt,n,bg,col)=>`<span style="background:${bg};color:${col};border-radius:20px;padding:5px 11px;font-size:12.5px;font-weight:600;white-space:nowrap">${txt} <b>${n}</b></span>`;
+    const chips=top.map(([c,n])=>chip('📍 '+esc(c),n,'#e7f6f0','#0b6b4f')).join('');
+    const sinChip=sin?chip('❓ sin ciudad',sin,'#fff3e0','#b45309'):'';
+    const pct=Math.round(((arr.length-sin)/arr.length)*100);
+    return `<div style="border:1px solid var(--linea);border-radius:12px;padding:11px 13px;margin-bottom:10px;background:#fafbfc">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--suave);text-transform:uppercase;margin-bottom:7px">📍 De dónde nos escriben · ${arr.length} leads · ${pct}% con ciudad</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}${sinChip}</div></div>`;
   },
   async crmLeadAnular(tel){
     tel=(tel||'').toString().replace(/\D/g,''); if(!tel) return;
