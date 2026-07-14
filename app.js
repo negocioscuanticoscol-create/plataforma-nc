@@ -790,7 +790,7 @@ const App = {
     const totVal=cots.reduce((a,c)=>a+(+c.total||0),0);
     const all=this._cotAll||[]; const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     const mesAct=new Date().toISOString().slice(0,7); const val=arr=>arr.reduce((a,c)=>a+(+c.total||0),0);
-    const esKit=c=>((c.datos||{}).kit_muestras==='SI');
+    const esKit=c=>this._esKitCot(c.datos);
     const cotsPed=cots.filter(c=>!esKit(c)), muestras=cots.filter(esKit);   // sub-cajones: pedidos (siempre) · muestras (colapsable)
     const delMes=all.filter(c=>(c.creado_en||'').slice(0,7)===mesAct);
     const anul=all.filter(c=>/anul/i.test(c.estado||''));   // cubre 'anulado' y 'anulada'
@@ -843,6 +843,14 @@ const App = {
         <span onclick="App.cotContactoToggle('${c.id}')" id="ctc-${c.id}" title="Marca que ya lo contacté" style="cursor:pointer;display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid #16a34a;background:${c.contactado?'#16a34a':'#fff'}"></span>
       </div></div>`;
   },
+  /* 🧪 Es KIT de muestras SOLO si NO lleva productos. Un pedido grande que ADEMÁS
+     lleva un kit adjunto es un PEDIDO, no un kit. (Juan Dennis $8.3M salía en kits.) */
+  _esKitCot(d){ d=d||{}; if(d.kit_muestras!=='SI') return false;
+    const uds=+(d.total_uds||0);
+    let p=d.productos;                                    // puede venir como texto JSON
+    if(typeof p==='string'){ try{ p=JSON.parse(p||'[]'); }catch(e){ p=[]; } }
+    const prods=Array.isArray(p)?p.length:0;
+    return uds<=0 && prods===0; },
   cotToggleMuestras(){ const b=document.getElementById('cotMuestrasBox'),a=document.getElementById('cotMuestrasArrow'); if(!b)return; const abrir=b.style.display==='none'; b.style.display=abrir?'block':'none'; if(a)a.textContent=abrir?'▾':'▸'; },
   _findCot(id){ return (this._cotsCola||[]).find(x=>x.id===id)||{}; },
   async cotBuscarBases(){
@@ -935,7 +943,7 @@ const App = {
       if(!(Array.isArray(ya)&&ya.length)){
         const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
         const _dtv=new Date(); const mes=M[_dtv.getMonth()]+'-'+_dtv.getFullYear();   // mes de la venta = AHORA (cuándo se autoriza), no la creación → cierre a fin de mes cae en el mes correcto
-        const esKit=(d.kit_muestras==='SI');
+        const esKit=this._esKitCot(d);
         const tv=esKit ? +(c.total||d.total||0) : +(d.subtotal_sin_iva||d.total||c.total||0);   // el kit ES venta: vale su precio, no 0
         const exceso=Math.max(0, (_cons||0) - (+(c.total||0)));   // lo que consignó de más → a comisión
         const cb=(+(d.comision||0))+exceso;
@@ -1023,7 +1031,7 @@ const App = {
       const d=p.datos||{}; const folio=p.folio||''; if(!folio) continue;
       try{ const rx=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(folio)+'&select=id&limit=1',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const ya=await rx.json(); if(Array.isArray(ya)&&ya.length) continue; }catch(e){}
       const dt=new Date(); const mes=M[dt.getMonth()]+'-'+dt.getFullYear();
-      const esKit=(d.kit_muestras==='SI');
+      const esKit=this._esKitCot(d);
       const tv=esKit?+(p.total||d.total||0):+(d.subtotal_sin_iva||d.total||p.total||0);
       const cb=+(d.comision||0);
       try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({empresa:'smart',mes,cliente:p.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:folio,notas:'Reparada por candado (pedido sin venta)'})}); if(r.ok) ok++; }catch(e){}
@@ -1305,7 +1313,7 @@ const App = {
       const ya=await rx.json(); if(Array.isArray(ya)&&ya.length) return;   // ya está, no duplica
       const d=cot.datos||{}; const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
       const _dtv=new Date(); const mes=M[_dtv.getMonth()]+'-'+_dtv.getFullYear();   // mes = AHORA (cuándo se despacha/registra la venta)
-      const esKit=(d.kit_muestras==='SI');
+      const esKit=this._esKitCot(d);
       const tv=esKit?+(cot.total||d.total||0):+(d.subtotal_sin_iva||d.total||cot.total||0); const cb=+(d.comision||0);
       await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
         body:JSON.stringify({empresa:'smart',mes,cliente:cot.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:cot.folio,notas:'Registrado al despachar'})});
@@ -1365,7 +1373,7 @@ const App = {
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.'+e+'&select=estado,datos',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const j=await r.json(); cots=Array.isArray(j)?j:[]; }catch(e2){}
     const nCot=cots.filter(c=>c.estado==='cotizacion').length;
     const nPed=cots.filter(c=>c.estado==='pedido').length;
-    const nKit=cots.filter(c=>c.datos&&(c.datos.kit_muestras==='SI'||/kit/i.test(JSON.stringify(c.datos||{})))).length;
+    const nKit=cots.filter(c=>this._esKitCot(c.datos)).length;
     this.set(`<button class="btn-sm" onclick="App.go('cotizaciones')" style="margin-bottom:10px;background:var(--gris)">← Volver</button>
       <h1>Clientes · Resumen</h1><div class="sub">Estado de tu base de clientes</div>
       <div class="card" style="text-align:center;border-left:4px solid var(--naranja)"><div style="font-size:34px;font-weight:800;color:var(--naranja);line-height:1">${cli.length}</div><div style="font-size:13px;margin-top:4px">Clientes totales en base</div></div>
