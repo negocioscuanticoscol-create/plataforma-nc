@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fast Fueling · ERP</title>
+<style>
+:root{--navy:#0d1b2a;--navy2:#16283d;--acc:#f77f00;--acc2:#ffb703;--bg:#f2f4f7;--card:#fff;--tx:#1a2433;--sub:#6b7686;--linea:#e3e7ee;--ok:#188a54;--rojo:#c0392b;--amar:#b7791f}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",system-ui,Arial,sans-serif;background:var(--bg);color:var(--tx);font-size:14.5px}
+header{background:var(--navy);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:12px}
+header .logo{font-size:19px;font-weight:800;letter-spacing:.03em}
+header .logo span{color:var(--acc)}
+header .sub{font-size:11px;color:#9fb0c3;letter-spacing:.14em;text-transform:uppercase}
+nav{background:var(--navy2);padding:6px 10px;display:flex;flex-wrap:wrap;gap:4px;position:sticky;top:0;z-index:40}
+nav button{background:transparent;border:none;color:#c8d3e0;padding:8px 13px;border-radius:8px;cursor:pointer;font-size:13.5px;font-weight:600}
+nav button.on{background:var(--acc);color:#fff}
+main{max-width:1180px;margin:0 auto;padding:18px 14px 80px}
+h1{font-size:21px;margin-bottom:2px}
+.sub2{color:var(--sub);font-size:13px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--linea);border-radius:12px;padding:14px 16px;margin-bottom:12px}
+.grid{display:grid;gap:10px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.kpi{background:var(--card);border:1px solid var(--linea);border-left:4px solid var(--acc);border-radius:10px;padding:12px 14px}
+.kpi .v{font-size:21px;font-weight:800}
+.kpi .l{font-size:11.5px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.kpi.rojo{border-left-color:var(--rojo)} .kpi.rojo .v{color:var(--rojo)}
+.kpi.ok{border-left-color:var(--ok)} .kpi.verde .v{color:var(--ok)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;padding:8px 8px;border-bottom:2px solid var(--linea)}
+td{padding:9px 8px;border-bottom:1px solid #eef1f5;vertical-align:top}
+tr:hover td{background:#fafbfd}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+th.num{text-align:right}
+.btn{background:var(--acc);color:#fff;border:none;border-radius:9px;padding:10px 16px;font-weight:700;cursor:pointer;font-size:14px}
+.btn.sec{background:#e8ecf2;color:var(--tx)}
+.btn.ok{background:var(--ok)} .btn.rojo{background:var(--rojo)} .btn.navy{background:var(--navy)}
+.btn.sm{padding:6px 11px;font-size:12.5px;border-radius:7px}
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700}
+.b-ok{background:#e3f5ec;color:var(--ok)} .b-pend{background:#fdeeee;color:var(--rojo)}
+.b-par{background:#fdf3e0;color:var(--amar)} .b-gris{background:#eef1f5;color:var(--sub)}
+.b-acc{background:#fef0e0;color:#c05e00}
+input,select,textarea{width:100%;padding:9px 11px;border:1px solid #ccd4de;border-radius:8px;font-size:14px;font-family:inherit;background:#fff}
+label{font-size:11.5px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.04em;display:block;margin:9px 0 3px}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:0 12px}
+.modal-bg{position:fixed;inset:0;background:rgba(13,27,42,.55);z-index:90;display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow:auto}
+.modal{background:#fff;border-radius:14px;padding:18px 20px;width:100%;max-width:760px}
+.modal h3{margin-bottom:8px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.tools input{max-width:280px}
+.empty{padding:26px;text-align:center;color:var(--sub)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 20px;border-radius:10px;z-index:99;font-weight:600}
+.chip{display:inline-block;background:#eef1f5;border-radius:14px;padding:3px 10px;font-size:12px;margin:2px 3px 2px 0}
+.low{color:var(--rojo);font-weight:800}
+.tabs2{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.tabs2 button{background:#e8ecf2;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;color:var(--tx);font-size:13px}
+.tabs2 button.on{background:var(--navy);color:#fff}
+.mini{font-size:12px;color:var(--sub)}
+@media(max-width:640px){ main{padding:12px 8px 90px} .modal{padding:14px} }
+@media print{ nav,header,.no-print{display:none!important} body{background:#fff} .print-area{display:block} }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">⛽ FAST <span>FUELING</span></div>
+    <div class="sub">ERP · Repuestos para vehículos cisterna</div>
+  </div>
+</header>
+<nav id="nav"></nav>
+<main id="main"><div class="empty">Cargando…</div></main>
+<div id="modal"></div>
+<script>
+/* ================= FAST FUELING ERP · Motor Cuántico NC =================
+   BD independiente: tablas ff_* en Supabase (REGLA: nunca cruzar con otras). */
+const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+const fecha=d=>d?String(d).slice(0,10):'';
+const hoy=()=>new Date().toISOString().slice(0,10);
+const mesAct=()=>hoy().slice(0,7);
+async function api(p,o={}){ try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H,...o}); const t=await r.text();
+  if(!r.ok){ console.warn('API',p,t.slice(0,150)); return o.method?null:[]; }
+  const d=t?JSON.parse(t):(o.method?{}:[]); return d; }catch(e){ console.warn(e); return o.method?null:[]; } }
+const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b),headers:{...H,Prefer:'return=representation'}});
+const patch=(p,b)=>api(p,{method:'PATCH',body:JSON.stringify(b),headers:{...H,Prefer:'return=minimal'}});
+function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+function modal(html){ $('modal').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)cerrar()"><div class="modal">${html}</div></div>`; }
+function cerrar(){ $('modal').innerHTML=''; }
+function safe(fn,nom){ return async function(...a){ try{ await fn.apply(App,a); }catch(e){ console.error(e); $('main').innerHTML=`<div class="card"><b>⚠️ No pude cargar ${nom}.</b><div class="mini">${esc(e.message||e)}</div><button class="btn" style="margin-top:8px" onclick="App.go(App.vista)">Reintentar</button></div>`; } }; }
+
+const App={
+vista:'inicio',
+TABS:[['inicio','🏠 Inicio'],['catalogo','📦 Catálogo'],['inventario','📊 Inventario'],['compras','🛒 Compras'],['facturacion','🧾 Facturación'],['cartera','💰 Cartera'],['bancos','🏦 Bancos'],['clientes','🏢 Clientes'],['proveedores','🚚 Proveedores'],['reportes','📈 Reportes']],
+nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
+go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
+  ({inicio:this.vInicio,catalogo:this.vCatalogo,inventario:this.vInventario,compras:this.vCompras,
+    facturacion:this.vFacturacion,cartera:this.vCartera,bancos:this.vBancos,clientes:this.vClientes,
+    proveedores:this.vProveedores,reportes:this.vReportes}[v]).call(this); },
+set(h){ $('main').innerHTML=h; window.scrollTo(0,0); },
+
+/* ---------- datos base cacheados por vista ---------- */
+async refs(){ this._refs=await api('ff_referencias?order=codigo&limit=3000'); return this._refs; },
+async clientes(){ this._cli=await api('ff_clientes?order=empresa&limit=2000'); return this._cli; },
+async provs(){ this._prov=await api('ff_proveedores?order=razon_social&limit=2000'); return this._prov; },
+async docs(){ this._docs=await api('ff_documentos?order=creado_en.desc&limit=4000'); return this._docs; },
+async abonos(){ this._abo=await api('ff_abonos?order=fecha.desc&limit=6000'); return this._abo; },
+cliNom(id){ const c=(this._cli||[]).find(x=>x.id===id); return c?c.empresa:'—'; },
+
+/* ================= INICIO ================= */
+vInicio: safe(async function(){
+  const [refs,docs,abonos,compras]=await Promise.all([this.refs(),this.docs(),this.abonos(),api('ff_compras?limit=2000')]);
+  await this.clientes();
+  const fact=docs.filter(d=>d.tipo==='factura'&&d.estado!=='anulada');
+  const abPorDoc={}; abonos.forEach(a=>abPorDoc[a.documento_id]=(abPorDoc[a.documento_id]||0)+(+a.valor||0));
+  const saldo=d=>Math.max(0,(+d.total||0)-(abPorDoc[d.id]||0));
+  const ventasHoy=fact.filter(d=>d.fecha_emision===hoy()).reduce((s,d)=>s+(+d.total||0),0);
+  const ventasMes=fact.filter(d=>(d.fecha_emision||'').slice(0,7)===mesAct()).reduce((s,d)=>s+(+d.total||0),0);
+  const pend=fact.filter(d=>saldo(d)>0);
+  const vencidas=pend.filter(d=>d.fecha_vencimiento&&d.fecha_vencimiento<hoy());
+  const carteraVencida=vencidas.reduce((s,d)=>s+saldo(d),0);
+  const bajos=refs.filter(r=>r.activo&&(+r.existencias||0)<=(+r.inv_min||0)&&(+r.inv_min||0)>0);
+  const valorInv=refs.reduce((s,r)=>s+(+r.existencias||0)*(+r.costo_promedio||0),0);
+  const compMes=compras.filter(c=>(c.fecha||'').slice(0,7)===mesAct()&&c.estado!=='anulada').reduce((s,c)=>s+(+c.total||0),0);
+  // top vendidos del mes
+  const cnt={};
+  fact.filter(d=>(d.fecha_emision||'').slice(0,7)===mesAct()).forEach(d=>(d.items||[]).forEach(i=>{ cnt[i.nombre]=(cnt[i.nombre]||0)+(+i.qty||0); }));
+  const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  this.set(`<h1>🏠 Panel</h1><div class="sub2">Fast Fueling SAS · ${hoy()}</div>
+  <div class="grid g4">
+    <div class="kpi verde ok"><div class="v">${money(ventasHoy)}</div><div class="l">Ventas de hoy</div></div>
+    <div class="kpi verde ok"><div class="v">${money(ventasMes)}</div><div class="l">Ventas del mes</div></div>
+    <div class="kpi"><div class="v">${pend.length}</div><div class="l">Facturas con saldo (${money(pend.reduce((s,d)=>s+saldo(d),0))})</div></div>
+    <div class="kpi rojo"><div class="v">${money(carteraVencida)}</div><div class="l">Cartera vencida (${vencidas.length} fact.)</div></div>
+    <div class="kpi ${bajos.length?'rojo':''}"><div class="v">${bajos.length}</div><div class="l">Referencias en inventario bajo</div></div>
+    <div class="kpi"><div class="v">${money(compMes)}</div><div class="l">Compras del mes</div></div>
+    <div class="kpi"><div class="v">${money(valorInv)}</div><div class="l">Valor del inventario (a costo)</div></div>
+    <div class="kpi"><div class="v">${refs.filter(r=>r.activo).length}</div><div class="l">Referencias activas</div></div>
+  </div>
+  <div class="card"><b>🏆 Más vendidos del mes</b>
+    ${top.length?`<table><thead><tr><th>Producto</th><th class="num">Unidades</th></tr></thead><tbody>${top.map(([n,q])=>`<tr><td>${esc(n)}</td><td class="num">${q}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Aún no hay ventas este mes.</div>'}
+  </div>
+  ${bajos.length?`<div class="card" style="border-left:4px solid var(--rojo)"><b style="color:var(--rojo)">⚠️ Inventario bajo</b>
+    <table><thead><tr><th>Código</th><th>Referencia</th><th class="num">Exist.</th><th class="num">Mínimo</th></tr></thead><tbody>
+    ${bajos.map(r=>`<tr><td>${esc(r.codigo)}</td><td>${esc(r.nombre)}</td><td class="num low">${+r.existencias||0}</td><td class="num">${+r.inv_min||0}</td></tr>`).join('')}</tbody></table></div>`:''}`);
+}, 'el panel'),
+
+/* ================= CATÁLOGO ================= */
+vCatalogo: safe(async function(){
+  const refs=await this.refs();
+  const q=(this._catQ||'').toLowerCase();
+  const list=refs.filter(r=>!q||[r.codigo,r.part_number,r.nombre,r.marca,r.fabricante,r.categoria,r.descripcion,r.compatibilidad].join(' ').toLowerCase().includes(q));
+  const cats=[...new Set(refs.map(r=>r.categoria).filter(Boolean))];
+  this.set(`<h1>📦 Catálogo de referencias</h1><div class="sub2">${refs.length} referencias · ${cats.length} categorías</div>
+  <div class="tools">
+    <input placeholder="🔎 Buscar por código, part number, marca…" value="${esc(this._catQ||'')}" oninput="App._catQ=this.value" onchange="App.vCatalogo()">
+    <button class="btn" onclick="App.refForm()">➕ Nueva referencia</button>
+  </div>
+  <div class="card" style="padding:0;overflow-x:auto"><table>
+  <thead><tr><th>Código</th><th>Referencia</th><th>Part #</th><th>Marca</th><th>Categoría</th><th class="num">Exist.</th><th class="num">Precio venta</th><th></th></tr></thead>
+  <tbody>${list.map(r=>`<tr>
+    <td><b>${esc(r.codigo)}</b>${r.activo?'':' <span class="badge b-gris">inactivo</span>'}</td>
+    <td>${r.foto_url?`<a href="${esc(r.foto_url)}" target="_blank">🖼️</a> `:''}${esc(r.nombre)}${r.ficha_url?` <a href="${esc(r.ficha_url)}" target="_blank">📄</a>`:''}<div class="mini">${esc(r.compatibilidad||'')}</div></td>
+    <td>${esc(r.part_number||'')}</td><td>${esc(r.marca||'')}</td><td>${esc(r.categoria||'')}</td>
+    <td class="num">${+r.existencias||0}</td><td class="num">${money(r.precio_venta)}</td>
+    <td><button class="btn sm sec" onclick="App.refForm(${r.id})">✏️</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">Sin resultados</td></tr>'}</tbody></table></div>`);
+},'el catálogo'),
+
+refForm(id){
+  const r=(this._refs||[]).find(x=>x.id===id)||{};
+  const F=(k,l,tp)=>`<div><label>${l}</label><input id="rf_${k}" type="${tp||'text'}" value="${esc(r[k]==null?'':r[k])}"></div>`;
+  modal(`<h3>${id?'✏️ Editar':'➕ Nueva'} referencia</h3>
+  <div class="frm">
+    ${F('codigo','Código interno (FF-…)')}${F('part_number','Part Number')}${F('fabricante','Fabricante')}${F('marca','Marca')}
+    ${F('categoria','Categoría')}${F('subcategoria','Subcategoría')}${F('nombre','Nombre comercial')}${F('unidad','Unidad de medida')}
+    ${F('peso','Peso (kg)','number')}${F('pais_origen','País de origen')}${F('ubicacion','Ubicación en bodega')}${F('lote','Lote (opcional)')}
+    ${F('inv_min','Inventario mínimo','number')}${F('inv_max','Inventario máximo','number')}
+    ${F('precio_venta','Precio de venta','number')}${F('ultimo_costo','Último costo','number')}
+  </div>
+  <label>Descripción técnica</label><textarea id="rf_descripcion" rows="2">${esc(r.descripcion||'')}</textarea>
+  <label>Compatibilidad (marca y modelo del vehículo)</label><textarea id="rf_compatibilidad" rows="2">${esc(r.compatibilidad||'')}</textarea>
+  <label>Observaciones</label><textarea id="rf_observaciones" rows="2">${esc(r.observaciones||'')}</textarea>
+  <div class="frm">
+    <div><label>Fotografía ${r.foto_url?'(ya tiene ✔)':''}</label><input id="rf_foto" type="file" accept="image/*"></div>
+    <div><label>Ficha técnica PDF ${r.ficha_url?'(ya tiene ✔)':''}</label><input id="rf_ficha" type="file" accept="application/pdf"></div>
+    <div><label>Estado</label><select id="rf_activo"><option value="true" ${r.activo!==false?'selected':''}>Activo</option><option value="false" ${r.activo===false?'selected':''}>Inactivo</option></select></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:14px">
+    <button class="btn" style="flex:1" onclick="App.refGuardar(${id||'null'})">💾 Guardar</button>
+    <button class="btn sec" onclick="cerrar()">Cancelar</button>
+  </div>`);
+},
+async subirArchivo(inputId,pref){
+  const f=$(inputId)&&$(inputId).files[0]; if(!f) return null;
+  const path='fastfueling/'+pref+'_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9.\-]/g,'_');
+  const r=await fetch(SB+'/storage/v1/object/documentos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K},body:f});
+  return r.ok? SB+'/storage/v1/object/public/documentos/'+path : null;
+},
+async refGuardar(id){
+  const v=k=>($('rf_'+k)?$('rf_'+k).value.trim():'');
+  const b={codigo:v('codigo'),part_number:v('part_number'),fabricante:v('fabricante'),marca:v('marca'),
+    categoria:v('categoria'),subcategoria:v('subcategoria'),nombre:v('nombre'),unidad:v('unidad')||'UND',
+    peso:+v('peso')||null,pais_origen:v('pais_origen'),ubicacion:v('ubicacion'),lote:v('lote'),
+    inv_min:+v('inv_min')||0,inv_max:+v('inv_max')||null,precio_venta:+v('precio_venta')||0,ultimo_costo:+v('ultimo_costo')||0,
+    descripcion:v('descripcion'),compatibilidad:v('compatibilidad'),observaciones:v('observaciones'),activo:v('activo')==='true'};
+  if(!b.nombre){ toast('Falta el nombre'); return; }
+  if(!b.codigo){ const n=(this._refs||[]).length+1; b.codigo='FF-'+String(n).padStart(3,'0'); }
+  const foto=await this.subirArchivo('rf_foto','foto'); if(foto) b.foto_url=foto;
+  const ficha=await this.subirArchivo('rf_ficha','ficha'); if(ficha) b.ficha_url=ficha;
+  const r=id? await patch('ff_referencias?id=eq.'+id,b) : await post('ff_referencias',b);
+  if(r===null&&!id){ toast('⚠️ No se pudo guardar'); return; }
+  cerrar(); toast('💾 Referencia guardada'); this.vCatalogo();
+},
+
+/* ================= INVENTARIO ================= */
+vInventario: safe(async function(){
+  const refs=await this.refs();
+  const sub=this._invTab||'exist';
+  const activos=refs.filter(r=>r.activo);
+  let cuerpo='';
+  if(sub==='exist'){
+    cuerpo=`<div class="card" style="padding:0;overflow-x:auto"><table>
+    <thead><tr><th>Código</th><th>Referencia</th><th class="num">Exist.</th><th class="num">Mín</th><th class="num">Costo prom.</th><th class="num">Últ. costo</th><th class="num">P. venta</th><th class="num">Margen</th><th>Ubicación</th><th></th></tr></thead><tbody>
+    ${activos.map(r=>{ const e=+r.existencias||0, cp=+r.costo_promedio||0, pv=+r.precio_venta||0;
+      const mg=pv>0?Math.round((1-cp/pv)*100):0; const low=e<=(+r.inv_min||0)&&(+r.inv_min||0)>0;
+      return `<tr><td><b>${esc(r.codigo)}</b></td><td>${esc(r.nombre)}</td>
+      <td class="num ${low?'low':''}">${e}${low?' ⚠️':''}</td><td class="num">${+r.inv_min||0}</td>
+      <td class="num">${money(cp)}</td><td class="num">${money(r.ultimo_costo)}</td><td class="num">${money(pv)}</td>
+      <td class="num">${mg}%</td><td>${esc(r.ubicacion||'')}</td>
+      <td><button class="btn sm sec" onclick="App.ajusteForm(${r.id})">± Ajustar</button></td></tr>`; }).join('')}</tbody></table></div>`;
+  } else {
+    const movs=await api('ff_movimientos?order=creado_en.desc&limit=300');
+    const nom=id=>{ const r=refs.find(x=>x.id===id); return r?r.codigo+' '+r.nombre:'#'+id; };
+    const ico={compra:'🛒 Entrada compra',venta:'🧾 Salida venta',ajuste:'± Ajuste',devolucion:'↩️ Devolución',traslado:'🔀 Traslado'};
+    cuerpo=`<div class="card" style="padding:0;overflow-x:auto"><table>
+    <thead><tr><th>Fecha</th><th>Tipo</th><th>Referencia</th><th class="num">Cantidad</th><th class="num">Costo unit.</th><th>Doc</th><th>Notas</th></tr></thead><tbody>
+    ${movs.map(m=>`<tr><td>${fecha(m.creado_en)}</td><td>${ico[m.tipo]||esc(m.tipo)}</td><td>${esc(nom(m.ref_id))}</td>
+    <td class="num" style="color:${(+m.cantidad||0)>=0?'var(--ok)':'var(--rojo)'};font-weight:700">${(+m.cantidad||0)>0?'+':''}${+m.cantidad||0}</td>
+    <td class="num">${money(m.costo_unit)}</td><td>${esc(m.doc||'')}</td><td class="mini">${esc(m.notas||'')}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Sin movimientos</td></tr>'}</tbody></table></div>`;
+  }
+  this.set(`<h1>📊 Inventario</h1><div class="sub2">Existencias, costos y movimientos</div>
+  <div class="tabs2">
+    <button class="${sub==='exist'?'on':''}" onclick="App._invTab='exist';App.vInventario()">Existencias</button>
+    <button class="${sub==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button>
+  </div>${cuerpo}`);
+},'el inventario'),
+
+ajusteForm(id){
+  const r=(this._refs||[]).find(x=>x.id===id)||{};
+  modal(`<h3>± Ajuste de inventario</h3>
+  <div class="mini" style="margin-bottom:8px"><b>${esc(r.codigo)}</b> ${esc(r.nombre)} · existencias actuales: <b>${+r.existencias||0}</b></div>
+  <div class="frm">
+    <div><label>Tipo</label><select id="aj_tipo"><option value="ajuste">Ajuste</option><option value="devolucion">Devolución (entra)</option><option value="traslado">Traslado (sale)</option></select></div>
+    <div><label>Cantidad (usa negativo para restar)</label><input id="aj_qty" type="number" value="0"></div>
+  </div>
+  <label>Motivo / notas</label><input id="aj_notas">
+  <div style="display:flex;gap:8px;margin-top:14px">
+    <button class="btn" style="flex:1" onclick="App.ajusteGuardar(${id})">💾 Aplicar</button>
+    <button class="btn sec" onclick="cerrar()">Cancelar</button>
+  </div>`);
+},
+async ajusteGuardar(id){
+  const r=(this._refs||[]).find(x=>x.id===id); if(!r) return;
+  let qty=+$('aj_qty').value||0; const tipo=$('aj_tipo').value;
+  if(!qty){ toast('Pon la cantidad'); return; }
+  if(tipo==='devolucion') qty=Math.abs(qty);
+  if(tipo==='traslado') qty=-Math.abs(qty);
+  await post('ff_movimientos',{ref_id:id,tipo,cantidad:qty,costo_unit:+r.costo_promedio||0,notas:$('aj_notas').value.trim()});
+  await patch('ff_referencias?id=eq.'+id,{existencias:(+r.existencias||0)+qty});
+  cerrar(); toast('± Inventario ajustado'); this.vInventario();
+},
+
+/* ================= COMPRAS ================= */
+vCompras: safe(async function(){
+  const [compras]=await Promise.all([api('ff_compras?order=creado_en.desc&limit=500'),this.provs(),this.refs()]);
+  const pnom=id=>{ const p=(this._prov||[]).find(x=>x.id===id); return p?p.razon_social:'—'; };
+  const bd={abierta:'b-acc',recibida:'b-ok',anulada:'b-gris'};
+  this.set(`<h1>🛒 Compras</h1><div class="sub2">Órdenes de compra y recepciones — al recibir, el inventario entra solo</div>
+  <div class="tools"><button class="btn" onclick="App.compraForm()">➕ Nueva orden de compra</button></div>
+  <div class="card" style="padding:0;overflow-x:auto"><table>
+  <thead><tr><th>Número</th><th>Fecha</th><th>Proveedor</th><th class="num">Total</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${compras.map(c=>`<tr><td><b>${esc(c.numero)}</b></td><td>${fecha(c.fecha)}</td><td>${esc(pnom(c.proveedor_id))}</td>
+  <td class="num">${money(c.total)}</td><td><span class="badge ${bd[c.estado]||'b-gris'}">${esc(c.estado)}</span></td>
+  <td>${c.estado==='abierta'?`<button class="btn sm ok" onclick="App.recibirCompra(${c.id})">📥 Recibir</button> <button class="btn sm rojo" onclick="App.anularCompra(${c.id})">✖</button>`:''}
+  <button class="btn sm sec" onclick="App.verCompra(${c.id})">👁</button></td></tr>`).join('')||'<tr><td colspan="6" class="empty">Sin órdenes aún</td></tr>'}</tbody></table></div>`);
+},'compras'),
+
+compraForm(){
+  this._lineas=[];
+  const provs=this._prov||[];
+  modal(`<h3>➕ Orden de compra</h3>
+  <div class="frm">
+    <div><label>Proveedor</label><select id="oc_prov">${provs.map(p=>`<option value="${p.id}">${esc(p.razon_social)}</option>`).join('')||'<option value="">— registra un proveedor primero —</option>'}</select></div>
+    <div><label>Notas</label><input id="oc_notas"></div>
+  </div>
+  <div style="margin-top:10px"><b>Ítems</b>
+    <div style="display:flex;gap:6px;margin:6px 0">
+      <select id="oc_ref" style="flex:2">${(this._refs||[]).filter(r=>r.activo).map(r=>`<option value="${r.id}">${esc(r.codigo)} · ${esc(r.nombre)}</option>`).join('')}</select>
+      <input id="oc_qty" type="number" placeholder="Cant." style="flex:.6">
+      <input id="oc_costo" type="number" placeholder="Costo unit." style="flex:1">
+      <button class="btn sm navy" onclick="App.addLineaOC()">＋</button>
+    </div>
+    <div id="oc_lineas"></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:14px">
+    <button class="btn" style="flex:1" onclick="App.compraGuardar()">💾 Crear orden</button>
+    <button class="btn sec" onclick="cerrar()">Cancelar</button>
+  </div>`);
+},
+addLineaOC(){
+  const rid=+$('oc_ref').value, qty=+$('oc_qty').value||0, costo=+$('oc_costo').value||0;
+  const r=(this._refs||[]).find(x=>x.id===rid); if(!r||qty<=0){ toast('Cantidad y costo'); return; }
+  this._lineas.push({ref_id:rid,codigo:r.codigo,nombre:r.nombre,qty,costo});
+  $('oc_qty').value=''; $('oc_costo').value='';
+  $('oc_lineas').innerHTML='<table><tbody>'+this._lineas.map((l,i)=>`<tr><td>${esc(l.codigo)} ${esc(l.nombre)}</td><td class="num">${l.qty} × ${money(l.costo)}</td><td class="num"><b>${money(l.qty*l.costo)}</b></td><td><button class="btn sm rojo" onclick="App._lineas.splice(${i},1);App.addLineaOC0()">✖</button></td></tr>`).join('')+`<tr><td colspan="4" class="num"><b>Total ${money(this._lineas.reduce((s,l)=>s+l.qty*l.costo,0))}</b></td></tr></tbody></table>`;
+},
+addLineaOC0(){ const tmp=this._lineas; this._lineas=tmp; $('oc_lineas').innerHTML=''; if(tmp.length){ const bak=[...tmp]; this._lineas=[]; bak.forEach(l=>{ this._lineas.push(l); }); this.addLineaOCRe(); } },
+addLineaOCRe(){ $('oc_lineas').innerHTML='<table><tbody>'+this._lineas.map((l,i)=>`<tr><td>${esc(l.codigo)} ${esc(l.nombre)}</td><td class="num">${l.qty} × ${money(l.costo)}</td><td class="num"><b>${money(l.qty*l.costo)}</b></td><td><button class="btn sm rojo" onclick="App._lineas.splice(${i},1);App.addLineaOC0()">✖</button></td></tr>`).join('')+(this._lineas.length?`<tr><td colspan="4" class="num"><b>Total ${money(this._lineas.reduce((s,l)=>s+l.qty*l.costo,0))}</b></td></tr>`:'')+'</tbody></table>'; },
+async compraGuardar(){
+  if(!this._lineas.length){ toast('Agrega ítems'); return; }
+  const provId=+$('oc_prov').value||null;
+  const n=await api('ff_compras?select=id&limit=1',{headers:{...H,Prefer:'count=exact'}});
+  const numero='OC-'+String(((await (async()=>{ const r=await fetch(SB+'/rest/v1/ff_compras?select=id',{headers:{...H,Prefer:'count=exact',Range:'0-0'}}); return +(r.headers.get('content-range')||'0/0').split('/')[1]||0; })())+1)).padStart(4,'0');
+  const total=this._lineas.reduce((s,l)=>s+l.qty*l.costo,0);
+  const r=await post('ff_compras',{tipo:'orden',numero,proveedor_id:provId,items:this._lineas,total,estado:'abierta',notas:$('oc_notas').value.trim()});
+  if(!r){ toast('⚠️ No se pudo crear'); return; }
+  cerrar(); toast('🛒 Orden '+numero+' creada'); this.vCompras();
+},
+verCompra(id){
+  api('ff_compras?id=eq.'+id).then(rs=>{ const c=rs[0]; if(!c) return;
+    modal(`<h3>🛒 ${esc(c.numero)} <span class="badge ${c.estado==='recibida'?'b-ok':'b-acc'}">${esc(c.estado)}</span></h3>
+    <div class="mini">${fecha(c.fecha)} · ${esc(this.cliNomP(c.proveedor_id))}</div>
+    <table style="margin-top:8px"><thead><tr><th>Ítem</th><th class="num">Cant.</th><th class="num">Costo</th><th class="num">Total</th></tr></thead>
+    <tbody>${(c.items||[]).map(l=>`<tr><td>${esc(l.codigo)} ${esc(l.nombre)}</td><td class="num">${l.qty}</td><td class="num">${money(l.costo)}</td><td class="num">${money(l.qty*l.costo)}</td></tr>`).join('')}
+    <tr><td colspan="4" class="num"><b>${money(c.total)}</b></td></tr></tbody></table>
+    ${c.notas?`<div class="mini" style="margin-top:6px">📝 ${esc(c.notas)}</div>`:''}
+    <button class="btn sec" style="margin-top:12px;width:100%" onclick="cerrar()">Cerrar</button>`); });
+},
+cliNomP(id){ const p=(this._prov||[]).find(x=>x.id===id); return p?p.razon_social:'—'; },
+async recibirCompra(id){
+  if(!confirm('¿Recibir esta orden? El inventario entra automáticamente.')) return;
+  const rs=await api('ff_compras?id=eq.'+id); const c=rs[0]; if(!c||c.estado!=='abierta') return;
+  const refs=await this.refs();
+  for(const l of (c.items||[])){
+    const r=refs.find(x=>x.id===l.ref_id); if(!r) continue;
+    const e0=+r.existencias||0, cp0=+r.costo_promedio||0;
+    const e1=e0+(+l.qty||0);
+    const cp1=e1>0? ((e0*cp0)+(+l.qty*+l.costo))/e1 : +l.costo;   // costo promedio ponderado
+    await post('ff_movimientos',{ref_id:r.id,tipo:'compra',cantidad:+l.qty,costo_unit:+l.costo,doc:c.numero});
+    await patch('ff_referencias?id=eq.'+r.id,{existencias:e1,costo_promedio:Math.round(cp1*100)/100,ultimo_costo:+l.costo,fecha_ult_compra:hoy()});
+  }
+  await patch('ff_compras?id=eq.'+id,{estado:'recibida'});
+  toast('📥 Recibida — inventario actualizado'); this.vCompras();
+},
+async anularCompra(id){ if(!confirm('¿Anular esta orden?')) return; await patch('ff_compras?id=eq.'+id,{estado:'anulada'}); this.vCompras(); },
+
+/* ================= FACTURACIÓN ================= */
+vFacturacion: safe(async function(){
+  const [docs]=await Promise.all([this.docs(),this.clientes(),this.refs(),this.abonos()]);
+  const sub=this._facTab||'factura';
+  const abPorDoc={}; (this._abo||[]).forEach(a=>abPorDoc[a.documento_id]=(abPorDoc[a.documento_id]||0)+(+a.valor||0));
+  const tipos=[['cotizacion','Cotizaciones'],['remision','Remisiones'],['factura','Facturas'],['nota_credito','Notas crédito']];
+  const list=docs.filter(d=>d.tipo===sub);
+  const est=d=>{ if(d.estado==='anulada') return '<span class="badge b-gris">anulada</span>';
+    if(d.tipo!=='factura') return '<span class="badge b-acc">'+esc(d.estado||'ok')+'</span>';
+    const ab=abPorDoc[d.id]||0, t=+d.total||0;
+    if(ab>=t&&t>0) return '<span class="badge b-ok">pagada</span>';
+    if(ab>0) return '<span class="badge b-par">parcial</span>';
+    return '<span class="badge b-pend">pendiente</span>'; };
+  this.set(`<h1>🧾 Facturación</h1><div class="sub2">Cotización → remisión → factura → nota crédito</div>
+  <div class="tabs2">${tipos.map(([v,n])=>`<button class="${v===sub?'on':''}" onclick="App._facTab='${v}';App.vFacturacion()">${n} (${docs.filter(d=>d.tipo===v).length})</button>`).join('')}</div>
+  <div class="tools"><button class="btn" onclick="App.docForm('${sub}')">➕ Nueva ${sub.replace('_',' ')}</button></div>
+  <div class="card" style="padding:0;overflow-x:auto"><table>
+  <thead><tr><th>Número</th><th>Fecha</th><th>Cliente</th><th class="num">Total</th><th>Estado</th><th></th></tr></thead><tbody>
+  ${list.map(d=>`<tr><td><b>${esc(d.numero)}</b></td><td>${fecha(d.fecha_emision)}</td><td>${esc(this.cliNom(d.cliente_id))}</td>
+  <td class="num">${money(d.total)}</td><td>${est(d)}</td>
+  <td><button class="btn sm sec" onclick="App.verDoc(${d.id})">👁</button>
+  ${d.tipo==='cotizacion'&&d.estado!=='anulada'?`<button class="btn sm ok" onclick="App.cotAFactura(${d.id})">→ Factura</button>`:''}
+  ${d.estado!=='anulada'?`<button class="btn sm rojo" onclick="App.anularDoc(${d.id})">✖</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nada aún en este cajón</td></tr>'}</tbody></table></div>`);
+},'facturación'),
+
+docForm(tipo){
+  this._lineasDoc=[]; this._docTipo=tipo;
+  const cli=this._cli||[];
+  modal(`<h3>➕ Nueva ${esc(tipo.replace('_',' '))}</h3>
+  <div class="frm">
+    <div><label>Cliente</label><select id="dc_cli">${cli.map(c=>`<option value="${c.id}">${esc(c.empresa)} ${c.nit?'· '+esc(c.nit):''}</option>`).join('')||'<option value="">— registra un cliente primero —</option>'}</select></div>
+    <div><label>Vence (días)</label><input id="dc_dias" type="number" value="30"></div>
+    <div><label>IVA</label><select id="dc_iva"><option value="19">19%</option><option value="0">0%</option></select></div>
+    <div><label>Descuento ($)</label><input id="dc_desc" type="number" value="0"></div>
+  </div>
+  <div style="margin-top:10px"><b>Ítems</b>
+    <div style="display:flex;gap:6px;margin:6px 0">
+      <select id="dc_ref" style="flex:2" onchange="App.dcPrecio()">${(this._refs||[]).filter(r=>r.activo).map(r=>`<option value="${r.id}">${esc(r.codigo)} · ${esc(r.nombre)} (exist: ${+r.existencias||0})</option>`).join('')}</select>
+      <input id="dc_qty" type="number" placeholder="Cant." style="flex:.6">
+      <input id="dc_precio" type="number" placeholder="Precio" style="flex:1">
+      <button class="btn sm navy" onclick="App.addLineaDoc()">＋</button>
+    </div>
+    <div id="dc_lineas"></div>
+  </div>
+  <label>Notas</label><input id="dc_notas">
+  <div style="display:flex;gap:8px;margin-top:14px">
+    <button class="btn" style="flex:1" onclick="App.docGuardar()">💾 Guardar</button>
+    <button class="btn sec" onclick="cerrar()">Cancelar</button>
+  </div>`);
+  this.dcPrecio();
+},
+dcPrecio(){ const r=(this._refs||[]).find(x=>x.id===+($('dc_ref')||{}).value); if(r&&$('dc_precio')) $('dc_precio').value=+r.precio_venta||''; },
+addLineaDoc(){
+  const rid=+$('dc_ref').value, qty=+$('dc_qty').value||0, precio=+$('dc_precio').value||0;
+  const r=(this._refs||[]).find(x=>x.id===rid); if(!r||qty<=0){ toast('Cantidad y precio'); return; }
+  this._lineasDoc.push({ref_id:rid,codigo:r.codigo,nombre:r.nombre,qty,precio});
+  $('dc_qty').value='';
+  this.pintaLineasDoc();
+},
+pintaLineasDoc(){
+  $('dc_lineas').innerHTML='<table><tbody>'+this._lineasDoc.map((l,i)=>`<tr><td>${esc(l.codigo)} ${esc(l.nombre)}</td><td class="num">${l.qty} × ${money(l.precio)}</td><td class="num"><b>${money(l.qty*l.precio)}</b></td><td><button class="btn sm rojo" onclick="App._lineasDoc.splice(${i},1);App.pintaLineasDoc()">✖</button></td></tr>`).join('')+(this._lineasDoc.length?`<tr><td colspan="4" class="num"><b>Subtotal ${money(this._lineasDoc.reduce((s,l)=>s+l.qty*l.precio,0))}</b></td></tr>`:'')+'</tbody></table>';
+},
+async numDoc(tipo){
+  const pref={cotizacion:'COT',remision:'REM',factura:'FAC',nota_credito:'NC'}[tipo]||'DOC';
+  const r=await fetch(SB+'/rest/v1/ff_documentos?tipo=eq.'+tipo+'&select=id',{headers:{...H,Prefer:'count=exact',Range:'0-0'}});
+  const n=+(r.headers.get('content-range')||'0/0').split('/')[1]||0;
+  return pref+'-'+String(n+1).padStart(4,'0');
+},
+async docGuardar(){
+  if(!this._lineasDoc.length){ toast('Agrega ítems'); return; }
+  const tipo=this._docTipo, cliId=+$('dc_cli').value||null;
+  if(!cliId){ toast('Falta el cliente'); return; }
+  const sub=this._lineasDoc.reduce((s,l)=>s+l.qty*l.precio,0);
+  const desc=+$('dc_desc').value||0;
+  const iva=Math.round((sub-desc)*(+$('dc_iva').value||0)/100);
+  const total=sub-desc+iva;
+  const dias=+$('dc_dias').value||0;
+  const venc=new Date(Date.now()+dias*86400000).toISOString().slice(0,10);
+  const numero=await this.numDoc(tipo);
+  const r=await post('ff_documentos',{tipo,numero,cliente_id:cliId,items:this._lineasDoc,subtotal:sub,descuento:desc,iva,total,
+    estado:'pendiente',fecha_emision:hoy(),fecha_vencimiento:venc,notas:$('dc_notas').value.trim()});
+  if(!r||!r[0]){ toast('⚠️ No se pudo guardar'); return; }
+  if(tipo==='factura') await this.moverInvDoc(r[0],-1);          // factura: SALE inventario
+  if(tipo==='nota_credito') await this.moverInvDoc(r[0],+1);     // nota crédito: DEVUELVE inventario
+  cerrar(); toast('🧾 '+numero+' creada'); this.vFacturacion();
+},
+async moverInvDoc(doc,signo){
+  const refs=await this.refs();
+  for(const l of (doc.items||[])){
+    const r=refs.find(x=>x.id===l.ref_id); if(!r) continue;
+    const q=signo*(+l.qty||0);
+    await post('ff_movimientos',{ref_id:r.id,tipo:signo<0?'venta':'devolucion',cantidad:q,costo_unit:+r.costo_promedio||0,doc:doc.numero});
+    const upd={existencias:(+r.existencias||0)+q}; if(signo<0) upd.fecha_ult_venta=hoy();
+    await patch('ff_referencias?id=eq.'+r.id,upd);
+  }
+},
+async cotAFactura(id){
+  if(!confirm('¿Convertir esta cotización en FACTURA? Saldrá inventario.')) return;
+  const rs=await api('ff_documentos?id=eq.'+id); const c=rs[0]; if(!c) return;
+  const numero=await this.numDoc('factura');
+  const r=await post('ff_documentos',{tipo:'factura',numero,cliente_id:c.cliente_id,items:c.items,subtotal:c.subtotal,
+    descuento:c.descuento,iva:c.iva,total:c.total,estado:'pendiente',fecha_emision:hoy(),
+    fecha_vencimiento:new Date(Date.now()+30*86400000).toISOString().slice(0,10),notas:'De '+c.numero});
+  if(r&&r[0]){ await this.moverInvDoc(r[0],-1); await patch('ff_documentos?id=eq.'+id,{estado:'facturada'}); toast('🧾 '+numero+' creada desde '+c.numero); }
+  this._facTab='factura'; this.vFacturacion();
+},
+async anularDoc(id){
+  if(!confirm('¿Anular este documento? Si es factura, el inventario se devuelve.')) return;
+  const rs=await api('ff_documentos?id=eq.'+id); const d=rs[0]; if(!d||d.estado==='anulada') return;
+  if(d.tipo==='factura') await this.moverInvDoc(d,+1);
+  await patch('ff_documentos?id=eq.'+id,{estado:'anulada'}); toast('✖ Anulado'); this.vFacturacion();
+},
+verDoc(id){
+  const d=(this._docs||[]).find(x=>x.id===id); if(!d) return;
+  const cli=(this._cli||[]).find(c=>c.id===d.cliente_id)||{};
+  const T={cotizacion:'COTIZACIÓN',remision:'REMISIÓN',factura:'FACTURA',nota_credito:'NOTA CRÉDITO'}[d.tipo];
+  modal(`<div class="print-area">
+  <div style="display:flex;justify-content:space-between;border-bottom:3px solid var(--acc);padding-bottom:8px">
+    <div><b style="font-size:17px">⛽ FAST FUELING SAS</b><div class="mini">Repuestos para vehículos cisterna</div></div>
+    <div style="text-align:right"><b>${T}</b><div>${esc(d.numero)}</div><div class="mini">${fecha(d.fecha_emision)}</div></div>
+  </div>
+  <div style="margin:10px 0"><b>${esc(cli.empresa||'—')}</b><div class="mini">${esc(cli.nit||'')} · ${esc(cli.direccion||'')} ${esc(cli.ciudad||'')}</div></div>
+  <table><thead><tr><th>Ítem</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Total</th></tr></thead><tbody>
+  ${(d.items||[]).map(l=>`<tr><td>${esc(l.codigo)} ${esc(l.nombre)}</td><td class="num">${l.qty}</td><td class="num">${money(l.precio)}</td><td class="num">${money(l.qty*l.precio)}</td></tr>`).join('')}
+  <tr><td colspan="3" class="num">Subtotal</td><td class="num">${money(d.subtotal)}</td></tr>
+  ${+d.descuento?`<tr><td colspan="3" class="num">Descuento</td><td class="num">-${money(d.descuento)}</td></tr>`:''}
+  <tr><td colspan="3" class="num">IVA</td><td class="num">${money(d.iva)}</td></tr>
+  <tr><td colspan="3" class="num"><b>TOTAL</b></td><td class="num"><b>${money(d.total)}</b></td></tr></tbody></table>
+  ${d.notas?`<div class="mini" style="margin-top:6px">📝 ${esc(d.notas)}</div>`:''}
+  </div>
+  <div style="display:flex;gap:8px;margin-top:12px" class="no-print">
+    <button class="btn navy" style="flex:1" onclick="window.print()">🖨️ Imprimir / PDF</button>
+    <button class="btn sec" onclick="cerrar()">Cerrar</button>
+  </div>`);
+},
+
+/* ================= CARTERA ================= */
+vCartera: safe(async function(){
+  const [docs]=await Promise.all([this.docs(),this.clientes(),this.abonos()]);
+  const fact=docs.filter(d=>d.tipo==='factura'&&d.estado!=='anulada');
+  const abPorDoc={}; (this._abo||[]).forEach(a=>abPorDoc[a.documento_id]=(abPorDoc[a.documento_id]||0)+(+a.valor||0));
+  const rows=fact.map(d=>{ const ab=abPorDoc[d.id]||0, s=Math.max(0,(+d.total||0)-ab);
+    const mora=d.fecha_vencimiento&&d.fecha_vencimiento<hoy()&&s>0? Math.floor((new Date(hoy())-new Date(d.fecha_vencimiento))/86400000):0;
+    return {...d,abonado:ab,saldo:s,mora}; }).filter(r=>r.saldo>0).sort((a,b)=>b.mora-a.mora);
+  const totS=rows.reduce((s,r)=>s+r.saldo,0), totV=rows.filter(r=>r.mora>0).reduce((s,r)=>s+r.saldo,0);
+  this.set(`<h1>💰 Cartera</h1><div class="sub2">Facturas con saldo pendiente</div>
+  <div class="grid g4">
+    <div class="kpi"><div class="v">${money(totS)}</div><div class="l">Cartera total (${rows.length} facturas)</div></div>
+    <div class="kpi rojo"><div class="v">${money(totV)}</div><div class="l">Vencida (${rows.filter(r=>r.mora>0).length})</div></div>
+    <div class="kpi ok verde"><div class="v">${money(totS-totV)}</div><div class="l">Por vencer</div></div>
+  </div>
+  <div class="card" style="padding:0;overflow-x:auto"><table>
+  <thead><tr><th>Factura</th><th>Cliente</th><th class="num">Valor</th><th class="num">Abonos</th><th class="num">Saldo</th><th>Vence</th><th class="num">Mora</th><th></th></tr></thead><tbody>
+  ${rows.map(r=>`<tr><td><b>${esc(r.numero)}</b></td><td>${esc(this.cliNom(r.cliente_id))}</td>
+  <td class="num">${money(r.total)}</td><td class="num">${money(r.abonado)}</td><td class="num"><b>${money(r.saldo)}</b></td>
+  <td>${fecha(r.fecha_vencimiento)}</td><td class="num ${r.mora>0?'low':''}">${r.mora>0?r.mora+' días':'—'}</td>
+  <td><button class="btn sm ok" onclick="App.abonoForm(${r.id},${r.saldo})">💵 Abonar</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">🎉 No hay cartera pendiente</td></tr>'}</tbody></table></div>`);
+},'la cartera'),
+
+async abonoForm(docId,saldo){
+  const bancos=await api('ff_bancos?order=banco');
+  modal(`<h3>💵 Registrar abono</h3>
+  <div class="mini" style="margin-bottom:8px">Saldo actual: <b>${money(saldo)}</b></div>
+  <div class="frm">
+    <div><label>Valor</label><input id="ab_valor" type="number" value="${saldo}"></div>
+    <div><label>Fecha</label><input id="ab_fecha" type="date" value="${hoy()}"></div>
+    <div><label>Entra a banco</label><select id="ab_banco"><option value="">— sin banco —</option>${bancos.map(b=>`<option value="${b.id}">${esc(b.banco)} ${esc(b.numero||'')}</option>`).join('')}</select></div>
+  </div>
+  <label>Notas</label><input id="ab_notas">
+  <div style="display:flex;gap:8px;margin-top:14px">
+    <button class="btn ok" style="flex:1" onclick="App.abonoGuardar(${docId})">💾 Registrar</button>
+    <button class="btn sec" onclick="cerrar()">Cancelar</button>
+  </div>`);
+},
+async abonoGuardar(docId){
+  const valor=+$('ab_valor').value||0; if(valor<=0){ toast('Pon el valor'); return; }
+  const bancoId=+$('ab_banco').value||null;
+  await post('ff_abonos',{documento_id:docId,valor,fecha:$('ab_fecha').value||hoy(),banco_id:bancoId,notas:$('ab_notas').value.trim()});
+  if(bancoId) await post('ff_banco_mov',{banco_id:bancoId,tipo:'recaudo',valor,detalle:'Abono factura #'+docId,fecha:$('ab_fecha').value||hoy()});
+  // actualizar estado de la factura
+  const abs=await api('ff_abonos?documento_id=eq.'+docId);
+  const doc=(await api('ff_documentos?id=eq.'+docId))[0];
+  const ab=abs.reduce((s,a)=>s+(+a.valor||0),0);
+  await patch('ff_documentos?id=eq.'+docId,{estado: ab>=(+doc.total||0)?'pagada':'parcial'});
+  cerrar(); toast('💵 Abono registrado'); this.vCartera();
+},
+
+/* ================= BANCOS ================= */
+vBancos: safe(async function(){
+  const [bancos,movs]=await Promise.all([api('ff_bancos?order=banco'),api('ff_banco_mov?order=fecha.desc&limit=200')]);
+  const saldo=b=>{ const m=movs.filter(x=>x.banco_id===b.id); const pos=['consignacion','recaudo'];
+    return (+b.saldo_inicial||0)+m.reduce((s,x)=>s+(pos.includes(x.tipo)?+x.valor:-+x.valor),0); };
+  const bn=id=>{ const b=bancos.find(x=>x.id===id); return b?b.banco:'—'; };
+  const S={consignacion:'＋ Consignación',recaudo:'＋ Recaudo',transferencia:'－ Transferencia',pago:'－ Pago'};
+  this.set(`<h1>🏦 Bancos</h1><div class="sub2">Cuentas y movimientos</div>
+  <div class="tools"><button class="btn" onclick="App.bancoForm()">➕ Nueva cuenta</button>
+  <button class="btn navy" onclick="App.bancoMovForm()">± Registrar movimiento</button></div>
+  <div class="grid g4">${bancos.map(b=>`<div class="kpi"><div class="v">${money(saldo(b))}</div>
+  <div class="l">${esc(b.banco)} · ${esc(b.tipo_cuenta||'')} ${esc(b.numero||'')}<br>${esc(b.titular||'')}</div></div>`).join('')||'<div class="empty">Registra tu primera cuenta</div>'}</div>
+  <div class="card" style="padding:0;overflow-x:auto"><table>
+  <thead><tr><th>Fecha</th><th>Banco</th><th>Tipo</th><th class="num">Valor</th><th>Detalle</th></tr></thead><tbody>
+  ${movs.map(m=>`<tr><td>${fecha(m.fecha)}</td><td>${esc(bn(m.banco_id))}</td><td>${S[m.tipo]||esc(m.tipo)}</td>
+  <td class="num" style="color:${['consignacion','recaudo'].includes(m.tipo)?'var(--ok)':'var(--rojo)'};font-weight:700">${money(m.valor)}</td>
+  <td class="mini">${esc(m.detalle||'')}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Sin movimientos</td></tr>'}</tbody></table></div>`);
+},'bancos'),
+bancoForm(){
+  modal(`<h3>➕ Cuenta bancaria</h3><div class="frm">
+  <div><label>Banco</label><input id="bk_banco"></div>
+  <div><label>Tipo de cuenta</label><select id="bk_tipo"><option>Ahorros</option><option>Corriente</option><option>Fiducia</option></select></div>
+  <div><label>Número</label><input id="bk_numero"></div>
+  <div><label>Moneda</label><select id="bk_moneda"><option>COP</option><option>USD</option></select></div>
+  <div><label>Titular</label><input id="bk_titular"></div>
+  <div><label>Saldo inicial</label><input id="bk_saldo" type="number" value="0"></div></div>
+  <div style="display:flex;gap:8px;margin-top:14px">
+  <button class="btn" style="flex:1" onclick="App.bancoGuardar()">💾 Guardar</button>
+  <button class="btn sec" onclick="cerrar()">Cancelar</button></div>`);
+},
+async bancoGuardar(){
+  const b={banco:$('bk_banco').value.trim(),tipo_cuenta:$('bk_tipo').value,numero:$('bk_numero').value.trim(),
+    moneda:$('bk_moneda').value,titular:$('bk_titular').value.trim(),saldo_inicial:+$('bk_saldo').value||0};
+  if(!b.banco){ toast('Falta el banco'); return; }
+  await post('ff_bancos',b); cerrar(); toast('🏦 Cuenta creada'); this.vBancos();
+},
+async bancoMovForm(){
+  const bancos=await api('ff_bancos?order=banco');
+  if(!bancos.length){ toast('Primero crea una cuenta'); return; }
+  modal(`<h3>± Movimiento bancario</h3><div class="frm">
+  <div><label>Banco</label><select id="bm_banco">${bancos.map(b=>`<option value="${b.id}">${esc(b.banco)} ${esc(b.numero||'')}</option>`).join('')}</select></div>
+  <div><label>Tipo</label><select id="bm_tipo"><option value="consignacion">＋ Consignación</option><option value="recaudo">＋ Recaudo</option><option value="transferencia">－ Transferencia</option><option value="pago">－ Pago</option></select></div>
+  <div><label>Valor</label><input id="bm_valor" type="number"></div>
+  <div><label>Fecha</label><input id="bm_fecha" type="date" value="${hoy()}"></div></div>
+  <label>Detalle</label><input id="bm_detalle">
+  <div style="display:flex;gap:8px;margin-top:14px">
+  <button class="btn" style="flex:1" onclick="App.bancoMovGuardar()">💾 Registrar</button>
+  <button class="btn sec" onclick="cerrar()">Cancelar</button></div>`);
+},
+async bancoMovGuardar(){
+  const v=+$('bm_valor').value||0; if(v<=0){ toast('Pon el valor'); return; }
+  await post('ff_banco_mov',{banco_id:+$('bm_banco').value,tipo:$('bm_tipo').value,valor:v,fecha:$('bm_fecha').value||hoy(),detalle:$('bm_detalle').value.trim()});
+  cerrar(); toast('🏦 Movimiento registrado'); this.vBancos();
+},
+
+/* ================= CLIENTES ================= */
+vClientes: safe(async function(){
+  const [cli]=await Promise.all([this.clientes(),this.docs(),this.abonos()]);
+  const fact=(this._docs||[]).filter(d=>d.tipo==='factura'&&d.estado!=='anulada');
+  const hist=id=>fact.filter(f=>f.cliente_id===id);
+  this.set(`<h1>🏢 Clientes</h1><div class="sub2">${cli.length} clientes</div>
+  <div class="tools"><button class="btn" onclick="App.clienteForm()">➕ Nuevo cliente</button></div>
+  <div class="card" style="padding:0;overflow-x:auto"><table>
+  <thead><tr><th>Empresa</th><th>NIT</th><th>Contacto</th><th>Ciudad</th><th class="num">Cupo crédito</th><th class="num">Compras</th><th></th></tr></thead><tbody>
+  ${cli.map(c=>{ const h=hist(c.id); return `<tr><td><b>${esc(c.empresa)}</b></td><td>${esc(c.nit||'')}</td>
+  <td>${esc(c.contacto||'')}<div class="mini">${esc(c.telefono||'')} ${esc(c.correo||'')}</div></td>
+  <td>${esc(c.ciudad||'')}</td><td class="num">${money(c.cupo_credito)}</td>
+  <td class="num">${h.length} fact. · ${money(h.reduce((s,f)=>s+(+f.total||0),0))}</td>
+  <td><button class="btn sm sec" onclick="App.clienteForm(${c.id})">✏️</button></td></tr>`; }).join('')||'<tr><td colspan="7" class="empty">Registra tu primer cliente</td></tr>'}</tbody></table></div>`);
+},'clientes'),
+clienteForm(id){
+  const c=(this._cli||[]).find(x=>x.id===id)||{};
+  const F=(k,l,tp)=>`<div><label>${l}</label><input id="cf_${k}" type="${tp||'text'}" value="${esc(c[k]==null?'':c[k])}"></div>`;
+  modal(`<h3>${id?'✏️ Editar':'➕ Nuevo'} cliente</h3><div class="frm">
+  ${F('empresa','Empresa')}${F('nit','NIT')}${F('contacto','Contacto')}${F('correo','Correo')}
+  ${F('telefono','Teléfono/WhatsApp')}${F('ciudad','Ciudad')}${F('direccion','Dirección')}${F('cupo_credito','Cupo de crédito ($)','number')}</div>
+  <label>Condiciones comerciales</label><input id="cf_condiciones" value="${esc(c.condiciones||'')}">
+  <div style="display:flex;gap:8px;margin-top:14px">
+  <button class="btn" style="flex:1" onclick="App.clienteGuardar(${id||'null'})">💾 Guardar</button>
+  <button class="btn sec" onclick="cerrar()">Cancelar</button></div>`);
+},
+async clienteGuardar(id){
+  const v=k=>$('cf_'+k).value.trim();
+  const b={empresa:v('empresa'),nit:v('nit'),contacto:v('contacto'),correo:v('correo'),telefono:v('telefono'),
+    ciudad:v('ciudad'),direccion:v('direccion'),cupo_credito:+v('cupo_credito')||0,condiciones:v('condiciones')};
+  if(!b.empresa){ toast('Falta la empresa'); return; }
+  id? await patch('ff_clientes?id=eq.'+id,b) : await post('ff_clientes',b);
+  cerrar(); toast('🏢 Cliente guardado'); this.vClientes();
+},
+
+/* ================= PROVEEDORES ================= */
+vProveedores: safe(async function(){
+  const prov=await this.provs();
+  this.set(`<h1>🚚 Proveedores</h1><div class="sub2">${prov.length} proveedores</div>
+  <div class="tools"><button class="btn" onclick="App.provForm()">➕ Nuevo proveedor</button></div>
+  <div class="card" style="padding:0;overflow-x:auto"><table>
+  <thead><tr><th>Razón social</th><th>NIT</th><th>Contacto</th><th>Ciudad/País</th><th>Marcas</th><th>Entrega</th><th></th></tr></thead><tbody>
+  ${prov.map(p=>`<tr><td><b>${esc(p.razon_social)}</b><div class="mini">${esc(p.nombre_comercial||'')}</div></td>
+  <td>${esc(p.nit||'')}</td><td>${esc(p.contacto||'')}<div class="mini">${esc(p.celular||'')} ${esc(p.correo||'')}</div></td>
+  <td>${esc(p.ciudad||'')} ${esc(p.pais||'')}</td><td>${esc(p.marcas||'')}</td><td>${esc(p.tiempo_entrega||'')}</td>
+  <td><button class="btn sm sec" onclick="App.provForm(${p.id})">✏️</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Registra tu primer proveedor</td></tr>'}</tbody></table></div>`);
+},'proveedores'),
+provForm(id){
+  const p=(this._prov||[]).find(x=>x.id===id)||{};
+  const F=(k,l)=>`<div><label>${l}</label><input id="pf_${k}" value="${esc(p[k]==null?'':p[k])}"></div>`;
+  modal(`<h3>${id?'✏️ Editar':'➕ Nuevo'} proveedor</h3><div class="frm">
+  ${F('razon_social','Razón social')}${F('nit','NIT')}${F('nombre_comercial','Nombre comercial')}${F('contacto','Contacto')}
+  ${F('cargo','Cargo')}${F('celular','Celular')}${F('whatsapp','WhatsApp')}${F('correo','Correo')}
+  ${F('web','Página web')}${F('direccion','Dirección')}${F('ciudad','Ciudad')}${F('pais','País')}
+  ${F('marcas','Marcas que representa')}${F('condiciones_pago','Condiciones de pago')}${F('moneda','Moneda')}${F('tiempo_entrega','Tiempo de entrega')}</div>
+  <label>Observaciones</label><textarea id="pf_observaciones" rows="2">${esc(p.observaciones||'')}</textarea>
+  <div style="display:flex;gap:8px;margin-top:14px">
+  <button class="btn" style="flex:1" onclick="App.provGuardar(${id||'null'})">💾 Guardar</button>
+  <button class="btn sec" onclick="cerrar()">Cancelar</button></div>`);
+},
+async provGuardar(id){
+  const v=k=>$('pf_'+k).value.trim();
+  const b={}; ['razon_social','nit','nombre_comercial','contacto','cargo','celular','whatsapp','correo','web','direccion','ciudad','pais','marcas','condiciones_pago','moneda','tiempo_entrega','observaciones'].forEach(k=>b[k]=v(k));
+  if(!b.razon_social){ toast('Falta la razón social'); return; }
+  id? await patch('ff_proveedores?id=eq.'+id,b) : await post('ff_proveedores',b);
+  cerrar(); toast('🚚 Proveedor guardado'); this.vProveedores();
+},
+
+/* ================= REPORTES ================= */
+vReportes: safe(async function(){
+  const [refs,docs,compras]=await Promise.all([this.refs(),this.docs(),api('ff_compras?limit=2000')]);
+  await Promise.all([this.clientes(),this.provs(),this.abonos()]);
+  const fact=docs.filter(d=>d.tipo==='factura'&&d.estado!=='anulada');
+  // ventas por mes (últimos 6)
+  const meses={}; fact.forEach(f=>{ const m=(f.fecha_emision||'').slice(0,7); if(m) meses[m]=(meses[m]||0)+(+f.total||0); });
+  const mesesArr=Object.entries(meses).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,6);
+  // utilidad por producto (ventas del histórico)
+  const util={};
+  fact.forEach(f=>(f.items||[]).forEach(i=>{ const r=refs.find(x=>x.id===i.ref_id);
+    const cp=r?(+r.costo_promedio||0):0; const u=(+i.precio-cp)*(+i.qty||0);
+    const k=i.codigo+' '+i.nombre; util[k]=util[k]||{v:0,u:0,q:0}; util[k].v+=(+i.precio*(+i.qty||0)); util[k].u+=u; util[k].q+=(+i.qty||0); }));
+  const utilArr=Object.entries(util).sort((a,b)=>b[1].u-a[1].u).slice(0,12);
+  // sin movimiento 90 días
+  const lim=new Date(Date.now()-90*86400000).toISOString().slice(0,10);
+  const sinMov=refs.filter(r=>r.activo&&(+r.existencias||0)>0&&(!r.fecha_ult_venta||r.fecha_ult_venta<lim));
+  // compras por proveedor
+  const cxp={}; compras.filter(c=>c.estado!=='anulada').forEach(c=>{ const n=this.cliNomP(c.proveedor_id); cxp[n]=(cxp[n]||0)+(+c.total||0); });
+  const valorInv=refs.reduce((s,r)=>s+(+r.existencias||0)*(+r.costo_promedio||0),0);
+  this.set(`<h1>📈 Reportes</h1><div class="sub2">Indicadores comerciales y financieros</div>
+  <div class="grid g4">
+    <div class="kpi"><div class="v">${money(valorInv)}</div><div class="l">Inventario valorizado (a costo)</div></div>
+    <div class="kpi ok verde"><div class="v">${money(utilArr.reduce((s,[,x])=>s+x.u,0))}</div><div class="l">Utilidad bruta histórica</div></div>
+    <div class="kpi ${sinMov.length?'rojo':''}"><div class="v">${sinMov.length}</div><div class="l">Referencias sin venta en 90 días</div></div>
+  </div>
+  <div class="card"><b>📅 Ventas por mes</b>
+  <table><thead><tr><th>Mes</th><th class="num">Ventas</th></tr></thead><tbody>
+  ${mesesArr.map(([m,v])=>`<tr><td>${m}</td><td class="num">${money(v)}</td></tr>`).join('')||'<tr><td colspan="2" class="empty">Sin datos</td></tr>'}</tbody></table></div>
+  <div class="card"><b>💎 Utilidad por producto (top)</b>
+  <table><thead><tr><th>Producto</th><th class="num">Und.</th><th class="num">Vendido</th><th class="num">Utilidad</th></tr></thead><tbody>
+  ${utilArr.map(([k,x])=>`<tr><td>${esc(k)}</td><td class="num">${x.q}</td><td class="num">${money(x.v)}</td><td class="num" style="color:var(--ok);font-weight:700">${money(x.u)}</td></tr>`).join('')||'<tr><td colspan="4" class="empty">Sin ventas aún</td></tr>'}</tbody></table></div>
+  <div class="card"><b>🛒 Compras por proveedor</b>
+  <table><thead><tr><th>Proveedor</th><th class="num">Comprado</th></tr></thead><tbody>
+  ${Object.entries(cxp).sort((a,b)=>b[1]-a[1]).map(([n,v])=>`<tr><td>${esc(n)}</td><td class="num">${money(v)}</td></tr>`).join('')||'<tr><td colspan="2" class="empty">Sin compras aún</td></tr>'}</tbody></table></div>
+  ${sinMov.length?`<div class="card"><b>🧊 Sin movimiento (90 días, con existencias)</b>
+  <table><thead><tr><th>Código</th><th>Referencia</th><th class="num">Exist.</th><th>Última venta</th></tr></thead><tbody>
+  ${sinMov.map(r=>`<tr><td>${esc(r.codigo)}</td><td>${esc(r.nombre)}</td><td class="num">${+r.existencias||0}</td><td>${fecha(r.fecha_ult_venta)||'nunca'}</td></tr>`).join('')}</tbody></table></div>`:''}`);
+},'reportes'),
+};
+App.nav(); App.go('inicio');
+</script>
+</body>
+</html>
