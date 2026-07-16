@@ -1899,7 +1899,7 @@ const App = {
   _proformaFlete(c){
     const pares=+c.pares||0;
     if(c.es_muestra && (c.muestra_tipo==='pie'||c.muestra_tipo==='parsv')) return {lbl:'Envío gratis',val:0};
-    if(c.es_muestra && c.muestra_tipo==='par'){ const v=(+c.flete)||Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000); return {lbl:money(v),val:v}; }
+    if(c.es_muestra && c.muestra_tipo==='par'){ const v=(c.flete==null||c.flete==='')?Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000):(+c.flete||0); return {lbl:v?money(v):'Sin transporte',val:v}; }
     const cajas=(+c.cajas)||(pares/C.PARES_CAJA);
     return cajas>=C.MIN_CAJAS_SIN_FLETE ? {lbl:'Incluido (gratis)',val:0} : {lbl:'Al cobro (transportadora que elija)',val:0};
   },
@@ -1981,6 +1981,12 @@ const App = {
         </select>
         <div class="hint" style="margin-top:6px" id="co_muestra_hint">La muestra usa las tallas de abajo (sin la regla de 16 pares por caja).</div>
         <div id="co_asesor_wrap" style="display:none;margin-top:8px"><label style="font-size:12px;color:#667">Nombre del vendedor/asesor *</label><input class="field" id="co_asesor" placeholder="Ej: Juan Pérez — equipo comercial"></div>
+        <div id="co_mflete_wrap" style="display:none;margin-top:8px"><label style="font-size:12px;color:#667">🚚 Transporte de la muestra</label>
+          <select class="field" id="co_muestra_flete">
+            <option value="nacional">Nacional — ${money(C.MUESTRA_FLETE||22000)} por cada ${C.MUESTRA_FLETE_PARES||3} pares</option>
+            <option value="bogota">Bogotá — $9.500</option>
+            <option value="sin">Sin transporte — $0 (recoge / al cobro)</option>
+          </select></div>
       </div>
       <div class="card" id="co_curva_card">
         <label>Arma la curva — pares por talla</label>
@@ -2052,6 +2058,7 @@ const App = {
     if(grid) grid.style.display = esPie ? 'none' : 'block';   // DE PIE no usa grilla
     if(pie)  pie.style.display  = esPie ? 'block' : 'none';
     const aw=$('co_asesor_wrap'); if(aw) aw.style.display=(v==='vendedor')?'block':'none';
+    const fw=$('co_mflete_wrap'); if(fw) fw.style.display=(v==='par')?'block':'none';
     const lbl=document.querySelector('#co_curva_card label'); if(lbl) lbl.textContent = v ? 'Tallas de la muestra — pares por talla' : 'Arma la curva — pares por talla';
     const h=$('co_muestra_hint'); if(h){ h.style.display = (v && !esPie) ? 'block' : 'none'; } },
   async guardarCotizacion(){
@@ -2076,10 +2083,13 @@ const App = {
         if(cu.pares<1){ alert('Pon las tallas/pares de la muestra en la grilla.'); return; }
       }
       const conIvaM=(($('co_iva')||{checked:true}).checked);
-      const sub=sinValor?0:C.MUESTRA_PAR*cu.pares, iva=(sinValor?0:(conIvaM?Math.round(sub*C.IVA):0)), flete=sinValor?0:Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000), total=sub+iva+flete;
+      const sub=sinValor?0:C.MUESTRA_PAR*cu.pares, iva=(sinValor?0:(conIvaM?Math.round(sub*C.IVA):0));
+      const _ft=(($('co_muestra_flete')||{}).value)||'nacional';
+      const flete=sinValor?0:(_ft==='bogota'?9500:(_ft==='sin'?0:Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000)));
+      const total=sub+iva+flete;
       const partes=Object.keys(cu.tallas).length ? Object.keys(cu.tallas).sort((a,b)=>a-b).map(t=>`T${t}×${cu.tallas[t]}`).join(', ') : `${cu.pares} nono(s)`;
       const reg={numero:num,cliente_id:cid||null,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':(esParSV?'parsv':((esSVC||esVend)?'nono':'par')),flete,
-        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esParSV?`Muestra PAR · SIN valor comercial (regalo) · ${cu.pares} par(es) · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} + IVA ${money(iva)} + 🚚 transporte ${money(flete)} (aparte) · ${partes}`))),
+        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esParSV?`Muestra PAR · SIN valor comercial (regalo) · ${cu.pares} par(es) · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} + IVA ${money(iva)} + 🚚 ${flete?('transporte '+money(flete)+(_ft==='bogota'?' (Bogotá)':'')+' (aparte)'):'SIN transporte'} · ${partes}`))),
         pares:cu.pares,cajas:0,resto:0,curva:cu.tallas,precio_par:sinValor?0:C.MUESTRA_PAR,subtotal:sub,iva,total,flete_al_cobro:false,estado:'cotizada',
         interno:esVend,asesor:esVend?asesorV:null,
         vendedor_id:this.user.id,referencia:(cl&&cl.referencia)||'701',recomendado:!!(cl&&cl.recomendado),comision_nc:0,comision_gpjr:0};
@@ -2268,7 +2278,7 @@ const App = {
       const ftxt = cajas>=C.MIN_CAJAS_SIN_FLETE ? '🚚 flete incluido (gratis)' : `🚚 flete al cobro${p.transporte?' · '+esc(p.transporte):' (transportadora que elija)'}`;
       liq = `💵 ${pares} × ${money(C.PRECIO_PAR)} = ${money(sub)} &nbsp;+ IVA ${money(iva)} &nbsp;· ${ftxt} &nbsp;= <b>${money(tot||sub+iva)}</b>`;
     } else if(p.muestra_tipo==='par'){
-      const sub=C.MUESTRA_PAR*pares, iva=Math.round(sub*C.IVA), fl=(+p.flete||0)||Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000);
+      const sub=C.MUESTRA_PAR*pares, iva=Math.round(sub*C.IVA), fl=(p.flete==null||p.flete==='')?Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000):(+p.flete||0);
       liq = `💵 ${pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} &nbsp;+ IVA ${money(iva)} &nbsp;+ 🚚 transporte ${money(fl)} (aparte) &nbsp;= <b>${money(tot||sub+iva+fl)}</b>`;
     } else {
       liq = '💵 Sin valor comercial · 🚚 envío gratis';
