@@ -718,6 +718,8 @@ vImportacion: safe(async function(){
     api('ff_import_cfg')]);
   this._impItems=items; this._impChecks=checks;
   this._trm=+((cfg.find(x=>x.clave==='trm')||{}).valor||4100);
+  this._unidades=+((cfg.find(x=>x.clave==='unidades')||{}).valor||3);
+  this._epc=+((cfg.find(x=>x.clave==='est_x_cont')||{}).valor||2);
   this.set(`<h1>🚛 Importación · camión cisterna de aviación</h1>
   <div class="sub2">Proveedor: CLW (Chengli, Suizhou-China) · 2 alternativas: camión COMPLETO vs solo ESTRUCTURA + chasis colombiano</div>
   <div class="tabs2">
@@ -730,13 +732,17 @@ vImportacion: safe(async function(){
 
 _impCalc(esc){
   const it=(this._impItems||[]).filter(x=>x.escenario===esc);
-  const cif=it.filter(x=>x.tipo==='cif_usd').reduce((s,x)=>s+(+x.valor||0),0);
+  const epc=Math.max(1,this._epc||1);
+  const efect=x=>{ let v=+x.valor||0; if(esc==='estructura' && x.tipo==='cif_usd' && /flete/i.test(x.concepto)) v=v/epc; return v; };
+  const cif=it.filter(x=>x.tipo==='cif_usd').reduce((s,x)=>s+efect(x),0);
   const arancel=it.filter(x=>x.tipo==='pct_cif').reduce((s,x)=>s+cif*(+x.valor||0)/100,0);
   const iva=it.filter(x=>x.tipo==='pct_iva').reduce((s,x)=>s+(cif+arancel)*(+x.valor||0)/100,0);
   const usd=it.filter(x=>x.tipo==='usd').reduce((s,x)=>s+(+x.valor||0),0);
   const cop=it.filter(x=>x.tipo==='cop').reduce((s,x)=>s+(+x.valor||0),0);
   const totUsd=cif+arancel+iva+usd;
-  return {it,cif,arancel,iva,usd,cop,totUsd,totCop:totUsd*this._trm+cop};
+  const n=Math.max(1,this._unidades||1);
+  const totCop=totUsd*this._trm+cop;
+  return {it,cif,arancel,iva,usd,cop,totUsd,totCop,n,proyUsd:totUsd*n,proyCop:totCop*n};
 },
 _impCol(escN,titulo,color){
   const c=this._impCalc(escN);
@@ -755,19 +761,24 @@ _impCol(escN,titulo,color){
     <tbody>${c.it.map(linea).join('')}
     <tr><td class="num" style="font-weight:700">CIF (FOB+flete+seguro)</td><td class="num" colspan="2"><b>${fUsd(c.cif)}</b></td></tr>
     <tr><td class="num" style="font-weight:700">TOTAL en dólares</td><td class="num" colspan="2"><b>${fUsd(c.totUsd)}</b></td></tr>
-    <tr><td class="num" style="font-weight:800;font-size:15px">TOTAL PUESTO EN COLOMBIA</td><td class="num" colspan="2" style="font-weight:800;font-size:16px;color:${color}">${money(c.totCop)}</td></tr>
+    <tr><td class="num" style="font-weight:800;font-size:15px">TOTAL POR UNIDAD puesto en Colombia</td><td class="num" colspan="2" style="font-weight:800;font-size:16px;color:${color}">${money(c.totCop)}</td></tr>
+    <tr><td class="num" style="font-weight:800;font-size:15px">🚛 TOTAL PROYECTO (${c.n} unidades)</td><td class="num" colspan="2" style="font-weight:800;font-size:17px;color:${color};background:#f6f8fc">${money(c.proyCop)}</td></tr>
     </tbody></table></div>`;
 },
 _impComparativo(){
   const a=this._impCalc('completo'), b=this._impCalc('estructura');
-  const dif=a.totCop-b.totCop;
+  const dif=a.proyCop-b.proyCop;
   return `<div class="card" style="background:#f6f8fc">
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
       <div><label style="margin:0">TRM (COP por USD)</label>
         <input type="number" value="${this._trm}" style="width:120px" onchange="App.impTrm(this.value)"></div>
+      <div><label style="margin:0">Unidades a traer</label>
+        <input type="number" value="${this._unidades}" min="1" style="width:80px" onchange="App.impCfg('unidades',this.value)"></div>
+      <div><label style="margin:0">Estructuras por contenedor</label>
+        <input type="number" value="${this._epc}" min="1" style="width:80px" onchange="App.impCfg('est_x_cont',this.value)"></div>
       <div class="kpi" style="flex:1;min-width:200px;border-left-color:${dif>0?'var(--ok)':'var(--rojo)'}">
         <div class="v">${money(Math.abs(dif))}</div>
-        <div class="l">${dif>0?'AHORRO armando en Colombia (estructura + chasis local)':'La opción camión completo sale más barata'}</div></div>
+        <div class="l">${dif>0?'AHORRO DEL PROYECTO armando en Colombia (estructura + chasis local)':'El camión completo sale más barato en el proyecto'}</div></div>
     </div>
     <div class="mini" style="margin-top:6px">⚠️ Los valores "estimado" son de referencia para el estudio — reemplázalos con las cotizaciones reales (naviera, aduana, concesionario). Todo es editable y queda guardado.</div>
   </div>
@@ -788,6 +799,10 @@ _impComparativo(){
 async impVal(id,v){ await patch('ff_import_items?id=eq.'+id,{valor:+v||0}); const x=(this._impItems||[]).find(i=>i.id===id); if(x)x.valor=+v||0; this.vImportacion(); },
 async impEst(id,v){ await patch('ff_import_items?id=eq.'+id,{estado:v}); const x=(this._impItems||[]).find(i=>i.id===id); if(x)x.estado=v; this.vImportacion(); },
 async impTrm(v){ this._trm=+v||4100; await patch('ff_import_cfg?clave=eq.trm',{valor:String(this._trm)}); this.vImportacion(); },
+async impCfg(k,v){ v=Math.max(1,+v||1);
+  const r=await patch('ff_import_cfg?clave=eq.'+k,{valor:String(v)});
+  try{ await post('ff_import_cfg',{clave:k,valor:String(v)}); }catch(e){}
+  this.vImportacion(); },
 
 _impChecklist(){
   const ch=this._impChecks||[];
