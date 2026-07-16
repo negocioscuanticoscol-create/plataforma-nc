@@ -856,6 +856,18 @@ const App = {
     if(typeof p==='string'){ try{ p=JSON.parse(p||'[]'); }catch(e){ p=[]; } }
     const prods=Array.isArray(p)?p.length:0;
     return uds<=0 && prods===0; },
+  /* 🔁 GUÍA detectada → programa reenganche de RECOMPRA a los 15 días (lo envía la tarea diaria) */
+  async _programarRecompra(empresa, telefono, nombre, ref, guia){
+    try{
+      const tel=String(telefono||'').replace(/\D/g,''); if(tel.length<10) return;
+      const f=new Date(Date.now()+15*86400000).toISOString().slice(0,10);
+      await fetch(this._SBU()+'/rest/v1/nc_recompras?on_conflict=empresa,telefono,ref',{method:'POST',
+        headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json',
+                 Prefer:'resolution=ignore-duplicates,return=minimal'},
+        body:JSON.stringify({empresa,telefono:tel,nombre:nombre||'',ref:ref||'',guia:guia||'',programada_para:f})});
+      this._toast('🔁 Recompra programada para dentro de 15 días');
+    }catch(e){}
+  },
   async _pagosFetch(){
     const e=window.NC_EMPRESA||'feroz';
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_pagos?empresa=eq.'+e+'&despachado=eq.false&order=creado_en.desc',
@@ -1362,6 +1374,11 @@ const App = {
     if(!guias.length){ alert('Pon al menos un número de guía antes de despachar.'); return; }
     const guia=guias.join('\n');   // varias guías = una por línea
     await this.cotUpd(id,{transportadora:transp,guia:guia,estado_envio:'despachado',despachado_at:new Date().toISOString()});
+    try{ const rq=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?id=eq.'+id+'&select=folio,cliente,datos',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}});
+      const rj=await rq.json(); const cot=(rj&&rj[0])||{}; const d=cot.datos||{};
+      const telR=(d.celular||d.envio_tel||'').toString();
+      if(telR) await this._programarRecompra('smart', telR, cot.cliente||d.contacto||'', cot.folio||'', guia);
+    }catch(e){}
     await this._regVentaSiFalta(id);   // candado: asegura que la venta quede en Ventas
     this._toast('📦 '+guias.length+' guía'+(guias.length>1?'s':'')+' despachada'+(guias.length>1?'s':'')+' por '+transp+' → pasó a Despachos.');
     this.vPedidosSmart();
@@ -2471,6 +2488,10 @@ const App = {
     if(modo==='despachar'){
       await this.sb.from('pedidos').update({estado:'despachado',transporte,guia,despachado_por:this.user.id,despachado_en:new Date().toISOString(),guia_en:(guia?new Date().toISOString():null),actualizado_en:new Date().toISOString()}).eq('id',id);
       await this.hist(id,'despachado','Despachado por '+transporte+(guia?(' · guía '+guia):''));
+      if(guia){ try{ const {data:pp}=await this.sb.from('pedidos').select('numero,cliente_id').eq('id',id).single();
+        const {data:clr}=await this.sb.from('clientes').select('nombre,tel').eq('id',(pp||{}).cliente_id).single();
+        if(clr&&clr.tel) await this._programarRecompra('feroz', clr.tel, clr.nombre, (pp||{}).numero||('PED-'+id), guia);
+      }catch(e){} }
       const { data:pp } = await this.sb.from('pedidos').select('curva,numero').eq('id',id).single();
       if(pp) await this.descontarInventario(id, pp.curva, 'Despacho '+(pp.numero||''));
       this.cerrarModal(); this.go(this.view);
@@ -2481,6 +2502,10 @@ const App = {
       if(guia && !(p&&p.guia_en)) _upd.guia_en=new Date().toISOString();   // ⏱ hora en que se puso la guía (solo la 1ra vez)
       await this.sb.from('pedidos').update(_upd).eq('id',id);
       await this.hist(id,(p&&p.estado)||'pendiente_pago','Guía registrada (enviado antes del pago): '+transporte+(guia?(' · guía '+guia):''));
+      if(guia){ try{ const {data:pp}=await this.sb.from('pedidos').select('numero,cliente_id').eq('id',id).single();
+        const {data:clr}=await this.sb.from('clientes').select('nombre,tel').eq('id',(pp||{}).cliente_id).single();
+        if(clr&&clr.tel) await this._programarRecompra('feroz', clr.tel, clr.nombre, (pp||{}).numero||('PED-'+id), guia);
+      }catch(e){} }
       this.cerrarModal(); this.toast('🚚 Guía registrada ✅ — ya aparece en Despachos'); this.go(this.view);
     }
   },
