@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fast Fueling · ERP</title>
+<title>FES Fueling · ERP</title>
 <style>
 :root{--navy:#0d1b2a;--navy2:#16283d;--acc:#f77f00;--acc2:#ffb703;--bg:#f2f4f7;--card:#fff;--tx:#1a2433;--sub:#6b7686;--linea:#e3e7ee;--ok:#188a54;--rojo:#c0392b;--amar:#b7791f}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -63,7 +63,7 @@ label{font-size:11.5px;font-weight:700;color:var(--sub);text-transform:uppercase
 <body>
 <header>
   <div>
-    <div class="logo">⛽ FAST <span>FUELING</span></div>
+    <div class="logo">⛽ FES <span>FUELING</span></div>
     <div class="sub">ERP · Repuestos para vehículos cisterna</div>
   </div>
 </header>
@@ -71,7 +71,7 @@ label{font-size:11.5px;font-weight:700;color:var(--sub);text-transform:uppercase
 <main id="main"><div class="empty">Cargando…</div></main>
 <div id="modal"></div>
 <script>
-/* ================= FAST FUELING ERP · Motor Cuántico NC =================
+/* ================= FES FUELING ERP · Motor Cuántico NC =================
    BD independiente: tablas ff_* en Supabase (REGLA: nunca cruzar con otras). */
 const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -128,7 +128,7 @@ vInicio: safe(async function(){
   const cnt={};
   fact.filter(d=>(d.fecha_emision||'').slice(0,7)===mesAct()).forEach(d=>(d.items||[]).forEach(i=>{ cnt[i.nombre]=(cnt[i.nombre]||0)+(+i.qty||0); }));
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  this.set(`<h1>🏠 Panel</h1><div class="sub2">Fast Fueling SAS · ${hoy()}</div>
+  this.set(`<h1>🏠 Panel</h1><div class="sub2">FES Fueling SAS · ${hoy()}</div>
   <div class="grid g4">
     <div class="kpi verde ok"><div class="v">${money(ventasHoy)}</div><div class="l">Ventas de hoy</div></div>
     <div class="kpi verde ok"><div class="v">${money(ventasMes)}</div><div class="l">Ventas del mes</div></div>
@@ -194,7 +194,7 @@ refForm(id){
 },
 async subirArchivo(inputId,pref){
   const f=$(inputId)&&$(inputId).files[0]; if(!f) return null;
-  const path='fastfueling/'+pref+'_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9.\-]/g,'_');
+  const path='fesfueling/'+pref+'_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9.\-]/g,'_');
   const r=await fetch(SB+'/storage/v1/object/documentos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K},body:f});
   return r.ok? SB+'/storage/v1/object/public/documentos/'+path : null;
 },
@@ -474,7 +474,7 @@ verDoc(id){
   const T={cotizacion:'COTIZACIÓN',remision:'REMISIÓN',factura:'FACTURA',nota_credito:'NOTA CRÉDITO'}[d.tipo];
   modal(`<div class="print-area">
   <div style="display:flex;justify-content:space-between;border-bottom:3px solid var(--acc);padding-bottom:8px">
-    <div><b style="font-size:17px">⛽ FAST FUELING SAS</b><div class="mini">Repuestos para vehículos cisterna</div></div>
+    <div><b style="font-size:17px">⛽ FES FUELING SAS</b><div class="mini">Repuestos para vehículos cisterna</div></div>
     <div style="text-align:right"><b>${T}</b><div>${esc(d.numero)}</div><div class="mini">${fecha(d.fecha_emision)}</div></div>
   </div>
   <div style="margin:10px 0"><b>${esc(cli.empresa||'—')}</b><div class="mini">${esc(cli.nit||'')} · ${esc(cli.direccion||'')} ${esc(cli.ciudad||'')}</div></div>
