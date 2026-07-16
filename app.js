@@ -799,20 +799,7 @@ const App = {
     const anul=all.filter(c=>/anul/i.test(c.estado||''));   // cubre 'anulado' y 'anulada'
     const anulMot={}; anul.forEach(c=>{ const m=((c.datos||{}).motivo_anulacion)||'(sin motivo)'; anulMot[m]=(anulMot[m]||0)+1; });
     const kitAll=all.filter(esKit); const kitMes=kitAll.filter(c=>(c.creado_en||'').slice(0,7)===mesAct);
-    const pg=this._pagosPend||[];
-    const pagosHTML = pg.length ? `<div class="card" style="border:2px solid #dc2626;background:#fef2f2;margin-bottom:12px">
-      <div style="font-weight:800;color:#b91c1c;font-size:15px">🚨 ${pg.length} pago(s) reportado(s) SIN despachar</div>
-      <div style="font-size:12px;color:#7f1d1d;margin:4px 0 8px">El cliente le mandó el comprobante al bot. Verifica la cuenta y despacha.</div>
-      ${pg.map(x=>`<div style="background:#fff;border:1px solid #fecaca;border-radius:8px;padding:9px 11px;margin-bottom:6px">
-        <div style="font-weight:700">${esc(x.nombre||'(sin nombre)')} ${x.ciudad?`<span style="font-weight:600;color:#0b6b4f;font-size:12px">📍 ${esc(x.ciudad)}</span>`:''}</div>
-        <div style="font-size:12px;color:#555;margin:2px 0">📱 ${esc(String(x.telefono||'').slice(-10))} · ${esc(x.motivo||'')} · ${new Date(x.creado_en).toLocaleDateString('es-CO')}</div>
-        ${x.notas?`<div style="font-size:12px;color:#b91c1c">${esc(x.notas)}</div>`:''}
-        ${x.mensaje?`<div style="font-size:11.5px;color:#777">💬 ${esc(String(x.mensaje).slice(0,160))}</div>`:''}
-        <div style="display:flex;gap:6px;margin-top:7px">
-          <a class="btn-sm" style="background:#25d366;color:#fff;text-decoration:none;padding:6px 12px" target="_blank" href="https://wa.me/${String(x.telefono||'').replace(/\D/g,'')}">💬 WhatsApp</a>
-          <button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.pagoDespachado(${x.id})">✅ Ya lo despaché</button>
-        </div></div>`).join('')}
-      </div>` : '';
+    const pagosHTML = this._pagosHTML(this._pagosPend||[],'cots');
     this.set(`
       ${pagosHTML}
       <h1>Cotizaciones</h1><div class="sub">Registra clientes · cotiza · sigue la cola</div>
@@ -869,12 +856,35 @@ const App = {
     if(typeof p==='string'){ try{ p=JSON.parse(p||'[]'); }catch(e){ p=[]; } }
     const prods=Array.isArray(p)?p.length:0;
     return uds<=0 && prods===0; },
-  async pagoDespachado(id){
+  async _pagosFetch(){
+    const e=window.NC_EMPRESA||'feroz';
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_pagos?empresa=eq.'+e+'&despachado=eq.false&order=creado_en.desc',
+      {headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}});
+      const j=await r.json(); return Array.isArray(j)?j:[]; }catch(err){ return []; }
+  },
+  /* 🚨 Alerta de pagos del bot (imagen de consignación) — se pinta igual en Panel y Cotizaciones */
+  _pagosHTML(pg,origen){
+    if(!pg.length) return '';
+    return `<div class="card" style="border:2px solid #dc2626;background:#fef2f2;margin-bottom:12px">
+      <div style="font-weight:800;color:#b91c1c;font-size:15px">🚨 ALERTA DE PAGOS · ${pg.length} consignación(es) reportada(s) al bot SIN despachar</div>
+      <div style="font-size:12px;color:#7f1d1d;margin:4px 0 8px">El cliente mandó el comprobante por WhatsApp. Verifica la cuenta y despacha — el bot ya creó la cotización del kit en la cola.</div>
+      ${pg.map(x=>`<div style="background:#fff;border:1px solid #fecaca;border-radius:8px;padding:9px 11px;margin-bottom:6px">
+        <div style="font-weight:700">${esc(x.nombre||'(sin nombre)')} ${x.ciudad?`<span style="font-weight:600;color:#0b6b4f;font-size:12px">📍 ${esc(x.ciudad)}</span>`:''}</div>
+        <div style="font-size:12px;color:#555;margin:2px 0">📱 ${esc(String(x.telefono||'').slice(-10))} · ${esc(x.motivo||'')} · ${new Date(x.creado_en).toLocaleDateString('es-CO')}</div>
+        ${x.notas?`<div style="font-size:12px;color:#b91c1c">${esc(x.notas)}</div>`:''}
+        ${x.mensaje?`<div style="font-size:11.5px;color:#777">💬 ${esc(String(x.mensaje).slice(0,160))}</div>`:''}
+        <div style="display:flex;gap:6px;margin-top:7px">
+          <a class="btn-sm" style="background:#25d366;color:#fff;text-decoration:none;padding:6px 12px" target="_blank" href="https://wa.me/${String(x.telefono||'').replace(/\D/g,'')}">💬 WhatsApp</a>
+          <button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.pagoDespachado(${x.id},'${origen||'cots'}')">✅ Ya lo despaché</button>
+        </div></div>`).join('')}
+      </div>`;
+  },
+  async pagoDespachado(id,origen){
     if(!confirm('¿Ya verificaste el pago en la cuenta y lo despachaste?')) return;
     try{ await fetch(this._SBU()+'/rest/v1/nc_pagos?id=eq.'+id,{method:'PATCH',
       headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},
       body:JSON.stringify({despachado:true})}); }catch(e){}
-    this._toast('✅ Pago marcado como despachado'); this.vCotLanding();
+    this._toast('✅ Pago marcado como despachado'); (origen==='panel')?this.vDashboardSmart():this.vCotLanding();
   },
   cotToggleMuestras(){ const b=document.getElementById('cotMuestrasBox'),a=document.getElementById('cotMuestrasArrow'); if(!b)return; const abrir=b.style.display==='none'; b.style.display=abrir?'block':'none'; if(a)a.textContent=abrir?'▾':'▸'; },
   _findCot(id){ return (this._cotsCola||[]).find(x=>x.id===id)||{}; },
@@ -1566,10 +1576,12 @@ const App = {
     const TOK='2d6356b7e12ad3314b5c85ce087864a3fd6d8e5015fbb105acc77cf44a3221b3';
     let convs=[];
     try{ const r=await fetch(GAS+'?action=list&client=SMART&token='+TOK); const d=await r.json(); convs=d.conversations||[]; }catch(e){}
+    const _pagosPanel=await this._pagosFetch();
     const total=convs.length, ahora=Date.now();
     const d30=convs.filter(c=>{const t=new Date(c.lastTime).getTime(); return (ahora-t)<30*864e5;}).length;
     const conNombre=convs.filter(c=>c.name && !/^\d+$/.test(c.name)).length;
     this.set(`
+      ${this._pagosHTML(_pagosPanel,'panel')}
       <h1>Tablero · Smart Envases</h1><div class="sub">Cómo vamos hoy</div>
       <div class="card" style="border-left:4px solid var(--naranja)">
         <div style="font-size:30px;font-weight:800;color:var(--naranja);line-height:1">${total}</div>
