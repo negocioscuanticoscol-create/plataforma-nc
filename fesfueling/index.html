@@ -95,12 +95,12 @@ function safe(fn,nom){ return async function(...a){ try{ await fn.apply(App,a); 
 
 const App={
 vista:'inicio',
-TABS:[['inicio','🏠 Inicio'],['catalogo','📦 Catálogo'],['inventario','📊 Inventario'],['compras','🛒 Compras'],['facturacion','🧾 Facturación'],['cartera','💰 Cartera'],['bancos','🏦 Bancos'],['clientes','🏢 Clientes'],['proveedores','🚚 Proveedores'],['reportes','📈 Reportes']],
+TABS:[['inicio','🏠 Inicio'],['catalogo','📦 Catálogo'],['inventario','📊 Inventario'],['compras','🛒 Compras'],['facturacion','🧾 Facturación'],['cartera','💰 Cartera'],['bancos','🏦 Bancos'],['clientes','🏢 Clientes'],['proveedores','🚚 Proveedores'],['reportes','📈 Reportes'],['importacion','🚛 Importación']],
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
   ({inicio:this.vInicio,catalogo:this.vCatalogo,inventario:this.vInventario,compras:this.vCompras,
     facturacion:this.vFacturacion,cartera:this.vCartera,bancos:this.vBancos,clientes:this.vClientes,
-    proveedores:this.vProveedores,reportes:this.vReportes}[v]).call(this); },
+    proveedores:this.vProveedores,reportes:this.vReportes,importacion:this.vImportacion}[v]).call(this); },
 set(h){ $('main').innerHTML=h; window.scrollTo(0,0); },
 
 /* ---------- datos base cacheados por vista ---------- */
@@ -708,6 +708,117 @@ vReportes: safe(async function(){
   <table><thead><tr><th>Código</th><th>Referencia</th><th class="num">Exist.</th><th>Última venta</th></tr></thead><tbody>
   ${sinMov.map(r=>`<tr><td>${esc(r.codigo)}</td><td>${esc(r.nombre)}</td><td class="num">${+r.existencias||0}</td><td>${fecha(r.fecha_ult_venta)||'nunca'}</td></tr>`).join('')}</tbody></table></div>`:''}`);
 },'reportes'),
+
+/* ================= 🚛 IMPORTACIÓN (estudio de viabilidad camión cisterna China) ================= */
+vImportacion: safe(async function(){
+  const sub=this._impTab||'comp';
+  const [items,checks,cfg]=await Promise.all([
+    api('ff_import_items?order=escenario,orden&limit=200'),
+    api('ff_import_check?order=orden,id&limit=300'),
+    api('ff_import_cfg')]);
+  this._impItems=items; this._impChecks=checks;
+  this._trm=+((cfg.find(x=>x.clave==='trm')||{}).valor||4100);
+  this.set(`<h1>🚛 Importación · camión cisterna de aviación</h1>
+  <div class="sub2">Proveedor: CLW (Chengli, Suizhou-China) · 2 alternativas: camión COMPLETO vs solo ESTRUCTURA + chasis colombiano</div>
+  <div class="tabs2">
+    <button class="${sub==='comp'?'on':''}" onclick="App._impTab='comp';App.vImportacion()">📊 Comparativo de costos</button>
+    <button class="${sub==='chk'?'on':''}" onclick="App._impTab='chk';App.vImportacion()">✅ Checklist (China + Colombia)</button>
+    <button class="no-print" style="background:#e8ecf2;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer" onclick="window.print()">🖨️ Imprimir</button>
+  </div>
+  ${sub==='comp'?this._impComparativo():this._impChecklist()}`);
+},'importación'),
+
+_impCalc(esc){
+  const it=(this._impItems||[]).filter(x=>x.escenario===esc);
+  const cif=it.filter(x=>x.tipo==='cif_usd').reduce((s,x)=>s+(+x.valor||0),0);
+  const arancel=it.filter(x=>x.tipo==='pct_cif').reduce((s,x)=>s+cif*(+x.valor||0)/100,0);
+  const iva=it.filter(x=>x.tipo==='pct_iva').reduce((s,x)=>s+(cif+arancel)*(+x.valor||0)/100,0);
+  const usd=it.filter(x=>x.tipo==='usd').reduce((s,x)=>s+(+x.valor||0),0);
+  const cop=it.filter(x=>x.tipo==='cop').reduce((s,x)=>s+(+x.valor||0),0);
+  const totUsd=cif+arancel+iva+usd;
+  return {it,cif,arancel,iva,usd,cop,totUsd,totCop:totUsd*this._trm+cop};
+},
+_impCol(escN,titulo,color){
+  const c=this._impCalc(escN);
+  const fUsd=n=>'US$ '+Math.round(n).toLocaleString('es-CO');
+  const linea=x=>{
+    const calc=x.tipo==='pct_cif'? ' → '+fUsd(c.cif*(+x.valor||0)/100) : x.tipo==='pct_iva'? ' → '+fUsd((c.cif+c.arancel)*(+x.valor||0)/100) : '';
+    return `<tr><td>${esc(x.concepto)}${x.notas?`<div class="mini">${esc(x.notas)}</div>`:''}</td>
+      <td class="num" style="white-space:nowrap"><input type="number" value="${+x.valor}" style="width:95px;text-align:right;padding:5px" onchange="App.impVal(${x.id},this.value)"> <span class="mini">${x.tipo==='cop'?'COP':x.tipo.startsWith('pct')?'%':'USD'}</span>${calc?`<div class="mini">${calc}</div>`:''}</td>
+      <td><select style="padding:5px;font-size:12px" onchange="App.impEst(${x.id},this.value)">
+        <option value="estimado" ${x.estado==='estimado'?'selected':''}>⚠️ estimado</option>
+        <option value="cotizado" ${x.estado==='cotizado'?'selected':''}>✅ cotizado</option>
+        <option value="confirmado" ${x.estado==='confirmado'?'selected':''}>✅ confirmado</option></select></td></tr>`; };
+  return `<div class="card" style="border-top:4px solid ${color};flex:1;min-width:330px">
+    <b style="font-size:15px">${titulo}</b>
+    <table style="margin-top:8px"><thead><tr><th>Concepto</th><th class="num">Valor</th><th>Estado</th></tr></thead>
+    <tbody>${c.it.map(linea).join('')}
+    <tr><td class="num" style="font-weight:700">CIF (FOB+flete+seguro)</td><td class="num" colspan="2"><b>${fUsd(c.cif)}</b></td></tr>
+    <tr><td class="num" style="font-weight:700">TOTAL en dólares</td><td class="num" colspan="2"><b>${fUsd(c.totUsd)}</b></td></tr>
+    <tr><td class="num" style="font-weight:800;font-size:15px">TOTAL PUESTO EN COLOMBIA</td><td class="num" colspan="2" style="font-weight:800;font-size:16px;color:${color}">${money(c.totCop)}</td></tr>
+    </tbody></table></div>`;
+},
+_impComparativo(){
+  const a=this._impCalc('completo'), b=this._impCalc('estructura');
+  const dif=a.totCop-b.totCop;
+  return `<div class="card" style="background:#f6f8fc">
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+      <div><label style="margin:0">TRM (COP por USD)</label>
+        <input type="number" value="${this._trm}" style="width:120px" onchange="App.impTrm(this.value)"></div>
+      <div class="kpi" style="flex:1;min-width:200px;border-left-color:${dif>0?'var(--ok)':'var(--rojo)'}">
+        <div class="v">${money(Math.abs(dif))}</div>
+        <div class="l">${dif>0?'AHORRO armando en Colombia (estructura + chasis local)':'La opción camión completo sale más barata'}</div></div>
+    </div>
+    <div class="mini" style="margin-top:6px">⚠️ Los valores "estimado" son de referencia para el estudio — reemplázalos con las cotizaciones reales (naviera, aduana, concesionario). Todo es editable y queda guardado.</div>
+  </div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    ${this._impCol('completo','🚛 ALTERNATIVA A · Camión COMPLETO desde China','#1b2a44')}
+    ${this._impCol('estructura','🔧 ALTERNATIVA B · ESTRUCTURA china + chasis colombiano','#f7941d')}
+  </div>
+  <div class="card"><b>📌 Lo que dijo la fábrica (base del estudio)</b>
+    <ul style="margin:8px 0 0 18px;line-height:1.7;font-size:13.5px">
+      <li><b>Estructura (tanque + equipos, SIN chasis): US$ 24.000</b> — mismo precio para 2–5 m³. Exige chasis con <b>toma de fuerza (PTO)</b>.</li>
+      <li><b>Camión completo Dongfeng 5.000 L: US$ 35.000</b>. Falta preguntar el precio del de 3 m³.</li>
+      <li>Volúmenes de fábrica: 5, 8, 12 m³ y semirremolque 45 m³. Producción ≈ <b>1 mes</b> (35 días hábiles tras anticipo).</li>
+      <li>Dos tipos: <b>a presión</b> (DN65 aviación ≥1.200 L/min) y <b>convencional</b> (gravedad, carrete 15 m).</li>
+      <li>Medio: queroseno de aviación (Jet) y gasolina de aviación — <b>pedir por escrito que la misma unidad sirva para ambos</b>.</li>
+      <li>Certificaciones ISO9001 y CCC. Confirmar forma de pago (anticipo + saldo).</li>
+    </ul></div>`;
+},
+async impVal(id,v){ await patch('ff_import_items?id=eq.'+id,{valor:+v||0}); const x=(this._impItems||[]).find(i=>i.id===id); if(x)x.valor=+v||0; this.vImportacion(); },
+async impEst(id,v){ await patch('ff_import_items?id=eq.'+id,{estado:v}); const x=(this._impItems||[]).find(i=>i.id===id); if(x)x.estado=v; this.vImportacion(); },
+async impTrm(v){ this._trm=+v||4100; await patch('ff_import_cfg?clave=eq.trm',{valor:String(this._trm)}); this.vImportacion(); },
+
+_impChecklist(){
+  const ch=this._impChecks||[];
+  const fc=this._impFiltro||'todos';
+  const list=ch.filter(x=>fc==='todos'||x.config===fc||x.config==='ambos');
+  const cats=[...new Set(list.map(x=>x.categoria))];
+  const EST={ofrecido:['✅ Lo ofrecen','b-ok'],por_confirmar:['⚠️ Por confirmar','b-par'],no_incluye:['❌ NO incluye','b-pend'],resuelto:['✔️ Resuelto','b-ok'],na:['— No aplica','b-gris']};
+  const done=list.filter(x=>['ofrecido','resuelto','na'].includes(x.estado)).length;
+  return `<div class="card" style="background:#f6f8fc;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <b>Progreso: ${done}/${list.length}</b>
+    <select style="max-width:240px" onchange="App._impFiltro=this.value;App.vImportacion()">
+      <option value="todos" ${fc==='todos'?'selected':''}>Ver todo</option>
+      <option value="completo" ${fc==='completo'?'selected':''}>Solo alternativa COMPLETO</option>
+      <option value="estructura" ${fc==='estructura'?'selected':''}>Solo alternativa ESTRUCTURA</option></select>
+    <button class="btn sm navy no-print" onclick="App.impAddChk()">➕ Agregar punto</button>
+    <span class="mini">Esto es lo que se revisa con China ANTES de viajar y en la visita a planta.</span></div>
+  ${cats.map(cat=>`<div class="card"><b>${esc(cat)}</b>
+    <table style="margin-top:6px"><tbody>
+    ${list.filter(x=>x.categoria===cat).map(x=>`<tr><td style="width:46%">${esc(x.item)}${x.config!=='ambos'?` <span class="chip">${esc(x.config)}</span>`:''}</td>
+      <td style="width:150px"><select style="padding:5px;font-size:12px" onchange="App.impChkEst(${x.id},this.value)">
+        ${Object.entries(EST).map(([k,ar])=>`<option value="${k}" ${x.estado===k?'selected':''}>${ar[0]}</option>`).join('')}</select></td>
+      <td><input value="${esc(x.notas||'')}" placeholder="notas…" style="padding:5px;font-size:12.5px" onchange="App.impChkNota(${x.id},this.value)"></td></tr>`).join('')}
+    </tbody></table></div>`).join('')}`;
+},
+async impChkEst(id,v){ await patch('ff_import_check?id=eq.'+id,{estado:v}); const x=(this._impChecks||[]).find(i=>i.id===id); if(x)x.estado=v; this.vImportacion(); },
+async impChkNota(id,v){ await patch('ff_import_check?id=eq.'+id,{notas:v}); const x=(this._impChecks||[]).find(i=>i.id===id); if(x)x.notas=v; },
+async impAddChk(){
+  const item=prompt('¿Qué punto quieres agregar al checklist?'); if(!item) return;
+  await post('ff_import_check',{config:'ambos',categoria:'4. Puntos adicionales',item,estado:'por_confirmar',orden:90});
+  toast('➕ Agregado'); this.vImportacion();
+},
 };
 App.nav(); App.go('inicio');
 </script>
