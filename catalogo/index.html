@@ -112,11 +112,30 @@ salir(){ this.rol=null; this.vend=null; this.cart=[]; this.landing(); },
 head(titulo,extra){ return `<header><div><div class="b">${esc(titulo)}</div>${extra?`<div class="r">${extra}</div>`:''}</div><button onclick="App.salir()">Salir</button></header>`; },
 
 /* ================= VENDEDOR ================= */
+_vnav(act){ return `<nav>${[['catalogo','🛍️ Catálogo'],['pedidos','🧾 Pedidos'],['vendedores','👥 Vendedores']].map(([v,n])=>`<button class="${v===act?'on':''}" onclick="App.vTab('${v}')">${n}</button>`).join('')}</nav>`; },
+vTab(t){ ({catalogo:this.vCatalogo,pedidos:this.vPedidosV,vendedores:this.vVendedoresV}[t]).call(this); },
+async vPedidosV(){
+  const q=this.vend?'&vendedor_id=eq.'+this.vend.id:'';
+  const ps=await api('vcat_pedidos?order=creado_en.desc&limit=300'+q);
+  const bd={pendiente:'b-pend',pagado:'b-pag',despachado:'b-desp'};
+  this.set(`${this.head('Pedidos', this.vend?('Vendedor: '+esc(this.vend.nombre)):'')}${this._vnav('pedidos')}
+    <main><h1>Pedidos</h1><div class="sub">${ps.length} pedido(s)</div>
+    ${ps.map(p=>`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><b>${esc(p.cliente_nombre||'—')}</b> <span class="badge ${bd[p.estado]||'b-pend'}">${esc(p.estado)}</span>
+      <div style="font-size:12px;color:var(--sub)">${esc(p.numero)} · ${esc(p.vendedor_nombre||'')} · ${money(p.total)} · comis ${money(p.comision)}</div>
+      <div style="font-size:12px;color:var(--sub)">📍 ${esc(p.direccion||'')} ${esc(p.ciudad||'')} · ${p.tipo_envio==='caja'?'📥 caja':'📦 directo'}</div></div>
+      ${p.comprobante_url?`<a class="btn sm sec" href="${esc(p.comprobante_url)}" target="_blank">🧾</a>`:''}</div></div>`).join('')||'<div class="empty">Aún no hay pedidos.</div>'}</main>`);
+},
+async vVendedoresV(){
+  const vs=await api('vcat_vendedores?order=nombre&limit=300');
+  this.set(`${this.head('Vendedores','')}${this._vnav('vendedores')}
+    <main><h1>Vendedores</h1><div class="sub">${vs.length} vendedor(es)</div>
+    ${vs.map(v=>`<div class="card"><b>${esc(v.nombre)}</b> ${v.activo?'':'<span class="badge b-pend">inactivo</span>'}<div style="font-size:12px;color:var(--sub)">CC ${esc(v.cedula||'—')} · 📱 ${esc(v.celular||'—')}</div></div>`).join('')||'<div class="empty">Sin vendedores.</div>'}</main>`);
+},
 async vCatalogo(){
   const prods=await api('vcat_productos?activo=eq.true&order=nombre&limit=500');
   this._prods=prods;
   const nC=this.cart.reduce((a,i)=>a+i.qty,0);
-  this.set(`${this.head('Catálogo', this.vend?('Vendedor: '+esc(this.vend.nombre)):'Elige vendedor al pagar')}
+  this.set(`${this.head('Catálogo', this.vend?('Vendedor: '+esc(this.vend.nombre)):'Elige vendedor al pagar')}${this._vnav('catalogo')}
     <main><h1>Productos</h1><div class="sub">Toca un producto para ver fotos y detalles.</div>
     <div class="grid">${prods.map(p=>{ const f=(p.fotos||[])[0]; const antes=+p.precio_antes||0; const dcto=(antes>p.precio&&antes>0)?Math.round((antes-p.precio)/antes*100):0;
       return `<div class="pcard">
