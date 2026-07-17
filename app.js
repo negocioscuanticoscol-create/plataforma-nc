@@ -1642,12 +1642,13 @@ const App = {
     ];
     const cel='padding:7px 9px;border-bottom:1px solid var(--linea);font-size:12.5px;text-align:right;white-space:nowrap';
     const th='padding:8px 9px;border-bottom:2px solid var(--linea);font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.04em;text-align:right;white-space:nowrap';
-    const head=`<th style="${th};text-align:left;position:sticky;left:0;background:#fff">Métrica</th>`+meses.map(m=>`<th style="${th}">${lbl(m)}</th>`).join('')+`<th style="${th};color:var(--naranja)">Total</th>`;
+    const head=`<th style="${th};text-align:left;position:sticky;left:0;background:#fff">Métrica</th>`+meses.map(m=>`<th style="${th}">${lbl(m)}</th>`).join('')+`<th style="${th};color:var(--naranja)">Total</th><th style="${th};color:var(--suave)">Prom</th>`;
     const body=filas.map(f=>{
       const tot = f.tot==='last' ? (+MM[meses[meses.length-1]][f.k]||0) : meses.reduce((a,m)=>a+(+MM[m][f.k]||0),0);
+      const prom = meses.length ? meses.reduce((a,m)=>a+(+MM[m][f.k]||0),0)/meses.length : 0;
       return `<tr><td style="${cel};text-align:left;font-weight:700;position:sticky;left:0;background:#fff">${f.t}</td>`+
         meses.map(m=>`<td style="${cel}">${f.fmt(MM[m][f.k])}</td>`).join('')+
-        `<td style="${cel};font-weight:800;color:var(--naranja)">${f.fmt(tot)}</td></tr>`;
+        `<td style="${cel};font-weight:800;color:var(--naranja)">${f.fmt(tot)}</td><td style="${cel};color:var(--suave)">${f.fmt(prom)}</td></tr>`;
     }).join('');
     return `<div class="card" style="overflow-x:auto"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><h2 style="font-size:15px">📋 Cuadro mensual</h2><button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="window.print()">🖨️ Imprimir</button></div>
       <table style="border-collapse:collapse;min-width:100%">${''}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
@@ -1691,6 +1692,11 @@ const App = {
     // ── CUADRO MENSUAL (tabla) ──
     const _ventBy={}, _recurSet={}, _m300={};
     _ventas.forEach(x=>{ const m=x.mes, k=(x.cliente||'').trim().toUpperCase(), tv=+x.total_vendido||0; if(!m)return; _ventBy[m]=(_ventBy[m]||0)+tv; if(k && _first[k] && _first[k].o<_mNum(m)) (_recurSet[m]=_recurSet[m]||new Set()).add(k); if(k && tv>300000) (_m300[m]=_m300[m]||new Set()).add(k); });
+    let _ref=[]; try{ const rf=await fetch(this._SBU()+'/rest/v1/nc_ventas_ref?empresa=eq.smart&select=mes,unidades&limit=5000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jf=await rf.json(); _ref=Array.isArray(jf)?jf:[]; }catch(e){}
+    const _envBy={}; _ref.forEach(r=>{ const q=String(r.mes||'').split('-'); if(q.length===2 && +q[1]>=1){ _envBy[_M3[(+q[1])-1]+'-'+q[0]]=(+r.unidades||0); } });
+    let _peds=[]; try{ const rpp=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.smart&estado=eq.pedido&select=creado_en,datos&limit=4000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jpp=await rpp.json(); _peds=Array.isArray(jpp)?jpp:[]; }catch(e){}
+    let _uAct=0; _peds.forEach(pp=>{ const d=pp.datos||{}; const dt=new Date(pp.creado_en); const mm=_M3[dt.getMonth()]+'-'+dt.getFullYear(); if(mm===_mesAct) _uAct+=(+d.total_uds||0); });
+    if(_uAct && !_envBy[_mesAct]) _envBy[_mesAct]=_uAct;
     const _rmap={}; _resumen.forEach(r=>{ if(r.mes)_rmap[r.mes]=r; });
     let _regBase=0; _resumen.forEach(r=>{ const rr=+r.clientes_registrados||0; if(rr>_regBase)_regBase=rr; });
     const _mesesSet=new Set(); _resumen.forEach(r=>r.mes&&_mesesSet.add(r.mes)); Object.keys(_kitBy).forEach(m=>_mesesSet.add(m)); Object.keys(_nuevoBy).forEach(m=>_mesesSet.add(m)); Object.keys(_ventBy).forEach(m=>_mesesSet.add(m));
@@ -1700,7 +1706,7 @@ const App = {
         nuevos:(_nuevoBy[m]!=null)?_nuevoBy[m]:(+r.clientes_nuevos||0),
         registrados:(r.clientes_registrados!=null)?(+r.clientes_registrados||0):(_regBase+(_nuevoBy[m]||0)),
         recur:(r.clientes_recurrentes!=null)?(+r.clientes_recurrentes||0):((_recurSet[m]&&_recurSet[m].size)||0),
-        envases:+r.unidades||0,
+        envases:(_envBy[m]!=null)?_envBy[m]:(+r.unidades||0),
         ventas:(r.total!=null)?(+r.total||0):(_ventBy[m]||0),
         mas300:(_m300[m]&&_m300[m].size)||0 }; });
     let _acc=0; _meses.forEach(m=>{ _acc+=(_MM[m].ventas||0); _MM[m].ventasAcum=_acc; });
