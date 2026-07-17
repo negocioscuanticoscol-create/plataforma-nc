@@ -78,7 +78,7 @@ const App = {
     $('me_rol').textContent = ROL_NOMBRE[this.perfil.rol] || this.perfil.rol;
     try{ const { data:cfg } = await this.sb.from('config').select('value').eq('key','nav_permisos').maybeSingle(); this._permisos = cfg?cfg.value:null; }catch(e){ this._permisos=null; }
     this.pintarNav();
-    const inicio = {facturacion:'pedidos', bodega:'despachos', planta:'planta'}[this.perfil.rol] || 'dashboard';
+    const inicio = {facturacion:'pedidos', bodega:'despachos', planta:'planta'}[this.perfil.rol] || (window.NC_EMPRESA==='smart'?'panel':'dashboard');
     this.go(inicio);
   },
 
@@ -142,7 +142,7 @@ const App = {
     const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','datos','admin','permisos'];
     const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
-      facturacion:['dashboard','pedidos','cartera'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
+      facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
     if(r==='admin') permitidos=TODOS;
     this._permitidos=permitidos;
