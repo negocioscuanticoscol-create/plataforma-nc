@@ -1344,6 +1344,8 @@ const App = {
           <select id="transp-${p.id}" class="field" style="padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:6px">${TR.map(t=>`<option ${p.transportadora===t?'selected':''}>${t}</option>`).join('')}</select>
           <div id="guias-${p.id}">${(()=>{const gg=(p.guia||'').split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);return (gg.length?gg:['']).map(g=>`<input class="gguia field" style="padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:4px" placeholder="N° de guía" value="${esc(g)}">`).join('');})()}</div>
           <button class="btn-sm" type="button" style="background:#eef2ff;color:#3a48b3;margin-top:2px" onclick="App.addGuia('${p.id}')">➕ Agregar otra guía</button>
+          <div style="margin-top:8px"><label style="font-size:11.5px;color:#667;font-weight:700;display:block;margin-bottom:3px">💸 Costo flete real (lo que pagamos a la transportadora)</label>
+          <input id="fpr-${p.id}" class="field" inputmode="numeric" placeholder="Ej: 12500" value="${(p.datos&&p.datos.flete_pagado)||''}" style="padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%"></div>
         </div>
         <div class="acciones-item">
           <label class="btn-sm" style="background:#eef2ff;color:#3a48b3;cursor:pointer">📎 Adjuntar guía<input type="file" accept="image/*" style="display:none" onchange="App.pedSubirFoto('${p.id}',this)"></label>
@@ -1365,8 +1367,8 @@ const App = {
         <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 🚚 ${esc(p.transportadora||'—')}${ciu?' · 📍 '+esc(ciu):''} · guía ${esc(guiaLbl)}${tel?` · 📱 <a href="https://wa.me/57${esc(tel.replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">${esc(tel)}</a>`:''}</div></div><span class="badge" style="${ent?'background:#e7f7ee;color:#16734a':'background:#fff3e0;color:#b45309'}">${ent?'✅ entregado':'🚚 en ruta'}</span></div>
         ${gs.length>1?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">${gs.map((g,i)=>`<span onclick="App.copiarGuia('${esc(g)}')" title="copiar guía" style="font-size:11px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:6px;padding:3px 7px;cursor:pointer">${i+1}. ${esc(g)} 📋</span>`).join('')}</div>`:''}
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f8fafc;border:1px solid var(--linea);border-radius:8px;padding:7px 9px;margin:6px 0;font-size:12px">
-          <span>🧾 Cobrado <b>${cl(fCob)}</b></span><span style="color:#bbb">→</span>
-          <span>💸 Pagó Interr. <input id="fp-${p.id}" value="${fPag||''}" placeholder="0" inputmode="numeric" style="width:82px;padding:4px 6px;border:1px solid var(--linea);border-radius:6px;text-align:right"></span>
+          <span>🧾 Cliente pagó <b>${cl(fCob)}</b></span><span style="color:#bbb">→</span>
+          <span>💸 Costo flete real <input id="fp-${p.id}" value="${fPag||''}" placeholder="0" inputmode="numeric" style="width:82px;padding:4px 6px;border:1px solid var(--linea);border-radius:6px;text-align:right"></span>
           <button class="btn-sm" style="background:var(--negro);color:#fff;padding:4px 9px" onclick="App.setFletePagado('${p.id}')">💾</button>
           ${fPag>0?`<span style="font-weight:800;color:${mg>=0?'#16a34a':'#dc2626'}">${mg>=0?'✅ +':'⚠️ '}${cl(mg)}</span>`:'<span style="color:#9aa">falta el real</span>'}
         </div>
@@ -1457,7 +1459,11 @@ const App = {
     const guias=box?Array.from(box.querySelectorAll('.gguia')).map(i=>i.value.trim()).filter(Boolean):[];
     if(!guias.length){ alert('Pon al menos un número de guía antes de despachar.'); return; }
     const guia=guias.join('\n');   // varias guías = una por línea
-    await this.cotUpd(id,{transportadora:transp,guia:guia,estado_envio:'despachado',despachado_at:new Date().toISOString()});
+    const fpr=+(($('fpr-'+id)||{}).value||'').replace(/\D/g,'')||0;   // 💸 costo flete real que pagamos
+    const _p=(this._peds||[]).find(x=>x.id===id)||{};
+    const _upd={transportadora:transp,guia:guia,estado_envio:'despachado',despachado_at:new Date().toISOString()};
+    if(fpr>0){ const _dat=Object.assign({}, _p.datos||{}); _dat.flete_pagado=fpr; _upd.datos=_dat; }
+    await this.cotUpd(id,_upd);
     try{ const rq=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?id=eq.'+id+'&select=folio,cliente,datos',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}});
       const rj=await rq.json(); const cot=(rj&&rj[0])||{}; const d=cot.datos||{};
       const telR=(d.celular||d.envio_tel||'').toString();
