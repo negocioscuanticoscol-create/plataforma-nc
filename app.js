@@ -64,6 +64,13 @@ const App = {
     }
     this.perfil = perf || { rol:'vendedor', nombre:this.user.email };
     if(this.perfil.activo===false){ await this.sb.auth.signOut(); alert('🔒 Este acceso fue bloqueado por el administrador.'); location.reload(); return; }
+    // 🏢 restricción por empresa: si el perfil tiene una empresa asignada, solo entra a esa (admin/gerente entran a todas)
+    if(this.perfil.empresa && this.perfil.empresa!==window.NC_EMPRESA && !['admin','gerente'].includes(this.perfil.rol)){
+      const dest={feroz:'Feroz',smart:'Smart',epheta:'Epheta'}[this.perfil.empresa]||this.perfil.empresa;
+      await this.sb.auth.signOut();
+      alert('🔒 Tu acceso es solo para '+dest+'. Entra por el enlace de '+dest+' (?empresa='+this.perfil.empresa+').');
+      location.href = location.pathname+'?empresa='+this.perfil.empresa; return;
+    }
     this._loginTs=Date.now();
     this._startHeartbeat();
     $('view-login').classList.add('hide'); $('app').classList.remove('hide');
