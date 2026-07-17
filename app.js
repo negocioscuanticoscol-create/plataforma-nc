@@ -64,6 +64,8 @@ const App = {
     }
     this.perfil = perf || { rol:'vendedor', nombre:this.user.email };
     if(this.perfil.activo===false){ await this.sb.auth.signOut(); alert('🔒 Este acceso fue bloqueado por el administrador.'); location.reload(); return; }
+    this._loginTs=Date.now();
+    this._startHeartbeat();
     $('view-login').classList.add('hide'); $('app').classList.remove('hide');
     $('me_nombre').textContent = this.perfil.nombre || this.user.email;
     $('me_rol').textContent = ROL_NOMBRE[this.perfil.rol] || this.perfil.rol;
@@ -73,6 +75,40 @@ const App = {
     this.go(inicio);
   },
 
+  /* 🔒 KILL-SWITCH: la pestaña se pregunta sola cada 45s si su sesión sigue válida */
+  _startHeartbeat(){
+    if(this._hb) clearInterval(this._hb);
+    this._hb=setInterval(()=>this._heartbeat(), 45000);
+  },
+  async _heartbeat(){
+    if(!this.user) return;
+    try{
+      const { data:cfg } = await this.sb.from('config').select('value').eq('key','force_logout_before').maybeSingle();
+      const thr = cfg && cfg.value ? +cfg.value : 0;
+      if(thr && this._loginTs && this._loginTs < thr){
+        if(this._hb) clearInterval(this._hb);
+        await this.sb.auth.signOut();
+        alert('🔒 Tu sesión fue cerrada por seguridad. Vuelve a entrar.');
+        location.reload(); return;
+      }
+      // por si te bloquearon el usuario mientras estabas dentro
+      const { data:me } = await this.sb.from('perfiles').select('activo').eq('id', this.user.id).maybeSingle();
+      if(me && me.activo===false){
+        if(this._hb) clearInterval(this._hb);
+        await this.sb.auth.signOut();
+        alert('🔒 Tu acceso fue bloqueado.'); location.reload();
+      }
+    }catch(e){}
+  },
+  async cerrarTodasSesiones(){
+    if(!confirm('¿Cerrar TODAS las sesiones abiertas en TODOS los computadores?\n\nTodos (incluido tú) tendrán que volver a entrar. Úsalo si dejaste una sesión abierta en un equipo ajeno.')) return;
+    const now=Date.now();
+    const { error } = await this.sb.from('config').upsert({key:'force_logout_before', value:now});
+    if(error){ alert('No se pudo: '+error.message); return; }
+    alert('🔒 Listo. Todas las sesiones abiertas se cerrarán solas en menos de 1 minuto (aunque no las toquen). Vuelve a entrar.');
+    if(this._hb) clearInterval(this._hb);
+    await this.sb.auth.signOut(); location.reload();
+  },
   rol(){ return this.perfil?.rol; },
   puede(...roles){ const r=this.rol(); if(r==='gerente'&&roles.some(x=>['vendedor','facturacion','bodega','planta'].includes(x))) return true; return roles.includes(r); },
 
@@ -3430,6 +3466,11 @@ const App = {
       <button class="btn-sm" style="width:100%;margin-top:8px;background:${u.activo===false?'#16a34a':'#dc2626'};color:#fff;font-weight:700" onclick="App.toggleActivo('${u.id}', ${u.activo===false})">${u.activo===false?'✅ Activar acceso':'🔒 Bloquear acceso'}</button>
       </div>`).join('')}
       <div class="hint" style="margin-top:10px">Cada persona se registra sola (botón "Crear cuenta" en el login) y luego tú le asignas el rol aquí. Con 🔒 Bloquear le quitas el acceso al instante.</div>
+      <div class="card" style="border:2px solid #dc2626;background:#fef2f2;margin-top:14px">
+        <div style="font-weight:800;color:#b91c1c">🔴 Cerrar sesión en TODOS los equipos</div>
+        <div style="font-size:12.5px;color:#7f1d1d;margin:5px 0 9px">¿Dejaste la app abierta en un computador ajeno? Esto cierra TODAS las sesiones abiertas (se cierran solas en menos de 1 minuto, aunque no las toquen). Tú solo vuelves a entrar.</div>
+        <button class="btn" style="background:#dc2626;color:#fff;width:100%;font-weight:800" onclick="App.cerrarTodasSesiones()">🔒 Cerrar todas las sesiones ahora</button>
+      </div>
     `);
   },
   async cambiarRol(id,rol){
