@@ -1623,6 +1623,21 @@ const App = {
   },
 
   // Dashboard de Smart: lee SUS datos reales (leads del bot Valentina)
+  /* 📊 gráfica de barras mensual (dibujada a mano, sin librerías) */
+  _chartMeses(titulo, emoji, series, color){
+    if(!series||!series.length) return `<div class="card"><div style="font-size:14px;font-weight:700">${emoji} ${titulo}</div><div class="empty">Aún sin datos.</div></div>`;
+    const max=Math.max(...series.map(s=>s.n),1);
+    const total=series.reduce((a,s)=>a+s.n,0);
+    const bars=series.map(s=>`<div style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:40px">
+        <div style="font-size:12px;font-weight:800;color:${color}">${s.n}</div>
+        <div style="width:26px;height:${Math.round(s.n/max*120)+3}px;background:${color};border-radius:5px 5px 0 0"></div>
+        <div style="font-size:10.5px;color:var(--suave);white-space:nowrap">${esc(s.mes)}</div>
+      </div>`).join('');
+    return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:700">${emoji} ${titulo}</div>
+        <div style="font-size:12px;color:var(--suave)">total <b style="color:${color}">${total}</b></div></div>
+      <div style="display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding:4px 2px 0;min-height:150px">${bars}</div></div>`;
+  },
   async vDashboardSmart(){
     this.loading();
     const GAS='https://script.google.com/macros/s/AKfycbwUqUU_53BwfTTKW1levIpgGEZowfOmW-UltufLD6ZAPgQl7w1VdiaTMNUILqRp0Syf/exec';
@@ -1630,6 +1645,17 @@ const App = {
     let convs=[];
     try{ const r=await fetch(GAS+'?action=list&client=SMART&token='+TOK); const d=await r.json(); convs=d.conversations||[]; }catch(e){}
     const _pagosPanel=await this._pagosFetch();
+    let _ventas=[]; try{ const rv=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&select=es_kit,mes,cliente&limit=5000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jv=await rv.json(); _ventas=Array.isArray(jv)?jv:[]; }catch(e){}
+    const _M3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const _mNum=m=>{const q=String(m||'').split('-');const i=_M3.indexOf((q[0]||'').toLowerCase());return i<0?0:(+q[1]||0)*12+i;};
+    const _kitBy={}; _ventas.filter(x=>x.es_kit).forEach(x=>{ const m=x.mes||'s/f'; if(m!=='s/f')_kitBy[m]=(_kitBy[m]||0)+1; });
+    const _kitSeries=Object.entries(_kitBy).sort((a,b)=>_mNum(a[0])-_mNum(b[0])).map(([mes,nn])=>({mes,n:nn}));
+    const _first={}; _ventas.forEach(x=>{ const k=(x.cliente||'').trim().toUpperCase(); if(!k||!x.mes)return; const o=_mNum(x.mes); if(!_first[k]||o<_first[k].o)_first[k]={o,mes:x.mes}; });
+    let _resumen=[]; try{ const rr=await fetch(this._SBU()+'/rest/v1/nc_resumen_mensual?empresa=eq.smart&select=mes,clientes_nuevos',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jr=await rr.json(); _resumen=Array.isArray(jr)?jr:[]; }catch(e){}
+    const _nuevoBy={}; _resumen.forEach(r=>{ if(r.mes)_nuevoBy[r.mes]=+r.clientes_nuevos||0; });   // histórico desde enero
+    const _mesAct=_M3[new Date().getMonth()]+'-'+new Date().getFullYear();
+    if(!(_mesAct in _nuevoBy)){ const _liveNuevo=Object.values(_first).filter(f=>f.mes===_mesAct).length; if(_liveNuevo)_nuevoBy[_mesAct]=_liveNuevo; }   // mes actual en vivo
+    const _nuevoSeries=Object.entries(_nuevoBy).sort((a,b)=>_mNum(a[0])-_mNum(b[0])).map(([mes,nn])=>({mes,n:nn}));
     const total=convs.length, ahora=Date.now();
     const d30=convs.filter(c=>{const t=new Date(c.lastTime).getTime(); return (ahora-t)<30*864e5;}).length;
     const conNombre=convs.filter(c=>c.name && !/^\d+$/.test(c.name)).length;
@@ -1644,10 +1670,8 @@ const App = {
         <div class="kpi"><b>${d30}</b><span>Leads últimos 30 días</span></div>
         <div class="kpi"><b>297</b><span>Empresas B2B (envases)</span></div>
       </div>
-      <div class="card" style="border-left:4px solid var(--rojo)">
-        <div style="font-size:14px;font-weight:700">💰 Ventas por mes — por conectar</div>
-        <div style="font-size:13px;margin-top:4px">Dime en qué Sheet/pestaña están las ventas de Smart y las traigo aquí (igual que Feroz).</div>
-      </div>
+      ${this._chartMeses('Kits despachados por mes','🎟️',_kitSeries,'#16a34a')}
+      ${this._chartMeses('Clientes nuevos por mes','👥',_nuevoSeries,'#2563eb')}
       <div class="sub" style="margin-top:10px">El detalle de contactos está en 👥 CRM (B2B + B2C).</div>
     `);
   },
