@@ -486,7 +486,10 @@ const App = {
       const ultima=months.length?months[months.length-1]:0;
       let frec=null,prox=null;
       if(months.length>=2){ frec=Math.max(1,Math.round((months[months.length-1]-months[0])/(months.length-1))); prox=ultima+frec; }
-      return {best:titt(o.best), doc:o.doc, cel:(((this._cliByDoc||{})[o.doc]||{}).celular)||(this._celByName||{})[norm(o.best)]||'', veces, ultimaTxt:numM(ultima), frecTxt: months.length<2?'1ª compra':(frec<=1?'mensual':'cada ~'+frec+' meses'), proxTxt: prox?numM(prox):'—', atrasado: !!(prox && prox<nowM)};
+      const acum=o.rows.reduce((a,r)=>a+(+r.total_vendido||0),0);   // valor acumulado (todas sus compras)
+      let ultRow=null,ultN=-1; o.rows.forEach(r=>{ const n=mNum(r.mes); if(n>=ultN){ultN=n;ultRow=r;} });   // último pedido
+      const ultimoValor=+((ultRow&&ultRow.total_vendido))||0;
+      return {best:titt(o.best), doc:o.doc, cel:(((this._cliByDoc||{})[o.doc]||{}).celular)||(this._celByName||{})[norm(o.best)]||'', veces, acum, ultimoValor, ultimaTxt:numM(ultima), frecTxt: months.length<2?'1ª compra':(frec<=1?'mensual':'cada ~'+frec+' meses'), proxTxt: prox?numM(prox):'—', atrasado: !!(prox && prox<nowM)};
     }).sort((a,b)=> a.atrasado!==b.atrasado ? (a.atrasado?-1:1) : b.veces-a.veces);
     const atrasados=this._cliAnalitico.filter(c=>c.atrasado).length;
     this.set(`<h1>Clientes · Smart</h1><div class="sub">Dashboard de clientes · perfil meta y recurrencia</div>
@@ -514,12 +517,13 @@ const App = {
   },
   _cliAnaRows(arr){
     if(!arr||!arr.length) return '<div class="empty">Sin clientes con compras.</div>';
+    const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     return arr.map(c=>{ const cel=(c.cel||''); const tel=(cel+'').replace(/\D/g,'');
-      return `<div class="item" style="${c.atrasado?'border-left:3px solid var(--rojo)':''}"><div class="top"><div><div class="nom">${esc(c.best)}${cel?` · <span style="font-size:12px;color:#445;font-weight:600">📱 ${esc(cel)}</span>`:''}</div>
-        <div class="meta">🛒 ${c.veces} compra(s) · última ${c.ultimaTxt} · 🔁 ${c.frecTxt}${c.proxTxt!=='—'?' · 🔮 próx '+c.proxTxt:''}${c.atrasado?' · <b style="color:var(--rojo)">⚠️ atrasado</b>':''}</div></div></div>
+      return `<div class="item" style="${c.atrasado?'border-left:3px solid var(--rojo)':''}"><div class="top"><div><div class="nom">${esc(c.best)} <small style="color:var(--gristxt);font-weight:700">(${c.veces})</small>${cel?` · <span style="font-size:12px;color:#445;font-weight:600">📱 ${esc(cel)}</span>`:''}</div>
+        <div class="meta">💰 acumulado <b>${cl(c.acum)}</b> · 📦 último ${cl(c.ultimoValor)} (${c.ultimaTxt}) · 🔁 ${c.frecTxt}${c.proxTxt!=='—'?' · 🔮 próx '+c.proxTxt:''}${c.atrasado?' · <b style="color:var(--rojo)">⚠️ atrasado</b>':''}</div></div></div>
         <div class="acciones-item">
           <button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.cotAbrir('${esc(c.doc)}')">🧮 Cotizar</button>
-          ${tel?`<a class="btn-sm" href="https://wa.me/57${tel}" target="_blank" style="background:#25d366;color:#fff">📱 WhatsApp</a><a class="btn-sm" href="tel:${esc(cel)}" style="background:#2f6fed;color:#fff">📞 Llamar</a>`:''}
+          ${tel?`<a class="btn-sm" href="https://wa.me/57${tel}" target="_blank" style="background:#25d366;color:#fff">📱 WhatsApp</a><a class="btn-sm" href="tel:${esc(cel)}" style="background:#2f6fed;color:#fff">📞 Llamar</a>`:`<button class="btn-sm" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa" onclick="App.cliSmartTel('${esc(c.doc||'')}')">➕ Tel</button>`}
         </div></div>`;}).join('');
   },
   _filtrarCli(){ const i=$('cq'); const q=(i&&i.value||'').toLowerCase(); const f=(this._cliAnalitico||[]).filter(c=>(c.best+' '+c.doc).toLowerCase().includes(q)); const w=$('cliList'); if(w) w.innerHTML=this._cliAnaRows(f); },
@@ -536,9 +540,16 @@ const App = {
     if(!doc){ alert('Este cliente no tiene documento en la base para guardar el teléfono.'); return; }
     const v=prompt('📱 Teléfono / celular del cliente (para contactarlo por WhatsApp):'); if(v===null) return;
     const t=(v||'').replace(/\D/g,''); if(t.length<7){ alert('Número inválido.'); return; }
-    const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'};
+    // el cliente puede existir solo en las ventas y NO como ficha en nc_clientes → upsert (crea si falta)
+    const row=(this._cliAnalitico||[]).find(x=>x.doc===doc);
+    const nombre=((this._cliByDoc||{})[doc]||{}).nombre||(row&&row.best)||('Cliente '+doc);
+    const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'};
     try{
-      await fetch(this._SBU()+'/rest/v1/nc_clientes?empresa=eq.smart&documento=eq.'+encodeURIComponent(doc),{method:'PATCH',headers:H,body:JSON.stringify({celular:t})});
+      const r=await fetch(this._SBU()+'/rest/v1/nc_clientes?on_conflict=empresa,documento',{method:'POST',headers:H,body:JSON.stringify({empresa:'smart',documento:doc,nombre:nombre,celular:t})});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      // refresca cache local para que se vea al instante
+      this._cliByDoc=this._cliByDoc||{}; this._cliByDoc[doc]={...(this._cliByDoc[doc]||{}),documento:doc,nombre:nombre,celular:t};
+      this._celByName=this._celByName||{}; if(row) this._celByName[norm(row.best)]=t;
       this._toast('📱 Teléfono guardado'); this.vClientesSmart();
     }catch(e){ alert('No se pudo guardar: '+e); }
   },
