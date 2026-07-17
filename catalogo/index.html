@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Catálogo · Ventas</title>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--tx:#1b2130;--sub:#6b7688;--line:#e4e8ef;--acc:#7b3ff2;--acc2:#9d6bff;
+ --ok:#189d5b;--rojo:#d13b3b;--wa:#25d366;--nequi:#20063b;--banco:#ffd500;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--tx);font-size:15px}
+header{background:linear-gradient(120deg,#5a1fd6,#8b52ff);color:#fff;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:30}
+header .b{font-weight:800;font-size:17px}
+header .r{font-size:12px;opacity:.9}
+header button{background:rgba(255,255,255,.18);border:none;color:#fff;padding:7px 12px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px}
+nav{display:flex;gap:5px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:52px;z-index:29}
+nav button{background:transparent;border:none;color:var(--sub);padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13.5px;white-space:nowrap}
+nav button.on{background:var(--acc);color:#fff}
+main{max-width:900px;margin:0 auto;padding:16px 12px 90px}
+h1{font-size:21px;margin-bottom:2px}.sub{color:var(--sub);font-size:13px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;transition:.15s}
+.pcard:hover{border-color:var(--acc);transform:translateY(-2px)}
+.pcard .ph{width:100%;aspect-ratio:1;background:#eef0f5 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:34px;color:#c3c9d4}
+.pcard .in{padding:10px 12px}
+.pcard .nm{font-weight:700;font-size:14px;line-height:1.2}
+.pcard .pr{color:var(--acc);font-weight:800;margin-top:4px}
+.pcard .cm{font-size:11px;color:var(--ok);font-weight:600;margin-top:2px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;margin-bottom:12px}
+.gal{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+.gal img{height:230px;border-radius:12px;object-fit:cover;flex:none}
+.gal .none{height:230px;width:100%;background:#eef0f5;border-radius:12px;display:flex;align-items:center;justify-content:center;color:#c3c9d4;font-size:40px}
+.btn{background:var(--acc);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-weight:700;cursor:pointer;font-size:15px;width:100%}
+.btn.sec{background:#eceaf7;color:var(--acc)}.btn.ok{background:var(--ok)}.btn.rojo{background:var(--rojo)}
+.btn.sm{padding:8px 13px;font-size:13px;width:auto;border-radius:8px}
+label{font-size:12px;font-weight:700;color:var(--sub);display:block;margin:10px 0 4px;text-transform:uppercase;letter-spacing:.03em}
+input,select,textarea{width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;font-size:15px;font-family:inherit;background:#fff}
+.row{display:flex;gap:10px;align-items:center}
+.qty{display:flex;align-items:center;gap:10px}
+.qty button{width:38px;height:38px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:20px;font-weight:800;cursor:pointer;color:var(--acc)}
+.item{display:flex;gap:11px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.item img{width:52px;height:52px;border-radius:9px;object-fit:cover;background:#eef0f5;flex:none}
+.item .g{flex:1}.item .nm{font-weight:700;font-size:14px}.item .meta{font-size:12px;color:var(--sub)}
+.tot{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}
+.tot.big{font-size:19px;font-weight:800;border-top:2px solid var(--tx);padding-top:9px;margin-top:5px}
+.fab{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:40;width:calc(100% - 24px);max-width:876px}
+.pay{border:2px solid var(--line);border-radius:12px;padding:12px;margin-top:8px;cursor:pointer}
+.pay.on{border-color:var(--acc);background:#f6f2ff}
+.pay .t{font-weight:800}.pay .d{font-size:13px;color:var(--sub);margin-top:3px}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+.b-pend{background:#fdeede;color:#b45309}.b-pag{background:#e3f5ec;color:var(--ok)}.b-desp{background:#e7eefc;color:#2f6fed}
+.empty{text-align:center;color:var(--sub);padding:34px}
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--tx);color:#fff;padding:11px 20px;border-radius:10px;font-weight:700;z-index:99}
+.modal-bg{position:fixed;inset:0;background:rgba(20,25,40,.5);z-index:90;display:flex;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto}
+.modal{background:#fff;border-radius:16px;padding:18px;width:100%;max-width:560px}
+.tabs2{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.tabs2 button{background:#eceaf7;border:none;border-radius:8px;padding:8px 13px;font-weight:700;cursor:pointer;color:var(--acc);font-size:13px}
+.tabs2 button.on{background:var(--acc);color:#fff}
+.land{max-width:420px;margin:8vh auto;padding:0 16px;text-align:center}
+.land .logo{font-size:26px;font-weight:800;margin-bottom:6px}
+.land .logo span{color:var(--acc)}
+.land .card{margin-top:16px;text-align:left}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#f0eefb;color:var(--acc);border-radius:10px;padding:11px 14px;font-weight:700;cursor:pointer;width:100%;justify-content:center;margin-bottom:8px;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal"></div><div id="toast"></div>
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+async function api(p,o={}){ try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H,...o}); const t=await r.text(); if(!r.ok){ console.warn(p,t.slice(0,120)); return o.method?null:[]; } return t?JSON.parse(t):(o.method?{}:[]); }catch(e){ console.warn(e); return o.method?null:[]; } }
+const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b),headers:{...H,Prefer:'return=representation'}});
+const patch=(p,b)=>api(p,{method:'PATCH',body:JSON.stringify(b),headers:{...H,Prefer:'return=minimal'}});
+const del=p=>api(p,{method:'DELETE',headers:{...H,Prefer:'return=minimal'}});
+function toast(m){ const t=document.createElement('div');t.className='toast';t.textContent=m;$('toast').appendChild(t);setTimeout(()=>t.remove(),2400); }
+function modal(h){ $('modal').innerHTML=`<div class="modal-bg" onclick="if(event.target===this)cerrar()"><div class="modal">${h}</div></div>`; }
+function cerrar(){ $('modal').innerHTML=''; }
+async function subir(file,pref){ if(!file)return null; const path='vcat/'+pref+'_'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9.\-]/g,'_'); const r=await fetch(SB+'/storage/v1/object/documentos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K},body:file}); return r.ok?SB+'/storage/v1/object/public/documentos/'+path:null; }
+
+const App={
+cfg:{}, rol:null, vend:null, cart:[], adminTab:'productos',
+async init(){ const c=await api('vcat_config'); this.cfg={}; c.forEach(x=>this.cfg[x.clave]=x.valor); this.landing(); },
+c(k){ return this.cfg[k]||''; },
+set(h){ $('app').innerHTML=h; window.scrollTo(0,0); },
+
+/* ---------- LANDING ---------- */
+async landing(){
+  const vends=await api('vcat_vendedores?activo=eq.true&order=nombre');
+  this.set(`<div class="land"><div class="logo">🛍️ <span>${esc(this.c('marca')||'Catálogo')}</span></div>
+    <div class="sub">Ventas por catálogo</div>
+    <div class="card"><label>Soy vendedor · elige tu nombre</label>
+      ${vends.map(v=>`<div class="chip" onclick="App.entraVend(${v.id})">👤 ${esc(v.nombre)}</div>`).join('')||'<div class="empty" style="padding:14px">Aún no hay vendedores. Entra como admin para crearlos.</div>'}
+      <div style="text-align:center;margin-top:14px"><button class="btn sec sm" onclick="App.entraAdmin()">⚙️ Administrador</button></div>
+    </div></div>`);
+},
+async entraVend(id){ const v=(await api('vcat_vendedores?id=eq.'+id))[0]; if(!v)return; this.rol='vendedor'; this.vend=v; this.cart=[]; this.vCatalogo(); },
+entraAdmin(){ const pin=prompt('PIN de administrador:'); if(pin==null)return; if(pin!==this.c('admin_pin')){ toast('PIN incorrecto'); return; } this.rol='admin'; this.vAdmin(); },
+salir(){ this.rol=null; this.vend=null; this.cart=[]; this.landing(); },
+head(titulo,extra){ return `<header><div><div class="b">${esc(titulo)}</div>${extra?`<div class="r">${extra}</div>`:''}</div><button onclick="App.salir()">Salir</button></header>`; },
+
+/* ================= VENDEDOR ================= */
+async vCatalogo(){
+  const prods=await api('vcat_productos?activo=eq.true&order=nombre&limit=500');
+  this._prods=prods;
+  const nC=this.cart.reduce((a,i)=>a+i.qty,0);
+  this.set(`${this.head('Catálogo','Vendedor: '+esc(this.vend.nombre))}
+    <main><h1>Productos</h1><div class="sub">Toca un producto para ver fotos y detalles.</div>
+    <div class="grid">${prods.map(p=>{ const f=(p.fotos||[])[0];
+      return `<div class="pcard" onclick="App.vProducto(${p.id})">
+        <div class="ph" ${f?`style="background-image:url('${esc(f)}')"`:''}>${f?'':'📦'}</div>
+        <div class="in"><div class="nm">${esc(p.nombre)}</div><div class="pr">${money(p.precio)}</div>
+        <div class="cm">Comisión ${this._comTxt(p)}</div></div></div>`; }).join('')||'<div class="empty">Sin productos aún.</div>'}</div></main>
+    ${nC?`<div class="fab"><button class="btn ok" onclick="App.vCarrito()">🛒 Ver carrito (${nC}) · ${money(this._totCart().total)}</button></div>`:''}`);
+},
+_comTxt(p){ return p.comision_tipo==='pct' ? (p.comision_valor+'%') : money(p.comision_valor); },
+_comVal(p){ return p.comision_tipo==='pct' ? Math.round((+p.precio||0)*(+p.comision_valor||0)/100) : (+p.comision_valor||0); },
+vProducto(id){
+  const p=(this._prods||[]).find(x=>x.id===id); if(!p)return; this._qty=1;
+  const fotos=p.fotos||[];
+  this.set(`${this.head('Producto','')}
+    <main><button class="btn sec sm" onclick="App.vCatalogo()">← Volver</button>
+    <div class="card" style="margin-top:10px">
+      <div class="gal">${fotos.length?fotos.map(f=>`<img src="${esc(f)}" alt="">`).join(''):'<div class="none">📦</div>'}</div>
+      <h1 style="margin-top:12px">${esc(p.nombre)}</h1>
+      <div class="pr" style="color:var(--acc);font-size:24px;font-weight:800">${money(p.precio)}</div>
+      ${p.categoria?`<div class="sub">${esc(p.categoria)}</div>`:''}
+      ${p.cualidades?`<div style="margin-top:10px;white-space:pre-wrap;line-height:1.55">${esc(p.cualidades)}</div>`:''}
+      <label>Cantidad</label>
+      <div class="qty"><button onclick="App.qtyChg(-1)">−</button><input id="qtyv" type="number" value="1" style="width:80px;text-align:center" oninput="App._qty=Math.max(1,+this.value||1)"><button onclick="App.qtyChg(1)">＋</button></div>
+      <button class="btn" style="margin-top:16px" onclick="App.addCart(${id})">🛒 Agregar al pedido</button>
+    </div></main>`);
+},
+qtyChg(d){ this._qty=Math.max(1,(this._qty||1)+d); const i=$('qtyv'); if(i)i.value=this._qty; },
+addCart(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return; const q=Math.max(1,this._qty||1);
+  const ex=this.cart.find(i=>i.id===id); if(ex)ex.qty+=q; else this.cart.push({id,nombre:p.nombre,precio:+p.precio||0,comu:this._comVal(p),foto:(p.fotos||[])[0]||'',qty:q});
+  toast('Agregado ✓'); this.vCatalogo();
+},
+_totCart(){ const sub=this.cart.reduce((a,i)=>a+i.precio*i.qty,0); const com=this.cart.reduce((a,i)=>a+i.comu*i.qty,0); const envio=+this.c('envio_default')||0; return {sub,com,envio,total:sub+envio}; },
+vCarrito(){
+  if(!this.cart.length){ this.vCatalogo(); return; }
+  const t=this._totCart();
+  this.set(`${this.head('Carrito','')}
+    <main><button class="btn sec sm" onclick="App.vCatalogo()">← Seguir viendo</button>
+    <div class="card" style="margin-top:10px">
+      ${this.cart.map((i,ix)=>`<div class="item"><img src="${esc(i.foto)}" onerror="this.style.visibility='hidden'"><div class="g"><div class="nm">${esc(i.nombre)}</div><div class="meta">${money(i.precio)} c/u</div></div>
+        <div class="qty"><button onclick="App.cartQty(${ix},-1)">−</button><b>${i.qty}</b><button onclick="App.cartQty(${ix},1)">＋</button></div></div>`).join('')}
+      <div style="margin-top:12px">
+        <div class="tot"><span>Productos</span><span>${money(t.sub)}</span></div>
+        <div class="tot"><span>Envío</span><span>${money(t.envio)}</span></div>
+        <div class="tot big"><span>TOTAL</span><span>${money(t.total)}</span></div></div>
+    </div>
+    <button class="btn" onclick="App.vCheckout()">Continuar al pago →</button></main>`);
+},
+cartQty(ix,d){ const it=this.cart[ix]; if(!it)return; it.qty=Math.max(0,it.qty+d); if(it.qty===0)this.cart.splice(ix,1); if(!this.cart.length){this.vCatalogo();return;} this.vCarrito(); },
+vCheckout(){
+  const t=this._totCart(); this._pago='nequi'; this._envio='directo';
+  this.set(`${this.head('Datos y pago','')}
+    <main><button class="btn sec sm" onclick="App.vCarrito()">← Volver</button>
+    <div class="card" style="margin-top:10px"><h1 style="font-size:17px">Datos del cliente</h1>
+      <label>Nombre del cliente</label><input id="ck_nom">
+      <label>Celular / WhatsApp</label><input id="ck_cel" inputmode="numeric">
+      <label>Dirección de entrega</label><input id="ck_dir">
+      <label>Ciudad</label><input id="ck_ciu">
+    </div>
+    <div class="card"><h1 style="font-size:17px">¿A dónde se despacha?</h1>
+      <div class="pay on" id="env-directo" onclick="App.selEnvio('directo')"><div class="t">📦 Directo al cliente</div><div class="d">Se envía a la dirección de arriba.</div></div>
+      <div class="pay" id="env-caja" onclick="App.selEnvio('caja')"><div class="t">📥 En la caja del vendedor</div><div class="d">Llega con los demás pedidos a ${esc(this.vend.nombre)} para entregar.</div></div>
+    </div>
+    <div class="card"><h1 style="font-size:17px">Forma de pago</h1>
+      <div class="pay on" id="pay-nequi" onclick="App.selPago('nequi')"><div class="t">💜 Nequi</div><div class="d">${esc(this.c('nequi'))} · ${esc(this.c('nequi_titular'))}</div></div>
+      <div class="pay" id="pay-banco" onclick="App.selPago('banco')"><div class="t">🏦 ${esc(this.c('banco')||'Transferencia')}</div><div class="d">${esc(this.c('banco_cuenta')||'(configurar)')} · ${esc(this.c('banco_titular'))}</div></div>
+      <label>📷 Sube la foto del comprobante</label><input id="ck_comp" type="file" accept="image/*">
+    </div>
+    <div class="card"><div class="tot big"><span>TOTAL A PAGAR</span><span>${money(t.total)}</span></div>
+      <div class="sub" style="margin-top:4px">Tu comisión: ${money(t.com)}</div></div>
+    <button class="btn ok" id="ck_btn" onclick="App.confirmar()">✅ Confirmar pedido</button></main>`);
+},
+selPago(p){ this._pago=p; $('pay-nequi').classList.toggle('on',p==='nequi'); $('pay-banco').classList.toggle('on',p==='banco'); },
+selEnvio(e){ this._envio=e; $('env-directo').classList.toggle('on',e==='directo'); $('env-caja').classList.toggle('on',e==='caja'); },
+async confirmar(){
+  const v=id=>($(id)&&$(id).value.trim())||'';
+  if(!v('ck_nom')){ toast('Falta el nombre del cliente'); return; }
+  const comp=$('ck_comp')&&$('ck_comp').files[0];
+  if(!comp){ if(!confirm('No subiste el comprobante. ¿Guardar el pedido igual?')) return; }
+  const b=$('ck_btn'); b.textContent='Guardando…'; b.disabled=true;
+  const url=comp?await subir(comp,'comp'):null;
+  const t=this._totCart();
+  const num='PC-'+Date.now().toString().slice(-7);
+  const reg={numero:num,vendedor_id:this.vend.id,vendedor_nombre:this.vend.nombre,
+    cliente_nombre:v('ck_nom'),cliente_cel:v('ck_cel'),direccion:v('ck_dir'),ciudad:v('ck_ciu'),
+    items:this.cart,subtotal:t.sub,envio:t.envio,total:t.total,comision:t.com,
+    forma_pago:this._pago,comprobante_url:url,tipo_envio:this._envio,estado:url?'pagado':'pendiente'};
+  const r=await post('vcat_pedidos',reg);
+  if(!r){ toast('⚠️ No se pudo guardar'); b.textContent='✅ Confirmar pedido'; b.disabled=false; return; }
+  this.cart=[]; this.vGracias(num,t.total);
+},
+vGracias(num,total){
+  this.set(`${this.head('¡Listo!','')}
+    <main style="text-align:center;padding-top:40px">
+      <div style="font-size:60px">🎉</div>
+      <h1 style="margin-top:10px">Pedido confirmado</h1>
+      <div class="sub">N° ${esc(num)} · ${money(total)}</div>
+      <div class="card" style="margin-top:16px;text-align:left">El comprobante y los datos ya llegaron al equipo. Tu comisión queda registrada. 🙌</div>
+      <button class="btn" onclick="App.vCatalogo()">Hacer otro pedido</button></main>`);
+},
+
+/* ================= ADMIN ================= */
+vAdmin(){ this.set(`${this.head('Administrador','Codificación y pedidos')}
+  <nav>${[['productos','📦 Productos'],['vendedores','👥 Vendedores'],['pedidos','🧾 Pedidos'],['config','⚙️ Config']].map(([v,n])=>`<button class="${v===this.adminTab?'on':''}" onclick="App.adminGo('${v}')">${n}</button>`).join('')}</nav>
+  <main id="amain"><div class="empty">Cargando…</div></main>`); this.adminGo(this.adminTab); },
+adminGo(t){ this.adminTab=t; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.textContent.includes({productos:'Productos',vendedores:'Vendedores',pedidos:'Pedidos',config:'Config'}[t])));
+  ({productos:this.aProductos,vendedores:this.aVendedores,pedidos:this.aPedidos,config:this.aConfig}[t]).call(this); },
+am(h){ $('amain').innerHTML=h; },
+
+async aProductos(){
+  const ps=await api('vcat_productos?order=creado_en.desc&limit=500'); this._aprods=ps;
+  this.am(`<div class="row" style="justify-content:space-between;margin-bottom:10px"><h1>Productos · la receta</h1><button class="btn sm" onclick="App.prodForm()">＋ Nuevo</button></div>
+    <div class="sub">Precio de venta · comisión del vendedor · costo de envío.</div>
+    ${ps.map(p=>`<div class="card"><div class="row" style="justify-content:space-between">
+      <div class="row"><img src="${esc((p.fotos||[])[0]||'')}" style="width:46px;height:46px;border-radius:9px;object-fit:cover;background:#eef0f5" onerror="this.style.visibility='hidden'">
+        <div><b>${esc(p.nombre)}</b> ${p.activo?'':'<span class="badge b-pend">inactivo</span>'}<div class="meta" style="font-size:12px;color:var(--sub)">${money(p.precio)} · comis ${this._comTxt(p)} · envío ${money(p.costo_envio)}</div></div></div>
+      <button class="btn sm sec" onclick="App.prodForm(${p.id})">✏️</button></div></div>`).join('')||'<div class="empty">Sin productos.</div>'}`);
+},
+prodForm(id){
+  const p=(this._aprods||[]).find(x=>x.id===id)||{comision_tipo:'fijo'};
+  modal(`<h1 style="font-size:18px;margin-bottom:6px">${id?'Editar':'Nuevo'} producto</h1>
+    <label>Nombre</label><input id="pf_nombre" value="${esc(p.nombre||'')}">
+    <label>Categoría</label><input id="pf_cat" value="${esc(p.categoria||'')}">
+    <div class="row"><div style="flex:1"><label>Precio de venta</label><input id="pf_precio" type="number" value="${+p.precio||0}"></div>
+      <div style="flex:1"><label>Costo de envío</label><input id="pf_envio" type="number" value="${+p.costo_envio||0}"></div></div>
+    <div class="row"><div style="flex:1"><label>Comisión</label><select id="pf_ctipo"><option value="fijo" ${p.comision_tipo!=='pct'?'selected':''}>Valor fijo ($)</option><option value="pct" ${p.comision_tipo==='pct'?'selected':''}>Porcentaje (%)</option></select></div>
+      <div style="flex:1"><label>Valor comisión</label><input id="pf_cval" type="number" value="${+p.comision_valor||0}"></div></div>
+    <label>Cualidades / descripción</label><textarea id="pf_cual" rows="4">${esc(p.cualidades||'')}</textarea>
+    <label>Fotos ${(p.fotos||[]).length?`(${p.fotos.length} ya cargadas — subir reemplaza)`:''}</label><input id="pf_fotos" type="file" accept="image/*" multiple>
+    <label>Estado</label><select id="pf_activo"><option value="true" ${p.activo!==false?'selected':''}>Activo</option><option value="false" ${p.activo===false?'selected':''}>Inactivo</option></select>
+    <div class="row" style="margin-top:14px"><button class="btn" onclick="App.prodGuardar(${id||'null'})">💾 Guardar</button><button class="btn sec sm" onclick="cerrar()">Cancelar</button></div>`);
+},
+async prodGuardar(id){
+  const v=k=>($('pf_'+k)&&$('pf_'+k).value.trim())||'';
+  const b={nombre:v('nombre'),categoria:v('cat'),precio:+v('precio')||0,costo_envio:+v('envio')||0,
+    comision_tipo:v('ctipo'),comision_valor:+v('cval')||0,cualidades:v('cual'),activo:v('activo')==='true'};
+  if(!b.nombre){ toast('Falta el nombre'); return; }
+  const files=$('pf_fotos')&&$('pf_fotos').files;
+  if(files&&files.length){ const urls=[]; for(const f of files){ const u=await subir(f,'prod'); if(u)urls.push(u); } if(urls.length)b.fotos=urls; }
+  const r=id?await patch('vcat_productos?id=eq.'+id,b):await post('vcat_productos',b);
+  cerrar(); toast('Guardado'); this.aProductos();
+},
+
+async aVendedores(){
+  const vs=await api('vcat_vendedores?order=nombre&limit=500'); this._avends=vs;
+  this.am(`<div class="row" style="justify-content:space-between;margin-bottom:10px"><h1>Vendedores</h1><button class="btn sm" onclick="App.vendForm()">＋ Nuevo</button></div>
+    ${vs.map(v=>`<div class="card"><div class="row" style="justify-content:space-between">
+      <div><b>${esc(v.nombre)}</b> ${v.activo?'':'<span class="badge b-pend">inactivo</span>'}<div class="meta" style="font-size:12px;color:var(--sub)">CC ${esc(v.cedula||'—')} · 📱 ${esc(v.celular||'—')}</div></div>
+      <button class="btn sm sec" onclick="App.vendForm(${v.id})">✏️</button></div></div>`).join('')||'<div class="empty">Sin vendedores.</div>'}`);
+},
+vendForm(id){
+  const v=(this._avends||[]).find(x=>x.id===id)||{};
+  modal(`<h1 style="font-size:18px;margin-bottom:6px">${id?'Editar':'Nuevo'} vendedor</h1>
+    <label>Nombre</label><input id="vf_nombre" value="${esc(v.nombre||'')}">
+    <label>Cédula</label><input id="vf_cedula" value="${esc(v.cedula||'')}">
+    <label>Celular</label><input id="vf_celular" value="${esc(v.celular||'')}">
+    <label>Estado</label><select id="vf_activo"><option value="true" ${v.activo!==false?'selected':''}>Activo</option><option value="false" ${v.activo===false?'selected':''}>Inactivo</option></select>
+    <div class="row" style="margin-top:14px"><button class="btn" onclick="App.vendGuardar(${id||'null'})">💾 Guardar</button><button class="btn sec sm" onclick="cerrar()">Cancelar</button></div>`);
+},
+async vendGuardar(id){
+  const v=k=>($('vf_'+k)&&$('vf_'+k).value.trim())||'';
+  const b={nombre:v('nombre'),cedula:v('cedula'),celular:v('celular'),activo:v('activo')==='true'};
+  if(!b.nombre){ toast('Falta el nombre'); return; }
+  id?await patch('vcat_vendedores?id=eq.'+id,b):await post('vcat_vendedores',b);
+  cerrar(); toast('Guardado'); this.aVendedores();
+},
+
+async aPedidos(){
+  const ps=await api('vcat_pedidos?order=creado_en.desc&limit=500'); this._apeds=ps;
+  const tot=ps.reduce((a,p)=>a+(+p.total||0),0), com=ps.reduce((a,p)=>a+(+p.comision||0),0);
+  const bd={pendiente:'b-pend',pagado:'b-pag',despachado:'b-desp'};
+  this.am(`<h1>Pedidos</h1><div class="sub">${ps.length} pedidos · vendido ${money(tot)} · comisiones ${money(com)}</div>
+    ${ps.map(p=>`<div class="card"><div class="row" style="justify-content:space-between">
+      <div><b>${esc(p.cliente_nombre||'—')}</b> <span class="badge ${bd[p.estado]||'b-pend'}">${esc(p.estado)}</span>
+        <div class="meta" style="font-size:12px;color:var(--sub)">${esc(p.numero)} · ${esc(p.vendedor_nombre)} · ${money(p.total)} · comis ${money(p.comision)}</div>
+        <div class="meta" style="font-size:12px;color:var(--sub)">📍 ${esc(p.direccion||'')} ${esc(p.ciudad||'')} · ${p.tipo_envio==='caja'?'📥 caja al vendedor':'📦 directo'} · ${esc(p.forma_pago)}</div></div></div>
+      <div class="row" style="gap:6px;margin-top:8px">
+        ${p.comprobante_url?`<a class="btn sm sec" href="${esc(p.comprobante_url)}" target="_blank">🧾 Comprobante</a>`:'<span class="badge b-pend">sin comprobante</span>'}
+        ${p.estado!=='pagado'?`<button class="btn sm ok" onclick="App.pedEstado(${p.id},'pagado')">✅ Pago OK</button>`:''}
+        ${p.estado!=='despachado'?`<button class="btn sm" style="width:auto;background:#2f6fed" onclick="App.pedEstado(${p.id},'despachado')">🚚 Despachado</button>`:''}
+        <button class="btn sm sec" onclick="App.pedVer(${p.id})">👁</button></div></div>`).join('')||'<div class="empty">Sin pedidos aún.</div>'}`);
+},
+async pedEstado(id,e){ await patch('vcat_pedidos?id=eq.'+id,{estado:e}); toast('Actualizado'); this.aPedidos(); },
+pedVer(id){ const p=(this._apeds||[]).find(x=>x.id===id); if(!p)return;
+  modal(`<h1 style="font-size:18px">${esc(p.numero)}</h1><div class="sub">${esc(p.vendedor_nombre)} → ${esc(p.cliente_nombre)}</div>
+    ${(p.items||[]).map(i=>`<div class="item"><div class="g"><div class="nm">${esc(i.nombre)}</div><div class="meta">${i.qty} × ${money(i.precio)}</div></div><b>${money(i.qty*i.precio)}</b></div>`).join('')}
+    <div class="tot"><span>Envío</span><span>${money(p.envio)}</span></div>
+    <div class="tot big"><span>Total</span><span>${money(p.total)}</span></div>
+    <div class="sub" style="margin-top:6px">Comisión del vendedor: <b>${money(p.comision)}</b></div>
+    <button class="btn sec" style="margin-top:12px" onclick="cerrar()">Cerrar</button>`);
+},
+
+async aConfig(){
+  const F=[['marca','Marca / nombre'],['nequi','Nequi (número)'],['nequi_titular','Nequi titular'],['banco','Banco'],['banco_cuenta','Cuenta bancaria'],['banco_titular','Cuenta titular'],['envio_default','Costo de envío por defecto'],['admin_pin','PIN admin']];
+  this.am(`<h1>Configuración</h1><div class="sub">A dónde llega el pago y datos generales.</div>
+    <div class="card">${F.map(([k,l])=>`<label>${l}</label><input id="cf_${k}" value="${esc(this.c(k))}">`).join('')}
+    <button class="btn" style="margin-top:14px" onclick="App.cfgGuardar()">💾 Guardar</button></div>`);
+},
+async cfgGuardar(){
+  const F=['marca','nequi','nequi_titular','banco','banco_cuenta','banco_titular','envio_default','admin_pin'];
+  for(const k of F){ const val=($('cf_'+k)&&$('cf_'+k).value)||''; await api('vcat_config?clave=eq.'+k,{method:'PATCH',body:JSON.stringify({valor:val}),headers:{...H,Prefer:'return=minimal'}}); this.cfg[k]=val; }
+  toast('Guardado');
+},
+};
+App.init();
+</script>
+</body>
+</html>
