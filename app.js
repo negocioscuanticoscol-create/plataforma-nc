@@ -78,7 +78,7 @@ const App = {
     $('me_rol').textContent = ROL_NOMBRE[this.perfil.rol] || this.perfil.rol;
     try{ const { data:cfg } = await this.sb.from('config').select('value').eq('key','nav_permisos').maybeSingle(); this._permisos = cfg?cfg.value:null; }catch(e){ this._permisos=null; }
     this.pintarNav();
-    const inicio = {facturacion:'pedidos', bodega:'despachos', planta:'planta'}[this.perfil.rol] || (window.NC_EMPRESA==='smart'?'panel':'dashboard');
+    const inicio = {facturacion:'cotizaciones', bodega:'despachos', planta:'planta'}[this.perfil.rol] || (window.NC_EMPRESA==='smart'?'panel':'dashboard');
     this.go(inicio);
   },
 
