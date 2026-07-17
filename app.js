@@ -1648,7 +1648,9 @@ const App = {
     let _ventas=[]; try{ const rv=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&select=es_kit,mes,cliente&limit=5000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jv=await rv.json(); _ventas=Array.isArray(jv)?jv:[]; }catch(e){}
     const _M3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     const _mNum=m=>{const q=String(m||'').split('-');const i=_M3.indexOf((q[0]||'').toLowerCase());return i<0?0:(+q[1]||0)*12+i;};
+    let _kitHist=[]; try{ const rk=await fetch(this._SBU()+'/rest/v1/nc_kits_mes?empresa=eq.smart&select=mes,kits',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jk=await rk.json(); _kitHist=Array.isArray(jk)?jk:[]; }catch(e){}
     const _kitBy={}; _ventas.filter(x=>x.es_kit).forEach(x=>{ const m=x.mes||'s/f'; if(m!=='s/f')_kitBy[m]=(_kitBy[m]||0)+1; });
+    _kitHist.forEach(h=>{ if(h.mes && !(h.mes in _kitBy)) _kitBy[h.mes]=+h.kits||0; });   // meses viejos (ene/feb) del Sheet
     const _kitSeries=Object.entries(_kitBy).sort((a,b)=>_mNum(a[0])-_mNum(b[0])).map(([mes,nn])=>({mes,n:nn}));
     const _first={}; _ventas.forEach(x=>{ const k=(x.cliente||'').trim().toUpperCase(); if(!k||!x.mes)return; const o=_mNum(x.mes); if(!_first[k]||o<_first[k].o)_first[k]={o,mes:x.mes}; });
     let _resumen=[]; try{ const rr=await fetch(this._SBU()+'/rest/v1/nc_resumen_mensual?empresa=eq.smart&select=mes,clientes_nuevos',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jr=await rr.json(); _resumen=Array.isArray(jr)?jr:[]; }catch(e){}
