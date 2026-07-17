@@ -1623,6 +1623,36 @@ const App = {
   },
 
   // Dashboard de Smart: lee SUS datos reales (leads del bot Valentina)
+  /* 📋 Cuadro mensual — cada métrica en fila, meses en columna, Total */
+  _tablaMeses(meses, MM){
+    if(!meses||!meses.length) return '';
+    const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
+    const nm=n=>Math.round(n||0).toLocaleString('es-CO');
+    const NOM={ene:'Ene',feb:'Feb',mar:'Mar',abr:'Abr',may:'May',jun:'Jun',jul:'Jul',ago:'Ago',sep:'Sep',oct:'Oct',nov:'Nov',dic:'Dic'};
+    const lbl=m=>{const q=String(m).split('-'); return (NOM[q[0]]||q[0]);};
+    const filas=[
+      {k:'kits', t:'🎟️ Kits', fmt:nm, tot:'sum'},
+      {k:'nuevos', t:'👥 Clientes nuevos', fmt:nm, tot:'sum'},
+      {k:'registrados', t:'📇 Clientes registrados', fmt:nm, tot:'last'},
+      {k:'recur', t:'🔁 Recurrentes', fmt:nm, tot:'sum'},
+      {k:'envases', t:'📦 Envases vendidos', fmt:nm, tot:'sum'},
+      {k:'ventas', t:'💰 Ventas del mes', fmt:cl, tot:'sum'},
+      {k:'ventasAcum', t:'📈 Ventas acumuladas', fmt:cl, tot:'last'},
+      {k:'mas300', t:'🎯 Clientes +$300k', fmt:nm, tot:'sum'},
+    ];
+    const cel='padding:7px 9px;border-bottom:1px solid var(--linea);font-size:12.5px;text-align:right;white-space:nowrap';
+    const th='padding:8px 9px;border-bottom:2px solid var(--linea);font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.04em;text-align:right;white-space:nowrap';
+    const head=`<th style="${th};text-align:left;position:sticky;left:0;background:#fff">Métrica</th>`+meses.map(m=>`<th style="${th}">${lbl(m)}</th>`).join('')+`<th style="${th};color:var(--naranja)">Total</th>`;
+    const body=filas.map(f=>{
+      const tot = f.tot==='last' ? (+MM[meses[meses.length-1]][f.k]||0) : meses.reduce((a,m)=>a+(+MM[m][f.k]||0),0);
+      return `<tr><td style="${cel};text-align:left;font-weight:700;position:sticky;left:0;background:#fff">${f.t}</td>`+
+        meses.map(m=>`<td style="${cel}">${f.fmt(MM[m][f.k])}</td>`).join('')+
+        `<td style="${cel};font-weight:800;color:var(--naranja)">${f.fmt(tot)}</td></tr>`;
+    }).join('');
+    return `<div class="card" style="overflow-x:auto"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><h2 style="font-size:15px">📋 Cuadro mensual</h2><button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="window.print()">🖨️ Imprimir</button></div>
+      <table style="border-collapse:collapse;min-width:100%">${''}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+      <div style="font-size:11px;color:var(--suave);margin-top:6px">Ene y feb: kits del Sheet Envios · lo demás automático por la app. “+$300k” y recurrentes: desde marzo (detalle en la base).</div></div>`;
+  },
   /* 📊 gráfica de barras mensual (dibujada a mano, sin librerías) */
   _chartMeses(titulo, emoji, series, color){
     if(!series||!series.length) return `<div class="card"><div style="font-size:14px;font-weight:700">${emoji} ${titulo}</div><div class="empty">Aún sin datos.</div></div>`;
@@ -1645,7 +1675,7 @@ const App = {
     let convs=[];
     try{ const r=await fetch(GAS+'?action=list&client=SMART&token='+TOK); const d=await r.json(); convs=d.conversations||[]; }catch(e){}
     const _pagosPanel=await this._pagosFetch();
-    let _ventas=[]; try{ const rv=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&select=es_kit,mes,cliente&limit=5000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jv=await rv.json(); _ventas=Array.isArray(jv)?jv:[]; }catch(e){}
+    let _ventas=[]; try{ const rv=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&select=es_kit,mes,cliente,total_vendido,comision_bruta&limit=5000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jv=await rv.json(); _ventas=Array.isArray(jv)?jv:[]; }catch(e){}
     const _M3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     const _mNum=m=>{const q=String(m||'').split('-');const i=_M3.indexOf((q[0]||'').toLowerCase());return i<0?0:(+q[1]||0)*12+i;};
     let _kitHist=[]; try{ const rk=await fetch(this._SBU()+'/rest/v1/nc_kits_mes?empresa=eq.smart&select=mes,kits',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jk=await rk.json(); _kitHist=Array.isArray(jk)?jk:[]; }catch(e){}
@@ -1653,11 +1683,27 @@ const App = {
     _kitHist.forEach(h=>{ if(h.mes && !(h.mes in _kitBy)) _kitBy[h.mes]=+h.kits||0; });   // meses viejos (ene/feb) del Sheet
     const _kitSeries=Object.entries(_kitBy).sort((a,b)=>_mNum(a[0])-_mNum(b[0])).map(([mes,nn])=>({mes,n:nn}));
     const _first={}; _ventas.forEach(x=>{ const k=(x.cliente||'').trim().toUpperCase(); if(!k||!x.mes)return; const o=_mNum(x.mes); if(!_first[k]||o<_first[k].o)_first[k]={o,mes:x.mes}; });
-    let _resumen=[]; try{ const rr=await fetch(this._SBU()+'/rest/v1/nc_resumen_mensual?empresa=eq.smart&select=mes,clientes_nuevos',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jr=await rr.json(); _resumen=Array.isArray(jr)?jr:[]; }catch(e){}
+    let _resumen=[]; try{ const rr=await fetch(this._SBU()+'/rest/v1/nc_resumen_mensual?empresa=eq.smart&select=mes,clientes_nuevos,clientes_recurrentes,clientes_registrados,unidades,total,ventas_libro',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jr=await rr.json(); _resumen=Array.isArray(jr)?jr:[]; }catch(e){}
     const _nuevoBy={}; _resumen.forEach(r=>{ if(r.mes)_nuevoBy[r.mes]=+r.clientes_nuevos||0; });   // histórico desde enero
     const _mesAct=_M3[new Date().getMonth()]+'-'+new Date().getFullYear();
     if(!(_mesAct in _nuevoBy)){ const _liveNuevo=Object.values(_first).filter(f=>f.mes===_mesAct).length; if(_liveNuevo)_nuevoBy[_mesAct]=_liveNuevo; }   // mes actual en vivo
     const _nuevoSeries=Object.entries(_nuevoBy).sort((a,b)=>_mNum(a[0])-_mNum(b[0])).map(([mes,nn])=>({mes,n:nn}));
+    // ── CUADRO MENSUAL (tabla) ──
+    const _ventBy={}, _recurSet={}, _m300={};
+    _ventas.forEach(x=>{ const m=x.mes, k=(x.cliente||'').trim().toUpperCase(), tv=+x.total_vendido||0; if(!m)return; _ventBy[m]=(_ventBy[m]||0)+tv; if(k && _first[k] && _first[k].o<_mNum(m)) (_recurSet[m]=_recurSet[m]||new Set()).add(k); if(k && tv>300000) (_m300[m]=_m300[m]||new Set()).add(k); });
+    const _rmap={}; _resumen.forEach(r=>{ if(r.mes)_rmap[r.mes]=r; });
+    let _regBase=0; _resumen.forEach(r=>{ const rr=+r.clientes_registrados||0; if(rr>_regBase)_regBase=rr; });
+    const _mesesSet=new Set(); _resumen.forEach(r=>r.mes&&_mesesSet.add(r.mes)); Object.keys(_kitBy).forEach(m=>_mesesSet.add(m)); Object.keys(_nuevoBy).forEach(m=>_mesesSet.add(m)); Object.keys(_ventBy).forEach(m=>_mesesSet.add(m));
+    const _meses=[..._mesesSet].filter(Boolean).sort((a,b)=>_mNum(a)-_mNum(b));
+    const _MM={}; _meses.forEach(m=>{ const r=_rmap[m]||{};
+      _MM[m]={ kits:_kitBy[m]||0,
+        nuevos:(_nuevoBy[m]!=null)?_nuevoBy[m]:(+r.clientes_nuevos||0),
+        registrados:(r.clientes_registrados!=null)?(+r.clientes_registrados||0):(_regBase+(_nuevoBy[m]||0)),
+        recur:(r.clientes_recurrentes!=null)?(+r.clientes_recurrentes||0):((_recurSet[m]&&_recurSet[m].size)||0),
+        envases:+r.unidades||0,
+        ventas:(r.total!=null)?(+r.total||0):(_ventBy[m]||0),
+        mas300:(_m300[m]&&_m300[m].size)||0 }; });
+    let _acc=0; _meses.forEach(m=>{ _acc+=(_MM[m].ventas||0); _MM[m].ventasAcum=_acc; });
     const total=convs.length, ahora=Date.now();
     const d30=convs.filter(c=>{const t=new Date(c.lastTime).getTime(); return (ahora-t)<30*864e5;}).length;
     const conNombre=convs.filter(c=>c.name && !/^\d+$/.test(c.name)).length;
@@ -1672,6 +1718,7 @@ const App = {
         <div class="kpi"><b>${d30}</b><span>Leads últimos 30 días</span></div>
         <div class="kpi"><b>297</b><span>Empresas B2B (envases)</span></div>
       </div>
+      ${this._tablaMeses(_meses,_MM)}
       ${this._chartMeses('Kits despachados por mes','🎟️',_kitSeries,'#16a34a')}
       ${this._chartMeses('Clientes nuevos por mes','👥',_nuevoSeries,'#2563eb')}
       <div class="sub" style="margin-top:10px">El detalle de contactos está en 👥 CRM (B2B + B2C).</div>
