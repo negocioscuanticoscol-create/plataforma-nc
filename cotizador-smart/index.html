@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Cotizador Smart Packaging Colombia</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#f7f5f0;--white:#fff;--dark:#111410;--dark2:#2a2d27;
@@ -25,30 +25,30 @@ a{text-decoration:none;color:inherit}
 .lmark{width:36px;height:36px;background:var(--gm);border-radius:8px;display:flex;align-items:center;justify-content:center}
 .lmark svg{width:20px;height:20px;fill:white;stroke:none}
 .ltxt{font-size:14px;font-weight:700;color:white;letter-spacing:.04em}
-.lsub{font-size:10px;color:rgba(255,255,255,.45);font-family:'JetBrains Mono',monospace}
+.lsub{font-size:10px;color:rgba(255,255,255,.45);font-family:'IBM Plex Mono',monospace}
 .hwa{background:var(--gm);color:white;font-size:12px;font-weight:600;padding:7px 14px;border-radius:20px;display:flex;align-items:center;gap:6px}
 .hwa svg{width:14px;height:14px;fill:white}
 
 .hero{background:var(--dark);padding:28px 20px 36px;position:relative;overflow:hidden}
 .hero::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:30px;background:var(--bg);border-radius:30px 30px 0 0}
-.htag{display:inline-block;background:rgba(45,158,95,.2);color:#6ee9a0;font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;margin-bottom:12px}
+.htag{display:inline-block;background:rgba(45,158,95,.2);color:#6ee9a0;font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;margin-bottom:12px}
 .hero h1{font-size:26px;font-weight:800;color:white;line-height:1.2;margin-bottom:8px}
 .hero h1 em{color:var(--acc);font-style:normal}
 .hero p{font-size:13px;color:rgba(255,255,255,.55);line-height:1.6}
 .hbadges{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
 .hbadge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);font-size:11px;padding:5px 10px;border-radius:20px}
-#inv-status{margin-top:8px;font-size:10px;color:rgba(255,255,255,.35);font-family:'JetBrains Mono',monospace}
+#inv-status{margin-top:8px;font-size:10px;color:rgba(255,255,255,.35);font-family:'IBM Plex Mono',monospace}
 
 .aviso-trazabilidad{margin:14px 12px 4px;background:linear-gradient(135deg,#0a2a1a 0%,#1a4a2a 100%);border:1.5px solid var(--gm);border-radius:var(--rl2);padding:16px 16px 14px;position:relative;overflow:hidden;}
 .aviso-trazabilidad::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gm),var(--acc),var(--gm));}
 .aviso-trazabilidad-icon{font-size:26px;margin-bottom:8px;display:block}
-.aviso-trazabilidad-titulo{font-size:13px;font-weight:800;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;font-family:'JetBrains Mono',monospace;}
+.aviso-trazabilidad-titulo{font-size:13px;font-weight:800;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;font-family:'IBM Plex Mono',monospace;}
 .aviso-trazabilidad-texto{font-size:13px;color:rgba(255,255,255,.85);line-height:1.65;font-weight:500}
 .aviso-trazabilidad-texto strong{color:#6ee9a0;font-weight:700}
 
 .steps{display:flex;background:white;border-bottom:1px solid var(--bd);overflow-x:auto;scrollbar-width:none}
 .steps::-webkit-scrollbar{display:none}
-.step{flex:1;min-width:80px;padding:13px 8px 11px;text-align:center;font-size:10px;font-weight:600;color:var(--t3);letter-spacing:.08em;font-family:'JetBrains Mono',monospace;border-right:1px solid var(--bd);position:relative;transition:all .2s}
+.step{flex:1;min-width:80px;padding:13px 8px 11px;text-align:center;font-size:10px;font-weight:600;color:var(--t3);letter-spacing:.08em;font-family:'IBM Plex Mono',monospace;border-right:1px solid var(--bd);position:relative;transition:all .2s}
 .step:last-child{border-right:none}
 .step.active{color:var(--green);background:var(--gl)}
 .step.active::after{content:'';position:absolute;bottom:0;left:0;right:0;height:3px;background:var(--gm);border-radius:3px 3px 0 0}
@@ -59,7 +59,7 @@ a{text-decoration:none;color:inherit}
 .panel{display:none;animation:fadeUp .2s ease}.panel.active{display:block}
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 
-.slabel{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;padding:18px 20px 10px}
+.slabel{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;padding:18px 20px 10px}
 
 .ibox{margin:14px 12px 0;background:var(--al);border:1px solid rgba(240,165,0,.3);border-radius:var(--r);padding:12px 14px;font-size:12px;color:#7a5800;line-height:1.6}
 .ibox strong{color:#5a4000}
@@ -77,7 +77,7 @@ a{text-decoration:none;color:inherit}
 .pbody{padding:0 16px 15px;display:none}
 .promo.open .pbody{display:block}
 .prow{display:flex;gap:8px}
-.pinp{flex:1;background:var(--bg);border:2px solid var(--gm);border-radius:10px;color:var(--dark);font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;padding:12px 15px;outline:none;letter-spacing:.12em;text-transform:uppercase}
+.pinp{flex:1;background:var(--bg);border:2px solid var(--gm);border-radius:10px;color:var(--dark);font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;padding:12px 15px;outline:none;letter-spacing:.12em;text-transform:uppercase}
 .pinp:focus{border-color:var(--green);background:white}
 .pinp.perr{border-color:var(--red)}
 .pbtn{background:var(--green);color:white;border:none;border-radius:10px;padding:12px 18px;font-family:'Outfit',sans-serif;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap}
@@ -92,9 +92,9 @@ a{text-decoration:none;color:inherit}
 .pc.sel{border-color:var(--gm);background:var(--gl)}
 .pc.sel::before{background:var(--gm)}
 .pvol{font-size:18px;font-weight:800;color:var(--dark);line-height:1;margin-bottom:0}
-.poz{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-bottom:4px;font-weight:500}
+.poz{font-size:10px;color:var(--t3);font-family:'IBM Plex Mono',monospace;margin-bottom:4px;font-weight:500}
 .pline{font-size:10px;color:var(--t2);margin-bottom:2px;font-weight:500}
-.pdims{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--t3);margin-bottom:5px}
+.pdims{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--t3);margin-bottom:5px}
 .ppaca{font-size:11px;color:var(--green);font-weight:700;margin-bottom:2px}
 .pmin{font-size:10px;color:var(--red);font-weight:700}
 
@@ -112,11 +112,11 @@ a{text-decoration:none;color:inherit}
 .cdot-b{width:12px;height:12px;border-radius:50%;background:#fff;border:1.5px solid #bbb;flex-shrink:0}
 .clabel{font-size:11px;font-weight:600;color:var(--t2)}
 .cqright{display:flex;align-items:center;gap:5px}
-.qinp{width:68px;background:white;border:1.5px solid var(--bd2);border-radius:8px;color:var(--dark);font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:500;padding:6px 8px;outline:none;text-align:center;-webkit-appearance:none}
+.qinp{width:68px;background:white;border:1.5px solid var(--bd2);border-radius:8px;color:var(--dark);font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:500;padding:6px 8px;outline:none;text-align:center;-webkit-appearance:none}
 .qinp:focus{border-color:var(--gm)}
 .qunit{font-size:10px;color:var(--t3)}
 .qwarn{font-size:10px;color:var(--red);margin-top:3px;display:none}
-.qtotline{font-size:10px;font-family:'JetBrains Mono',monospace;margin-top:5px;text-align:right;color:var(--t2)}
+.qtotline{font-size:10px;font-family:'IBM Plex Mono',monospace;margin-top:5px;text-align:right;color:var(--t2)}
 
 .kit-muestras-card{margin:0 12px 16px;background:white;border:2px solid var(--acc);border-radius:var(--rl2);padding:14px 15px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;}
 .kit-muestras-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--acc)}
@@ -129,7 +129,7 @@ a{text-decoration:none;color:inherit}
 
 .fwrap{padding:0 12px 14px}
 .field{margin-bottom:12px}
-.field label{display:block;font-size:11px;font-weight:600;color:var(--t2);margin-bottom:5px;letter-spacing:.05em;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--t2);margin-bottom:5px;letter-spacing:.05em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace}
 .field input,.field textarea,.field select{width:100%;background:white;border:1.5px solid var(--bd);border-radius:var(--r);color:var(--dark);font-family:'Outfit',sans-serif;font-size:14px;padding:10px 13px;outline:none;transition:border-color .15s;-webkit-appearance:none}
 .field input:focus,.field textarea:focus,.field select:focus{border-color:var(--gm)}
 .field textarea{resize:none;height:72px;line-height:1.5}
@@ -145,7 +145,7 @@ a{text-decoration:none;color:inherit}
 .tipo-card .tsub{font-size:10px;color:var(--t3);margin-top:2px}
 .fbox{background:var(--gl);border:1px solid rgba(45,158,95,.25);border-radius:var(--r);padding:11px 14px;margin-bottom:13px;font-size:12px;color:var(--green);line-height:1.6}
 
-.transp-label{font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.05em;text-transform:uppercase;font-family:'JetBrains Mono',monospace;margin-bottom:8px;margin-top:14px;display:block}
+.transp-label{font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.05em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-bottom:8px;margin-top:14px;display:block}
 .transp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
 @media(max-width:400px){.transp-grid{grid-template-columns:1fr}}
 .transp-card{border:2px solid var(--bd);border-radius:var(--r);padding:12px 10px;text-align:center;cursor:pointer;transition:all .15s;background:white}
@@ -164,17 +164,17 @@ a{text-decoration:none;color:inherit}
 .toggle-envio.active .te-sw{background:var(--gm)}
 .toggle-envio.active .te-sw::after{transform:translateX(16px)}
 .envio-box{display:none;background:white;border:1.5px solid var(--gm);border-radius:var(--r);padding:13px 14px;margin-bottom:4px}
-.envio-box-title{font-size:11px;font-weight:600;color:var(--green);font-family:'JetBrains Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.envio-box-title{font-size:11px;font-weight:600;color:var(--green);font-family:'IBM Plex Mono',monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
 
 .swrap{padding:14px 12px}
 .scard{background:white;border:1px solid var(--bd);border-radius:var(--rl2);overflow:hidden;margin-bottom:12px}
-.shdr{background:var(--dark);padding:11px 15px;font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.shdr{background:var(--dark);padding:11px 15px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
 .shdr-folio{color:var(--acc);font-weight:600}
 .srow{display:flex;justify-content:space-between;align-items:flex-start;padding:9px 15px;border-bottom:1px solid var(--bd);font-size:13px}
 .srow:last-child{border-bottom:none}
 .srl{color:var(--t2)}
-.srl small{display:block;font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;margin-top:1px}
-.srr{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--dark);text-align:right}
+.srl small{display:block;font-size:10px;color:var(--t3);font-family:'IBM Plex Mono',monospace;margin-top:1px}
+.srr{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--dark);text-align:right}
 .snote{font-size:11px;color:var(--t3);line-height:1.6;margin-bottom:14px}
 
 .btn{display:block;width:100%;padding:13px 20px;border-radius:var(--r);font-family:'Outfit',sans-serif;font-weight:700;font-size:15px;cursor:pointer;border:none;transition:all .18s;text-align:center;letter-spacing:.02em}
@@ -192,7 +192,7 @@ a{text-decoration:none;color:inherit}
 .confirmado-title{font-size:18px;font-weight:800;color:var(--green);margin-bottom:6px}
 .confirmado-sub{font-size:13px;color:var(--t2);line-height:1.6}
 
-.footer{padding:18px 20px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.08em;border-top:1px solid var(--bd)}
+.footer{padding:18px 20px;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--t3);letter-spacing:.08em;border-top:1px solid var(--bd)}
 .sheets-sending{display:none;text-align:center;padding:8px;font-size:12px;color:var(--t3)}
 label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;color:var(--green)!important}
 .ali-btn{display:inline-flex;align-items:center;gap:6px;background:var(--bg);border:1.5px solid var(--bd);border-radius:8px;padding:8px 13px;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;user-select:none;-webkit-user-select:none;}
@@ -274,7 +274,7 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
 <div class="panel" id="p2">
   <div class="fwrap" style="padding-top:14px">
     <div class="fbox"><strong>Envío a toda Colombia</strong> — una vez verificado el pago despachamos de inmediato. Tu pedido llega en 2-3 días hábiles. Flete incluido en la factura.</div>
-    <div style="font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.05em;text-transform:uppercase;font-family:'JetBrains Mono',monospace;margin-bottom:8px">Tipo de cliente *</div>
+    <div style="font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.05em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-bottom:8px">Tipo de cliente *</div>
     <div class="tipo-grid">
       <div class="tipo-card tsel" id="tc-nat" onclick="setTipo('nat')"><div class="ticon">👤</div><div class="ttitle">Persona natural</div><div class="tsub">Cédula de ciudadanía</div></div>
       <div class="tipo-card" id="tc-jur" onclick="setTipo('jur')"><div class="ticon">🏢</div><div class="ttitle">Persona jurídica</div><div class="tsub">Empresa con NIT / RUT</div></div>
@@ -394,17 +394,17 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
       <div class="shdr"><span>Cotización Smart Packaging Colombia</span><span class="shdr-folio" id="folio-display"></span></div>
       <div id="sum-items"></div>
       <div style="padding:10px 15px;background:var(--bg)">
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">Subtotal sin IVA</span><span style="font-family:'JetBrains Mono',monospace;font-weight:500" id="s-sub">-</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">IVA 19%</span><span style="font-family:'JetBrains Mono',monospace;font-weight:500" id="s-iva">-</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--t2)">Flete <span id="s-cajas" style="font-size:10px;color:var(--t3)"></span></span><span style="font-family:'JetBrains Mono',monospace;font-weight:500;color:var(--acc)" id="s-flete">-</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">Subtotal sin IVA</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-sub">-</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">IVA 19%</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-iva">-</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--t2)">Flete <span id="s-cajas" style="font-size:10px;color:var(--t3)"></span></span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500;color:var(--acc)" id="s-flete">-</span></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 15px;background:var(--gl);border-top:2px solid var(--gm)">
         <span style="font-size:13px;font-weight:700;color:var(--dark)">Total a pagar</span>
-        <span style="font-size:22px;font-weight:800;color:var(--green);font-family:'JetBrains Mono',monospace" id="s-total">$0</span>
+        <span style="font-size:22px;font-weight:800;color:var(--green);font-family:'IBM Plex Mono',monospace" id="s-total">$0</span>
       </div>
       <div style="padding:11px 15px;background:#0d1b2a;color:#e8eef5">
         <div style="font-size:10px;letter-spacing:1.5px;color:#f5a524;font-weight:700;margin-bottom:4px">📥 DATOS PARA CONSIGNACIÓN</div>
-        <div style="font-size:12.5px;line-height:1.55">Bancolombia · Cuenta de Ahorros<br><b style="font-size:15px;letter-spacing:.5px;font-family:'JetBrains Mono',monospace">86066350101</b><br>MARTIN GUEVARA MEJÍA · CC 1126604274</div>
+        <div style="font-size:12.5px;line-height:1.55">Bancolombia · Cuenta de Ahorros<br><b style="font-size:19px;letter-spacing:2px;font-family:'IBM Plex Mono',monospace">86066350101</b><br>MARTIN GUEVARA MEJÍA · CC 1126604274</div>
         <div style="font-size:10.5px;color:#9aa7b5;margin-top:4px">📲 Envía el comprobante por WhatsApp y despachamos</div>
       </div>
     </div>
