@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NC · Centro de Mando</title>
+<style>
+:root{--bg:#0d1017;--panel:#151a24;--card:#1b2230;--line:#26303f;--tx:#eaf0f8;--sub:#93a2b5;--faint:#5f6d80;
+  --acc:#f2792a;--acc2:#ffb703;--ok:#3fbf7f;--azul:#4a9de8;--rosa:#ec5b8f;--mora:#8b7cf0;
+  --ig:#e1306c;--fb:#1877f2;--tk:#00d5c4;--wa:#25d366;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--tx);font-size:14.5px;-webkit-font-smoothing:antialiased}
+header{background:linear-gradient(135deg,#141a26,#1d2740 60%,#141a26);border-bottom:1px solid var(--line);padding:16px 20px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:30}
+.logo{font-size:20px;font-weight:800;letter-spacing:.02em}
+.logo span{color:var(--acc)}
+.tag{font-size:11px;color:var(--faint);letter-spacing:.16em;text-transform:uppercase}
+nav{display:flex;gap:6px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:57px;z-index:29;flex-wrap:wrap}
+nav button{background:transparent;border:none;color:var(--sub);padding:9px 15px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
+nav button.on{background:var(--acc);color:#fff}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 80px}
+h1{font-size:22px;margin-bottom:2px}
+.sub{color:var(--sub);font-size:13px;margin-bottom:18px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:13px 15px}
+.kpi b{font-size:23px;font-weight:800;display:block;line-height:1.1}
+.kpi span{font-size:11.5px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em}
+.kpi.acc b{color:var(--acc)} .kpi.ok b{color:var(--ok)} .kpi.azul b{color:var(--azul)}
+.cli{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:14px}
+.cli .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.cli h2{font-size:17px}
+.cli .badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:#22303f;color:var(--sub)}
+.redes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.red{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:11px 13px}
+.red .rh{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13.5px;margin-bottom:7px}
+.dot{width:10px;height:10px;border-radius:3px;flex:none}
+.red input{width:100%;background:#0f141d;border:1px solid var(--line);border-radius:7px;color:var(--tx);padding:6px 8px;font-size:12.5px;margin-bottom:5px}
+.red .seg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub)}
+.red .seg input{width:90px;margin:0;text-align:right;font-weight:700;color:var(--tx)}
+.red a.open{font-size:11.5px;color:var(--azul);text-decoration:none}
+.agentes{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.chip{font-size:12px;font-weight:600;padding:5px 11px;border-radius:20px;display:inline-flex;align-items:center;gap:6px}
+.chip.on{background:#12291f;color:var(--ok);border:1px solid #1f4a37}
+.chip.off{background:#2a2331;color:#b58bd6;border:1px solid #3d3350}
+.pauta{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);font-size:13px}
+.pauta div b{color:var(--acc);font-size:16px}
+.btn{background:var(--acc);color:#fff;border:none;border-radius:9px;padding:9px 15px;font-weight:700;cursor:pointer;font-size:13.5px}
+.btn.ghost{background:#22303f;color:var(--tx)}
+.emp{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.empc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;text-decoration:none;color:var(--tx);display:block}
+.empc:hover{border-color:var(--acc)}
+.empc .en{font-size:16px;font-weight:800}
+.empc .ed{font-size:12.5px;color:var(--sub);margin-top:3px}
+.empc .go{color:var(--acc);font-weight:700;font-size:13px;margin-top:10px;display:inline-block}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--acc);color:#fff;padding:10px 18px;border-radius:10px;font-weight:700;z-index:99}
+.empty{padding:30px;text-align:center;color:var(--sub)}
+.aglist .ag{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin-bottom:9px}
+.aglist .ag .an{font-weight:700} .aglist .ag .ad{font-size:12.5px;color:var(--sub);margin-top:2px}
+@media(max-width:560px){nav{top:56px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">◆ NC <span>Centro de Mando</span></div>
+  <div class="tag">Negocios Cuánticos</div>
+</header>
+<nav id="nav"></nav>
+<main id="main"><div class="empty">Cargando…</div></main>
+<div id="toast"></div>
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const nm=n=>Math.round(+n||0).toLocaleString('es-CO');
+async function api(pth,o={}){ try{ const r=await fetch(SB+'/rest/v1/'+pth,{headers:H,...o}); if(o.count){ return +((r.headers.get('content-range')||'0/0').split('/')[1])||0; } const t=await r.text(); if(!r.ok){ console.warn(pth,t.slice(0,120)); return o.method?null:[]; } const d=t?JSON.parse(t):[]; return d; }catch(e){ console.warn(e); return o.method?null:[]; } }
+const patch=(pth,b)=>api(pth,{method:'PATCH',body:JSON.stringify(b),headers:{...H,Prefer:'return=minimal'}});
+const post=(pth,b)=>api(pth,{method:'POST',body:JSON.stringify(b),headers:{...H,Prefer:'return=minimal'}});
+function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; $('toast').appendChild(t); setTimeout(()=>t.remove(),2200); }
+function mesISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'; }
+
+const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'},TikTok:{c:'var(--tk)',ic:'🎵'},WhatsApp:{c:'var(--wa)',ic:'💬'}};
+
+const App={
+vista:'marketing',
+TABS:[['marketing','📣 Marketing'],['empresas','🏢 Empresas'],['agentes','🤖 Agentes']],
+nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
+go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
+  ({marketing:this.vMarketing,empresas:this.vEmpresas,agentes:this.vAgentes}[v]).call(this); },
+
+async vMarketing(){
+  const cuentas=await api('nc_mkt_cuentas?order=orden&limit=500');
+  // leads del mes por bot
+  const desde=mesISO();
+  const leadsSmart=await api('nc_bot_leads?empresa=eq.smart&creado_en=gte.'+desde+'&select=telefono',{count:true});
+  const leadsFeroz=await api('nc_bot_leads_feroz?creado_en=gte.'+desde+'&select=telefono',{count:true});
+  const leadsBy={smart:leadsSmart,feroz:leadsFeroz};
+  const clientes=[...new Set(cuentas.map(c=>c.cliente))];
+  const totSeg=cuentas.reduce((a,c)=>a+(+c.seguidores||0),0);
+  const totLeads=leadsSmart+leadsFeroz;
+  this._cuentas=cuentas;
+  $('main').innerHTML=`<h1>📣 Marketing · todas las marcas</h1>
+    <div class="sub">Redes, seguidores, pauta y agentes de cada marca — en un solo sitio.</div>
+    <div class="kpis">
+      <div class="kpi acc"><b>${nm(totSeg)}</b><span>Seguidores (total)</span></div>
+      <div class="kpi ok"><b>${nm(totLeads)}</b><span>Leads de bots este mes</span></div>
+      <div class="kpi azul"><b>${clientes.length}</b><span>Marcas</span></div>
+      <div class="kpi"><b>${cuentas.length}</b><span>Cuentas de red</span></div>
+    </div>
+    ${clientes.map(cl=>this._cardCliente(cl,cuentas.filter(c=>c.cliente===cl),leadsBy)).join('')}
+    <button class="btn ghost" style="width:100%;margin-top:6px" onclick="App.addCuenta()">＋ Agregar marca / red</button>`;
+},
+_cardCliente(cl, reds, leadsBy){
+  const bot=(reds.find(r=>r.bot)||{}).bot;
+  const leads=bot?(leadsBy[bot]||0):null;
+  const seg=reds.reduce((a,r)=>a+(+r.seguidores||0),0);
+  const agentes = bot
+    ? `<span class="chip on">🤖 Bot de venta</span><span class="chip on">📊 Analista de pauta</span><span class="chip off">✍️ Contenido (por montar)</span><span class="chip off">💬 Engagement (por montar)</span>`
+    : `<span class="chip off">🤖 Bot (por montar)</span><span class="chip off">✍️ Contenido</span>`;
+  return `<div class="cli">
+    <div class="top"><h2>${esc(cl)}</h2><span class="badge">${nm(seg)} seguidores</span></div>
+    <div class="redes">${reds.map(r=>this._red(r)).join('')}</div>
+    ${leads!=null?`<div class="pauta">
+      <div>Leads del bot este mes · <b>${nm(leads)}</b></div>
+      <div style="color:var(--sub)">objetivo pauta: <b style="color:var(--tx);font-size:13px">Mensajes</b></div></div>`:''}
+    <div class="agentes">${agentes}</div>
+  </div>`;
+},
+_red(r){
+  const m=RED[r.red]||{c:'var(--sub)',ic:'🔗'};
+  return `<div class="red">
+    <div class="rh"><span class="dot" style="background:${m.c}"></span>${m.ic} ${esc(r.red)}</div>
+    <input placeholder="@usuario / handle" value="${esc(r.handle||'')}" onchange="App.upd(${r.id},'handle',this.value)">
+    <input placeholder="link (https://…)" value="${esc(r.url||'')}" onchange="App.upd(${r.id},'url',this.value)">
+    <div class="seg">👥 <input type="number" value="${+r.seguidores||0}" onchange="App.upd(${r.id},'seguidores',this.value)"> seguidores
+      ${r.url?`· <a class="open" href="${esc(r.url)}" target="_blank">abrir ↗</a>`:''}</div>
+  </div>`;
+},
+async upd(id,campo,val){
+  const b={}; b[campo]= campo==='seguidores' ? (+val||0) : val;
+  await patch('nc_mkt_cuentas?id=eq.'+id,b);
+  const c=(this._cuentas||[]).find(x=>x.id===id); if(c)c[campo]=b[campo];
+  toast('Guardado');
+  if(campo==='seguidores') this.vMarketing();
+},
+async addCuenta(){
+  const cl=prompt('Marca / cliente (ej: Smart, Epheta, un cliente nuevo):'); if(!cl) return;
+  const red=prompt('Red (Instagram, Facebook, TikTok, WhatsApp):','Instagram'); if(!red) return;
+  await post('nc_mkt_cuentas',{cliente:cl.trim(),red:red.trim(),orden:99});
+  toast('Agregada'); this.vMarketing();
+},
+
+vEmpresas(){
+  const emp=[
+   ['Feroz','Botas de dotación · distribuidores','https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=feroz'],
+   ['Smart','Envases herméticos · B2B','https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=smart'],
+   ['FES Fueling','ERP repuestos cisternas','https://negocioscuanticoscol-create.github.io/plataforma-nc/fesfueling/'],
+   ['ZARRAT','Atelier de moda a la medida','https://negocioscuanticoscol-create.github.io/plataforma-nc/zarrat/'],
+  ];
+  $('main').innerHTML=`<h1>🏢 Empresas</h1><div class="sub">Entra a la operación de cada una.</div>
+    <div class="emp">${emp.map(([n,d,u])=>`<a class="empc" href="${u}" target="_blank"><div class="en">${esc(n)}</div><div class="ed">${esc(d)}</div><span class="go">Abrir →</span></a>`).join('')}</div>`;
+},
+
+vAgentes(){
+  const ag=[
+   ['🤖 Valentina (Smart)','Vende el kit por WhatsApp, detecta pagos, reengancha','on'],
+   ['🛡️ Sofía (Feroz)','Capta distribuidores, pide ciudad+empresa, handoff al gerente','on'],
+   ['📊 Analista de Pauta','Cada mañana 8am: qué anuncio deja/quita + alertas','on'],
+   ['💰 Detector de pagos','Comprobante → alerta + cotización del kit automática','on'],
+   ['🔁 Recompra +15 días','Guía registrada → reenganche de recompra','on'],
+   ['✍️ Agente de Contenido','Calendario + arma posts por marca','off'],
+   ['💬 Agente de Engagement','Comentario → DM → bot de venta','off'],
+   ['👔 Gerente de Marketing','Junta todo y da una sola lectura diaria','off'],
+  ];
+  $('main').innerHTML=`<h1>🤖 Agentes</h1><div class="sub">El equipo de IA de NC · verde = activo · morado = por montar.</div>
+    <div class="aglist">${ag.map(([n,d,st])=>`<div class="ag"><div><div class="an">${esc(n)}</div><div class="ad">${esc(d)}</div></div><span class="chip ${st}">${st==='on'?'● activo':'por montar'}</span></div>`).join('')}</div>`;
+},
+};
+App.nav(); App.go('marketing');
+</script>
+</body>
+</html>
