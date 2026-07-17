@@ -4,14 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Plataforma Feroz</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --naranja:#E8620C; --naranja2:#ff7a1a; --negro:#15171c; --gris:#f4f5f7;
     --verde:#2e9e4f; --rojo:#d22; --azul:#2f6fed; --linea:#e3e5ea; --texto:#1d1f24; --suave:#6b7280;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--gris);color:var(--texto)}
+  body{font-family:'IBM Plex Sans',-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--gris);color:var(--texto);font-feature-settings:'zero' 1;font-variant-numeric:slashed-zero}
   input,select,textarea,button{font-family:inherit;font-size:16px}
   .hide{display:none!important}
 
@@ -172,7 +172,7 @@
 <script>
   // Versión fija → el navegador CACHEA los archivos (carga 1 vez y luego instantáneo).
   // Cuando se cambie el código, subir este número (NCVER) y el usuario hace Ctrl+Shift+R una vez.
-  var NCVER='20260717l';
+  var NCVER='20260717m';
   ['config.js','geo-co.js','app.js'].forEach(function(s){
     document.write('<scr'+'ipt src="'+s+'?v='+NCVER+'"><\/scr'+'ipt>');
   });
