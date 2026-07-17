@@ -1361,14 +1361,33 @@ const App = {
     const ruta=desp.filter(p=>p.estado_envio==='despachado'), entreg=desp.filter(p=>p.estado_envio==='entregado');
     const tab=(this._despTabSmart==='entregado')?'entregado':'ruta';
     const lista=tab==='entregado'?entreg:ruta;
-    const item=p=>{const ent=p.estado_envio==='entregado';const tel=(p.celular||(p.datos&&p.datos.celular)||'').toString();const gs=(p.guia||'').split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);const guiaLbl=gs.length>1?gs.length+' guías':(gs[0]||'—');return `<div class="item">
-        <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 🚚 ${esc(p.transportadora||'—')} · guía ${esc(guiaLbl)}${tel?` · 📱 <a href="https://wa.me/57${esc(tel.replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">${esc(tel)}</a>`:''}</div></div><span class="badge" style="${ent?'background:#e7f7ee;color:#16734a':'background:#fff3e0;color:#b45309'}">${ent?'✅ entregado':'🚚 en ruta'}</span></div>
+    const item=p=>{const ent=p.estado_envio==='entregado';const tel=(p.celular||(p.datos&&p.datos.celular)||'').toString();const gs=(p.guia||'').split(/[\n,;]+/).map(x=>x.trim()).filter(Boolean);const guiaLbl=gs.length>1?gs.length+' guías':(gs[0]||'—');const dd=p.datos||{};const fCob=+dd.flete||0;const fPag=+dd.flete_pagado||0;const mg=fCob-fPag;const ciu=dd.ciudad||dd.envio_ciudad||'';return `<div class="item">
+        <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 🚚 ${esc(p.transportadora||'—')}${ciu?' · 📍 '+esc(ciu):''} · guía ${esc(guiaLbl)}${tel?` · 📱 <a href="https://wa.me/57${esc(tel.replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">${esc(tel)}</a>`:''}</div></div><span class="badge" style="${ent?'background:#e7f7ee;color:#16734a':'background:#fff3e0;color:#b45309'}">${ent?'✅ entregado':'🚚 en ruta'}</span></div>
         ${gs.length>1?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin:6px 0">${gs.map((g,i)=>`<span onclick="App.copiarGuia('${esc(g)}')" title="copiar guía" style="font-size:11px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:6px;padding:3px 7px;cursor:pointer">${i+1}. ${esc(g)} 📋</span>`).join('')}</div>`:''}
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#f8fafc;border:1px solid var(--linea);border-radius:8px;padding:7px 9px;margin:6px 0;font-size:12px">
+          <span>🧾 Cobrado <b>${cl(fCob)}</b></span><span style="color:#bbb">→</span>
+          <span>💸 Pagó Interr. <input id="fp-${p.id}" value="${fPag||''}" placeholder="0" inputmode="numeric" style="width:82px;padding:4px 6px;border:1px solid var(--linea);border-radius:6px;text-align:right"></span>
+          <button class="btn-sm" style="background:var(--negro);color:#fff;padding:4px 9px" onclick="App.setFletePagado('${p.id}')">💾</button>
+          ${fPag>0?`<span style="font-weight:800;color:${mg>=0?'#16a34a':'#dc2626'}">${mg>=0?'✅ +':'⚠️ '}${cl(mg)}</span>`:'<span style="color:#9aa">falta el real</span>'}
+        </div>
         <div class="acciones-item">
           ${p.guia_url?`<a class="btn-sm" href="${p.guia_url}" target="_blank" style="background:#e5e7eb">🖼️ Ver guía</a>`:''}
           ${ent?`<span class="btn-sm" style="background:#e7f7ee;color:#16734a">Entregado ${(p.entregado_at||'').slice(0,10)}</span>`:`<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.pedEntregado('${p.id}')">✅ Marcar entregado</button>`}
         </div></div>`;};
+    const anal=desp.filter(p=>+((p.datos||{}).flete_pagado)>0);
+    const totCob=anal.reduce((a,p)=>a+(+((p.datos||{}).flete)||0),0);
+    const totPag=anal.reduce((a,p)=>a+(+((p.datos||{}).flete_pagado)||0),0);
+    const dif=totCob-totPag; const enRojo=anal.filter(p=>(+((p.datos||{}).flete)||0)<(+((p.datos||{}).flete_pagado)||0));
     this.set(`<h1>Despachos</h1><div class="sub">Recibidos por transportadora / entregados · (luego: API Interrapidísimo)</div>
+      <div class="card" style="background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;border:none;margin-bottom:12px">
+        <div style="font-size:12px;opacity:.85;margin-bottom:6px">📊 Flete cobrado vs. pagado a Interrapidísimo <span style="opacity:.6">· ${anal.length} de ${desp.length} con flete real registrado</span></div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline">
+          <div><div style="font-size:11px;opacity:.7">🧾 Cobrado</div><div style="font-size:19px;font-weight:800">${cl(totCob)}</div></div>
+          <div><div style="font-size:11px;opacity:.7">💸 Pagado Interr.</div><div style="font-size:19px;font-weight:800">${cl(totPag)}</div></div>
+          <div><div style="font-size:11px;opacity:.7">Diferencia</div><div style="font-size:19px;font-weight:800;color:${dif>=0?'#4ade80':'#f87171'}">${dif>=0?'+':''}${cl(dif)}</div></div>
+        </div>
+        ${enRojo.length?`<div style="font-size:11.5px;margin-top:7px;color:#fca5a5">⚠️ ${enRojo.length} despacho(s) cobraron MENOS flete del que pagamos → revisar cotización de esos destinos.</div>`:(anal.length?'<div style="font-size:11.5px;margin-top:7px;color:#86efac">✅ Todos los despachos con flete real están cubiertos.</div>':'<div style="font-size:11.5px;margin-top:7px;opacity:.7">Registra el flete que cobró Interrapidísimo en cada despacho para ver el análisis.</div>')}
+      </div>
       <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px">
         <button class="btn-sm" style="flex:0 0 auto;font-weight:700;background:${tab==='ruta'?'var(--naranja);color:#fff':'#eef1f5;color:#555'}" onclick="App.despTabSmart('ruta')">🚚 En ruta (${ruta.length})</button>
         <button class="btn-sm" style="flex:0 0 auto;font-weight:700;background:${tab==='entregado'?'var(--naranja);color:#fff':'#eef1f5;color:#555'}" onclick="App.despTabSmart('entregado')">✅ Entregados (${entreg.length})</button>
@@ -1376,6 +1395,17 @@ const App = {
       ${lista.length?lista.map(item).join(''):`<div class="empty">${tab==='entregado'?'Aún no hay entregados.':'No hay envíos en ruta. Despacha pedidos desde 📦 Pedidos.'}</div>`}`);
   },
   despTabSmart(t){ this._despTabSmart=t; this.vDespachosSmart(); },
+  async setFletePagado(id){
+    const el=$('fp-'+id); if(!el) return; const val=+((el.value||'').replace(/\D/g,''))||0;
+    const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
+    try{
+      const rr=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?id=eq.'+id+'&select=datos&limit=1',{headers:H});
+      const d=((await rr.json())[0]||{}).datos||{}; d.flete_pagado=val;
+      await this.cotUpd(id,{datos:d});
+      const p=(this._peds||[]).find(x=>x.id===id); if(p){ p.datos=p.datos||{}; p.datos.flete_pagado=val; }
+      this._toast('💸 Flete real guardado'); this.vDespachosSmart();
+    }catch(e){ alert('No se pudo guardar el flete: '+e); }
+  },
   async pedACotizacionSmart(id){
     const p=(this._peds||[]).find(x=>x.id===id)||{};
     if(!confirm('¿Devolver este pedido a COTIZACIÓN? (ej: aún no han pagado)\n\nSale de Pedidos, vuelve a la cola de Cotizaciones y su venta se descuenta de comisiones.')) return;
