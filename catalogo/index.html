@@ -89,7 +89,7 @@ async function subir(file,pref){ if(!file)return null; const path='vcat/'+pref+'
 
 const App={
 cfg:{}, rol:null, vend:null, cart:[], adminTab:'productos',
-async init(){ const c=await api('vcat_config'); this.cfg={}; c.forEach(x=>this.cfg[x.clave]=x.valor); this.landing(); },
+async init(){ const c=await api('vcat_config'); this.cfg={}; c.forEach(x=>this.cfg[x.clave]=x.valor); const p=new URLSearchParams(location.search); if(p.get('ver')||p.get('catalogo')){ this.verCatalogo(); } else { this.landing(); } },
 c(k){ return this.cfg[k]||''; },
 set(h){ $('app').innerHTML=h; window.scrollTo(0,0); },
 
@@ -275,7 +275,7 @@ vGracias(num,total){
 
 /* ================= ADMIN ================= */
 vAdmin(){ this.set(`${this.head('Administrador','Codificación y pedidos')}
-  <nav>${[['productos','📦 Productos'],['vendedores','👥 Vendedores'],['pedidos','🧾 Pedidos'],['config','⚙️ Config']].map(([v,n])=>`<button class="${v===this.adminTab?'on':''}" onclick="App.adminGo('${v}')">${n}</button>`).join('')}</nav>
+  <nav>${[['productos','📦 Productos'],['vendedores','👥 Vendedores'],['pedidos','🧾 Pedidos'],['config','⚙️ Config']].map(([v,n])=>`<button class="${v===this.adminTab?'on':''}" onclick="App.adminGo('${v}')">${n}</button>`).join('')}<button style="margin-left:auto;color:var(--acc);font-weight:800" onclick="App.verCatalogo()">🛍️ Ver catálogo</button></nav>
   <main id="amain"><div class="empty">Cargando…</div></main>`); this.adminGo(this.adminTab); },
 adminGo(t){ this.adminTab=t; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.textContent.includes({productos:'Productos',vendedores:'Vendedores',pedidos:'Pedidos',config:'Config'}[t])));
   ({productos:this.aProductos,vendedores:this.aVendedores,pedidos:this.aPedidos,config:this.aConfig}[t]).call(this); },
