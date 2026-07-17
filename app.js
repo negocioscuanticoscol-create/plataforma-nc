@@ -8,7 +8,7 @@ const ESTADOS = {
   pendiente_pago:'Pendiente de pago', consignado:'Consignado', autorizado:'Autorizado',
   despachado:'Despachado', entregado:'Entregado', anulado:'Anulado'
 };
-const ROL_NOMBRE = {admin:'Admin', vendedor:'Vendedor', facturacion:'Facturación', bodega:'Bodega', planta:'Jefe de Planta'};
+const ROL_NOMBRE = {admin:'Admin', gerente:'Gerente', director:'Director General', vendedor:'Vendedor', facturacion:'Facturación', bodega:'Bodega', planta:'Jefe de Planta'};
 
 const App = {
   sb:null, user:null, perfil:null, view:'dashboard', signupMode:false,
@@ -65,7 +65,7 @@ const App = {
     this.perfil = perf || { rol:'vendedor', nombre:this.user.email };
     if(this.perfil.activo===false){ await this.sb.auth.signOut(); alert('🔒 Este acceso fue bloqueado por el administrador.'); location.reload(); return; }
     // 🏢 restricción por empresa: si el perfil tiene una empresa asignada, solo entra a esa (admin/gerente entran a todas)
-    if(this.perfil.empresa && this.perfil.empresa!==window.NC_EMPRESA && !['admin','gerente'].includes(this.perfil.rol)){
+    if(this.perfil.empresa && this.perfil.empresa!==window.NC_EMPRESA && !['admin','gerente','director'].includes(this.perfil.rol)){
       const dest={feroz:'Feroz',smart:'Smart',epheta:'Epheta'}[this.perfil.empresa]||this.perfil.empresa;
       await this.sb.auth.signOut();
       alert('🔒 Tu acceso es solo para '+dest+'. Entra por el enlace de '+dest+' (?empresa='+this.perfil.empresa+').');
@@ -117,7 +117,7 @@ const App = {
     await this.sb.auth.signOut(); location.reload();
   },
   rol(){ return this.perfil?.rol; },
-  puede(...roles){ const r=this.rol(); if(r==='gerente'&&roles.some(x=>['vendedor','facturacion','bodega','planta'].includes(x))) return true; return roles.includes(r); },
+  puede(...roles){ const r=this.rol(); if((r==='gerente'||r==='director')&&roles.some(x=>['vendedor','facturacion','bodega','planta'].includes(x))) return true; return roles.includes(r); },
 
   /* ---------- NAV ---------- */
   pintarNav(){
@@ -141,6 +141,7 @@ const App = {
     ];
     const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','datos','admin','permisos'];
     const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido'],
+      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
       facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
@@ -3562,7 +3563,7 @@ const App = {
     const { data:cfg } = await this.sb.from('config').select('value').eq('key','nav_permisos').maybeSingle();
     this._permisos = cfg?cfg.value:{};
     const MODS=[['dashboard','📊 Tablero'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],['despachos','🚚 Despachos'],['ventas','💰 Ventas'],['crm','📇 CRM'],['clientes','👥 Clientes'],['cobertura','🗺️ Cobertura'],['planta','🏭 Planta'],['admin','⚙️ Equipo']];
-    const ROLES=[['vendedor','Vendedor'],['facturacion','Facturación'],['bodega','Bodega'],['planta','Jefe de Planta']];
+    const ROLES=[['director','Director General'],['gerente','Gerente'],['vendedor','Vendedor'],['facturacion','Facturación'],['bodega','Bodega'],['planta','Jefe de Planta']];
     let html=`<h1>🔐 Permisos</h1><div class="sub">Marca qué módulos ve cada rol</div>
       <div class="hint" style="margin-bottom:10px">El Admin (tú) siempre ve todo. Cada persona ve según su rol (lo asignas en ⚙️ Equipo).</div>`;
     ROLES.forEach(([rk,rn])=>{
@@ -3576,7 +3577,7 @@ const App = {
   },
   async guardarPermisos(){
     const nuevo={admin:["dashboard","cotizaciones","pedidos","despachos","ventas","clientes","crm","cobertura","planta","admin","permisos"]};
-    ['vendedor','facturacion','bodega','planta'].forEach(rk=>nuevo[rk]=[]);
+    ['director','gerente','vendedor','facturacion','bodega','planta'].forEach(rk=>nuevo[rk]=[]);
     document.querySelectorAll('#main input[data-rol]').forEach(i=>{ if(i.checked) nuevo[i.dataset.rol].push(i.dataset.mod); });
     const { error } = await this.sb.from('config').update({value:nuevo, updated_at:new Date().toISOString()}).eq('key','nav_permisos');
     if(error){ alert('Error: '+error.message); return; }
