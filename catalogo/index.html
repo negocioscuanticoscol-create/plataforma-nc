@@ -98,11 +98,14 @@ async landing(){
   const vends=await api('vcat_vendedores?activo=eq.true&order=nombre');
   this.set(`<div class="land"><div class="logo">🛍️ <span>${esc(this.c('marca')||'Catálogo')}</span></div>
     <div class="sub">Ventas por catálogo</div>
-    <div class="card"><label>Soy vendedor · elige tu nombre</label>
+    <div class="card">
+      <button class="chip" style="background:var(--acc);color:#fff" onclick="App.verCatalogo()">🛍️ Ver catálogo</button>
+      <label style="margin-top:12px">Soy vendedor · elige tu nombre</label>
       ${vends.map(v=>`<div class="chip" onclick="App.entraVend(${v.id})">👤 ${esc(v.nombre)}</div>`).join('')||'<div class="empty" style="padding:14px">Aún no hay vendedores. Entra como admin para crearlos.</div>'}
       <div style="text-align:center;margin-top:14px"><button class="btn sec sm" onclick="App.entraAdmin()">⚙️ Administrador</button></div>
     </div></div>`);
 },
+verCatalogo(){ this.rol='vendedor'; this.vend=null; this.cart=[]; this.vCatalogo(); },
 async entraVend(id){ const v=(await api('vcat_vendedores?id=eq.'+id))[0]; if(!v)return; this.rol='vendedor'; this.vend=v; this.cart=[]; this.vCatalogo(); },
 entraAdmin(){ const pin=prompt('PIN de administrador:'); if(pin==null)return; if(pin!==this.c('admin_pin')){ toast('PIN incorrecto'); return; } this.rol='admin'; this.vAdmin(); },
 salir(){ this.rol=null; this.vend=null; this.cart=[]; this.landing(); },
@@ -113,7 +116,7 @@ async vCatalogo(){
   const prods=await api('vcat_productos?activo=eq.true&order=nombre&limit=500');
   this._prods=prods;
   const nC=this.cart.reduce((a,i)=>a+i.qty,0);
-  this.set(`${this.head('Catálogo','Vendedor: '+esc(this.vend.nombre))}
+  this.set(`${this.head('Catálogo', this.vend?('Vendedor: '+esc(this.vend.nombre)):'Elige vendedor al pagar')}
     <main><h1>Productos</h1><div class="sub">Toca un producto para ver fotos y detalles.</div>
     <div class="grid">${prods.map(p=>{ const f=(p.fotos||[])[0]; const antes=+p.precio_antes||0; const dcto=(antes>p.precio&&antes>0)?Math.round((antes-p.precio)/antes*100):0;
       return `<div class="pcard">
@@ -122,20 +125,20 @@ async vCatalogo(){
         <div class="in" onclick="App.vProducto(${p.id})" style="cursor:pointer">
           <div class="nm">${esc(p.nombre)}</div>
           <div class="prow">${dcto>0?`<span class="antes">${money(antes)}</span>`:''}<span class="pr">${money(p.precio)}</span></div>
-          <div class="cm">⚖️ ${(+p.peso||0).toFixed(1)}kg · Comisión ${this._comTxt(p)}</div></div>
+          <div class="cm">⚖️ ${Math.round(+p.peso||0)} gr · Comisión ${this._comTxt(p)}</div></div>
         <button class="add" onclick="App.addRapido(${p.id})">🛒 Añadir al carrito</button></div>`; }).join('')||'<div class="empty">Sin productos aún.</div>'}</div></main>
     ${nC?(()=>{ const peso=this._pesoCart(), meta=this._metaPeso(), falta=Math.max(0,meta-peso), masivo=peso>=meta;
       const pct=Math.min(100,Math.round(peso/meta*100));
       return `<div class="fab"><button class="btn ok" style="padding:0;overflow:hidden" onclick="App.vCarrito()">
-        <div style="padding:11px 14px 4px;display:flex;justify-content:space-between;align-items:center"><span>🛒 Ver carrito (${nC}) · ${peso.toFixed(1)}kg</span><span>${money(this._totCart().total)}</span></div>
-        <div style="font-size:12px;font-weight:600;padding:0 14px 6px;opacity:.95">${masivo?'✅ ¡Meta de '+meta+'kg! Ganas comisión alta':'💪 Te faltan '+falta.toFixed(1)+'kg para más comisión en TODO'}</div>
+        <div style="padding:11px 14px 4px;display:flex;justify-content:space-between;align-items:center"><span>🛒 Ver carrito (${nC}) · ${Math.round(peso)} gr</span><span>${money(this._totCart().total)}</span></div>
+        <div style="font-size:12px;font-weight:600;padding:0 14px 6px;opacity:.95">${masivo?'✅ ¡Meta de '+meta+' gr! Ganas comisión alta':'💪 Te faltan '+Math.round(falta)+' gr para más comisión en TODO'}</div>
         <div style="height:5px;background:rgba(255,255,255,.3)"><div style="height:100%;width:${pct}%;background:#fff"></div></div>
       </button></div>`; })():''}`);
 },
 _comTxt(p){ return p.comision_tipo==='pct' ? (p.comision_valor+'%') : money(p.comision_valor); },
 _comVal(p,masivo){ const val = masivo && (+p.comision_masivo>0) ? +p.comision_masivo : +p.comision_valor||0;
   return p.comision_tipo==='pct' ? Math.round((+p.precio||0)*val/100) : val; },
-_metaPeso(){ return +this.c('peso_base_kg')||1; },
+_metaPeso(){ return +this.c('peso_base_gr')||1000; },
 _pesoCart(){ return this.cart.reduce((a,i)=>a+(+i.peso||0)*i.qty,0); },
 _esMasivo(){ return this._pesoCart() >= this._metaPeso(); },
 vProducto(id){
@@ -157,7 +160,7 @@ vProducto(id){
       <h1 style="font-size:24px">${esc(p.nombre)}</h1>
       ${p.categoria?`<div class="sub" style="margin:2px 0 8px">${esc(p.categoria)}</div>`:''}
       <div style="display:flex;align-items:baseline;gap:10px">${(+p.precio_antes>p.precio)?`<span style="color:#aab2c0;text-decoration:line-through;font-size:18px">${money(p.precio_antes)}</span>`:''}<div style="color:var(--acc);font-size:30px;font-weight:800">${money(p.precio)}</div>${(+p.precio_antes>p.precio&&+p.precio_antes>0)?`<span class="dcto" style="position:static">-${Math.round((p.precio_antes-p.precio)/p.precio_antes*100)}% DCTO</span>`:''}</div>
-      <div class="sub" style="margin-top:2px">Precio público · ⚖️ ${(+p.peso||0).toFixed(1)} kg</div>
+      <div class="sub" style="margin-top:2px">Precio público · ⚖️ ${Math.round(+p.peso||0)} gr</div>
     </div>
     ${p.cualidades?`<div class="card"><div style="font-weight:800;margin-bottom:6px">✨ Bondades / características</div><div style="white-space:pre-wrap;line-height:1.6">${esc(p.cualidades)}</div>
       ${p.video_url?`<a class="btn" style="background:var(--wa);margin-top:12px;text-decoration:none;display:block;text-align:center" href="${esc(p.video_url)}" target="_blank">🎥 Ver el video de bondades</a>`:''}</div>`:''}
@@ -173,9 +176,9 @@ addCart(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return; const q
   const ex=this.cart.find(i=>i.id===id); if(ex)ex.qty+=q; else this.cart.push({id,nombre:p.nombre,precio:+p.precio||0,ci:this._comVal(p,false),cm:this._comVal(p,true),peso:+p.peso||0,foto:(p.fotos||[])[0]||'',qty:q});
   toast('Agregado ✓'); this.vCatalogo();
 },
-_fleteMasivo(){ const base=+this.c('envio_masivo')||0, pbase=+this.c('peso_base_kg')||1, extra=+this.c('tarifa_kg_extra')||0;
+_fleteMasivo(){ const base=+this.c('envio_masivo')||0, pbase=+this.c('peso_base_gr')||1000, extra=+this.c('tarifa_kg_extra')||0;
   const peso=this.cart.reduce((a,i)=>a+(+i.peso||0)*i.qty,0);
-  const sobre=Math.max(0,Math.ceil(peso-pbase));
+  const sobre=Math.max(0,Math.ceil((peso-pbase)/1000));
   return {flete:base+sobre*extra, peso, sobre}; },
 _totCart(){ const masivo=this._esMasivo();
   const sub=this.cart.reduce((a,i)=>a+i.precio*i.qty,0);
@@ -195,7 +198,7 @@ vCarrito(){
   } else {
     const comMas=this.cart.reduce((a,i)=>a+i.cm*i.qty,0);
     const extra=comMas-t.com;
-    banner=`<div class="card" style="background:#fff7e6;border-color:#ffe1a8"><b style="color:#b45309">💪 Te faltan ${falta.toFixed(1)}kg para el kilo</b><div class="sub" style="margin:0">Vas en <b>${peso.toFixed(1)}kg</b>. Al llegar a ${meta}kg, TODOS tus productos suben a la comisión alta: ganarías <b style="color:var(--ok)">+${money(extra)}</b>. ¡Agrega más y esfuérzate! 💪</div></div>`;
+    banner=`<div class="card" style="background:#fff7e6;border-color:#ffe1a8"><b style="color:#b45309">💪 Te faltan ${Math.round(falta)} gr para el kilo</b><div class="sub" style="margin:0">Vas en <b>${Math.round(peso)} gr</b>. Al llegar a ${meta} gr, TODOS tus productos suben a la comisión alta: ganarías <b style="color:var(--ok)">+${money(extra)}</b>. ¡Agrega más y esfuérzate! 💪</div></div>`;
   }
   this.set(`${this.head('Carrito','')}
     <main><button class="btn sec sm" onclick="App.vCatalogo()">← Seguir viendo</button>
@@ -205,17 +208,19 @@ vCarrito(){
         <div class="qty"><button onclick="App.cartQty(${ix},-1)">−</button><b>${i.qty}</b><button onclick="App.cartQty(${ix},1)">＋</button></div></div>`).join('')}
       <div style="margin-top:12px">
         <div class="tot"><span>Productos (${qty})</span><span>${money(t.sub)}</span></div>
-        <div class="tot"><span>Envío ${t.masivo?`(masivo · ${t.peso.toFixed(1)}kg${t.sobre>0?' · +'+t.sobre+'kg':''})`:'(individual)'}</span><span>${money(t.envio)}</span></div>
+        <div class="tot"><span>Envío ${t.masivo?`(masivo · ${Math.round(t.peso)} gr${t.sobre>0?' · +'+t.sobre+'kg':''})`:'(individual)'}</span><span>${money(t.envio)}</span></div>
         <div class="tot"><span>Tu comisión</span><span style="color:var(--ok);font-weight:700">${money(t.com)}</span></div>
         <div class="tot big"><span>TOTAL</span><span>${money(t.total)}</span></div></div>
     </div>
     <button class="btn" onclick="App.vCheckout()">Continuar al pago →</button></main>`);
 },
 cartQty(ix,d){ const it=this.cart[ix]; if(!it)return; it.qty=Math.max(0,it.qty+d); if(it.qty===0)this.cart.splice(ix,1); if(!this.cart.length){this.vCatalogo();return;} this.vCarrito(); },
-vCheckout(){
+async vCheckout(){
   const t=this._totCart(); this._pago='nequi'; this._envio='directo';
+  const vends = this.vend ? [] : await api('vcat_vendedores?activo=eq.true&order=nombre');
   this.set(`${this.head('Datos y pago','')}
     <main><button class="btn sec sm" onclick="App.vCarrito()">← Volver</button>
+    ${this.vend?'':`<div class="card" style="margin-top:10px"><h1 style="font-size:17px">¿Quién vende?</h1><label>Vendedor</label><select id="ck_vend"><option value="">— elige el vendedor —</option>${vends.map(v=>`<option value="${v.id}">${esc(v.nombre)}</option>`).join('')}</select></div>`}
     <div class="card" style="margin-top:10px"><h1 style="font-size:17px">Datos del cliente</h1>
       <label>Nombre del cliente</label><input id="ck_nom">
       <label>Celular / WhatsApp</label><input id="ck_cel" inputmode="numeric">
@@ -224,7 +229,7 @@ vCheckout(){
     </div>
     <div class="card"><h1 style="font-size:17px">¿A dónde se despacha?</h1>
       <div class="pay on" id="env-directo" onclick="App.selEnvio('directo')"><div class="t">📦 Directo al cliente</div><div class="d">Se envía a la dirección de arriba.</div></div>
-      <div class="pay" id="env-caja" onclick="App.selEnvio('caja')"><div class="t">📥 En la caja del vendedor</div><div class="d">Llega con los demás pedidos a ${esc(this.vend.nombre)} para entregar.</div></div>
+      <div class="pay" id="env-caja" onclick="App.selEnvio('caja')"><div class="t">📥 En la caja del vendedor</div><div class="d">Llega con los demás pedidos al vendedor para entregar.</div></div>
     </div>
     <div class="card"><h1 style="font-size:17px">Forma de pago</h1>
       <div class="pay on" id="pay-nequi" onclick="App.selPago('nequi')"><div class="t">💜 Nequi</div><div class="d">${esc(this.c('nequi'))} · ${esc(this.c('nequi_titular'))}</div></div>
@@ -239,6 +244,9 @@ selPago(p){ this._pago=p; $('pay-nequi').classList.toggle('on',p==='nequi'); $('
 selEnvio(e){ this._envio=e; $('env-directo').classList.toggle('on',e==='directo'); $('env-caja').classList.toggle('on',e==='caja'); },
 async confirmar(){
   const v=id=>($(id)&&$(id).value.trim())||'';
+  // resolver vendedor (si entró en modo "ver catálogo", lo elige aquí)
+  if(!this.vend){ const vid=$('ck_vend')&&$('ck_vend').value; if(!vid){ toast('Elige el vendedor'); return; }
+    this.vend=(await api('vcat_vendedores?id=eq.'+vid))[0]; if(!this.vend){ toast('Vendedor no válido'); return; } }
   if(!v('ck_nom')){ toast('Falta el nombre del cliente'); return; }
   const comp=$('ck_comp')&&$('ck_comp').files[0];
   if(!comp){ if(!confirm('No subiste el comprobante. ¿Guardar el pedido igual?')) return; }
@@ -261,7 +269,7 @@ vGracias(num,total){
       <h1 style="margin-top:10px">Pedido confirmado</h1>
       <div class="sub">N° ${esc(num)} · ${money(total)}</div>
       <div class="card" style="margin-top:16px;text-align:left">El comprobante y los datos ya llegaron al equipo. Tu comisión queda registrada. 🙌
-      <div style="margin-top:8px;font-size:13px;color:var(--sub)">🧾 Factura a nombre de: <b style="color:var(--tx)">${esc(this.vend.nombre)}</b></div></div>
+      <div style="margin-top:8px;font-size:13px;color:var(--sub)">🧾 Factura a nombre de: <b style="color:var(--tx)">${esc((this.vend||{}).nombre||'')}</b></div></div>
       <button class="btn" onclick="App.vCatalogo()">Hacer otro pedido</button></main>`);
 },
 
@@ -291,7 +299,7 @@ prodForm(id){
     <div class="row"><div style="flex:1"><label>Precio antes (tachado, opcional)</label><input id="pf_antes" type="number" value="${+p.precio_antes||0}"></div>
       <div style="flex:1"><label>Valor final (lo que paga)</label><input id="pf_precio" type="number" value="${+p.precio||0}" ${oi}></div></div>
     <div class="row"><div style="flex:1"><label>IVA %</label><input id="pf_iva" type="number" value="${p.iva_pct!=null?+p.iva_pct:19}" ${oi}></div>
-      <div style="flex:1"><label>Peso (kg) ⚖️</label><input id="pf_peso" type="number" step="0.1" value="${+p.peso||0}"></div></div>
+      <div style="flex:1"><label>Peso (gramos) ⚖️</label><input id="pf_peso" type="number" step="1" value="${+p.peso||0}"></div></div>
     <div class="sub" style="font-size:12px">El peso se usa en el flete consolidado: hasta el peso base cuesta la tarifa base; de ahí sube por kilo (se configura en ⚙️ Config).</div>
     <div class="row"><div style="flex:1"><label>Comisión plataforma (NC)</label><select id="pf_ptipo" ${oi}><option value="fijo" ${p.plat_tipo!=='pct'?'selected':''}>Fijo ($)</option><option value="pct" ${p.plat_tipo==='pct'?'selected':''}>%</option></select></div>
       <div style="flex:1"><label>Valor</label><input id="pf_pval" type="number" value="${+p.plat_valor||0}" ${oi}></div>
@@ -400,13 +408,13 @@ pedVer(id){ const p=(this._apeds||[]).find(x=>x.id===id); if(!p)return;
 },
 
 async aConfig(){
-  const F=[['marca','Marca / nombre'],['nequi','Nequi (número)'],['nequi_titular','Nequi titular'],['banco','Banco'],['banco_cuenta','Cuenta bancaria'],['banco_titular','Cuenta titular'],['envio_individual','Costo de envío INDIVIDUAL'],['envio_masivo','Envío MASIVO base (hasta el peso base)'],['peso_base_kg','Peso base incluido (kg, ej: 1)'],['tarifa_kg_extra','Tarifa por kilo adicional'],['umbral_masivo','Productos para envío masivo (ej: 5)'],['admin_pin','PIN admin']];
+  const F=[['marca','Marca / nombre'],['nequi','Nequi (número)'],['nequi_titular','Nequi titular'],['banco','Banco'],['banco_cuenta','Cuenta bancaria'],['banco_titular','Cuenta titular'],['envio_individual','Costo de envío INDIVIDUAL'],['envio_masivo','Envío MASIVO base (hasta el peso base)'],['peso_base_gr','Peso base incluido (gramos, ej: 1000)'],['tarifa_kg_extra','Tarifa por kilo (1000gr) adicional'],['umbral_masivo','Productos para envío masivo (ej: 5)'],['admin_pin','PIN admin']];
   this.am(`<h1>Configuración</h1><div class="sub">A dónde llega el pago y datos generales.</div>
     <div class="card">${F.map(([k,l])=>`<label>${l}</label><input id="cf_${k}" value="${esc(this.c(k))}">`).join('')}
     <button class="btn" style="margin-top:14px" onclick="App.cfgGuardar()">💾 Guardar</button></div>`);
 },
 async cfgGuardar(){
-  const F=['marca','nequi','nequi_titular','banco','banco_cuenta','banco_titular','envio_individual','envio_masivo','peso_base_kg','tarifa_kg_extra','umbral_masivo','admin_pin'];
+  const F=['marca','nequi','nequi_titular','banco','banco_cuenta','banco_titular','envio_individual','envio_masivo','peso_base_gr','tarifa_kg_extra','umbral_masivo','admin_pin'];
   for(const k of F){ const val=($('cf_'+k)&&$('cf_'+k).value)||''; await api('vcat_config?clave=eq.'+k,{method:'PATCH',body:JSON.stringify({valor:val}),headers:{...H,Prefer:'return=minimal'}}); this.cfg[k]=val; }
   toast('Guardado');
 },
