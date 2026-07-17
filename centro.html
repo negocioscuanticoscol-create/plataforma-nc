@@ -59,6 +59,20 @@ h1{font-size:22px;margin-bottom:2px}
 .empty{padding:30px;text-align:center;color:var(--sub)}
 .aglist .ag{display:flex;justify-content:space-between;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin-bottom:9px}
 .aglist .ag .an{font-weight:700} .aglist .ag .ad{font-size:12.5px;color:var(--sub);margin-top:2px}
+.finsec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:6px 4px;margin-bottom:14px}
+.finsec h3{font-size:13px;padding:10px 14px 6px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em}
+.finrow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--line)}
+.finrow .fc b{font-size:14px} .finrow .fn{font-size:11.5px;color:var(--faint);margin-top:2px}
+.finbadge{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;background:#22303f;color:var(--sub);margin-left:5px}
+.finbadge.auto{background:#12291f;color:var(--ok)}
+.finm{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.finm input{width:120px;background:#0f141d;border:1px solid var(--line);border-radius:7px;color:var(--tx);padding:7px 9px;font-size:13.5px;text-align:right;font-weight:700}
+.finm .pfx{color:var(--faint)} .finm b{font-size:14px}
+.finx{background:transparent;border:none;color:var(--faint);cursor:pointer;font-size:14px}
+.finx:hover{color:var(--rosa)}
+.neto{border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px;background:linear-gradient(135deg,#141a26,#1b2740)}
+.neto .nl{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.06em}
+.neto .nv{font-size:30px;font-weight:800;margin-top:3px}
 @media(max-width:560px){nav{top:56px}}
 </style>
 </head>
@@ -86,10 +100,52 @@ const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'
 
 const App={
 vista:'resumen',
-TABS:[['resumen','📊 Resumen'],['marketing','📣 Marketing'],['empresas','🏢 Empresas'],['agentes','🤖 Agentes']],
+TABS:[['resumen','📊 Resumen'],['marketing','📣 Marketing'],['financiero','💰 Financiero'],['empresas','🏢 Empresas'],['agentes','🤖 Agentes']],
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({resumen:this.vResumen,marketing:this.vMarketing,empresas:this.vEmpresas,agentes:this.vAgentes}[v]).call(this); },
+  ({resumen:this.vResumen,marketing:this.vMarketing,financiero:this.vFinanciero,empresas:this.vEmpresas,agentes:this.vAgentes}[v]).call(this); },
+
+async vFinanciero(){
+  const lineas=await api('nc_finanzas?order=orden&limit=500');
+  const sc=(await api('nc_smart_comision_mes'))[0]||{comision:0,ventas:0};
+  const fc=(await api('nc_feroz_comision_mes'))[0]||{comision:0,pedidos:0};
+  this._fin=lineas;
+  const money=n=>'$'+nm(n);
+  const ing=lineas.filter(l=>l.tipo==='ingreso'&&l.activo!==false);
+  const gas=lineas.filter(l=>l.tipo==='gasto'&&l.activo!==false).sort((a,b)=>(a.dia_pago||99)-(b.dia_pago||99));
+  const comSmart=+sc.comision||0, comFeroz=+fc.comision||0;
+  const totIng=ing.reduce((a,l)=>a+(+l.monto||0),0)+comSmart+comFeroz;
+  const cobrado=ing.filter(l=>l.pagado).reduce((a,l)=>a+(+l.monto||0),0)+comSmart+comFeroz;
+  const porCobrar=ing.filter(l=>!l.pagado).reduce((a,l)=>a+(+l.monto||0),0);
+  const totGas=gas.reduce((a,l)=>a+(+l.monto||0),0);
+  const neto=totIng-totGas;
+  // fila de INGRESO: monto + ¿entró?
+  const rowIng=l=>`<div class="finrow"><div class="fc"><b>${esc(l.concepto)}</b>${l.empresa?`<span class="finbadge">${esc(l.empresa)}</span>`:''}${l.nota?`<div class="fn">${esc(l.nota)}</div>`:''}</div>
+    <div class="finm"><span class="pfx">$</span><input type="number" value="${+l.monto||0}" onchange="App.finUpd(${l.id},'monto',this.value)">
+      <button class="chip ${l.pagado?'on':'off'}" style="cursor:pointer;border:none" onclick="App.finPagado(${l.id},${!l.pagado})">${l.pagado?'✅ entró':'⏳ pendiente'}</button>
+      <button class="finx" onclick="App.finDel(${l.id})">✕</button></div></div>`;
+  // fila de GASTO: día de pago + monto
+  const rowGas=l=>`<div class="finrow"><div class="fc"><b>${esc(l.concepto)}</b>${l.nota?`<div class="fn">${esc(l.nota)}</div>`:''}</div>
+    <div class="finm">📅 <input type="number" min="1" max="31" placeholder="día" style="width:56px" value="${l.dia_pago||''}" onchange="App.finUpd(${l.id},'dia_pago',this.value)">
+      <span class="pfx">$</span><input type="number" value="${+l.monto||0}" onchange="App.finUpd(${l.id},'monto',this.value)"><button class="finx" onclick="App.finDel(${l.id})">✕</button></div></div>`;
+  const auto=(nom,det,val)=>`<div class="finrow"><div class="fc"><b>${nom}</b><span class="finbadge auto">AUTO</span>${det?`<div class="fn">${det}</div>`:''}</div><div class="finm"><b>${money(val)}</b></div></div>`;
+  $('main').innerHTML=`<h1>💰 Financiero · cómo vamos</h1>
+    <div class="sub">Comisiones que traen las apps + gastos con su día de pago. Para cuadrar el flujo de caja.</div>
+    <div class="neto"><div class="nl">Cómo vamos este mes (ingresos − gastos)</div>
+      <div class="nv" style="color:${neto>=0?'var(--ok)':'var(--rosa)'}">${money(neto)}</div>
+      <div style="font-size:12.5px;color:var(--sub);margin-top:6px">Ingresos ${money(totIng)} · Gastos ${money(totGas)} · Por cobrar ${money(porCobrar)}</div></div>
+    <div class="finsec"><h3>📈 Ingresos / Comisiones — ¿entró la plata?</h3>
+      ${auto('Comisión Smart',(sc.ventas||0)+' ventas este mes',comSmart)}
+      ${auto('Comisión Feroz',(fc.pedidos||0)+' pedido(s) con comisión',comFeroz)}
+      ${ing.map(rowIng).join('')}</div>
+    <div class="finsec"><h3>📅 Gastos de NC — ordenados por día de pago</h3>
+      ${gas.map(rowGas).join('')||'<div class="finrow"><span style="color:var(--faint);padding:6px 10px">Sin gastos cargados</span></div>'}</div>
+    <div style="display:flex;gap:8px"><button class="btn" onclick="App.finAdd('ingreso')">＋ Ingreso</button><button class="btn ghost" onclick="App.finAdd('gasto')">＋ Gasto</button></div>`;
+},
+async finUpd(id,campo,val){ const b={}; b[campo]=(campo==='dia_pago')?(+val||null):(+val||0); await patch('nc_finanzas?id=eq.'+id,b); const l=(this._fin||[]).find(x=>x.id===id); if(l)l[campo]=b[campo]; toast('Guardado'); if(campo==='dia_pago') this.vFinanciero(); },
+async finPagado(id,val){ await patch('nc_finanzas?id=eq.'+id,{pagado:val}); const l=(this._fin||[]).find(x=>x.id===id); if(l)l.pagado=val; this.vFinanciero(); },
+async finDel(id){ if(!confirm('¿Eliminar esta línea?'))return; await api('nc_finanzas?id=eq.'+id,{method:'DELETE',headers:{...H,Prefer:'return=minimal'}}); toast('Eliminada'); this.vFinanciero(); },
+async finAdd(tipo){ const con=prompt((tipo==='ingreso'?'Ingreso':'Gasto')+' — concepto:'); if(!con)return; const mo=prompt('Monto ($):','0'); const b={tipo,concepto:con.trim(),monto:+mo||0,orden:50}; if(tipo==='gasto'){ const d=prompt('Día de pago del mes (1-31, opcional):',''); if(d)b.dia_pago=+d||null; } await post('nc_finanzas',b); toast('Agregado'); this.vFinanciero(); },
 
 async _leadsMes(){
   const desde=mesISO();
