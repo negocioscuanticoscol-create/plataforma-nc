@@ -246,25 +246,62 @@ async aProductos(){
       <button class="btn sm sec" onclick="App.prodForm(${p.id})">✏️</button></div></div>`).join('')||'<div class="empty">Sin productos.</div>'}`);
 },
 prodForm(id){
-  const p=(this._aprods||[]).find(x=>x.id===id)||{comision_tipo:'fijo'};
-  modal(`<h1 style="font-size:18px;margin-bottom:6px">${id?'Editar':'Nuevo'} producto</h1>
+  const p=(this._aprods||[]).find(x=>x.id===id)||{comision_tipo:'fijo',plat_tipo:'fijo',iva_pct:19};
+  const oi='oninput="App.prodCalc()"';
+  modal(`<h1 style="font-size:18px;margin-bottom:6px">${id?'Editar':'Nuevo'} producto · hoja de costos</h1>
     <label>Nombre</label><input id="pf_nombre" value="${esc(p.nombre||'')}">
     <label>Categoría</label><input id="pf_cat" value="${esc(p.categoria||'')}">
-    <div class="row"><div style="flex:1"><label>Precio de venta</label><input id="pf_precio" type="number" value="${+p.precio||0}"></div>
-      <div style="flex:1"><label>Costo de envío</label><input id="pf_envio" type="number" value="${+p.costo_envio||0}"></div></div>
-    <div class="row"><div style="flex:1"><label>Comisión</label><select id="pf_ctipo"><option value="fijo" ${p.comision_tipo!=='pct'?'selected':''}>Valor fijo ($)</option><option value="pct" ${p.comision_tipo==='pct'?'selected':''}>Porcentaje (%)</option></select></div>
-      <div style="flex:1"><label>Comisión individual</label><input id="pf_cval" type="number" value="${+p.comision_valor||0}"></div>
-      <div style="flex:1"><label>Comisión masivo 🎯</label><input id="pf_cmas" type="number" value="${+p.comision_masivo||0}"></div></div>
-    <div class="sub" style="font-size:12px">La comisión masivo (más alta) se aplica cuando el pedido llega al mínimo de productos (se configura en ⚙️ Config).</div>
-    <label>Cualidades / descripción</label><textarea id="pf_cual" rows="4">${esc(p.cualidades||'')}</textarea>
+    <div class="row"><div style="flex:1"><label>Valor final (lo que paga el cliente)</label><input id="pf_precio" type="number" value="${+p.precio||0}" ${oi}></div>
+      <div style="flex:.7"><label>IVA %</label><input id="pf_iva" type="number" value="${p.iva_pct!=null?+p.iva_pct:19}" ${oi}></div></div>
+    <div class="row"><div style="flex:1"><label>Comisión plataforma (NC)</label><select id="pf_ptipo" ${oi}><option value="fijo" ${p.plat_tipo!=='pct'?'selected':''}>Fijo ($)</option><option value="pct" ${p.plat_tipo==='pct'?'selected':''}>%</option></select></div>
+      <div style="flex:1"><label>Valor</label><input id="pf_pval" type="number" value="${+p.plat_valor||0}" ${oi}></div>
+      <div style="flex:1"><label>Comisión vendedor</label><select id="pf_ctipo" ${oi}><option value="fijo" ${p.comision_tipo!=='pct'?'selected':''}>Fijo ($)</option><option value="pct" ${p.comision_tipo==='pct'?'selected':''}>%</option></select></div></div>
+    <div style="background:#f6f4ff;border:1px solid #e0d8ff;border-radius:10px;padding:10px 12px;margin-top:10px">
+      <div style="font-weight:800;color:var(--acc);font-size:13px;margin-bottom:6px">📦 INDIVIDUAL</div>
+      <div class="row"><div style="flex:1"><label>Flete individual</label><input id="pf_envio" type="number" value="${+p.costo_envio||0}" ${oi}></div>
+        <div style="flex:1"><label>Comisión vendedor indiv.</label><input id="pf_cval" type="number" value="${+p.comision_valor||0}" ${oi}></div></div></div>
+    <div style="background:#eefaf1;border:1px solid #cdeed8;border-radius:10px;padding:10px 12px;margin-top:8px">
+      <div style="font-weight:800;color:var(--ok);font-size:13px;margin-bottom:6px">🎯 CONSOLIDADO (masivo)</div>
+      <div class="row"><div style="flex:1"><label>Flete consolidado</label><input id="pf_emas" type="number" value="${+p.costo_envio_masivo||0}" ${oi}></div>
+        <div style="flex:1"><label>Comisión vendedor consol.</label><input id="pf_cmas" type="number" value="${+p.comision_masivo||0}" ${oi}></div></div></div>
+    <div id="pf_break" style="margin-top:12px"></div>
+    <label>Cualidades / descripción</label><textarea id="pf_cual" rows="3">${esc(p.cualidades||'')}</textarea>
     <label>Fotos ${(p.fotos||[]).length?`(${p.fotos.length} ya cargadas — subir reemplaza)`:''}</label><input id="pf_fotos" type="file" accept="image/*" multiple>
     <label>Estado</label><select id="pf_activo"><option value="true" ${p.activo!==false?'selected':''}>Activo</option><option value="false" ${p.activo===false?'selected':''}>Inactivo</option></select>
     <div class="row" style="margin-top:14px"><button class="btn" onclick="App.prodGuardar(${id||'null'})">💾 Guardar</button><button class="btn sec sm" onclick="cerrar()">Cancelar</button></div>`);
+  this.prodCalc();
+},
+prodCalc(){
+  const g=k=>($('pf_'+k)&&$('pf_'+k).value)||'';
+  const precio=+g('precio')||0, iva=+g('iva')||0;
+  const plat = g('ptipo')==='pct' ? Math.round(precio*(+g('pval')||0)/100) : (+g('pval')||0);
+  const ct=g('ctipo');
+  const cv=v=> ct==='pct' ? Math.round(precio*(+v||0)/100) : (+v||0);
+  const fi=+g('envio')||0, ci=cv(g('cval')), fc=+g('emas')||0, cc=cv(g('cmas'));
+  const base = iva>0 ? Math.round(precio/(1+iva/100)) : precio;
+  const ivaVal = precio-base;
+  const netoI = precio-ivaVal-fi-ci-plat;
+  const netoC = precio-ivaVal-fc-cc-plat;
+  const f=n=>money(n);
+  const el=$('pf_break'); if(!el) return;
+  el.innerHTML=`<div style="background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden">
+    <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;font-size:12.5px">
+      <div style="padding:8px 10px;font-weight:700;background:#f4f5f8">Concepto</div><div style="padding:8px 10px;font-weight:700;background:#f4f5f8;text-align:right;color:var(--acc)">Individual</div><div style="padding:8px 10px;font-weight:700;background:#f4f5f8;text-align:right;color:var(--ok)">Consolidado</div>
+      <div style="padding:7px 10px">Valor final</div><div style="padding:7px 10px;text-align:right">${f(precio)}</div><div style="padding:7px 10px;text-align:right">${f(precio)}</div>
+      <div style="padding:7px 10px;color:var(--sub)">− IVA (${iva}%)</div><div style="padding:7px 10px;text-align:right;color:var(--sub)">−${f(ivaVal)}</div><div style="padding:7px 10px;text-align:right;color:var(--sub)">−${f(ivaVal)}</div>
+      <div style="padding:7px 10px;color:var(--sub)">− Flete</div><div style="padding:7px 10px;text-align:right;color:var(--sub)">−${f(fi)}</div><div style="padding:7px 10px;text-align:right;color:var(--sub)">−${f(fc)}</div>
+      <div style="padding:7px 10px;color:var(--sub)">− Comisión vendedor</div><div style="padding:7px 10px;text-align:right;color:var(--sub)">−${f(ci)}</div><div style="padding:7px 10px;text-align:right;color:var(--sub)">−${f(cc)}</div>
+      <div style="padding:7px 10px;color:var(--sub)">− Comisión plataforma</div><div style="padding:7px 10px;text-align:right;color:var(--sub)">−${f(plat)}</div><div style="padding:7px 10px;text-align:right;color:var(--sub)">−${f(plat)}</div>
+      <div style="padding:9px 10px;font-weight:800;border-top:2px solid var(--tx)">= NETO fabricante</div><div style="padding:9px 10px;text-align:right;font-weight:800;border-top:2px solid var(--tx);color:${netoI>=0?'var(--acc)':'var(--rojo)'}">${f(netoI)}</div><div style="padding:9px 10px;text-align:right;font-weight:800;border-top:2px solid var(--tx);color:${netoC>=0?'var(--ok)':'var(--rojo)'}">${f(netoC)}</div>
+    </div></div>`;
 },
 async prodGuardar(id){
   const v=k=>($('pf_'+k)&&$('pf_'+k).value.trim())||'';
-  const b={nombre:v('nombre'),categoria:v('cat'),precio:+v('precio')||0,costo_envio:+v('envio')||0,
-    comision_tipo:v('ctipo'),comision_valor:+v('cval')||0,comision_masivo:+v('cmas')||0,cualidades:v('cual'),activo:v('activo')==='true'};
+  const b={nombre:v('nombre'),categoria:v('cat'),precio:+v('precio')||0,iva_pct:+v('iva')||0,
+    plat_tipo:v('ptipo'),plat_valor:+v('pval')||0,
+    costo_envio:+v('envio')||0,costo_envio_masivo:+v('emas')||0,
+    comision_tipo:v('ctipo'),comision_valor:+v('cval')||0,comision_masivo:+v('cmas')||0,
+    cualidades:v('cual'),activo:v('activo')==='true'};
   if(!b.nombre){ toast('Falta el nombre'); return; }
   const files=$('pf_fotos')&&$('pf_fotos').files;
   if(files&&files.length){ const urls=[]; for(const f of files){ const u=await subir(f,'prod'); if(u)urls.push(u); } if(urls.length)b.fotos=urls; }
