@@ -17,6 +17,10 @@ header{background:linear-gradient(135deg,#141a26,#1d2740 60%,#141a26);border-bot
 nav{display:flex;gap:6px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:57px;z-index:29;flex-wrap:wrap}
 nav button{background:transparent;border:none;color:var(--sub);padding:9px 15px;border-radius:9px;cursor:pointer;font-size:14px;font-weight:600}
 nav button.on{background:var(--acc);color:#fff}
+.cajones{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:16px}
+.caj{background:var(--card);border:1px solid var(--line);color:var(--sub);padding:9px 16px;border-radius:10px;cursor:pointer;font-weight:700;font-size:14px}
+.caj.on{background:#0b1f2a;color:#fff;border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+.caj.add{color:var(--acc)}
 main{max-width:1080px;margin:0 auto;padding:20px 16px 80px}
 h1{font-size:22px;margin-bottom:2px}
 .sub{color:var(--sub);font-size:13px;margin-bottom:18px}
@@ -81,34 +85,68 @@ function mesISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMo
 const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'},TikTok:{c:'var(--tk)',ic:'🎵'},WhatsApp:{c:'var(--wa)',ic:'💬'}};
 
 const App={
-vista:'marketing',
-TABS:[['marketing','📣 Marketing'],['empresas','🏢 Empresas'],['agentes','🤖 Agentes']],
+vista:'resumen',
+TABS:[['resumen','📊 Resumen'],['marketing','📣 Marketing'],['empresas','🏢 Empresas'],['agentes','🤖 Agentes']],
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({marketing:this.vMarketing,empresas:this.vEmpresas,agentes:this.vAgentes}[v]).call(this); },
+  ({resumen:this.vResumen,marketing:this.vMarketing,empresas:this.vEmpresas,agentes:this.vAgentes}[v]).call(this); },
+
+async _leadsMes(){
+  const desde=mesISO();
+  const smart=await api('nc_bot_leads?empresa=eq.smart&creado_en=gte.'+desde+'&select=telefono',{count:true});
+  const feroz=await api('nc_bot_leads_feroz?creado_en=gte.'+desde+'&select=telefono',{count:true});
+  return {smart,feroz};
+},
+
+async vResumen(){
+  const leadsBy=await this._leadsMes();
+  const cuentas=await api('nc_mkt_cuentas?select=cliente,seguidores&limit=500');
+  const segBy={}; cuentas.forEach(c=>segBy[c.cliente]=(segBy[c.cliente]||0)+(+c.seguidores||0));
+  const emp=[
+   {n:'Feroz',bot:'feroz',d:'Botas de dotación · distribuidores',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=feroz'},
+   {n:'Smart',bot:'smart',d:'Envases herméticos · B2B',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=smart'},
+   {n:'Epheta',bot:null,d:'Aseo · en construcción',u:null},
+   {n:'FES Fueling',bot:null,d:'ERP repuestos cisternas',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/fesfueling/'},
+   {n:'ZARRAT',bot:null,d:'Atelier de moda a la medida',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/zarrat/'},
+  ];
+  const totLeads=(leadsBy.smart||0)+(leadsBy.feroz||0);
+  const totSeg=cuentas.reduce((a,c)=>a+(+c.seguidores||0),0);
+  $('main').innerHTML=`<h1>📊 Resumen · todas las empresas</h1>
+    <div class="sub">La foto de Negocios Cuánticos en un vistazo.</div>
+    <div class="kpis">
+      <div class="kpi ok"><b>${nm(totLeads)}</b><span>Leads de bots este mes</span></div>
+      <div class="kpi acc"><b>${nm(totSeg)}</b><span>Seguidores (total)</span></div>
+      <div class="kpi azul"><b>${emp.length}</b><span>Empresas</span></div>
+    </div>
+    <div class="emp">${emp.map(e=>{ const lm=e.bot?(leadsBy[e.bot]||0):null; const seg=segBy[e.n]||0;
+      return `<div class="empc" ${e.u?`onclick="window.open('${e.u}','_blank')" style="cursor:pointer"`:''}>
+        <div class="en">${esc(e.n)}</div><div class="ed">${esc(e.d)}</div>
+        <div style="display:flex;gap:14px;margin-top:10px;font-size:12.5px">
+          ${lm!=null?`<span>💬 <b style="color:var(--ok)">${nm(lm)}</b> leads/mes</span>`:'<span style="color:var(--faint)">sin bot</span>'}
+          ${seg?`<span>👥 <b>${nm(seg)}</b></span>`:''}</div>
+        ${e.u?'<span class="go">Abrir →</span>':''}</div>`; }).join('')}</div>`;
+},
 
 async vMarketing(){
   const cuentas=await api('nc_mkt_cuentas?order=orden&limit=500');
-  // leads del mes por bot
-  const desde=mesISO();
-  const leadsSmart=await api('nc_bot_leads?empresa=eq.smart&creado_en=gte.'+desde+'&select=telefono',{count:true});
-  const leadsFeroz=await api('nc_bot_leads_feroz?creado_en=gte.'+desde+'&select=telefono',{count:true});
-  const leadsBy={smart:leadsSmart,feroz:leadsFeroz};
+  const leadsBy=await this._leadsMes();
+  this._cuentas=cuentas; this._leadsBy=leadsBy;
   const clientes=[...new Set(cuentas.map(c=>c.cliente))];
+  let sel=this._mkSel; if(!clientes.includes(sel)) sel=clientes[0];
+  this._mkSel=sel;
   const totSeg=cuentas.reduce((a,c)=>a+(+c.seguidores||0),0);
-  const totLeads=leadsSmart+leadsFeroz;
-  this._cuentas=cuentas;
-  $('main').innerHTML=`<h1>📣 Marketing · todas las marcas</h1>
-    <div class="sub">Redes, seguidores, pauta y agentes de cada marca — en un solo sitio.</div>
+  const totLeads=(leadsBy.smart||0)+(leadsBy.feroz||0);
+  $('main').innerHTML=`<h1>📣 Marketing</h1>
+    <div class="sub">Elige una marca y ve su marketing: redes, seguidores, pauta y agentes.</div>
     <div class="kpis">
       <div class="kpi acc"><b>${nm(totSeg)}</b><span>Seguidores (total)</span></div>
       <div class="kpi ok"><b>${nm(totLeads)}</b><span>Leads de bots este mes</span></div>
       <div class="kpi azul"><b>${clientes.length}</b><span>Marcas</span></div>
-      <div class="kpi"><b>${cuentas.length}</b><span>Cuentas de red</span></div>
     </div>
-    ${clientes.map(cl=>this._cardCliente(cl,cuentas.filter(c=>c.cliente===cl),leadsBy)).join('')}
-    <button class="btn ghost" style="width:100%;margin-top:6px" onclick="App.addCuenta()">＋ Agregar marca / red</button>`;
+    <div class="cajones">${clientes.map(cl=>`<button class="caj ${cl===sel?'on':''}" onclick="App.mkSel('${esc(cl)}')">${esc(cl)}</button>`).join('')}<button class="caj add" onclick="App.addCuenta()">＋ marca</button></div>
+    ${sel?this._cardCliente(sel,cuentas.filter(c=>c.cliente===sel),leadsBy):'<div class="empty">Agrega tu primera marca.</div>'}`;
 },
+mkSel(cl){ this._mkSel=cl; this.vMarketing(); },
 _cardCliente(cl, reds, leadsBy){
   const bot=(reds.find(r=>r.bot)||{}).bot;
   const leads=bot?(leadsBy[bot]||0):null;
@@ -175,7 +213,7 @@ vAgentes(){
     <div class="aglist">${ag.map(([n,d,st])=>`<div class="ag"><div><div class="an">${esc(n)}</div><div class="ad">${esc(d)}</div></div><span class="chip ${st}">${st==='on'?'● activo':'por montar'}</span></div>`).join('')}</div>`;
 },
 };
-App.nav(); App.go('marketing');
+App.nav(); App.go('resumen');
 </script>
 </body>
 </html>
