@@ -2147,7 +2147,7 @@ const App = {
             <tr><td>IVA (19%)</td><td style="text-align:right">${money(iva)}</td></tr>
             <tr><td>🚚 Transporte</td><td style="text-align:right">${fl.val?money(fl.val):esc(fl.lbl)}</td></tr>
             <tr><td class="big">TOTAL</td><td style="text-align:right" class="big">${money(tot)}</td></tr></table></div>
-          <div class="cuenta"><b>💳 Para confirmar tu pedido, consigna en:</b><br>${esc(C.CUENTA)}<br><span style="color:#16a34a">Envía el comprobante por WhatsApp y lo despachamos.</span></div>
+          <div class="cuenta"><b>💳 Para confirmar tu pedido, consigna en:</b><br><span style="font-family:'IBM Plex Mono',Consolas,'Courier New',monospace;letter-spacing:.5px;font-weight:600">${esc(C.CUENTA)}</span><br><span style="color:#16a34a">Envía el comprobante por WhatsApp y lo despachamos.</span></div>
         </div>
         <div class="acts"><button class="b1" onclick="window.print()">🖨️ Imprimir / PDF</button><a class="b2" href="${wa}" target="_blank">📱 Enviar por WhatsApp</a></div>
       </div>
