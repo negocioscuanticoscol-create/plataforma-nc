@@ -100,10 +100,10 @@ const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'
 
 const App={
 vista:'resumen',
-TABS:[['resumen','📊 Resumen'],['marketing','📣 Marketing'],['financiero','💰 Financiero'],['empresas','🏢 Empresas'],['agentes','🤖 Agentes']],
+TABS:[['resumen','📊 Resumen'],['marketing','📣 Marketing'],['financiero','💰 Financiero'],['agentes','🤖 Agentes']],
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({resumen:this.vResumen,marketing:this.vMarketing,financiero:this.vFinanciero,empresas:this.vEmpresas,agentes:this.vAgentes}[v]).call(this); },
+  ({resumen:this.vResumen,marketing:this.vMarketing,financiero:this.vFinanciero,agentes:this.vAgentes}[v]).call(this); },
 
 async vFinanciero(){
   const lineas=await api('nc_finanzas?order=orden&limit=500');
