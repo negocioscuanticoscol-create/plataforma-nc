@@ -117,7 +117,10 @@ async vCatalogo(){
     ${nC?`<div class="fab"><button class="btn ok" onclick="App.vCarrito()">🛒 Ver carrito (${nC}) · ${money(this._totCart().total)}</button></div>`:''}`);
 },
 _comTxt(p){ return p.comision_tipo==='pct' ? (p.comision_valor+'%') : money(p.comision_valor); },
-_comVal(p){ return p.comision_tipo==='pct' ? Math.round((+p.precio||0)*(+p.comision_valor||0)/100) : (+p.comision_valor||0); },
+_comVal(p,masivo){ const val = masivo && (+p.comision_masivo>0) ? +p.comision_masivo : +p.comision_valor||0;
+  return p.comision_tipo==='pct' ? Math.round((+p.precio||0)*val/100) : val; },
+_umbral(){ return Math.max(2,+this.c('umbral_masivo')||5); },
+_esMasivo(){ return this.cart.reduce((a,i)=>a+i.qty,0) >= this._umbral(); },
 vProducto(id){
   const p=(this._prods||[]).find(x=>x.id===id); if(!p)return; this._qty=1;
   const fotos=p.fotos||[];
@@ -136,21 +139,38 @@ vProducto(id){
 },
 qtyChg(d){ this._qty=Math.max(1,(this._qty||1)+d); const i=$('qtyv'); if(i)i.value=this._qty; },
 addCart(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return; const q=Math.max(1,this._qty||1);
-  const ex=this.cart.find(i=>i.id===id); if(ex)ex.qty+=q; else this.cart.push({id,nombre:p.nombre,precio:+p.precio||0,comu:this._comVal(p),foto:(p.fotos||[])[0]||'',qty:q});
+  const ex=this.cart.find(i=>i.id===id); if(ex)ex.qty+=q; else this.cart.push({id,nombre:p.nombre,precio:+p.precio||0,ci:this._comVal(p,false),cm:this._comVal(p,true),foto:(p.fotos||[])[0]||'',qty:q});
   toast('Agregado ✓'); this.vCatalogo();
 },
-_totCart(){ const sub=this.cart.reduce((a,i)=>a+i.precio*i.qty,0); const com=this.cart.reduce((a,i)=>a+i.comu*i.qty,0); const envio=+this.c('envio_default')||0; return {sub,com,envio,total:sub+envio}; },
+_totCart(){ const masivo=this._esMasivo();
+  const sub=this.cart.reduce((a,i)=>a+i.precio*i.qty,0);
+  const com=this.cart.reduce((a,i)=>a+(masivo?i.cm:i.ci)*i.qty,0);
+  const envio = masivo ? (+this.c('envio_masivo')||0) : (+this.c('envio_individual')||+this.c('envio_default')||0);
+  return {sub,com,envio,total:sub+envio,masivo}; },
 vCarrito(){
   if(!this.cart.length){ this.vCatalogo(); return; }
   const t=this._totCart();
+  const qty=this.cart.reduce((a,i)=>a+i.qty,0), umb=this._umbral();
+  // incentivo: cuánto GANARÍA si completa el envío masivo
+  let banner='';
+  if(t.masivo){
+    banner=`<div class="card" style="background:#e7f7ee;border-color:#bfe6cf"><b style="color:var(--ok)">🎉 ¡Envío masivo activado!</b><div class="sub" style="margin:0">Ganas la comisión alta y el envío consolidado. Tu comisión: <b style="color:var(--ok)">${money(t.com)}</b></div></div>`;
+  } else {
+    const faltan=umb-qty;
+    const comMas=this.cart.reduce((a,i)=>a+i.cm*i.qty,0);
+    const extra=comMas-t.com;
+    if(extra>0||faltan>0) banner=`<div class="card" style="background:#fff7e6;border-color:#ffe1a8"><b style="color:#b45309">💪 Completa el envío masivo (${umb} productos)</b><div class="sub" style="margin:0">Te faltan <b>${faltan}</b> · al llegar a ${umb} ganas <b style="color:var(--ok)">+${money(extra)}</b> de comisión${(+this.c('envio_masivo')||0)!==(+this.c('envio_individual')||0)?' y cambia el envío':''}.</div></div>`;
+  }
   this.set(`${this.head('Carrito','')}
     <main><button class="btn sec sm" onclick="App.vCatalogo()">← Seguir viendo</button>
+    ${banner}
     <div class="card" style="margin-top:10px">
       ${this.cart.map((i,ix)=>`<div class="item"><img src="${esc(i.foto)}" onerror="this.style.visibility='hidden'"><div class="g"><div class="nm">${esc(i.nombre)}</div><div class="meta">${money(i.precio)} c/u</div></div>
         <div class="qty"><button onclick="App.cartQty(${ix},-1)">−</button><b>${i.qty}</b><button onclick="App.cartQty(${ix},1)">＋</button></div></div>`).join('')}
       <div style="margin-top:12px">
-        <div class="tot"><span>Productos</span><span>${money(t.sub)}</span></div>
-        <div class="tot"><span>Envío</span><span>${money(t.envio)}</span></div>
+        <div class="tot"><span>Productos (${qty})</span><span>${money(t.sub)}</span></div>
+        <div class="tot"><span>Envío ${t.masivo?'(masivo)':'(individual)'}</span><span>${money(t.envio)}</span></div>
+        <div class="tot"><span>Tu comisión</span><span style="color:var(--ok);font-weight:700">${money(t.com)}</span></div>
         <div class="tot big"><span>TOTAL</span><span>${money(t.total)}</span></div></div>
     </div>
     <button class="btn" onclick="App.vCheckout()">Continuar al pago →</button></main>`);
@@ -233,7 +253,9 @@ prodForm(id){
     <div class="row"><div style="flex:1"><label>Precio de venta</label><input id="pf_precio" type="number" value="${+p.precio||0}"></div>
       <div style="flex:1"><label>Costo de envío</label><input id="pf_envio" type="number" value="${+p.costo_envio||0}"></div></div>
     <div class="row"><div style="flex:1"><label>Comisión</label><select id="pf_ctipo"><option value="fijo" ${p.comision_tipo!=='pct'?'selected':''}>Valor fijo ($)</option><option value="pct" ${p.comision_tipo==='pct'?'selected':''}>Porcentaje (%)</option></select></div>
-      <div style="flex:1"><label>Valor comisión</label><input id="pf_cval" type="number" value="${+p.comision_valor||0}"></div></div>
+      <div style="flex:1"><label>Comisión individual</label><input id="pf_cval" type="number" value="${+p.comision_valor||0}"></div>
+      <div style="flex:1"><label>Comisión masivo 🎯</label><input id="pf_cmas" type="number" value="${+p.comision_masivo||0}"></div></div>
+    <div class="sub" style="font-size:12px">La comisión masivo (más alta) se aplica cuando el pedido llega al mínimo de productos (se configura en ⚙️ Config).</div>
     <label>Cualidades / descripción</label><textarea id="pf_cual" rows="4">${esc(p.cualidades||'')}</textarea>
     <label>Fotos ${(p.fotos||[]).length?`(${p.fotos.length} ya cargadas — subir reemplaza)`:''}</label><input id="pf_fotos" type="file" accept="image/*" multiple>
     <label>Estado</label><select id="pf_activo"><option value="true" ${p.activo!==false?'selected':''}>Activo</option><option value="false" ${p.activo===false?'selected':''}>Inactivo</option></select>
@@ -242,7 +264,7 @@ prodForm(id){
 async prodGuardar(id){
   const v=k=>($('pf_'+k)&&$('pf_'+k).value.trim())||'';
   const b={nombre:v('nombre'),categoria:v('cat'),precio:+v('precio')||0,costo_envio:+v('envio')||0,
-    comision_tipo:v('ctipo'),comision_valor:+v('cval')||0,cualidades:v('cual'),activo:v('activo')==='true'};
+    comision_tipo:v('ctipo'),comision_valor:+v('cval')||0,comision_masivo:+v('cmas')||0,cualidades:v('cual'),activo:v('activo')==='true'};
   if(!b.nombre){ toast('Falta el nombre'); return; }
   const files=$('pf_fotos')&&$('pf_fotos').files;
   if(files&&files.length){ const urls=[]; for(const f of files){ const u=await subir(f,'prod'); if(u)urls.push(u); } if(urls.length)b.fotos=urls; }
@@ -300,13 +322,13 @@ pedVer(id){ const p=(this._apeds||[]).find(x=>x.id===id); if(!p)return;
 },
 
 async aConfig(){
-  const F=[['marca','Marca / nombre'],['nequi','Nequi (número)'],['nequi_titular','Nequi titular'],['banco','Banco'],['banco_cuenta','Cuenta bancaria'],['banco_titular','Cuenta titular'],['envio_default','Costo de envío por defecto'],['admin_pin','PIN admin']];
+  const F=[['marca','Marca / nombre'],['nequi','Nequi (número)'],['nequi_titular','Nequi titular'],['banco','Banco'],['banco_cuenta','Cuenta bancaria'],['banco_titular','Cuenta titular'],['envio_individual','Costo de envío INDIVIDUAL'],['envio_masivo','Costo de envío MASIVO'],['umbral_masivo','Productos para envío masivo (ej: 5)'],['admin_pin','PIN admin']];
   this.am(`<h1>Configuración</h1><div class="sub">A dónde llega el pago y datos generales.</div>
     <div class="card">${F.map(([k,l])=>`<label>${l}</label><input id="cf_${k}" value="${esc(this.c(k))}">`).join('')}
     <button class="btn" style="margin-top:14px" onclick="App.cfgGuardar()">💾 Guardar</button></div>`);
 },
 async cfgGuardar(){
-  const F=['marca','nequi','nequi_titular','banco','banco_cuenta','banco_titular','envio_default','admin_pin'];
+  const F=['marca','nequi','nequi_titular','banco','banco_cuenta','banco_titular','envio_individual','envio_masivo','umbral_masivo','admin_pin'];
   for(const k of F){ const val=($('cf_'+k)&&$('cf_'+k).value)||''; await api('vcat_config?clave=eq.'+k,{method:'PATCH',body:JSON.stringify({valor:val}),headers:{...H,Prefer:'return=minimal'}}); this.cfg[k]=val; }
   toast('Guardado');
 },
