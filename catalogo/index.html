@@ -19,13 +19,19 @@ nav button.on{background:var(--acc);color:#fff}
 main{max-width:900px;margin:0 auto;padding:16px 12px 90px}
 h1{font-size:21px;margin-bottom:2px}.sub{color:var(--sub);font-size:13px;margin-bottom:14px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-.pcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;cursor:pointer;transition:.15s}
-.pcard:hover{border-color:var(--acc);transform:translateY(-2px)}
-.pcard .ph{width:100%;aspect-ratio:1;background:#eef0f5 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:34px;color:#c3c9d4}
-.pcard .in{padding:10px 12px}
-.pcard .nm{font-weight:700;font-size:14px;line-height:1.2}
-.pcard .pr{color:var(--acc);font-weight:800;margin-top:4px}
-.pcard .cm{font-size:11px;color:var(--ok);font-weight:600;margin-top:2px}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:.15s;position:relative;display:flex;flex-direction:column}
+.pcard:hover{box-shadow:0 8px 24px rgba(90,31,214,.12);transform:translateY(-2px)}
+.pcard .ph{width:100%;aspect-ratio:1;background:#f7f7fa center/contain no-repeat;display:flex;align-items:center;justify-content:center;font-size:34px;color:#c3c9d4;cursor:pointer}
+.pcard .dcto{position:absolute;top:9px;left:9px;background:#ffe3ea;color:#e5397a;font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px;z-index:2}
+.pcard .fav{position:absolute;top:8px;right:10px;font-size:16px;color:#c3c9d4;z-index:2}
+.pcard .in{padding:11px 12px;display:flex;flex-direction:column;gap:2px;flex:1}
+.pcard .nm{font-weight:700;font-size:13.5px;line-height:1.25;text-transform:uppercase;letter-spacing:.01em;min-height:34px}
+.pcard .prow{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-top:3px}
+.pcard .antes{color:#aab2c0;text-decoration:line-through;font-size:13px}
+.pcard .pr{color:var(--acc);font-weight:800;font-size:17px}
+.pcard .cm{font-size:11px;color:var(--ok);font-weight:600}
+.pcard .add{margin:0 10px 11px;padding:9px;border:1px solid var(--acc);background:#fff;color:var(--acc);border-radius:9px;font-weight:700;cursor:pointer;font-size:13px}
+.pcard .add:hover{background:var(--acc);color:#fff}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;margin-bottom:12px}
 .gal{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
 .gal img{height:230px;border-radius:12px;object-fit:cover;flex:none}
@@ -109,18 +115,29 @@ async vCatalogo(){
   const nC=this.cart.reduce((a,i)=>a+i.qty,0);
   this.set(`${this.head('Catálogo','Vendedor: '+esc(this.vend.nombre))}
     <main><h1>Productos</h1><div class="sub">Toca un producto para ver fotos y detalles.</div>
-    <div class="grid">${prods.map(p=>{ const f=(p.fotos||[])[0];
-      return `<div class="pcard" onclick="App.vProducto(${p.id})">
-        <div class="ph" ${f?`style="background-image:url('${esc(f)}')"`:''}>${f?'':'📦'}</div>
-        <div class="in"><div class="nm">${esc(p.nombre)}</div><div class="pr">${money(p.precio)}</div>
-        <div class="cm">Comisión ${this._comTxt(p)}</div></div></div>`; }).join('')||'<div class="empty">Sin productos aún.</div>'}</div></main>
-    ${nC?`<div class="fab"><button class="btn ok" onclick="App.vCarrito()">🛒 Ver carrito (${nC}) · ${money(this._totCart().total)}</button></div>`:''}`);
+    <div class="grid">${prods.map(p=>{ const f=(p.fotos||[])[0]; const antes=+p.precio_antes||0; const dcto=(antes>p.precio&&antes>0)?Math.round((antes-p.precio)/antes*100):0;
+      return `<div class="pcard">
+        ${dcto>0?`<span class="dcto">-${dcto}% DCTO</span>`:''}<span class="fav">♡</span>
+        <div class="ph" ${f?`style="background-image:url('${esc(f)}')"`:''} onclick="App.vProducto(${p.id})">${f?'':'📦'}</div>
+        <div class="in" onclick="App.vProducto(${p.id})" style="cursor:pointer">
+          <div class="nm">${esc(p.nombre)}</div>
+          <div class="prow">${dcto>0?`<span class="antes">${money(antes)}</span>`:''}<span class="pr">${money(p.precio)}</span></div>
+          <div class="cm">⚖️ ${(+p.peso||0).toFixed(1)}kg · Comisión ${this._comTxt(p)}</div></div>
+        <button class="add" onclick="App.addRapido(${p.id})">🛒 Añadir al carrito</button></div>`; }).join('')||'<div class="empty">Sin productos aún.</div>'}</div></main>
+    ${nC?(()=>{ const peso=this._pesoCart(), meta=this._metaPeso(), falta=Math.max(0,meta-peso), masivo=peso>=meta;
+      const pct=Math.min(100,Math.round(peso/meta*100));
+      return `<div class="fab"><button class="btn ok" style="padding:0;overflow:hidden" onclick="App.vCarrito()">
+        <div style="padding:11px 14px 4px;display:flex;justify-content:space-between;align-items:center"><span>🛒 Ver carrito (${nC}) · ${peso.toFixed(1)}kg</span><span>${money(this._totCart().total)}</span></div>
+        <div style="font-size:12px;font-weight:600;padding:0 14px 6px;opacity:.95">${masivo?'✅ ¡Meta de '+meta+'kg! Ganas comisión alta':'💪 Te faltan '+falta.toFixed(1)+'kg para más comisión en TODO'}</div>
+        <div style="height:5px;background:rgba(255,255,255,.3)"><div style="height:100%;width:${pct}%;background:#fff"></div></div>
+      </button></div>`; })():''}`);
 },
 _comTxt(p){ return p.comision_tipo==='pct' ? (p.comision_valor+'%') : money(p.comision_valor); },
 _comVal(p,masivo){ const val = masivo && (+p.comision_masivo>0) ? +p.comision_masivo : +p.comision_valor||0;
   return p.comision_tipo==='pct' ? Math.round((+p.precio||0)*val/100) : val; },
-_umbral(){ return Math.max(2,+this.c('umbral_masivo')||5); },
-_esMasivo(){ return this.cart.reduce((a,i)=>a+i.qty,0) >= this._umbral(); },
+_metaPeso(){ return +this.c('peso_base_kg')||1; },
+_pesoCart(){ return this.cart.reduce((a,i)=>a+(+i.peso||0)*i.qty,0); },
+_esMasivo(){ return this._pesoCart() >= this._metaPeso(); },
 vProducto(id){
   const p=(this._prods||[]).find(x=>x.id===id); if(!p)return; this._qty=1;
   const fotos=p.fotos||[];
@@ -139,18 +156,19 @@ vProducto(id){
     <div class="card" style="margin-top:12px">
       <h1 style="font-size:24px">${esc(p.nombre)}</h1>
       ${p.categoria?`<div class="sub" style="margin:2px 0 8px">${esc(p.categoria)}</div>`:''}
-      <div style="color:var(--acc);font-size:30px;font-weight:800">${money(p.precio)}</div>
-      <div class="sub" style="margin-top:2px">Precio público</div>
+      <div style="display:flex;align-items:baseline;gap:10px">${(+p.precio_antes>p.precio)?`<span style="color:#aab2c0;text-decoration:line-through;font-size:18px">${money(p.precio_antes)}</span>`:''}<div style="color:var(--acc);font-size:30px;font-weight:800">${money(p.precio)}</div>${(+p.precio_antes>p.precio&&+p.precio_antes>0)?`<span class="dcto" style="position:static">-${Math.round((p.precio_antes-p.precio)/p.precio_antes*100)}% DCTO</span>`:''}</div>
+      <div class="sub" style="margin-top:2px">Precio público · ⚖️ ${(+p.peso||0).toFixed(1)} kg</div>
     </div>
     ${p.cualidades?`<div class="card"><div style="font-weight:800;margin-bottom:6px">✨ Bondades / características</div><div style="white-space:pre-wrap;line-height:1.6">${esc(p.cualidades)}</div>
       ${p.video_url?`<a class="btn" style="background:var(--wa);margin-top:12px;text-decoration:none;display:block;text-align:center" href="${esc(p.video_url)}" target="_blank">🎥 Ver el video de bondades</a>`:''}</div>`:''}
     <a class="btn" style="background:var(--wa);text-decoration:none;display:block;text-align:center;margin-bottom:10px" href="${wa}" target="_blank">📲 Enviar info por WhatsApp</a>
     <div class="card"><label>Cantidad</label>
       <div class="qty"><button onclick="App.qtyChg(-1)">−</button><input id="qtyv" type="number" value="1" style="width:80px;text-align:center" oninput="App._qty=Math.max(1,+this.value||1)"><button onclick="App.qtyChg(1)">＋</button></div>
-      <button class="btn" style="margin-top:16px" onclick="App.addCart(${id})">🛒 Agregar al pedido</button></div>
+      <button class="btn" style="margin-top:16px" onclick="App.addCart(${id})">🛒 Añadir al carrito</button></div>
     </main>`);
 },
 qtyChg(d){ this._qty=Math.max(1,(this._qty||1)+d); const i=$('qtyv'); if(i)i.value=this._qty; },
+addRapido(id){ this._qty=1; this.addCart(id); },
 addCart(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return; const q=Math.max(1,this._qty||1);
   const ex=this.cart.find(i=>i.id===id); if(ex)ex.qty+=q; else this.cart.push({id,nombre:p.nombre,precio:+p.precio||0,ci:this._comVal(p,false),cm:this._comVal(p,true),peso:+p.peso||0,foto:(p.fotos||[])[0]||'',qty:q});
   toast('Agregado ✓'); this.vCatalogo();
@@ -168,16 +186,16 @@ _totCart(){ const masivo=this._esMasivo();
 vCarrito(){
   if(!this.cart.length){ this.vCatalogo(); return; }
   const t=this._totCart();
-  const qty=this.cart.reduce((a,i)=>a+i.qty,0), umb=this._umbral();
-  // incentivo: cuánto GANARÍA si completa el envío masivo
+  const qty=this.cart.reduce((a,i)=>a+i.qty,0);
+  const peso=this._pesoCart(), meta=this._metaPeso(), falta=Math.max(0,meta-peso);
+  // incentivo por PESO: llegar a 1 kilo sube la comisión de TODOS los productos
   let banner='';
   if(t.masivo){
-    banner=`<div class="card" style="background:#e7f7ee;border-color:#bfe6cf"><b style="color:var(--ok)">🎉 ¡Envío masivo activado!</b><div class="sub" style="margin:0">Ganas la comisión alta y el envío consolidado. Tu comisión: <b style="color:var(--ok)">${money(t.com)}</b></div></div>`;
+    banner=`<div class="card" style="background:#e7f7ee;border-color:#bfe6cf"><b style="color:var(--ok)">🎉 ¡Meta de ${meta}kg alcanzada!</b><div class="sub" style="margin:0">Ganas la comisión ALTA en todos los productos. Tu comisión: <b style="color:var(--ok)">${money(t.com)}</b></div></div>`;
   } else {
-    const faltan=umb-qty;
     const comMas=this.cart.reduce((a,i)=>a+i.cm*i.qty,0);
     const extra=comMas-t.com;
-    if(extra>0||faltan>0) banner=`<div class="card" style="background:#fff7e6;border-color:#ffe1a8"><b style="color:#b45309">💪 Completa el envío masivo (${umb} productos)</b><div class="sub" style="margin:0">Te faltan <b>${faltan}</b> · al llegar a ${umb} ganas <b style="color:var(--ok)">+${money(extra)}</b> de comisión${(+this.c('envio_masivo')||0)!==(+this.c('envio_individual')||0)?' y cambia el envío':''}.</div></div>`;
+    banner=`<div class="card" style="background:#fff7e6;border-color:#ffe1a8"><b style="color:#b45309">💪 Te faltan ${falta.toFixed(1)}kg para el kilo</b><div class="sub" style="margin:0">Vas en <b>${peso.toFixed(1)}kg</b>. Al llegar a ${meta}kg, TODOS tus productos suben a la comisión alta: ganarías <b style="color:var(--ok)">+${money(extra)}</b>. ¡Agrega más y esfuérzate! 💪</div></div>`;
   }
   this.set(`${this.head('Carrito','')}
     <main><button class="btn sec sm" onclick="App.vCatalogo()">← Seguir viendo</button>
@@ -270,9 +288,10 @@ prodForm(id){
   modal(`<h1 style="font-size:18px;margin-bottom:6px">${id?'Editar':'Nuevo'} producto · hoja de costos</h1>
     <label>Nombre</label><input id="pf_nombre" value="${esc(p.nombre||'')}">
     <label>Categoría</label><input id="pf_cat" value="${esc(p.categoria||'')}">
-    <div class="row"><div style="flex:1"><label>Valor final (lo que paga el cliente)</label><input id="pf_precio" type="number" value="${+p.precio||0}" ${oi}></div>
-      <div style="flex:.7"><label>IVA %</label><input id="pf_iva" type="number" value="${p.iva_pct!=null?+p.iva_pct:19}" ${oi}></div>
-      <div style="flex:.7"><label>Peso (kg) ⚖️</label><input id="pf_peso" type="number" step="0.1" value="${+p.peso||0}"></div></div>
+    <div class="row"><div style="flex:1"><label>Precio antes (tachado, opcional)</label><input id="pf_antes" type="number" value="${+p.precio_antes||0}"></div>
+      <div style="flex:1"><label>Valor final (lo que paga)</label><input id="pf_precio" type="number" value="${+p.precio||0}" ${oi}></div></div>
+    <div class="row"><div style="flex:1"><label>IVA %</label><input id="pf_iva" type="number" value="${p.iva_pct!=null?+p.iva_pct:19}" ${oi}></div>
+      <div style="flex:1"><label>Peso (kg) ⚖️</label><input id="pf_peso" type="number" step="0.1" value="${+p.peso||0}"></div></div>
     <div class="sub" style="font-size:12px">El peso se usa en el flete consolidado: hasta el peso base cuesta la tarifa base; de ahí sube por kilo (se configura en ⚙️ Config).</div>
     <div class="row"><div style="flex:1"><label>Comisión plataforma (NC)</label><select id="pf_ptipo" ${oi}><option value="fijo" ${p.plat_tipo!=='pct'?'selected':''}>Fijo ($)</option><option value="pct" ${p.plat_tipo==='pct'?'selected':''}>%</option></select></div>
       <div style="flex:1"><label>Valor</label><input id="pf_pval" type="number" value="${+p.plat_valor||0}" ${oi}></div>
@@ -319,7 +338,7 @@ prodCalc(){
 },
 async prodGuardar(id){
   const v=k=>($('pf_'+k)&&$('pf_'+k).value.trim())||'';
-  const b={nombre:v('nombre'),categoria:v('cat'),precio:+v('precio')||0,iva_pct:+v('iva')||0,peso:+v('peso')||0,
+  const b={nombre:v('nombre'),categoria:v('cat'),precio:+v('precio')||0,precio_antes:+v('antes')||0,iva_pct:+v('iva')||0,peso:+v('peso')||0,
     plat_tipo:v('ptipo'),plat_valor:+v('pval')||0,
     costo_envio:+v('envio')||0,costo_envio_masivo:+v('emas')||0,
     comision_tipo:v('ctipo'),comision_valor:+v('cval')||0,comision_masivo:+v('cmas')||0,
