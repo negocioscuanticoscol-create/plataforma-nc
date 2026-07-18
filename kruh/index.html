@@ -79,9 +79,9 @@ const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const num=n=>Math.round(+n||0).toLocaleString('es-CO');
 async function GET(p){ const r=await fetch(SB+'/rest/v1/'+p,{headers:H}); return r.ok?r.json():[]; }
-async function POST(t,b){ const r=await fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(b)}); return r.ok?(await r.json())[0]:null; }
-async function PATCH(t,b){ return fetch(SB+'/rest/v1/'+t,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); }
-async function DEL(t){ return fetch(SB+'/rest/v1/'+t,{method:'DELETE',headers:H}); }
+async function POST(t,b){ const r=await fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(b)}); if(t.indexOf('nc_auditoria')<0)App._audit('crear',t,b); return r.ok?(await r.json())[0]:null; }
+async function PATCH(t,b){ const r=fetch(SB+'/rest/v1/'+t,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); if(t.indexOf('nc_auditoria')<0)App._audit('editar',t,b); return r; }
+async function DEL(t){ const r=fetch(SB+'/rest/v1/'+t,{method:'DELETE',headers:H}); if(t.indexOf('nc_auditoria')<0)App._audit('eliminar',t,null); return r; }
 function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),1900); }
 function modal(html){ $('modal-host').innerHTML='<div class="modal" onclick="if(event.target===this)App.cerrar()"><div class="box">'+html+'</div></div>'; }
 function cerrar(){ $('modal-host').innerHTML=''; }
@@ -102,8 +102,14 @@ const App={
       <div class="hint" id="lg_err" style="color:var(--bad);display:none;margin-top:8px">Clave incorrecta</div></div></div>`;
     setTimeout(()=>{const e=$('lg_pass');if(e)e.focus();},60); },
   login(){ const p=($('lg_pass').value||'').trim(); let rol=''; for(const k in this.PASS){ if(p===this.PASS[k])rol=k; }
-    if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; sessionStorage.setItem('kruh_rol',rol); this.init(); },
+    if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; sessionStorage.setItem('kruh_rol',rol); this._audit('entrar','sesión','ingresó como '+rol); this.init(); },
   logout(){ sessionStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
+  _audit(accion,tabla,body){ try{
+    const t=(tabla||'').split('?')[0], ent=t.replace(/^kruh_/,'');
+    let det=''; if(body){ det=body.nombre||body.cliente||body.ingrediente||body.producto||body.categoria||body.provee||''; if(!det){try{det=JSON.stringify(body)}catch(e){det=''}} det=String(det).slice(0,180); }
+    const q=(tabla||'').split('?')[1]; if(q&&!det)det=q.slice(0,90);
+    fetch(SB+'/rest/v1/nc_auditoria',{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify({cliente:'kruh',rol:this.rol||'?',accion,entidad:ent,detalle:det})}).catch(()=>{});
+  }catch(e){} },
   paintHeader(){ const q=document.querySelector('.quien'); if(q) q.innerHTML=`${this.rol==='admin'?'Admin':'Gerencia'} · <a onclick="App.logout()" style="cursor:pointer;text-decoration:underline">salir</a>`; },
   nav(){ $('nav').innerHTML=this.TABS.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
