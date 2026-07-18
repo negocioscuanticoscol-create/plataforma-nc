@@ -90,7 +90,21 @@ const App={
   cerrar,
   TABS:[['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['inventario','📦 Inventario'],['proveedores','🚚 Proveedores'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas']],
   view:'recetas',
-  async init(){ this.nav(); this.go('recetas'); },
+  PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
+  get esAdmin(){ return this.rol==='admin'; },
+  async init(){ this.rol=localStorage.getItem('kruh_rol')||''; if(!this.PASS[this.rol]&&this.rol!=='admin'&&this.rol!=='gerencia'){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go('recetas'); },
+  vLogin(){ $('nav').innerHTML=''; $('main').className='';
+    $('main').innerHTML=`<div style="max-width:340px;margin:44px auto 0"><div class="card" style="text-align:center">
+      <div style="font-family:Fraunces,serif;font-size:38px;color:var(--ink)">kruh<b style="color:var(--acc)">.</b></div>
+      <div class="sub" style="margin:4px 0 16px">Ingresa tu clave</div>
+      <input id="lg_pass" type="password" placeholder="Clave" style="text-align:center" onkeydown="if(event.key==='Enter')App.login()">
+      <button class="btn acc full" onclick="App.login()">Entrar</button>
+      <div class="hint" id="lg_err" style="color:var(--bad);display:none;margin-top:8px">Clave incorrecta</div></div></div>`;
+    setTimeout(()=>{const e=$('lg_pass');if(e)e.focus();},60); },
+  login(){ const p=($('lg_pass').value||'').trim(); let rol=''; for(const k in this.PASS){ if(p===this.PASS[k])rol=k; }
+    if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; localStorage.setItem('kruh_rol',rol); this.init(); },
+  logout(){ localStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
+  paintHeader(){ const q=document.querySelector('.quien'); if(q) q.innerHTML=`${this.rol==='admin'?'Admin':'Gerencia'} · <a onclick="App.logout()" style="cursor:pointer;text-decoration:underline">salir</a>`; },
   nav(){ $('nav').innerHTML=this.TABS.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
     ({recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,inventario:this.vInventario,proveedores:this.vProveedores,presupuestos:this.vPresupuestos,ventas:this.vVentas}[v]||this.vRecetas).call(this); },
@@ -105,7 +119,7 @@ const App={
     const rBy={}; recs.forEach(r=>{(rBy[r.producto_id]=rBy[r.producto_id]||[]).push(r);});
     const cats=[...new Set(prods.map(p=>p.categoria||'Sin categoría'))];
     this.set(`<h1>Recetas y costos</h1><div class="sub">Producto → peso/presentación → ingredientes con costo → proceso → costo, precio, IVA y margen</div>
-      <button class="btn acc" onclick="App.prodModal()">＋ Nuevo producto</button>
+      ${this.esAdmin?`<button class="btn acc" onclick="App.prodModal()">＋ Nuevo producto</button>`:'<div class="hint">Modo Gerencia: puedes ver recetas y costos, pero solo Admin los edita.</div>'}
       ${prods.length?cats.map(cat=>`<div style="margin-top:16px"><div class="tag" style="margin-bottom:8px">${esc(cat)}</div>
         <div class="grid">${prods.filter(p=>(p.categoria||'Sin categoría')===cat).map(p=>{
           const rr=rBy[p.id]||[];
@@ -115,11 +129,11 @@ const App={
           return `<div class="card">
             <div class="top" style="display:flex;justify-content:space-between"><div><div class="nm">${esc(p.nombre)}</div>
               <div class="mt">${p.peso?num(p.peso)+' '+esc(p.unidad||'g')+' · ':''}${esc(p.presentacion||'')} <span class="tag ${p.perecedero?'pe':'np'}">${p.perecedero?'Perecedero':'No perecedero'}</span></div></div>
-              <button class="btn gh sm" onclick="App.prodModal('${p.id}')">✎</button></div>
+              ${this.esAdmin?`<button class="btn gh sm" onclick="App.prodModal('${p.id}')">✎</button>`:''}</div>
             <div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px">
               <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Ingredientes</div>
-              ${rr.length?rr.map(r=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0"><span>• ${esc(r.ingrediente)} <small class="dim">${num(r.cantidad)} ${esc(r.unidad||'')}</small></span><span>${money((+r.cantidad||0)*(+r.costo_unit||0))} <a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:5px">✕</a></span></div>`).join(''):'<div class="hint">Sin ingredientes.</div>'}
-              <button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Ingrediente</button></div>
+              ${rr.length?rr.map(r=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0"><span>• ${esc(r.ingrediente)} <small class="dim">${num(r.cantidad)} ${esc(r.unidad||'')}</small></span><span>${money((+r.cantidad||0)*(+r.costo_unit||0))} ${this.esAdmin?`<a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:5px">✕</a>`:''}</span></div>`).join(''):'<div class="hint">Sin ingredientes.</div>'}
+              ${this.esAdmin?`<button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Ingrediente</button>`:''}</div>
             ${p.proceso?`<div style="margin-top:9px"><a onclick="App._recOpen='${abierto?'':p.id}';App.vRecetas()" style="font-size:12px;color:var(--acc);cursor:pointer">${abierto?'▾':'▸'} Proceso de elaboración</a>${abierto?`<div class="hint" style="white-space:pre-wrap;margin-top:5px">${esc(p.proceso)}</div>`:''}</div>`:''}
             <div style="margin-top:10px;background:var(--paper);border-radius:9px;padding:9px 11px;font-size:12.5px">
               <div class="row" style="justify-content:space-between"><span class="dim">Costo ingredientes</span><b>${money(costo)}</b></div>
