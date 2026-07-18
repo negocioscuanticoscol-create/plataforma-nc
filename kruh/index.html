@@ -103,9 +103,13 @@ const App={
   view:'dashboard',
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
+  ROLES:['admin','gerencia','cajera','panadero','bodeguero','chef'],
   get esAdmin(){ return this.rol==='admin'; },
-  async init(){ this.rol=sessionStorage.getItem('kruh_rol')||''; try{ this._usuarios=await GET('kruh_usuarios?select=nombre,rol,clave,activo&limit=200'); }catch(e){ this._usuarios=[]; }
-    if(this.rol!=='admin'&&this.rol!=='gerencia'){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go('dashboard'); },
+  _tabsRol(){ return (this.rol==='admin'||this.rol==='gerencia')?this.TABS.map(t=>t[0]):((this._permisos||{})[this.rol]||['dashboard']); },
+  _primeraTab(){ const t=this._tabsRol(); return t.includes('dashboard')?'dashboard':(t[0]||'dashboard'); },
+  async init(){ this.rol=sessionStorage.getItem('kruh_rol')||'';
+    try{ const [us,pm]=await Promise.all([GET('kruh_usuarios?select=nombre,rol,clave,activo&limit=200'),GET('kruh_permisos?limit=50')]); this._usuarios=us; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]); }catch(e){ this._usuarios=[]; this._permisos={}; }
+    if(!this.ROLES.includes(this.rol)){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go(this._primeraTab()); },
   vLogin(){ $('nav').innerHTML=''; $('main').className='';
     $('main').innerHTML=`<div style="max-width:340px;margin:44px auto 0"><div class="card" style="text-align:center">
       <div style="font-family:Fraunces,serif;font-size:38px;color:var(--ink)">kruh<b style="color:var(--acc)">.</b></div>
@@ -119,7 +123,7 @@ const App={
     if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; sessionStorage.setItem('kruh_rol',rol); this.init(); },
   logout(){ sessionStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
   _okBorrar(){ const p=prompt('🔒 Clave para BORRAR:'); if(p===null)return false; if(p===this.PASS.admin||p===this.PASS.gerencia)return true; alert('Clave incorrecta'); return false; },
-  paintHeader(){ const q=document.querySelector('.quien'); if(q) q.innerHTML=`${this.rol==='admin'?'Admin':'Gerencia'} · <a onclick="App.logout()" style="cursor:pointer;text-decoration:underline">salir</a>`; },
+  paintHeader(){ const q=document.querySelector('.quien'); if(q){ const r=(this.rol||'').charAt(0).toUpperCase()+(this.rol||'').slice(1); q.innerHTML=`${r} · <a onclick="App.logout()" style="cursor:pointer;text-decoration:underline">salir</a>`; } },
 
   /* ===================== DASHBOARD ===================== */
   async vDashboard(){
@@ -169,8 +173,9 @@ const App={
     const b={mes:nombre,ventas:+$('d_ven').value||0,costo:+$('d_cos').value||0,meta:+$('d_meta').value||40000000,orden:(this.MESNOM.indexOf(nombre)>0?this.MESNOM.indexOf(nombre):99)};
     await fetch(SB+'/rest/v1/kruh_dashboard?on_conflict=mes',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(b)});
     cerrar(); toast('Guardado'); this.vDashboard(); },
-  nav(){ $('nav').innerHTML=this.TABS.filter(([v])=>v!=='usuarios'||this.esAdmin).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
-  go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  nav(){ const perm=this._tabsRol(); $('nav').innerHTML=this.TABS.filter(([v])=>v==='usuarios'?this.esAdmin:perm.includes(v)).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
+  go(v){ const perm=this._tabsRol(); if(v==='usuarios'){ if(!this.esAdmin)v=this._primeraTab(); } else if(!perm.includes(v))v=this._primeraTab();
+    this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
     ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,presupuestos:this.vPresupuestos,ventas:this.vVentas,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ $('main').className=''; $('main').innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
@@ -540,18 +545,30 @@ const App={
   async vUsuarios(){
     if(!this.esAdmin) return this.set('<h1>Usuarios</h1><div class="empty">Solo el Admin gestiona usuarios.</div>');
     this.loading();
-    const us=await GET('kruh_usuarios?order=creado_en&limit=200'); this._us=us;
-    this.set(`<h1>Usuarios y atribuciones</h1><div class="sub">Cada persona con su clave, su rol y lo que puede hacer</div>
+    const [us,pm]=await Promise.all([GET('kruh_usuarios?order=creado_en&limit=200'),GET('kruh_permisos?limit=50')]);
+    this._us=us; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]);
+    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas']];
+    const RMAT=['cajera','panadero','bodeguero','chef'];
+    this.set(`<h1>Usuarios y permisos</h1><div class="sub">Cada persona con su clave y rol · y qué pestaña ve cada rol</div>
       <button class="btn acc" onclick="App.usModal()">＋ Nuevo usuario</button>
-      <div class="card" style="background:var(--paper);font-size:12.5px"><b>Claves base (siempre activas):</b><br>Admin → <code>kruhadmin2026</code> · Gerencia → <code>kruhgerencia2026</code>. Aquí agregas usuarios con nombre y su propia clave.</div>
-      <div>${us.length?us.map(u=>`<div class="item"><div class="top"><div><div class="nm">${esc(u.nombre)} <span class="tag ${u.rol==='admin'?'np':'pe'}">${esc(u.rol)}</span> ${u.activo===false?'<span class="tag">inactivo</span>':''}</div>
-        <div class="mt">🔑 ${esc(u.clave||'—')} · ${esc(u.atribuciones||'sin atribuciones definidas')}</div></div>
-        <button class="btn gh sm" onclick="App.usModal('${u.id}')">✎</button></div></div>`).join(''):'<div class="empty">Sin usuarios adicionales aún.</div>'}</div>`);
+      <div class="card" style="background:var(--paper);font-size:12.5px"><b>Claves base:</b> Admin → <code>kruhadmin2026</code> (ve todo) · Gerencia → <code>kruhgerencia2026</code> (ve todo).</div>
+      <div>${us.length?us.map(u=>`<div class="item"><div class="top"><div><div class="nm">${esc(u.nombre)} <span class="tag ${u.rol==='admin'||u.rol==='gerencia'?'np':'pe'}" style="text-transform:capitalize">${esc(u.rol)}</span> ${u.activo===false?'<span class="tag">inactivo</span>':''}</div>
+        <div class="mt">🔑 ${esc(u.clave||'—')}${u.atribuciones?' · '+esc(u.atribuciones):''}</div></div>
+        <button class="btn gh sm" onclick="App.usModal('${u.id}')">✎</button></div></div>`).join(''):'<div class="empty">Sin usuarios adicionales aún.</div>'}</div>
+      <h1 style="font-size:18px;margin-top:22px">Permisos por rol</h1>
+      <div class="sub">Admin y Gerencia ven todo. Marca qué pestaña ve cada rol operativo.</div>
+      ${RMAT.map(r=>`<div class="card"><b style="text-transform:capitalize;font-size:15px">${r}</b>
+        <div style="margin-top:6px">${MODS.map(([mk,mn])=>`<label style="display:flex;align-items:center;gap:9px;padding:4px 0;font-size:13.5px;cursor:pointer"><input type="checkbox" data-rol="${r}" data-mod="${mk}" ${(this._permisos[r]||[]).includes(mk)?'checked':''} style="width:18px;height:18px;accent-color:var(--acc)">${mn}</label>`).join('')}</div></div>`).join('')}
+      <button class="btn acc full" onclick="App.permGuardar()">Guardar permisos</button>`);
   },
+  async permGuardar(){ const RMAT=['cajera','panadero','bodeguero','chef'], nuevo={}; RMAT.forEach(r=>nuevo[r]=[]);
+    document.querySelectorAll('#main input[data-rol]').forEach(i=>{ if(i.checked)nuevo[i.dataset.rol].push(i.dataset.mod); });
+    for(const r of RMAT){ await fetch(SB+'/rest/v1/kruh_permisos?on_conflict=rol',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({rol:r,tabs:nuevo[r],actualizado:new Date().toISOString()})}); }
+    this._permisos=Object.assign(this._permisos||{},nuevo); toast('Permisos guardados'); },
   usModal(id){ const u=(this._us||[]).find(x=>x.id===id)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Nuevo'} usuario</h3>
       <div class="g2"><div><label>Nombre</label><input id="u_nom" value="${esc(u.nombre||'')}"></div>
-      <div><label>Rol</label><select id="u_rol"><option value="gerencia" ${u.rol==='gerencia'?'selected':''}>Gerencia</option><option value="admin" ${u.rol==='admin'?'selected':''}>Admin</option></select></div></div>
+      <div><label>Rol</label><select id="u_rol">${this.ROLES.map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join('')}</select></div></div>
       <label>Clave de acceso</label><input id="u_clave" value="${esc(u.clave||'')}">
       <label>Atribuciones (qué puede hacer)</label><textarea id="u_atr" placeholder="Ej: maneja pedidos e inventario, no borra">${esc(u.atribuciones||'')}</textarea>
       <label>¿Activo?</label><select id="u_act"><option value="true" ${u.activo!==false?'selected':''}>Sí</option><option value="false" ${u.activo===false?'selected':''}>No</option></select>
