@@ -92,7 +92,7 @@ const App={
   view:'recetas',
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
   get esAdmin(){ return this.rol==='admin'; },
-  async init(){ this.rol=localStorage.getItem('kruh_rol')||''; if(!this.PASS[this.rol]&&this.rol!=='admin'&&this.rol!=='gerencia'){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go('recetas'); },
+  async init(){ this.rol=sessionStorage.getItem('kruh_rol')||''; if(!this.PASS[this.rol]&&this.rol!=='admin'&&this.rol!=='gerencia'){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go('recetas'); },
   vLogin(){ $('nav').innerHTML=''; $('main').className='';
     $('main').innerHTML=`<div style="max-width:340px;margin:44px auto 0"><div class="card" style="text-align:center">
       <div style="font-family:Fraunces,serif;font-size:38px;color:var(--ink)">kruh<b style="color:var(--acc)">.</b></div>
@@ -102,8 +102,8 @@ const App={
       <div class="hint" id="lg_err" style="color:var(--bad);display:none;margin-top:8px">Clave incorrecta</div></div></div>`;
     setTimeout(()=>{const e=$('lg_pass');if(e)e.focus();},60); },
   login(){ const p=($('lg_pass').value||'').trim(); let rol=''; for(const k in this.PASS){ if(p===this.PASS[k])rol=k; }
-    if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; localStorage.setItem('kruh_rol',rol); this.init(); },
-  logout(){ localStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
+    if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; sessionStorage.setItem('kruh_rol',rol); this.init(); },
+  logout(){ sessionStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
   paintHeader(){ const q=document.querySelector('.quien'); if(q) q.innerHTML=`${this.rol==='admin'?'Admin':'Gerencia'} · <a onclick="App.logout()" style="cursor:pointer;text-decoration:underline">salir</a>`; },
   nav(){ $('nav').innerHTML=this.TABS.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
