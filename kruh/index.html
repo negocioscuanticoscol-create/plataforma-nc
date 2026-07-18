@@ -99,7 +99,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['inventario','📦 Inventario'],['proveedores','🚚 Proveedores'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas']],
   view:'dashboard',
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
@@ -121,14 +121,19 @@ const App={
   /* ===================== DASHBOARD ===================== */
   async vDashboard(){
     this.loading();
-    const [meses,leads,ventas]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en,tipo&limit=5000'),GET('kruh_ventas?select=cliente,creado_en&limit=8000')]);
+    const [meses,leads,ventas,peds,recs]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en&limit=5000'),GET('kruh_ventas?select=monto,creado_en&limit=8000'),GET('kruh_pedidos?select=items,creado_en&limit=3000'),GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000')]);
     this._dash=meses;
-    const now=new Date(), cm=now.getMonth()+1, mesIni=new Date(now.getFullYear(),now.getMonth(),1);
-    let act=meses.find(m=>m.mes&&this.MESNOM[cm]&&m.mes.toLowerCase()===this.MESNOM[cm].toLowerCase())||meses[meses.length-1]||{ventas:0,costo:0,meta:40000000};
-    const ventasM=+act.ventas||0, costo=+act.costo||0, ubruta=ventasM-costo, margen=ventasM>0?ubruta/ventasM*100:0, meta=+act.meta||40000000;
-    const acumMC=meses.reduce((a,m)=>a+((+m.ventas||0)-(+m.costo||0)),0);
+    const now=new Date(), cm=now.getMonth()+1, mesIni=new Date(now.getFullYear(),now.getMonth(),1), mesNom=this.MESNOM[cm]||'';
+    const costoProd={}; recs.forEach(r=>{costoProd[r.producto_id]=(costoProd[r.producto_id]||0)+(+r.cantidad||0)*(+r.costo_unit||0);});
+    const liveVentas=ventas.filter(v=>new Date(v.creado_en)>=mesIni).reduce((a,v)=>a+(+v.monto||0),0);
+    let liveCosto=0; peds.forEach(p=>{ if(new Date(p.creado_en)<mesIni)return; (p.items||[]).forEach(it=>{liveCosto+=(+it.qty||0)*(costoProd[it.producto_id]||0);}); });
+    const manual=meses.find(m=>m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase())||{ventas:0,costo:0,meta:40000000};
+    const auto=liveVentas>0;
+    const ventasM=auto?liveVentas:(+manual.ventas||0), costo=liveCosto>0?liveCosto:(+manual.costo||0);
+    const ubruta=ventasM-costo, margen=ventasM>0?ubruta/ventasM*100:0, meta=+manual.meta||40000000;
+    const acumMC=meses.reduce((a,m)=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();return a+((es?ventasM:(+m.ventas||0))-(es?costo:(+m.costo||0)));},0);
     const registrados=leads.length, nuevosMes=leads.filter(l=>new Date(l.creado_en)>=mesIni).length;
-    this.set(`<h1>Dashboard</h1><div class="sub">${esc(act.mes||'')} · meta Negocios Cuánticos ${money(meta)}</div>
+    this.set(`<h1>Dashboard</h1><div class="sub">${esc(mesNom)} ${auto?'· <span style="color:var(--ok);font-weight:700">automático con las ventas del mes</span>':'· simulado (al ingresar pedidos se calcula solo)'} · meta ${money(meta)}</div>
       <div class="kpis">
         <div class="kpi dark"><b>${money(ventasM)}</b><span>Ventas del mes</span></div>
         <div class="kpi"><b>${money(costo)}</b><span>Costo</span></div>
@@ -144,8 +149,8 @@ const App={
         <b style="font-size:24px;color:var(--acc);font-family:Fraunces,serif">${money(acumMC)}</b>
         <div class="hint">Suma de (ventas − costo) de todos los meses. Al cambiar precios de items, este acumulado se mueve.</div></div>
       <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
-      ${meses.map(m=>{const v=+m.ventas||0,mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)}</div>
-        <div class="mt">Ventas ${money(v)}${m.costo?' · costo '+money(m.costo):''} · meta ${money(mt)}</div></div>
+      ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=es?ventasM:(+m.ventas||0),cc=es?costo:(+m.costo||0),mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':''}</div>
+        <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''} · meta ${money(mt)}</div></div>
         ${this.esAdmin?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
         <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div></div>`;}).join('')}
       ${this.esAdmin?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
@@ -163,7 +168,7 @@ const App={
     cerrar(); toast('Guardado'); this.vDashboard(); },
   nav(){ $('nav').innerHTML=this.TABS.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,inventario:this.vInventario,proveedores:this.vProveedores,presupuestos:this.vPresupuestos,ventas:this.vVentas}[v]||this.vDashboard).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,presupuestos:this.vPresupuestos,ventas:this.vVentas}[v]||this.vDashboard).call(this); },
   set(h){ $('main').className=''; $('main').innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -190,7 +195,7 @@ const App={
             <div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px">
               <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Ingredientes</div>
               ${rr.length?rr.map(r=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0"><span>• ${esc(r.ingrediente)} <small class="dim">${num(r.cantidad)} ${esc(r.unidad||'')}</small></span><span>${money((+r.cantidad||0)*(+r.costo_unit||0))} ${this.esAdmin?`<a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:5px">✕</a>`:''}</span></div>`).join(''):'<div class="hint">Sin ingredientes.</div>'}
-              ${this.esAdmin?`<button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Ingrediente</button>`:''}</div>
+              ${this.esAdmin?`<button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Adicionar ingrediente</button>`:''}</div>
             <div style="margin-top:9px;border-top:1px dashed var(--line);padding-top:9px">
               <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Pasos de elaboración</div>
               ${(pBy[p.id]||[]).map((s,i)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0;align-items:flex-start"><span><b>${i+1}.</b> ${esc(s.texto)}</span>${this.esAdmin?`<a onclick="App.pasoDel('${s.id}')" style="color:var(--bad);cursor:pointer;flex:none">✕</a>`:''}</div>`).join('')||'<div class="hint">Sin pasos.</div>'}
@@ -213,7 +218,10 @@ const App={
       <div><label>¿Perecedero?</label><select id="p_per"><option value="true" ${p.perecedero!==false?'selected':''}>Sí</option><option value="false" ${p.perecedero===false?'selected':''}>No</option></select></div></div>
       <div class="g2"><div><label>Precio de venta</label><input id="p_pre" type="number" value="${p.precio||0}"></div>
       <div><label>IVA %</label><input id="p_iva" type="number" value="${p.iva_pct||0}"></div></div>
-      <label>Foto (URL, opcional)</label><input id="p_foto" value="${esc(p.foto_url||'')}" placeholder="https://…">
+      <label>Foto del producto</label>
+      <div class="row" style="gap:8px"><input id="p_foto" value="${esc(p.foto_url||'')}" placeholder="URL o sube una foto" style="flex:1">
+      <label class="btn gh sm" style="cursor:pointer;white-space:nowrap">📷 Adicionar<input type="file" accept="image/*" style="display:none" onchange="App.subirFoto(this,'${id||''}')"></label></div>
+      <img id="p_foto_prev" src="${esc(p.foto_url||'')}" style="${p.foto_url?'':'display:none;'}max-width:130px;border-radius:8px;margin-top:6px">
       <button class="btn acc full" onclick="App.prodSave('${id||''}')">Guardar producto</button>
       <div class="hint">Los ingredientes y los pasos se agregan en el cajón del producto.</div>
       ${id?`<button class="btn gh full" onclick="App.prodDel('${id}')" style="color:var(--bad)">Eliminar producto</button>`:''}`);
@@ -241,6 +249,14 @@ const App={
   async recDel(id){ await DEL('kruh_recetas?id=eq.'+id); this.vRecetas(); },
   async pasoAdd(pid){ const t=prompt('Paso de elaboración:'); if(!t||!t.trim())return; const n=(await GET('kruh_pasos?producto_id=eq.'+pid+'&select=id')).length; await POST('kruh_pasos',{producto_id:pid,texto:t.trim(),orden:n+1}); toast('Paso agregado'); this.vRecetas(); },
   async pasoDel(id){ await DEL('kruh_pasos?id=eq.'+id); this.vRecetas(); },
+  async subirFoto(input,prodId){ const f=input.files&&input.files[0]; if(!f)return;
+    const ext=(f.name.split('.').pop()||'jpg').toLowerCase(), path='p-'+(prodId||'nuevo')+'-'+Date.now()+'.'+ext;
+    toast('Subiendo foto…');
+    const r=await fetch(SB+'/storage/v1/object/kruh-fotos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K},body:f});
+    if(!r.ok){ alert('No se pudo subir la foto'); return; }
+    const url=SB+'/storage/v1/object/public/kruh-fotos/'+path;
+    if(prodId){ await PATCH('kruh_productos?id=eq.'+prodId,{foto_url:url}); toast('Foto agregada'); (this.view==='pedidos'?this.vPedidos():this.vRecetas()); }
+    else { if($('p_foto'))$('p_foto').value=url; const pv=$('p_foto_prev'); if(pv){pv.src=url; pv.style.display='block';} toast('Foto lista'); } },
 
   /* ===================== PEDIDOS (catálogo con foto + carrito) ===================== */
   async vPedidos(){
@@ -260,7 +276,8 @@ const App={
           ${prods.length?prods.map(p=>{const q=cart[p.id]||0;return `<div class="pcard">
             <div class="pimg" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'🥖'}</div>
             <div class="pin"><div class="pn">${esc(p.nombre)}</div><div class="pp">${money(p.precio)}</div>
-              <div class="stp"><button onclick="App.cartSet('${p.id}',-1)">−</button><b>${q}</b><button onclick="App.cartSet('${p.id}',1)">＋</button></div></div>
+              <div class="stp"><button onclick="App.cartSet('${p.id}',-1)">−</button><b>${q}</b><button onclick="App.cartSet('${p.id}',1)">＋</button></div>
+              ${this.esAdmin?`<label style="font-size:10px;color:var(--acc);cursor:pointer;display:block;margin-top:5px;text-align:center">📷 ${p.foto_url?'cambiar':'adicionar'} foto<input type="file" accept="image/*" style="display:none" onchange="App.subirFoto(this,'${p.id}')"></label>`:''}</div>
           </div>`;}).join(''):'<div class="empty">No hay productos. Créalos en Recetas.</div>'}
         </div></div>
         <div style="flex:0 0 228px;position:sticky;top:58px" class="card">
@@ -408,35 +425,77 @@ const App={
     if(!b.nombre){alert('Nombre');return;} if(id)await PATCH('kruh_proveedores?id=eq.'+id,b); else await POST('kruh_proveedores',b); cerrar(); toast('Guardado'); this.vProveedores(); },
   async provDel(id){ if(!confirm('¿Eliminar proveedor?'))return; await DEL('kruh_proveedores?id=eq.'+id); cerrar(); this.vProveedores(); },
 
-  /* ===================== PRESUPUESTOS (meta por producto, semanal) ===================== */
+  /* ===================== MATERIA PRIMA ===================== */
+  async vMateriaPrima(){
+    this.loading();
+    const [mp,provs]=await Promise.all([GET('kruh_materiaprima?order=categoria,nombre&limit=2000'),GET('kruh_proveedores?order=nombre&limit=2000')]);
+    this._mp=mp; this._provs=provs;
+    const bajos=mp.filter(m=>(+m.existencias||0)<=(+m.stock_min||0)&&(+m.stock_min||0)>0);
+    const valor=mp.reduce((a,m)=>a+(+m.existencias||0)*(+m.costo_unit||0),0);
+    this.set(`<h1>Materia prima</h1><div class="sub">Insumos que compras a proveedores · stock, costo y mínimo</div>
+      <div class="kpis"><div class="kpi"><b>${mp.length}</b><span>Insumos</span></div>
+        <div class="kpi"><b style="color:${bajos.length?'var(--bad)':'var(--ok)'}">${bajos.length}</b><span>Bajo mínimo</span></div>
+        <div class="kpi dark"><b>${money(valor)}</b><span>Valor en materia prima</span></div></div>
+      <button class="btn acc" onclick="App.mpModal()">＋ Nuevo insumo</button>
+      <div style="margin-top:12px">${mp.length?mp.map(m=>{const bajo=(+m.existencias||0)<=(+m.stock_min||0)&&(+m.stock_min||0)>0;return `<div class="item" style="${bajo?'border-left:3px solid var(--bad)':''}"><div class="top"><div>
+        <div class="nm">${esc(m.nombre)}</div><div class="mt">${esc(m.categoria||'')}${m.proveedor?' · 🚚 '+esc(m.proveedor):''} · ${money(m.costo_unit)}/${esc(m.unidad||'kg')}</div></div>
+        <div style="text-align:right"><div class="nm" style="color:${bajo?'var(--bad)':'var(--ink)'}">${num(m.existencias)} ${esc(m.unidad||'kg')}</div>${bajo?'<span class="tag pe">bajo</span>':''}</div></div>
+        <div class="row" style="margin-top:9px"><button class="btn acc sm" onclick="App.mpMov('${m.id}','entrada')">＋ Compra</button>
+          <button class="btn gh sm" onclick="App.mpMov('${m.id}','salida')">− Consumo</button>
+          ${this.esAdmin?`<button class="btn gh sm" onclick="App.mpModal('${m.id}')">✎</button>`:''}</div></div>`;}).join(''):'<div class="empty">Sin materia prima. Agrega el primer insumo.</div>'}</div>`);
+  },
+  mpModal(id){ const m=(this._mp||[]).find(x=>x.id===id)||{}, provs=this._provs||[];
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Nuevo'} insumo</h3>
+      <div class="g2"><div><label>Nombre</label><input id="mp_nom" value="${esc(m.nombre||'')}"></div>
+      <div><label>Categoría</label><input id="mp_cat" value="${esc(m.categoria||'')}" placeholder="Harinas, Lácteos…"></div></div>
+      <div class="g3"><div><label>Unidad</label><input id="mp_uni" value="${esc(m.unidad||'kg')}"></div>
+      <div><label>Costo x unidad</label><input id="mp_cu" type="number" value="${m.costo_unit||0}"></div>
+      <div><label>Stock mínimo</label><input id="mp_min" type="number" value="${m.stock_min||0}"></div></div>
+      <label>Proveedor</label><select id="mp_prov"><option value="">—</option>${provs.map(pv=>`<option value="${pv.id}" data-n="${esc(pv.nombre)}" ${m.proveedor_id===pv.id?'selected':''}>${esc(pv.nombre)}</option>`).join('')}</select>
+      <button class="btn acc full" onclick="App.mpSave('${id||''}')">Guardar</button>
+      ${id?`<button class="btn gh full" style="color:var(--bad)" onclick="App.mpDel('${id}')">Eliminar</button>`:''}`); },
+  async mpSave(id){ const s=$('mp_prov'), o=s.options[s.selectedIndex], b={nombre:$('mp_nom').value.trim(),categoria:$('mp_cat').value.trim(),unidad:$('mp_uni').value.trim()||'kg',costo_unit:+$('mp_cu').value||0,stock_min:+$('mp_min').value||0,proveedor_id:s.value||null,proveedor:s.value?o.dataset.n:null};
+    if(!b.nombre){alert('Nombre');return;} if(id)await PATCH('kruh_materiaprima?id=eq.'+id,b); else await POST('kruh_materiaprima',b); cerrar(); toast('Guardado'); this.vMateriaPrima(); },
+  async mpDel(id){ if(!confirm('¿Eliminar insumo?'))return; await DEL('kruh_materiaprima?id=eq.'+id); cerrar(); this.vMateriaPrima(); },
+  mpMov(id,tipo){ const m=(this._mp||[]).find(x=>x.id===id)||{}; const v=prompt((tipo==='entrada'?'Cantidad que ENTRA':'Cantidad que se CONSUME')+' ('+(m.unidad||'kg')+'):'); if(v===null)return; const q=+v||0; if(q<=0)return;
+    const nueva=(+m.existencias||0)+(tipo==='entrada'?q:-q); PATCH('kruh_materiaprima?id=eq.'+id,{existencias:nueva}).then(()=>{toast('Stock actualizado');this.vMateriaPrima();}); },
+
+  /* ===================== PRESUPUESTOS (meta en cantidad, 4 semanas) ===================== */
   async vPresupuestos(){
     this.loading();
     const [pres,peds,prods]=await Promise.all([GET('kruh_presupuestos?order=creado_en&limit=500'),GET('kruh_pedidos?limit=3000'),GET('kruh_productos?order=nombre&limit=1000')]);
     this._pres=pres; this._prods=prods;
     const now=new Date(), mesIni=new Date(now.getFullYear(),now.getMonth(),1);
-    const diasMes=new Date(now.getFullYear(),now.getMonth()+1,0).getDate(), semanas=Math.ceil(diasMes/7);
-    const vpp={};
-    peds.forEach(p=>{ const d=new Date(p.creado_en); if(d<mesIni)return; const sem=Math.min(semanas-1,Math.floor((d.getDate()-1)/7)); (p.items||[]).forEach(it=>{ const k=it.producto_id; (vpp[k]=vpp[k]||new Array(semanas).fill(0))[sem]+=(+it.qty||0)*(+it.precio||0); }); });
-    this.set(`<h1>Presupuestos</h1><div class="sub">Meta mensual por producto, dividida en semanas · avance con las ventas reales</div>
+    const vc={}, vm={};
+    peds.forEach(p=>{ const d=new Date(p.creado_en); if(d<mesIni)return; const s=Math.min(3,Math.floor((d.getDate()-1)/7)); (p.items||[]).forEach(it=>{ const k=it.producto_id; (vc[k]=vc[k]||[0,0,0,0])[s]+=(+it.qty||0); (vm[k]=vm[k]||[0,0,0,0])[s]+=(+it.qty||0)*(+it.precio||0); }); });
+    this.set(`<h1>Presupuestos</h1><div class="sub">Meta en cantidad por producto · el precio y el total salen de la base · dividida en 4 semanas · avance en cantidad y dinero</div>
       <button class="btn acc" onclick="App.presModal()">＋ Nueva meta</button>
       <div style="margin-top:14px">${pres.length?pres.map(pr=>{
-        const arr=vpp[pr.producto_id]||new Array(semanas).fill(0), vendido=arr.reduce((a,b)=>a+b,0);
-        const meta=+pr.meta||0, metaSem=meta/semanas, pct=meta>0?Math.min(100,vendido/meta*100):0, falta=Math.max(0,meta-vendido);
-        return `<div class="item"><div class="top"><div><div class="nm">${esc(pr.producto||'—')}</div>
-          <div class="mt">Meta ${money(meta)}/mes · ${money(metaSem)}/semana · vendido ${money(vendido)}</div></div>
+        const prod=prods.find(x=>x.id===pr.producto_id)||{}, precio=+prod.precio||0;
+        const metaCant=+pr.meta_cant||0, metaPesos=metaCant*precio, semCant=metaCant/4;
+        const arrC=vc[pr.producto_id]||[0,0,0,0], arrM=vm[pr.producto_id]||[0,0,0,0];
+        const vendCant=arrC.reduce((a,b)=>a+b,0), vendPesos=arrM.reduce((a,b)=>a+b,0);
+        const pct=metaCant>0?Math.min(100,vendCant/metaCant*100):0, faltaC=Math.max(0,metaCant-vendCant), faltaP=Math.max(0,metaPesos-vendPesos);
+        return `<div class="item"><div class="top"><div><div class="nm">${esc(pr.producto||prod.nombre||'—')}</div>
+          <div class="mt">Meta ${num(metaCant)} und × ${money(precio)} = <b>${money(metaPesos)}</b>/mes · ${num(semCant)} und/semana</div></div>
           <div class="nm" style="color:${pct>=100?'var(--ok)':(pct>=60?'var(--warn)':'var(--bad)')}">${pct.toFixed(0)}%</div></div>
           <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div>
-          <div class="row" style="gap:6px;margin-top:8px">${arr.map((v,i)=>`<div style="flex:1;text-align:center;font-size:11px"><div class="dim">S${i+1}</div><b style="color:${v>=metaSem?'var(--ok)':'var(--ink2)'}">${money(v)}</b></div>`).join('')}</div>
-          <div class="hint" style="margin-top:6px">${falta>0?('Faltan '+money(falta)+' para la meta'):'¡Meta cumplida! 🎉'} <a onclick="App.presDel('${pr.id}')" style="color:var(--bad);cursor:pointer;float:right">eliminar</a></div></div>`;}).join(''):'<div class="empty">Escoge un producto del catálogo y ponle su meta mensual.</div>'}</div>`);
+          <div class="row" style="gap:6px;margin-top:8px">${arrC.map((cn,i)=>`<div style="flex:1;text-align:center;font-size:11px"><div class="dim">S${i+1}</div><b style="color:${cn>=semCant&&semCant>0?'var(--ok)':'var(--ink2)'}">${num(cn)}</b><div class="dim">${money(arrM[i])}</div></div>`).join('')}</div>
+          <div class="hint" style="margin-top:6px">Lleva <b>${num(vendCant)} und</b> · ${money(vendPesos)} · faltan <b>${num(faltaC)} und</b> (${money(faltaP)}) <a onclick="App.presDel('${pr.id}')" style="color:var(--bad);cursor:pointer;float:right">eliminar</a></div></div>`;}).join(''):'<div class="empty">Escoge un producto y ponle su meta en cantidad; el precio y el total salen de la base.</div>'}</div>`);
   },
   presModal(){ const prods=this._prods||[];
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Nueva meta por producto</h3>
       <label>Producto (del catálogo)</label>
-      <select id="pr_prod">${prods.map(p=>`<option value="${p.id}" data-n="${esc(p.nombre)}">${esc(p.nombre)}</option>`).join('')}</select>
-      <label>Meta del mes ($)</label><input id="pr_meta" type="number">
-      <button class="btn acc full" onclick="App.presSave()">Guardar meta</button>`); },
-  async presSave(){ const s=$('pr_prod'), o=s.options[s.selectedIndex]; if(!o){alert('Producto');return;}
-    await POST('kruh_presupuestos',{producto_id:o.value,producto:o.dataset.n,meta:+$('pr_meta').value||0,periodo:'mes'});
+      <select id="pr_prod" onchange="App.presCalc()">${prods.map(p=>`<option value="${p.id}" data-n="${esc(p.nombre)}" data-pre="${p.precio||0}">${esc(p.nombre)} · ${money(p.precio)}</option>`).join('')}</select>
+      <label>Meta del mes (cantidad / unidades)</label><input id="pr_cant" type="number" oninput="App.presCalc()">
+      <div class="card" style="background:var(--paper);margin-top:8px"><div class="row" style="justify-content:space-between"><span class="dim">Precio (base)</span><b id="pr_pre">$0</b></div>
+        <div class="row" style="justify-content:space-between"><span class="dim">Total meta</span><b id="pr_tot" style="color:var(--acc)">$0</b></div>
+        <div class="row" style="justify-content:space-between"><span class="dim">Por semana</span><span id="pr_sem">0 und</span></div></div>
+      <button class="btn acc full" onclick="App.presSave()">Guardar meta</button>`); this.presCalc(); },
+  presCalc(){ const s=$('pr_prod'); if(!s)return; const o=s.options[s.selectedIndex], pre=+(o?o.dataset.pre:0)||0, cant=+($('pr_cant').value)||0;
+    if($('pr_pre'))$('pr_pre').textContent=money(pre); if($('pr_tot'))$('pr_tot').textContent=money(pre*cant); if($('pr_sem'))$('pr_sem').textContent=num(cant/4)+' und'; },
+  async presSave(){ const s=$('pr_prod'), o=s.options[s.selectedIndex]; if(!o){alert('Producto');return;} const cant=+$('pr_cant').value||0;
+    await POST('kruh_presupuestos',{producto_id:o.value,producto:o.dataset.n,meta_cant:cant,meta:cant*(+o.dataset.pre||0),periodo:'mes'});
     cerrar(); toast('Meta guardada'); this.vPresupuestos(); },
   async presDel(id){ await DEL('kruh_presupuestos?id=eq.'+id); this.vPresupuestos(); },
 
