@@ -60,6 +60,17 @@
   .modal .box{background:var(--card);border-radius:16px 16px 0 0;padding:17px;width:100%;max-width:920px;max-height:90vh;overflow:auto}
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:22px;z-index:80;font-size:13px}
   small.dim{color:var(--mut)}
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--sh)}
+  .pimg{aspect-ratio:1/1;background:#efe6d5 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:34px}
+  .pin{padding:8px 10px}
+  .pn{font-weight:700;font-size:13px;line-height:1.2;min-height:31px}
+  .pp{color:var(--acc);font-weight:800;font-size:14px;margin:2px 0 6px}
+  .stp{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  .stp button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:18px;font-weight:700;cursor:pointer;color:var(--ink)}
+  .stp b{font-size:15px;min-width:20px;text-align:center}
+  .cajon{flex:1;min-width:130px;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--card);cursor:pointer;text-align:center;box-shadow:var(--sh)}
+  .cajon.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .cajon b{display:block;font-size:22px;font-family:Fraunces,serif}
   @media(max-width:640px){.g2,.g3{grid-template-columns:1fr}}
 </style>
 
@@ -79,20 +90,21 @@ const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const num=n=>Math.round(+n||0).toLocaleString('es-CO');
 async function GET(p){ const r=await fetch(SB+'/rest/v1/'+p,{headers:H}); return r.ok?r.json():[]; }
-async function POST(t,b){ const r=await fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(b)}); if(t.indexOf('nc_auditoria')<0)App._audit('crear',t,b); return r.ok?(await r.json())[0]:null; }
-async function PATCH(t,b){ const r=fetch(SB+'/rest/v1/'+t,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); if(t.indexOf('nc_auditoria')<0)App._audit('editar',t,b); return r; }
-async function DEL(t){ const r=fetch(SB+'/rest/v1/'+t,{method:'DELETE',headers:H}); if(t.indexOf('nc_auditoria')<0)App._audit('eliminar',t,null); return r; }
+async function POST(t,b){ const r=await fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(b)}); return r.ok?(await r.json())[0]:null; }
+async function PATCH(t,b){ return fetch(SB+'/rest/v1/'+t,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); }
+async function DEL(t){ return fetch(SB+'/rest/v1/'+t,{method:'DELETE',headers:H}); }
 function toast(t){ const d=document.createElement('div'); d.className='toast'; d.textContent=t; document.body.appendChild(d); setTimeout(()=>d.remove(),1900); }
 function modal(html){ $('modal-host').innerHTML='<div class="modal" onclick="if(event.target===this)App.cerrar()"><div class="box">'+html+'</div></div>'; }
 function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['inventario','📦 Inventario'],['proveedores','🚚 Proveedores'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas']],
-  view:'recetas',
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['inventario','📦 Inventario'],['proveedores','🚚 Proveedores'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas']],
+  view:'dashboard',
+  MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
   get esAdmin(){ return this.rol==='admin'; },
-  async init(){ this.rol=sessionStorage.getItem('kruh_rol')||''; if(!this.PASS[this.rol]&&this.rol!=='admin'&&this.rol!=='gerencia'){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go('recetas'); },
+  async init(){ this.rol=sessionStorage.getItem('kruh_rol')||''; if(!this.PASS[this.rol]&&this.rol!=='admin'&&this.rol!=='gerencia'){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go('dashboard'); },
   vLogin(){ $('nav').innerHTML=''; $('main').className='';
     $('main').innerHTML=`<div style="max-width:340px;margin:44px auto 0"><div class="card" style="text-align:center">
       <div style="font-family:Fraunces,serif;font-size:38px;color:var(--ink)">kruh<b style="color:var(--acc)">.</b></div>
@@ -102,27 +114,66 @@ const App={
       <div class="hint" id="lg_err" style="color:var(--bad);display:none;margin-top:8px">Clave incorrecta</div></div></div>`;
     setTimeout(()=>{const e=$('lg_pass');if(e)e.focus();},60); },
   login(){ const p=($('lg_pass').value||'').trim(); let rol=''; for(const k in this.PASS){ if(p===this.PASS[k])rol=k; }
-    if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; sessionStorage.setItem('kruh_rol',rol); this._audit('entrar','sesión','ingresó como '+rol); this.init(); },
+    if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; sessionStorage.setItem('kruh_rol',rol); this.init(); },
   logout(){ sessionStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
-  _audit(accion,tabla,body){ try{
-    const t=(tabla||'').split('?')[0], ent=t.replace(/^kruh_/,'');
-    let det=''; if(body){ det=body.nombre||body.cliente||body.ingrediente||body.producto||body.categoria||body.provee||''; if(!det){try{det=JSON.stringify(body)}catch(e){det=''}} det=String(det).slice(0,180); }
-    const q=(tabla||'').split('?')[1]; if(q&&!det)det=q.slice(0,90);
-    fetch(SB+'/rest/v1/nc_auditoria',{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify({cliente:'kruh',rol:this.rol||'?',accion,entidad:ent,detalle:det})}).catch(()=>{});
-  }catch(e){} },
   paintHeader(){ const q=document.querySelector('.quien'); if(q) q.innerHTML=`${this.rol==='admin'?'Admin':'Gerencia'} · <a onclick="App.logout()" style="cursor:pointer;text-decoration:underline">salir</a>`; },
+
+  /* ===================== DASHBOARD ===================== */
+  async vDashboard(){
+    this.loading();
+    const [meses,leads,ventas]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en,tipo&limit=5000'),GET('kruh_ventas?select=cliente,creado_en&limit=8000')]);
+    this._dash=meses;
+    const now=new Date(), cm=now.getMonth()+1, mesIni=new Date(now.getFullYear(),now.getMonth(),1);
+    let act=meses.find(m=>m.mes&&this.MESNOM[cm]&&m.mes.toLowerCase()===this.MESNOM[cm].toLowerCase())||meses[meses.length-1]||{ventas:0,costo:0,meta:40000000};
+    const ventasM=+act.ventas||0, costo=+act.costo||0, ubruta=ventasM-costo, margen=ventasM>0?ubruta/ventasM*100:0, meta=+act.meta||40000000;
+    const acumMC=meses.reduce((a,m)=>a+((+m.ventas||0)-(+m.costo||0)),0);
+    const registrados=leads.length, nuevosMes=leads.filter(l=>new Date(l.creado_en)>=mesIni).length;
+    this.set(`<h1>Dashboard</h1><div class="sub">${esc(act.mes||'')} · meta Negocios Cuánticos ${money(meta)}</div>
+      <div class="kpis">
+        <div class="kpi dark"><b>${money(ventasM)}</b><span>Ventas del mes</span></div>
+        <div class="kpi"><b>${money(costo)}</b><span>Costo</span></div>
+        <div class="kpi"><b style="color:var(--ok)">${money(ubruta)}</b><span>Utilidad bruta</span></div>
+        <div class="kpi"><b>${margen.toFixed(0)}%</b><span>Margen contribución</span></div>
+        <div class="kpi"><b>${registrados}</b><span>Clientes registrados</span></div>
+        <div class="kpi"><b style="color:var(--acc)">${nuevosMes}</b><span>Clientes nuevos (mes)</span></div>
+      </div>
+      <div class="card"><div class="row" style="justify-content:space-between"><b>Meta del mes (NC)</b><span>${money(ventasM)} / ${money(meta)}</span></div>
+        <div class="bar" style="height:12px"><i style="width:${Math.min(100,meta>0?ventasM/meta*100:0)}%;background:var(--acc)"></i></div>
+        <div class="hint">${meta>ventasM?('Faltan '+money(meta-ventasM)+' para la meta'):'¡Meta cumplida! 🎉'}</div></div>
+      <div class="card"><div style="font-family:Fraunces,serif;font-size:16px">Margen de contribución acumulado</div>
+        <b style="font-size:24px;color:var(--acc);font-family:Fraunces,serif">${money(acumMC)}</b>
+        <div class="hint">Suma de (ventas − costo) de todos los meses. Al cambiar precios de items, este acumulado se mueve.</div></div>
+      <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
+      ${meses.map(m=>{const v=+m.ventas||0,mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)}</div>
+        <div class="mt">Ventas ${money(v)}${m.costo?' · costo '+money(m.costo):''} · meta ${money(mt)}</div></div>
+        ${this.esAdmin?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
+        <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div></div>`;}).join('')}
+      ${this.esAdmin?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
+  },
+  dashModal(mes){ const m=(this._dash||[]).find(x=>x.mes===mes)||{};
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${mes?'Editar '+esc(mes):'Nuevo mes'}</h3>
+      <label>Mes</label><input id="d_mes" value="${esc(m.mes||'')}" ${mes?'readonly':''} placeholder="Agosto">
+      <div class="g3"><div><label>Ventas</label><input id="d_ven" type="number" value="${m.ventas||0}"></div>
+      <div><label>Costo</label><input id="d_cos" type="number" value="${m.costo||0}"></div>
+      <div><label>Meta</label><input id="d_meta" type="number" value="${m.meta||40000000}"></div></div>
+      <button class="btn acc full" onclick="App.dashSave('${mes||''}')">Guardar</button>`); },
+  async dashSave(mes){ const nombre=$('d_mes').value.trim(); if(!nombre){alert('Mes');return;}
+    const b={mes:nombre,ventas:+$('d_ven').value||0,costo:+$('d_cos').value||0,meta:+$('d_meta').value||40000000,orden:(this.MESNOM.indexOf(nombre)>0?this.MESNOM.indexOf(nombre):99)};
+    await fetch(SB+'/rest/v1/kruh_dashboard?on_conflict=mes',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(b)});
+    cerrar(); toast('Guardado'); this.vDashboard(); },
   nav(){ $('nav').innerHTML=this.TABS.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,inventario:this.vInventario,proveedores:this.vProveedores,presupuestos:this.vPresupuestos,ventas:this.vVentas}[v]||this.vRecetas).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,inventario:this.vInventario,proveedores:this.vProveedores,presupuestos:this.vPresupuestos,ventas:this.vVentas}[v]||this.vDashboard).call(this); },
   set(h){ $('main').className=''; $('main').innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
   /* ===================== RECETAS = HOJA DE COSTOS ===================== */
   async vRecetas(){
     this.loading();
-    const [prods,recs,provs]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_recetas?order=creado_en&limit=5000'),GET('kruh_proveedores?order=nombre&limit=2000')]);
+    const [prods,recs,provs,pasos]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_recetas?order=creado_en&limit=5000'),GET('kruh_proveedores?order=nombre&limit=2000'),GET('kruh_pasos?order=orden,creado_en&limit=5000')]);
     this._prods=prods; this._provs=provs;
     const rBy={}; recs.forEach(r=>{(rBy[r.producto_id]=rBy[r.producto_id]||[]).push(r);});
+    const pBy={}; pasos.forEach(s=>{(pBy[s.producto_id]=pBy[s.producto_id]||[]).push(s);});
     const cats=[...new Set(prods.map(p=>p.categoria||'Sin categoría'))];
     this.set(`<h1>Recetas y costos</h1><div class="sub">Producto → peso/presentación → ingredientes con costo → proceso → costo, precio, IVA y margen</div>
       ${this.esAdmin?`<button class="btn acc" onclick="App.prodModal()">＋ Nuevo producto</button>`:'<div class="hint">Modo Gerencia: puedes ver recetas y costos, pero solo Admin los edita.</div>'}
@@ -140,7 +191,10 @@ const App={
               <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Ingredientes</div>
               ${rr.length?rr.map(r=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0"><span>• ${esc(r.ingrediente)} <small class="dim">${num(r.cantidad)} ${esc(r.unidad||'')}</small></span><span>${money((+r.cantidad||0)*(+r.costo_unit||0))} ${this.esAdmin?`<a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:5px">✕</a>`:''}</span></div>`).join(''):'<div class="hint">Sin ingredientes.</div>'}
               ${this.esAdmin?`<button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Ingrediente</button>`:''}</div>
-            ${p.proceso?`<div style="margin-top:9px"><a onclick="App._recOpen='${abierto?'':p.id}';App.vRecetas()" style="font-size:12px;color:var(--acc);cursor:pointer">${abierto?'▾':'▸'} Proceso de elaboración</a>${abierto?`<div class="hint" style="white-space:pre-wrap;margin-top:5px">${esc(p.proceso)}</div>`:''}</div>`:''}
+            <div style="margin-top:9px;border-top:1px dashed var(--line);padding-top:9px">
+              <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Pasos de elaboración</div>
+              ${(pBy[p.id]||[]).map((s,i)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0;align-items:flex-start"><span><b>${i+1}.</b> ${esc(s.texto)}</span>${this.esAdmin?`<a onclick="App.pasoDel('${s.id}')" style="color:var(--bad);cursor:pointer;flex:none">✕</a>`:''}</div>`).join('')||'<div class="hint">Sin pasos.</div>'}
+              ${this.esAdmin?`<button class="btn gh sm full" onclick="App.pasoAdd('${p.id}')">＋ Paso</button>`:''}</div>
             <div style="margin-top:10px;background:var(--paper);border-radius:9px;padding:9px 11px;font-size:12.5px">
               <div class="row" style="justify-content:space-between"><span class="dim">Costo ingredientes</span><b>${money(costo)}</b></div>
               <div class="row" style="justify-content:space-between"><span class="dim">Precio venta</span><b>${money(precio)}</b></div>
@@ -159,11 +213,12 @@ const App={
       <div><label>¿Perecedero?</label><select id="p_per"><option value="true" ${p.perecedero!==false?'selected':''}>Sí</option><option value="false" ${p.perecedero===false?'selected':''}>No</option></select></div></div>
       <div class="g2"><div><label>Precio de venta</label><input id="p_pre" type="number" value="${p.precio||0}"></div>
       <div><label>IVA %</label><input id="p_iva" type="number" value="${p.iva_pct||0}"></div></div>
-      <label>Proceso de elaboración</label><textarea id="p_proc" placeholder="Paso a paso…">${esc(p.proceso||'')}</textarea>
+      <label>Foto (URL, opcional)</label><input id="p_foto" value="${esc(p.foto_url||'')}" placeholder="https://…">
       <button class="btn acc full" onclick="App.prodSave('${id||''}')">Guardar producto</button>
+      <div class="hint">Los ingredientes y los pasos se agregan en el cajón del producto.</div>
       ${id?`<button class="btn gh full" onclick="App.prodDel('${id}')" style="color:var(--bad)">Eliminar producto</button>`:''}`);
   },
-  async prodSave(id){ const b={nombre:$('p_nom').value.trim(),categoria:$('p_cat').value.trim(),presentacion:$('p_pres').value.trim(),peso:+$('p_peso').value||0,unidad:$('p_uni').value.trim()||'g',precio:+$('p_pre').value||0,iva_pct:+$('p_iva').value||0,perecedero:$('p_per').value==='true',proceso:$('p_proc').value.trim()};
+  async prodSave(id){ const b={nombre:$('p_nom').value.trim(),categoria:$('p_cat').value.trim(),presentacion:$('p_pres').value.trim(),peso:+$('p_peso').value||0,unidad:$('p_uni').value.trim()||'g',precio:+$('p_pre').value||0,iva_pct:+$('p_iva').value||0,perecedero:$('p_per').value==='true',foto_url:$('p_foto').value.trim()};
     if(!b.nombre){alert('Ponle nombre');return;} if(id) await PATCH('kruh_productos?id=eq.'+id,b); else await POST('kruh_productos',b);
     cerrar(); toast('Guardado · ya está en el catálogo'); this.vRecetas(); },
   async prodDel(id){ if(!confirm('¿Eliminar el producto y su receta?'))return; await DEL('kruh_recetas?producto_id=eq.'+id); await DEL('kruh_productos?id=eq.'+id); cerrar(); toast('Eliminado'); this.vRecetas(); },
@@ -184,65 +239,96 @@ const App={
     await POST('kruh_recetas',{producto_id:pid,ingrediente:ing,cantidad:+$('r_cant').value||0,unidad:$('r_uni').value.trim(),costo_unit:+$('r_cu').value||0,proveedor_id:$('r_prov').value||null});
     cerrar(); toast('Ingrediente agregado'); this.vRecetas(); },
   async recDel(id){ await DEL('kruh_recetas?id=eq.'+id); this.vRecetas(); },
+  async pasoAdd(pid){ const t=prompt('Paso de elaboración:'); if(!t||!t.trim())return; const n=(await GET('kruh_pasos?producto_id=eq.'+pid+'&select=id')).length; await POST('kruh_pasos',{producto_id:pid,texto:t.trim(),orden:n+1}); toast('Paso agregado'); this.vRecetas(); },
+  async pasoDel(id){ await DEL('kruh_pasos?id=eq.'+id); this.vRecetas(); },
 
-  /* ===================== PEDIDOS ===================== */
+  /* ===================== PEDIDOS (catálogo con foto + carrito) ===================== */
   async vPedidos(){
     this.loading();
-    const [prods,peds]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_pedidos?order=creado_en.desc&limit=300')]);
-    this._prods=prods;
-    this.set(`<h1>Pedidos</h1><div class="sub">Arma el pedido con los productos; al guardar, descuenta del inventario</div>
-      <button class="btn acc" onclick="App.pedModal()">＋ Nuevo pedido</button>
-      <div style="margin-top:14px">${peds.length?peds.map(p=>{const it=(p.items||[]);return `<div class="item"><div class="top"><div>
-        <div class="nm">${esc(p.cliente||'—')} ${p.telefono?`· <a href="https://wa.me/57${esc((p.telefono||'').replace(/\\D/g,''))}" target="_blank" style="color:#16734a;font-size:12px">📱 ${esc(p.telefono)}</a>`:''}</div>
-        <div class="mt">${it.map(i=>esc(i.nombre)+' ×'+i.qty).join(' · ')||'sin items'} · 📅 ${(p.creado_en||'').slice(0,10)}</div></div>
-        <div style="text-align:right"><div class="nm" style="color:var(--acc)">${money(p.total)}</div><span class="tag">${esc(p.estado||'nuevo')}</span></div></div></div>`;}).join(''):'<div class="empty">Sin pedidos aún.</div>'}</div>`);
+    const [prods,peds]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_pedidos?order=creado_en.desc&limit=100')]);
+    this._prods=prods; this._peds=peds; this._cart=this._cart||{};
+    this._pedPaint();
   },
-  pedModal(){ const P=this._prods||[]; this._cart=[];
-    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Nuevo pedido</h3>
-      <div class="g2"><div><label>Cliente</label><input id="pd_cli"></div><div><label>Teléfono</label><input id="pd_tel"></div></div>
-      <label>Productos</label>
-      <div style="max-height:34vh;overflow:auto;border:1px solid var(--line);border-radius:9px;padding:6px">
-        ${P.length?P.map(p=>`<div class="row" style="justify-content:space-between;padding:5px 4px;border-bottom:1px solid var(--line2)">
-          <span style="font-size:14px">${esc(p.nombre)} <small class="dim">${money(p.precio)}</small></span>
-          <input type="number" min="0" value="0" style="width:70px;text-align:center" data-pid="${p.id}" data-nom="${esc(p.nombre)}" data-pre="${p.precio||0}" oninput="App.pedCalc()"></div>`).join(''):'<div class="hint">No hay productos. Créalos en Recetas.</div>'}
+  _pedPaint(){
+    const prods=this._prods||[], cart=this._cart||{};
+    let sub=0, iva=0, nItems=0;
+    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const b=(+p.precio||0)*q; sub+=b; iva+=b*(+p.iva_pct||0)/100; nItems+=q; }
+    const total=sub+iva;
+    this.set(`<h1>Pedidos</h1><div class="sub">Toca − / + para armar el pedido; la cuenta se calcula al lado</div>
+      <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:1;min-width:250px"><div class="grid" style="grid-template-columns:repeat(2,1fr)">
+          ${prods.length?prods.map(p=>{const q=cart[p.id]||0;return `<div class="pcard">
+            <div class="pimg" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'🥖'}</div>
+            <div class="pin"><div class="pn">${esc(p.nombre)}</div><div class="pp">${money(p.precio)}</div>
+              <div class="stp"><button onclick="App.cartSet('${p.id}',-1)">−</button><b>${q}</b><button onclick="App.cartSet('${p.id}',1)">＋</button></div></div>
+          </div>`;}).join(''):'<div class="empty">No hay productos. Créalos en Recetas.</div>'}
+        </div></div>
+        <div style="flex:0 0 228px;position:sticky;top:58px" class="card">
+          <div style="font-family:Fraunces,serif;font-size:17px;margin-bottom:8px">La cuenta</div>
+          <input id="pd_cli" placeholder="Cliente" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App._cartCli=this.value">
+          <input id="pd_tel" placeholder="Teléfono" value="${esc(this._cartTel||'')}" oninput="App._cartTel=this.value">
+          <div style="margin-top:10px;font-size:13px">
+            <div class="row" style="justify-content:space-between"><span class="dim">Productos</span><b>${nItems}</b></div>
+            <div class="row" style="justify-content:space-between"><span class="dim">Subtotal</span><b>${money(sub)}</b></div>
+            <div class="row" style="justify-content:space-between"><span class="dim">IVA</span><span>${money(iva)}</span></div>
+            <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total</span><b style="font-size:18px;color:var(--acc)">${money(total)}</b></div>
+          </div>
+          <button class="btn acc full" onclick="App.pedGuardar()" ${nItems?'':'disabled style="opacity:.5"'}>Guardar pedido</button>
+          <button class="btn gh full" style="margin-top:6px" onclick="App._cart={};App._pedPaint()">Vaciar</button>
+        </div>
       </div>
-      <div id="pd_tot" style="text-align:right;font-weight:800;margin-top:8px;font-size:16px">Total: $0</div>
-      <button class="btn acc full" onclick="App.pedSave()">Guardar pedido</button>`);
+      <h1 style="font-size:18px;margin-top:22px">Pedidos guardados</h1>
+      ${(this._peds||[]).length?this._peds.map(p=>{const it=(p.items||[]);const tel=(p.telefono||'').replace(/\D/g,'');return `<div class="item"><div class="top"><div>
+        <div class="nm">${esc(p.cliente||'—')} ${tel?`· <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-size:12px">📱</a>`:''}</div>
+        <div class="mt">${it.map(i=>esc(i.nombre)+' ×'+i.qty).join(' · ')||''} · 📅 ${(p.creado_en||'').slice(0,10)}</div></div>
+        <div class="nm" style="color:var(--acc)">${money(p.total)}</div></div></div>`;}).join(''):'<div class="empty">Aún sin pedidos guardados.</div>'}`);
   },
-  pedCalc(){ let t=0; document.querySelectorAll('#modal-host input[data-pid]').forEach(i=>{ t+=(+i.value||0)*(+i.dataset.pre||0); }); $('pd_tot').textContent='Total: '+money(t); },
-  async pedSave(){ const items=[]; let total=0;
-    document.querySelectorAll('#modal-host input[data-pid]').forEach(i=>{ const q=+i.value||0; if(q>0){ items.push({producto_id:i.dataset.pid,nombre:i.dataset.nom,qty:q,precio:+i.dataset.pre||0}); total+=q*(+i.dataset.pre||0); } });
-    if(!items.length){alert('Agrega al menos un producto');return;}
-    const cli=$('pd_cli').value.trim(), tel=$('pd_tel').value.trim();
+  cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value;
+    const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
+  async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; let total=0;
+    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0}); total+=(+p.precio||0)*q*(1+(+p.iva_pct||0)/100); }
+    if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim();
     await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,total,estado:'nuevo'});
-    // descuenta inventario + registra venta
-    for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')});
-      const p=(this._prods||[]).find(x=>x.id===it.producto_id); if(p){ await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:(+p.existencias||0)-it.qty}); } }
-    if(cli) await POST('kruh_ventas',{cliente:cli,telefono:tel,producto:items.map(i=>i.nombre).join(', '),monto:total});
-    cerrar(); toast('Pedido guardado y descontado del inventario'); this.vPedidos();
-  },
+    for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:(+p.existencias||0)-it.qty}); }
+    if(cli)await POST('kruh_ventas',{cliente:cli,telefono:tel,producto:items.map(i=>i.nombre).join(', '),monto:total});
+    this._cart={}; this._cartCli=''; this._cartTel=''; toast('Pedido guardado y descontado'); this.vPedidos(); },
 
-  /* ===================== CRM (copiado de Smart, limpio) ===================== */
+  /* ===================== CRM (cajones: Comunidad / Nuevos → canal) ===================== */
   ETAPAS:['contactado','interesado','pedido','cliente'],
+  CANALES:[['todos','Todos'],['local','🏪 Local'],['digital','📱 Digital'],['organico','🌱 Orgánico']],
   async vCrm(){
     this.loading();
-    const leads=await GET('kruh_leads?order=creado_en.desc&limit=1000');
+    const leads=await GET('kruh_leads?order=creado_en.desc&limit=2000'); this._leads=leads;
     const EM={contactado:'👋 Contactado',interesado:'💡 Interesado',pedido:'📋 Pedido',cliente:'🛒 Cliente'};
-    this.set(`<h1>CRM</h1><div class="sub">Embudo: 👋 Contactado → 💡 Interesado → 📋 Pedido → 🛒 Cliente</div>
-      <button class="btn acc" onclick="App.leadModal()">＋ Nuevo lead</button>
-      <div class="kpis" style="margin-top:12px">${this.ETAPAS.map(e=>`<div class="kpi"><b>${leads.filter(l=>l.etapa===e).length}</b><span>${EM[e]}</span></div>`).join('')}</div>
-      <div style="margin-top:6px">${leads.length?leads.map(l=>`<div class="item"><div class="top"><div>
-        <div class="nm">${esc(l.nombre||'—')} ${l.telefono?`· <a href="https://wa.me/57${esc((l.telefono||'').replace(/\\D/g,''))}" target="_blank" style="color:#16734a;font-size:12px">📱</a>`:''}</div>
-        <div class="mt">${esc(l.ciudad||'')}${l.interes?' · '+esc(l.interes):''}</div></div>
+    const caj=this._crmCajon||'nuevos', can=this._crmCanal||'todos';
+    const comun=leads.filter(l=>l.tipo==='comunidad'), nuevos=leads.filter(l=>(l.tipo||'nuevo')!=='comunidad');
+    let lista=caj==='comunidad'?comun:nuevos;
+    if(caj==='nuevos'&&can!=='todos') lista=lista.filter(l=>(l.canal||'local')===can);
+    this.set(`<h1>CRM</h1><div class="sub">Comunidad y nuevos por canal · embudo 👋 → 💡 → 📋 → 🛒</div>
+      <div class="row" style="gap:10px;margin-bottom:12px">
+        <div class="cajon ${caj==='comunidad'?'on':''}" onclick="App._crmCajon='comunidad';App.vCrm()"><b>${comun.length}</b>👥 Comunidad</div>
+        <div class="cajon ${caj==='nuevos'?'on':''}" onclick="App._crmCajon='nuevos';App.vCrm()"><b>${nuevos.length}</b>✨ Nuevos</div></div>
+      ${caj==='nuevos'?`<div class="row" style="gap:6px;margin-bottom:12px">${this.CANALES.map(([v,t])=>`<span class="et ${can===v?'on':''}" onclick="App._crmCanal='${v}';App.vCrm()">${t}${v!=='todos'?' ('+nuevos.filter(l=>(l.canal||'local')===v).length+')':''}</span>`).join('')}</div>`:''}
+      <button class="btn acc" onclick="App.leadModal()">＋ Registro de cliente</button>
+      <div style="margin-top:12px">${lista.length?lista.map(l=>`<div class="item"><div class="top"><div>
+        <div class="nm">${esc(l.nombre||'—')} ${l.telefono?`· <a href="https://wa.me/57${esc((l.telefono||'').replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-size:12px">📱</a>`:''}</div>
+        <div class="mt">${l.tipo==='comunidad'?'👥 comunidad':('✨ '+esc(l.canal||'local'))}${l.ciudad?' · '+esc(l.ciudad):''}${l.interes?' · '+esc(l.interes):''}</div></div>
         <a onclick="App.leadDel('${l.id}')" style="color:var(--bad);cursor:pointer">✕</a></div>
-        <div class="row" style="margin-top:8px">${this.ETAPAS.map(e=>`<span class="et ${l.etapa===e?'on':''}" onclick="App.leadEtapa('${l.id}','${e}')">${EM[e]}</span>`).join('')}</div></div>`).join(''):'<div class="empty">Sin leads. Agrega el primero o los trae el bot.</div>'}</div>`);
+        <div class="row" style="margin-top:8px">${this.ETAPAS.map(e=>`<span class="et ${l.etapa===e?'on':''}" onclick="App.leadEtapa('${l.id}','${e}')">${EM[e]}</span>`).join('')}</div></div>`).join(''):'<div class="empty">Sin leads en este cajón.</div>'}</div>`);
   },
-  leadModal(){ modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Nuevo lead</h3>
+  ORIGEN:[['registrado','Cliente registrado (comunidad)','comunidad','local'],['nuevo','Cliente nuevo (local)','nuevo','local'],['digital','Digital','nuevo','digital'],['organico','Orgánico','nuevo','organico']],
+  leadModal(){ const caj=this._crmCajon||'nuevos', defO=caj==='comunidad'?'registrado':'nuevo';
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Registro de cliente</h3>
     <div class="g2"><div><label>Nombre</label><input id="l_nom"></div><div><label>Teléfono</label><input id="l_tel"></div></div>
-    <div class="g2"><div><label>Ciudad</label><input id="l_ciu"></div><div><label>Interés</label><input id="l_int"></div></div>
-    <button class="btn acc full" onclick="App.leadSave()">Guardar</button>`); },
-  async leadSave(){ const b={nombre:$('l_nom').value.trim(),telefono:$('l_tel').value.trim(),ciudad:$('l_ciu').value.trim(),interes:$('l_int').value.trim(),etapa:'contactado'};
-    if(!b.nombre){alert('Nombre');return;} await POST('kruh_leads',b); cerrar(); toast('Lead creado'); this.vCrm(); },
+    <label>Dirección</label><input id="l_dir">
+    <div class="g2"><div><label>Ciudad</label><input id="l_ciu"></div><div><label>Instagram</label><input id="l_ig" placeholder="@usuario"></div></div>
+    <div class="g2"><div><label>Cédula / Ciudadanía</label><input id="l_ced"></div>
+    <div><label>Origen</label><select id="l_org">${this.ORIGEN.map(o=>`<option value="${o[0]}" ${o[0]===defO?'selected':''}>${o[1]}</option>`).join('')}</select></div></div>
+    <label>Interés / notas</label><input id="l_int">
+    <button class="btn acc full" onclick="App.leadSave()">Guardar cliente</button>`); },
+  async leadSave(){ const org=this.ORIGEN.find(o=>o[0]===$('l_org').value)||['','','nuevo','local'];
+    const b={nombre:$('l_nom').value.trim(),telefono:$('l_tel').value.trim(),direccion:$('l_dir').value.trim(),ciudad:$('l_ciu').value.trim(),instagram:$('l_ig').value.trim(),cedula:$('l_ced').value.trim(),interes:$('l_int').value.trim(),etapa:'contactado',tipo:org[2],canal:org[3]};
+    if(!b.nombre){alert('Nombre');return;} await POST('kruh_leads',b); cerrar(); toast('Cliente registrado'); this.vCrm(); },
   async leadEtapa(id,e){ await PATCH('kruh_leads?id=eq.'+id,{etapa:e}); this.vCrm(); },
   async leadDel(id){ if(!confirm('¿Eliminar lead?'))return; await DEL('kruh_leads?id=eq.'+id); this.vCrm(); },
 
@@ -286,58 +372,72 @@ const App={
   /* ===================== PROVEEDORES ===================== */
   async vProveedores(){
     this.loading();
-    const provs=await GET('kruh_proveedores?order=nombre&limit=2000'); this._provs=provs;
-    this.set(`<h1>Proveedores</h1><div class="sub">Directorio: qué provee cada uno, unidad y valor (base para las recetas)</div>
+    const provs=await GET('kruh_proveedores?order=categoria,nombre&limit=2000'); this._provs=provs;
+    const cats=[...new Set(provs.map(p=>p.categoria||'Sin categoría'))];
+    this.set(`<h1>Proveedores</h1><div class="sub">Directorio de restaurante · qué provee, categoría, condiciones de pago y contacto</div>
       <button class="btn acc" onclick="App.provModal()">＋ Nuevo proveedor</button>
-      <div style="margin-top:14px">${provs.length?provs.map(p=>`<div class="item" style="cursor:pointer" onclick="App._provOpen=App._provOpen==='${p.id}'?'':'${p.id}';App.vProveedores()">
+      ${provs.length?cats.map(cat=>`<div style="margin-top:14px"><div class="tag" style="margin-bottom:8px">${esc(cat)}</div>
+        ${provs.filter(p=>(p.categoria||'Sin categoría')===cat).map(p=>`<div class="item" style="cursor:pointer" onclick="App._provOpen=App._provOpen==='${p.id}'?'':'${p.id}';App.vProveedores()">
         <div class="top"><div><div class="nm">${esc(p.nombre)}</div><div class="mt">${esc(p.provee||'—')}${p.telefono?' · 📱 '+esc(p.telefono):''}</div></div>
         <span class="tag">${p.valor?money(p.valor)+'/'+esc(p.unidad||'und'):'—'}</span></div>
-        ${this._provOpen===p.id?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px;font-size:13px">
-          <div><b>Provee:</b> ${esc(p.provee||'—')}</div><div><b>Unidad:</b> ${esc(p.unidad||'—')} · <b>Valor:</b> ${money(p.valor)}</div>
-          <div><b>Contacto:</b> ${esc(p.contacto||'—')}</div>${p.notas?`<div><b>Notas:</b> ${esc(p.notas)}</div>`:''}
-          <button class="btn gh sm" style="margin-top:8px" onclick="event.stopPropagation();App.provModal('${p.id}')">✎ Editar</button></div>`:''}</div>`).join(''):'<div class="empty">Sin proveedores aún.</div>'}</div>`);
+        ${this._provOpen===p.id?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px;font-size:13px;line-height:1.7">
+          <div><b>Provee:</b> ${esc(p.provee||'—')} · <b>Unidad:</b> ${esc(p.unidad||'—')} · <b>Valor:</b> ${money(p.valor)}</div>
+          <div><b>NIT:</b> ${esc(p.nit||'—')} · <b>Pago:</b> ${esc(p.condicion_pago||'—')}${p.dias_credito?' ('+p.dias_credito+' días)':''}</div>
+          <div><b>Frecuencia:</b> ${esc(p.frecuencia||'—')} · <b>Pedido mín.:</b> ${p.pedido_minimo?money(p.pedido_minimo):'—'}</div>
+          <div><b>Contacto:</b> ${esc(p.contacto||'—')}${p.email?' · '+esc(p.email):''}</div>${p.notas?`<div><b>Notas:</b> ${esc(p.notas)}</div>`:''}
+          <button class="btn gh sm" style="margin-top:8px" onclick="event.stopPropagation();App.provModal('${p.id}')">✎ Editar</button></div>`:''}</div>`).join('')}</div>`).join(''):'<div class="empty">Sin proveedores aún.</div>'}`);
   },
   provModal(id){ const p=(this._provs||[]).find(x=>x.id===id)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Nuevo'} proveedor</h3>
-      <label>Nombre</label><input id="pv_nom" value="${esc(p.nombre||'')}">
-      <label>Qué provee</label><input id="pv_pro" value="${esc(p.provee||'')}" placeholder="Harina, mantequilla, empaques…">
-      <div class="g2"><div><label>Unidad de medida</label><input id="pv_uni" value="${esc(p.unidad||'')}" placeholder="kg, L, und"></div>
-      <div><label>Valor</label><input id="pv_val" type="number" value="${p.valor||0}"></div></div>
+      <div class="g2"><div><label>Nombre / Empresa</label><input id="pv_nom" value="${esc(p.nombre||'')}"></div>
+      <div><label>Categoría</label><input id="pv_cat" value="${esc(p.categoria||'')}" placeholder="Harinas, Lácteos, Cárnicos, Frutas y verduras, Empaques, Limpieza, Gas…"></div></div>
+      <label>Qué provee</label><input id="pv_pro" value="${esc(p.provee||'')}" placeholder="Harina de trigo, mantequilla…">
+      <div class="g3"><div><label>Unidad</label><input id="pv_uni" value="${esc(p.unidad||'')}" placeholder="kg, L, und"></div>
+      <div><label>Valor</label><input id="pv_val" type="number" value="${p.valor||0}"></div>
+      <div><label>Pedido mínimo</label><input id="pv_min" type="number" value="${p.pedido_minimo||0}"></div></div>
+      <div class="g2"><div><label>Condición de pago</label><select id="pv_cp"><option value="Contado" ${p.condicion_pago==='Contado'?'selected':''}>Contado</option><option value="Crédito" ${p.condicion_pago==='Crédito'?'selected':''}>Crédito</option></select></div>
+      <div><label>Días de crédito</label><input id="pv_dias" type="number" value="${p.dias_credito||0}"></div></div>
+      <div class="g2"><div><label>Frecuencia de entrega</label><input id="pv_frec" value="${esc(p.frecuencia||'')}" placeholder="Diaria, semanal…"></div>
+      <div><label>NIT / Cédula</label><input id="pv_nit" value="${esc(p.nit||'')}"></div></div>
       <div class="g2"><div><label>Contacto</label><input id="pv_con" value="${esc(p.contacto||'')}"></div><div><label>Teléfono</label><input id="pv_tel" value="${esc(p.telefono||'')}"></div></div>
+      <label>Email</label><input id="pv_email" value="${esc(p.email||'')}">
       <label>Notas</label><textarea id="pv_not">${esc(p.notas||'')}</textarea>
       <button class="btn acc full" onclick="App.provSave('${id||''}')">Guardar</button>
       ${id?`<button class="btn gh full" style="color:var(--bad)" onclick="App.provDel('${id}')">Eliminar</button>`:''}`); },
-  async provSave(id){ const b={nombre:$('pv_nom').value.trim(),provee:$('pv_pro').value.trim(),unidad:$('pv_uni').value.trim(),valor:+$('pv_val').value||0,contacto:$('pv_con').value.trim(),telefono:$('pv_tel').value.trim(),notas:$('pv_not').value.trim()};
+  async provSave(id){ const b={nombre:$('pv_nom').value.trim(),categoria:$('pv_cat').value.trim(),provee:$('pv_pro').value.trim(),unidad:$('pv_uni').value.trim(),valor:+$('pv_val').value||0,pedido_minimo:+$('pv_min').value||0,condicion_pago:$('pv_cp').value,dias_credito:+$('pv_dias').value||0,frecuencia:$('pv_frec').value.trim(),nit:$('pv_nit').value.trim(),contacto:$('pv_con').value.trim(),telefono:$('pv_tel').value.trim(),email:$('pv_email').value.trim(),notas:$('pv_not').value.trim()};
     if(!b.nombre){alert('Nombre');return;} if(id)await PATCH('kruh_proveedores?id=eq.'+id,b); else await POST('kruh_proveedores',b); cerrar(); toast('Guardado'); this.vProveedores(); },
   async provDel(id){ if(!confirm('¿Eliminar proveedor?'))return; await DEL('kruh_proveedores?id=eq.'+id); cerrar(); this.vProveedores(); },
 
-  /* ===================== PRESUPUESTOS (metas por categoría) ===================== */
+  /* ===================== PRESUPUESTOS (meta por producto, semanal) ===================== */
   async vPresupuestos(){
     this.loading();
-    const [pres,ventas,prods]=await Promise.all([GET('kruh_presupuestos?order=categoria&limit=500'),GET('kruh_ventas?limit=5000'),GET('kruh_productos?limit=1000')]);
-    this._pres=pres;
-    const mesIni=new Date(); mesIni.setDate(1); mesIni.setHours(0,0,0,0);
-    const catPere={}; prods.forEach(p=>{catPere[(p.nombre||'').toLowerCase()]=p.perecedero;});
-    // ventas del mes por categoría (aprox: por nombre de producto->categoria)
-    const catByProd={}; prods.forEach(p=>{catByProd[(p.nombre||'').toLowerCase()]=p.categoria||'Sin categoría';});
-    const ventaCat={}; ventas.forEach(v=>{ if(new Date(v.creado_en)>=mesIni){ const primer=(v.producto||'').split(',')[0].trim().toLowerCase(); const cat=catByProd[primer]||'General'; ventaCat[cat]=(ventaCat[cat]||0)+(+v.monto||0); } });
-    this.set(`<h1>Presupuestos</h1><div class="sub">Metas por categoría (perecederos / no perecederos) — el avance sale solo con las ventas del mes</div>
+    const [pres,peds,prods]=await Promise.all([GET('kruh_presupuestos?order=creado_en&limit=500'),GET('kruh_pedidos?limit=3000'),GET('kruh_productos?order=nombre&limit=1000')]);
+    this._pres=pres; this._prods=prods;
+    const now=new Date(), mesIni=new Date(now.getFullYear(),now.getMonth(),1);
+    const diasMes=new Date(now.getFullYear(),now.getMonth()+1,0).getDate(), semanas=Math.ceil(diasMes/7);
+    const vpp={};
+    peds.forEach(p=>{ const d=new Date(p.creado_en); if(d<mesIni)return; const sem=Math.min(semanas-1,Math.floor((d.getDate()-1)/7)); (p.items||[]).forEach(it=>{ const k=it.producto_id; (vpp[k]=vpp[k]||new Array(semanas).fill(0))[sem]+=(+it.qty||0)*(+it.precio||0); }); });
+    this.set(`<h1>Presupuestos</h1><div class="sub">Meta mensual por producto, dividida en semanas · avance con las ventas reales</div>
       <button class="btn acc" onclick="App.presModal()">＋ Nueva meta</button>
-      <div style="margin-top:14px">${pres.length?pres.map(p=>{ const logrado=ventaCat[p.categoria]||0; const pct=p.meta>0?Math.min(100,logrado/p.meta*100):0;
-        return `<div class="item"><div class="top"><div><div class="nm">${esc(p.categoria)} <span class="tag ${p.perecedero?'pe':'np'}">${p.perecedero?'Perecedero':'No perecedero'}</span></div>
-          <div class="mt">Meta ${money(p.meta)} · Logrado ${money(logrado)}</div></div>
+      <div style="margin-top:14px">${pres.length?pres.map(pr=>{
+        const arr=vpp[pr.producto_id]||new Array(semanas).fill(0), vendido=arr.reduce((a,b)=>a+b,0);
+        const meta=+pr.meta||0, metaSem=meta/semanas, pct=meta>0?Math.min(100,vendido/meta*100):0, falta=Math.max(0,meta-vendido);
+        return `<div class="item"><div class="top"><div><div class="nm">${esc(pr.producto||'—')}</div>
+          <div class="mt">Meta ${money(meta)}/mes · ${money(metaSem)}/semana · vendido ${money(vendido)}</div></div>
           <div class="nm" style="color:${pct>=100?'var(--ok)':(pct>=60?'var(--warn)':'var(--bad)')}">${pct.toFixed(0)}%</div></div>
           <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div>
-          <a onclick="App.presDel('${p.id}')" style="color:var(--bad);cursor:pointer;font-size:12px;float:right;margin-top:6px">eliminar</a></div>`;}).join(''):'<div class="empty">Define tu primera meta por categoría.</div>'}</div>`);
+          <div class="row" style="gap:6px;margin-top:8px">${arr.map((v,i)=>`<div style="flex:1;text-align:center;font-size:11px"><div class="dim">S${i+1}</div><b style="color:${v>=metaSem?'var(--ok)':'var(--ink2)'}">${money(v)}</b></div>`).join('')}</div>
+          <div class="hint" style="margin-top:6px">${falta>0?('Faltan '+money(falta)+' para la meta'):'¡Meta cumplida! 🎉'} <a onclick="App.presDel('${pr.id}')" style="color:var(--bad);cursor:pointer;float:right">eliminar</a></div></div>`;}).join(''):'<div class="empty">Escoge un producto del catálogo y ponle su meta mensual.</div>'}</div>`);
   },
-  presModal(){ const cats=[...new Set((this._prods||[]).map(p=>p.categoria).filter(Boolean))];
-    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Nueva meta</h3>
-      <label>Categoría</label><input id="pr_cat" list="pr_cats"><datalist id="pr_cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
-      <div class="g2"><div><label>¿Perecedero?</label><select id="pr_per"><option value="true">Sí</option><option value="false">No</option></select></div>
-      <div><label>Meta ($ del mes)</label><input id="pr_meta" type="number"></div></div>
-      <button class="btn acc full" onclick="App.presSave()">Guardar</button>`); },
-  async presSave(){ const b={categoria:$('pr_cat').value.trim(),perecedero:$('pr_per').value==='true',meta:+$('pr_meta').value||0,periodo:'mes'};
-    if(!b.categoria){alert('Categoría');return;} await POST('kruh_presupuestos',b); cerrar(); toast('Meta guardada'); this.vPresupuestos(); },
+  presModal(){ const prods=this._prods||[];
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Nueva meta por producto</h3>
+      <label>Producto (del catálogo)</label>
+      <select id="pr_prod">${prods.map(p=>`<option value="${p.id}" data-n="${esc(p.nombre)}">${esc(p.nombre)}</option>`).join('')}</select>
+      <label>Meta del mes ($)</label><input id="pr_meta" type="number">
+      <button class="btn acc full" onclick="App.presSave()">Guardar meta</button>`); },
+  async presSave(){ const s=$('pr_prod'), o=s.options[s.selectedIndex]; if(!o){alert('Producto');return;}
+    await POST('kruh_presupuestos',{producto_id:o.value,producto:o.dataset.n,meta:+$('pr_meta').value||0,periodo:'mes'});
+    cerrar(); toast('Meta guardada'); this.vPresupuestos(); },
   async presDel(id){ await DEL('kruh_presupuestos?id=eq.'+id); this.vPresupuestos(); },
 
   /* ===================== VENTAS (clientes, estilo Smart) ===================== */
@@ -355,8 +455,9 @@ const App={
     const totMes=arr.reduce((a,o)=>a+o.mesMonto,0);
     this.set(`<h1>Ventas</h1><div class="sub">🟢 = compró este mes · el 2º círculo lo marcas tú cuando le hagas seguimiento por WhatsApp</div>
       <div class="kpis"><div class="kpi dark"><b>${money(totMes)}</b><span>Ventas del mes</span></div>
-        <div class="kpi"><b>${arr.filter(o=>o.estemes).length}</b><span>Clientes activos (mes)</span></div>
-        <div class="kpi"><b>${arr.length}</b><span>Clientes totales</span></div></div>
+        <div class="kpi"><b>${arr.length}</b><span>Clientes registrados</span></div>
+        <div class="kpi"><b style="color:var(--acc)">${arr.filter(o=>new Date(o.primera)>=mesIni).length}</b><span>Clientes nuevos (mes)</span></div>
+        <div class="kpi"><b>${arr.filter(o=>o.estemes).length}</b><span>Activos (mes)</span></div></div>
       <button class="btn acc" onclick="App.ventaModal()">＋ Registrar venta</button>
       <div style="margin-top:12px">${arr.length?arr.map(o=>{const tel=(o.tel||'').replace(/\\D/g,'');const on=segSet[o.cliente];return `<div class="item"><div class="top">
         <div class="row" style="gap:9px;align-items:flex-start"><span class="circ ${o.estemes?'on':''}" title="${o.estemes?'compró este mes':'no este mes'}"></span>
