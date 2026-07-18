@@ -99,12 +99,13 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['usuarios','👤 Usuarios']],
   view:'dashboard',
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
   get esAdmin(){ return this.rol==='admin'; },
-  async init(){ this.rol=sessionStorage.getItem('kruh_rol')||''; if(!this.PASS[this.rol]&&this.rol!=='admin'&&this.rol!=='gerencia'){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go('dashboard'); },
+  async init(){ this.rol=sessionStorage.getItem('kruh_rol')||''; try{ this._usuarios=await GET('kruh_usuarios?select=nombre,rol,clave,activo&limit=200'); }catch(e){ this._usuarios=[]; }
+    if(this.rol!=='admin'&&this.rol!=='gerencia'){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go('dashboard'); },
   vLogin(){ $('nav').innerHTML=''; $('main').className='';
     $('main').innerHTML=`<div style="max-width:340px;margin:44px auto 0"><div class="card" style="text-align:center">
       <div style="font-family:Fraunces,serif;font-size:38px;color:var(--ink)">kruh<b style="color:var(--acc)">.</b></div>
@@ -114,8 +115,10 @@ const App={
       <div class="hint" id="lg_err" style="color:var(--bad);display:none;margin-top:8px">Clave incorrecta</div></div></div>`;
     setTimeout(()=>{const e=$('lg_pass');if(e)e.focus();},60); },
   login(){ const p=($('lg_pass').value||'').trim(); let rol=''; for(const k in this.PASS){ if(p===this.PASS[k])rol=k; }
+    if(!rol){ const u=(this._usuarios||[]).find(x=>x.clave===p&&x.activo!==false); if(u)rol=u.rol; }
     if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; sessionStorage.setItem('kruh_rol',rol); this.init(); },
   logout(){ sessionStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
+  _okBorrar(){ const p=prompt('🔒 Clave para BORRAR:'); if(p===null)return false; if(p===this.PASS.admin||p===this.PASS.gerencia)return true; alert('Clave incorrecta'); return false; },
   paintHeader(){ const q=document.querySelector('.quien'); if(q) q.innerHTML=`${this.rol==='admin'?'Admin':'Gerencia'} · <a onclick="App.logout()" style="cursor:pointer;text-decoration:underline">salir</a>`; },
 
   /* ===================== DASHBOARD ===================== */
@@ -166,9 +169,9 @@ const App={
     const b={mes:nombre,ventas:+$('d_ven').value||0,costo:+$('d_cos').value||0,meta:+$('d_meta').value||40000000,orden:(this.MESNOM.indexOf(nombre)>0?this.MESNOM.indexOf(nombre):99)};
     await fetch(SB+'/rest/v1/kruh_dashboard?on_conflict=mes',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(b)});
     cerrar(); toast('Guardado'); this.vDashboard(); },
-  nav(){ $('nav').innerHTML=this.TABS.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
+  nav(){ $('nav').innerHTML=this.TABS.filter(([v])=>v!=='usuarios'||this.esAdmin).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,presupuestos:this.vPresupuestos,ventas:this.vVentas}[v]||this.vDashboard).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,presupuestos:this.vPresupuestos,ventas:this.vVentas,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ $('main').className=''; $('main').innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -198,8 +201,8 @@ const App={
               ${this.esAdmin?`<button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Adicionar ingrediente</button>`:''}</div>
             <div style="margin-top:9px;border-top:1px dashed var(--line);padding-top:9px">
               <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Pasos de elaboración</div>
-              ${(pBy[p.id]||[]).map((s,i)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0;align-items:flex-start"><span><b>${i+1}.</b> ${esc(s.texto)}</span>${this.esAdmin?`<a onclick="App.pasoDel('${s.id}')" style="color:var(--bad);cursor:pointer;flex:none">✕</a>`:''}</div>`).join('')||'<div class="hint">Sin pasos.</div>'}
-              ${this.esAdmin?`<button class="btn gh sm full" onclick="App.pasoAdd('${p.id}')">＋ Paso</button>`:''}</div>
+              ${(pBy[p.id]||[]).map((s,i)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0;align-items:flex-start"><span><b>${i+1}.</b> ${esc(s.texto)}</span><a onclick="App.pasoDel('${s.id}')" style="color:var(--bad);cursor:pointer;flex:none">✕</a></div>`).join('')||'<div class="hint">Sin pasos.</div>'}
+              <button class="btn gh sm full" onclick="App.pasoAdd('${p.id}')">＋ Adicionar paso</button></div>
             <div style="margin-top:10px;background:var(--paper);border-radius:9px;padding:9px 11px;font-size:12.5px">
               <div class="row" style="justify-content:space-between"><span class="dim">Costo ingredientes</span><b>${money(costo)}</b></div>
               <div class="row" style="justify-content:space-between"><span class="dim">Precio venta</span><b>${money(precio)}</b></div>
@@ -229,7 +232,7 @@ const App={
   async prodSave(id){ const b={nombre:$('p_nom').value.trim(),categoria:$('p_cat').value.trim(),presentacion:$('p_pres').value.trim(),peso:+$('p_peso').value||0,unidad:$('p_uni').value.trim()||'g',precio:+$('p_pre').value||0,iva_pct:+$('p_iva').value||0,perecedero:$('p_per').value==='true',foto_url:$('p_foto').value.trim()};
     if(!b.nombre){alert('Ponle nombre');return;} if(id) await PATCH('kruh_productos?id=eq.'+id,b); else await POST('kruh_productos',b);
     cerrar(); toast('Guardado · ya está en el catálogo'); this.vRecetas(); },
-  async prodDel(id){ if(!confirm('¿Eliminar el producto y su receta?'))return; await DEL('kruh_recetas?producto_id=eq.'+id); await DEL('kruh_productos?id=eq.'+id); cerrar(); toast('Eliminado'); this.vRecetas(); },
+  async prodDel(id){ if(!this._okBorrar())return; await DEL('kruh_recetas?producto_id=eq.'+id); await DEL('kruh_productos?id=eq.'+id); cerrar(); toast('Eliminado'); this.vRecetas(); },
   recModal(pid){ const provs=this._provs||[];
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Agregar ingrediente</h3>
       <label>Ingrediente</label><input id="r_ing">
@@ -274,10 +277,9 @@ const App={
       <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div style="flex:1;min-width:250px"><div class="grid" style="grid-template-columns:repeat(2,1fr)">
           ${prods.length?prods.map(p=>{const q=cart[p.id]||0;return `<div class="pcard">
-            <div class="pimg" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'🥖'}</div>
+            ${this.esAdmin?`<label class="pimg" style="cursor:pointer;${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:'flex-direction:column;color:var(--acc);font-size:22px'}">${p.foto_url?'':'📷<span style="font-size:10px;font-weight:700;margin-top:2px">Agregar foto</span>'}<input type="file" accept="image/*" style="display:none" onchange="App.subirFoto(this,'${p.id}')"></label>`:`<div class="pimg" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'🥖'}</div>`}
             <div class="pin"><div class="pn">${esc(p.nombre)}</div><div class="pp">${money(p.precio)}</div>
-              <div class="stp"><button onclick="App.cartSet('${p.id}',-1)">−</button><b>${q}</b><button onclick="App.cartSet('${p.id}',1)">＋</button></div>
-              ${this.esAdmin?`<label style="font-size:10px;color:var(--acc);cursor:pointer;display:block;margin-top:5px;text-align:center">📷 ${p.foto_url?'cambiar':'adicionar'} foto<input type="file" accept="image/*" style="display:none" onchange="App.subirFoto(this,'${p.id}')"></label>`:''}</div>
+              <div class="stp"><button onclick="App.cartSet('${p.id}',-1)">−</button><b>${q}</b><button onclick="App.cartSet('${p.id}',1)">＋</button></div></div>
           </div>`;}).join(''):'<div class="empty">No hay productos. Créalos en Recetas.</div>'}
         </div></div>
         <div style="flex:0 0 228px;position:sticky;top:58px" class="card">
@@ -347,7 +349,7 @@ const App={
     const b={nombre:$('l_nom').value.trim(),telefono:$('l_tel').value.trim(),direccion:$('l_dir').value.trim(),ciudad:$('l_ciu').value.trim(),instagram:$('l_ig').value.trim(),cedula:$('l_ced').value.trim(),interes:$('l_int').value.trim(),etapa:'contactado',tipo:org[2],canal:org[3]};
     if(!b.nombre){alert('Nombre');return;} await POST('kruh_leads',b); cerrar(); toast('Cliente registrado'); this.vCrm(); },
   async leadEtapa(id,e){ await PATCH('kruh_leads?id=eq.'+id,{etapa:e}); this.vCrm(); },
-  async leadDel(id){ if(!confirm('¿Eliminar lead?'))return; await DEL('kruh_leads?id=eq.'+id); this.vCrm(); },
+  async leadDel(id){ if(!this._okBorrar())return; await DEL('kruh_leads?id=eq.'+id); this.vCrm(); },
 
   /* ===================== INVENTARIO + índice de cobertura ===================== */
   async vInventario(){
@@ -423,7 +425,7 @@ const App={
       ${id?`<button class="btn gh full" style="color:var(--bad)" onclick="App.provDel('${id}')">Eliminar</button>`:''}`); },
   async provSave(id){ const b={nombre:$('pv_nom').value.trim(),categoria:$('pv_cat').value.trim(),provee:$('pv_pro').value.trim(),unidad:$('pv_uni').value.trim(),valor:+$('pv_val').value||0,pedido_minimo:+$('pv_min').value||0,condicion_pago:$('pv_cp').value,dias_credito:+$('pv_dias').value||0,frecuencia:$('pv_frec').value.trim(),nit:$('pv_nit').value.trim(),contacto:$('pv_con').value.trim(),telefono:$('pv_tel').value.trim(),email:$('pv_email').value.trim(),notas:$('pv_not').value.trim()};
     if(!b.nombre){alert('Nombre');return;} if(id)await PATCH('kruh_proveedores?id=eq.'+id,b); else await POST('kruh_proveedores',b); cerrar(); toast('Guardado'); this.vProveedores(); },
-  async provDel(id){ if(!confirm('¿Eliminar proveedor?'))return; await DEL('kruh_proveedores?id=eq.'+id); cerrar(); this.vProveedores(); },
+  async provDel(id){ if(!this._okBorrar())return; await DEL('kruh_proveedores?id=eq.'+id); cerrar(); this.vProveedores(); },
 
   /* ===================== MATERIA PRIMA ===================== */
   async vMateriaPrima(){
@@ -456,7 +458,7 @@ const App={
       ${id?`<button class="btn gh full" style="color:var(--bad)" onclick="App.mpDel('${id}')">Eliminar</button>`:''}`); },
   async mpSave(id){ const s=$('mp_prov'), o=s.options[s.selectedIndex], b={nombre:$('mp_nom').value.trim(),categoria:$('mp_cat').value.trim(),unidad:$('mp_uni').value.trim()||'kg',costo_unit:+$('mp_cu').value||0,stock_min:+$('mp_min').value||0,proveedor_id:s.value||null,proveedor:s.value?o.dataset.n:null};
     if(!b.nombre){alert('Nombre');return;} if(id)await PATCH('kruh_materiaprima?id=eq.'+id,b); else await POST('kruh_materiaprima',b); cerrar(); toast('Guardado'); this.vMateriaPrima(); },
-  async mpDel(id){ if(!confirm('¿Eliminar insumo?'))return; await DEL('kruh_materiaprima?id=eq.'+id); cerrar(); this.vMateriaPrima(); },
+  async mpDel(id){ if(!this._okBorrar())return; await DEL('kruh_materiaprima?id=eq.'+id); cerrar(); this.vMateriaPrima(); },
   mpMov(id,tipo){ const m=(this._mp||[]).find(x=>x.id===id)||{}; const v=prompt((tipo==='entrada'?'Cantidad que ENTRA':'Cantidad que se CONSUME')+' ('+(m.unidad||'kg')+'):'); if(v===null)return; const q=+v||0; if(q<=0)return;
     const nueva=(+m.existencias||0)+(tipo==='entrada'?q:-q); PATCH('kruh_materiaprima?id=eq.'+id,{existencias:nueva}).then(()=>{toast('Stock actualizado');this.vMateriaPrima();}); },
 
@@ -497,7 +499,7 @@ const App={
   async presSave(){ const s=$('pr_prod'), o=s.options[s.selectedIndex]; if(!o){alert('Producto');return;} const cant=+$('pr_cant').value||0;
     await POST('kruh_presupuestos',{producto_id:o.value,producto:o.dataset.n,meta_cant:cant,meta:cant*(+o.dataset.pre||0),periodo:'mes'});
     cerrar(); toast('Meta guardada'); this.vPresupuestos(); },
-  async presDel(id){ await DEL('kruh_presupuestos?id=eq.'+id); this.vPresupuestos(); },
+  async presDel(id){ if(!this._okBorrar())return; await DEL('kruh_presupuestos?id=eq.'+id); this.vPresupuestos(); },
 
   /* ===================== VENTAS (clientes, estilo Smart) ===================== */
   async vVentas(){
@@ -533,6 +535,31 @@ const App={
     <button class="btn acc full" onclick="App.ventaSave()">Guardar</button>`); },
   async ventaSave(){ const b={cliente:$('v_cli').value.trim(),telefono:$('v_tel').value.trim(),producto:$('v_pro').value.trim(),monto:+$('v_mon').value||0};
     if(!b.cliente){alert('Cliente');return;} await POST('kruh_ventas',b); cerrar(); toast('Venta registrada'); this.vVentas(); },
+
+  /* ===================== USUARIOS Y ATRIBUCIONES (solo admin) ===================== */
+  async vUsuarios(){
+    if(!this.esAdmin) return this.set('<h1>Usuarios</h1><div class="empty">Solo el Admin gestiona usuarios.</div>');
+    this.loading();
+    const us=await GET('kruh_usuarios?order=creado_en&limit=200'); this._us=us;
+    this.set(`<h1>Usuarios y atribuciones</h1><div class="sub">Cada persona con su clave, su rol y lo que puede hacer</div>
+      <button class="btn acc" onclick="App.usModal()">＋ Nuevo usuario</button>
+      <div class="card" style="background:var(--paper);font-size:12.5px"><b>Claves base (siempre activas):</b><br>Admin → <code>kruhadmin2026</code> · Gerencia → <code>kruhgerencia2026</code>. Aquí agregas usuarios con nombre y su propia clave.</div>
+      <div>${us.length?us.map(u=>`<div class="item"><div class="top"><div><div class="nm">${esc(u.nombre)} <span class="tag ${u.rol==='admin'?'np':'pe'}">${esc(u.rol)}</span> ${u.activo===false?'<span class="tag">inactivo</span>':''}</div>
+        <div class="mt">🔑 ${esc(u.clave||'—')} · ${esc(u.atribuciones||'sin atribuciones definidas')}</div></div>
+        <button class="btn gh sm" onclick="App.usModal('${u.id}')">✎</button></div></div>`).join(''):'<div class="empty">Sin usuarios adicionales aún.</div>'}</div>`);
+  },
+  usModal(id){ const u=(this._us||[]).find(x=>x.id===id)||{};
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Nuevo'} usuario</h3>
+      <div class="g2"><div><label>Nombre</label><input id="u_nom" value="${esc(u.nombre||'')}"></div>
+      <div><label>Rol</label><select id="u_rol"><option value="gerencia" ${u.rol==='gerencia'?'selected':''}>Gerencia</option><option value="admin" ${u.rol==='admin'?'selected':''}>Admin</option></select></div></div>
+      <label>Clave de acceso</label><input id="u_clave" value="${esc(u.clave||'')}">
+      <label>Atribuciones (qué puede hacer)</label><textarea id="u_atr" placeholder="Ej: maneja pedidos e inventario, no borra">${esc(u.atribuciones||'')}</textarea>
+      <label>¿Activo?</label><select id="u_act"><option value="true" ${u.activo!==false?'selected':''}>Sí</option><option value="false" ${u.activo===false?'selected':''}>No</option></select>
+      <button class="btn acc full" onclick="App.usSave('${id||''}')">Guardar</button>
+      ${id?`<button class="btn gh full" style="color:var(--bad)" onclick="App.usDel('${id}')">Eliminar</button>`:''}`); },
+  async usSave(id){ const b={nombre:$('u_nom').value.trim(),rol:$('u_rol').value,clave:$('u_clave').value.trim(),atribuciones:$('u_atr').value.trim(),activo:$('u_act').value==='true'};
+    if(!b.nombre||!b.clave){alert('Nombre y clave son obligatorios');return;} if(id)await PATCH('kruh_usuarios?id=eq.'+id,b); else await POST('kruh_usuarios',b); cerrar(); toast('Usuario guardado'); this.vUsuarios(); },
+  async usDel(id){ if(!this._okBorrar())return; await DEL('kruh_usuarios?id=eq.'+id); cerrar(); this.vUsuarios(); },
 };
 window.addEventListener('DOMContentLoaded',()=>App.init());
 </script>
