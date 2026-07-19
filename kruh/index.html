@@ -106,8 +106,8 @@ const App={
   ROLES:['admin','gerencia','cajera','panadero','bodeguero','chef'],
   get esAdmin(){ return this.rol==='admin'; },
   get puedeGestionar(){ return this.rol==='admin'||this.rol==='gerencia'; },
-  _tabsRol(){ return (this.rol==='admin'||this.rol==='gerencia')?this.TABS.map(t=>t[0]):((this._permisos||{})[this.rol]||['dashboard']); },
-  _primeraTab(){ const t=this._tabsRol(); return t.includes('dashboard')?'dashboard':(t[0]||'dashboard'); },
+  _tabsRol(){ if(this.rol==='admin') return this.TABS.map(t=>t[0]); const base=(this.rol==='gerencia')?this.TABS.map(t=>t[0]):((this._permisos||{})[this.rol]||['recetas']); return base.filter(v=>v!=='usuarios'&&v!=='dashboard'); },
+  _primeraTab(){ const t=this._tabsRol(); return t.includes('dashboard')?'dashboard':(t[0]||'recetas'); },
   async init(){ this.rol=sessionStorage.getItem('kruh_rol')||'';
     try{ const [us,pm]=await Promise.all([GET('kruh_usuarios?select=nombre,rol,clave,activo&limit=200'),GET('kruh_permisos?limit=50')]); this._usuarios=us; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]); }catch(e){ this._usuarios=[]; this._permisos={}; }
     if(!this.ROLES.includes(this.rol)){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go(this._primeraTab()); },
@@ -159,9 +159,9 @@ const App={
       <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
       ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=es?ventasM:(+m.ventas||0),cc=es?costo:(+m.costo||0),mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':''}</div>
         <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''} · meta ${money(mt)}</div></div>
-        ${this.puedeGestionar?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
+        ${this.esAdmin?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
         <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div></div>`;}).join('')}
-      ${this.puedeGestionar?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
+      ${this.esAdmin?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
   },
   dashModal(mes){ const m=(this._dash||[]).find(x=>x.mes===mes)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${mes?'Editar '+esc(mes):'Nuevo mes'}</h3>
@@ -174,8 +174,8 @@ const App={
     const b={mes:nombre,ventas:+$('d_ven').value||0,costo:+$('d_cos').value||0,meta:+$('d_meta').value||40000000,orden:(this.MESNOM.indexOf(nombre)>0?this.MESNOM.indexOf(nombre):99)};
     await fetch(SB+'/rest/v1/kruh_dashboard?on_conflict=mes',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(b)});
     cerrar(); toast('Guardado'); this.vDashboard(); },
-  nav(){ const perm=this._tabsRol(); $('nav').innerHTML=this.TABS.filter(([v])=>v==='usuarios'?this.esAdmin:perm.includes(v)).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
-  go(v){ const perm=this._tabsRol(); if(v==='usuarios'){ if(!this.esAdmin)v=this._primeraTab(); } else if(!perm.includes(v))v=this._primeraTab();
+  nav(){ const perm=this._tabsRol(); $('nav').innerHTML=this.TABS.filter(([v])=>perm.includes(v)).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
+  go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
     ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,presupuestos:this.vPresupuestos,ventas:this.vVentas,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ $('main').className=''; $('main').innerHTML=h; },
@@ -228,6 +228,7 @@ const App={
       <div><label>¿Perecedero?</label><select id="p_per"><option value="true" ${p.perecedero!==false?'selected':''}>Sí</option><option value="false" ${p.perecedero===false?'selected':''}>No</option></select></div></div>
       <div class="g2"><div><label>Precio de venta</label><input id="p_pre" type="number" value="${p.precio||0}"></div>
       <div><label>IVA %</label><input id="p_iva" type="number" value="${p.iva_pct||0}"></div></div>
+      <label>Stock mínimo (alerta de inventario)</label><input id="p_min" type="number" value="${p.inv_min||0}">
       <label>Foto del producto</label>
       <div class="row" style="gap:8px"><input id="p_foto" value="${esc(p.foto_url||'')}" placeholder="URL o sube una foto" style="flex:1">
       <label class="btn gh sm" style="cursor:pointer;white-space:nowrap">📷 Adicionar<input type="file" accept="image/*" style="display:none" onchange="App.subirFoto(this,'${id||''}')"></label></div>
@@ -236,7 +237,7 @@ const App={
       <div class="hint">Los ingredientes y los pasos se agregan en el cajón del producto.</div>
       ${id?`<button class="btn gh full" onclick="App.prodDel('${id}')" style="color:var(--bad)">Eliminar producto</button>`:''}`);
   },
-  async prodSave(id){ const b={nombre:$('p_nom').value.trim(),categoria:$('p_cat').value.trim(),presentacion:$('p_pres').value.trim(),peso:+$('p_peso').value||0,unidad:$('p_uni').value.trim()||'g',precio:+$('p_pre').value||0,iva_pct:+$('p_iva').value||0,perecedero:$('p_per').value==='true',foto_url:$('p_foto').value.trim()};
+  async prodSave(id){ const b={nombre:$('p_nom').value.trim(),categoria:$('p_cat').value.trim(),presentacion:$('p_pres').value.trim(),peso:+$('p_peso').value||0,unidad:$('p_uni').value.trim()||'g',precio:+$('p_pre').value||0,iva_pct:+$('p_iva').value||0,inv_min:+$('p_min').value||0,perecedero:$('p_per').value==='true',foto_url:$('p_foto').value.trim()};
     if(!b.nombre){alert('Ponle nombre');return;} if(id) await PATCH('kruh_productos?id=eq.'+id,b); else await POST('kruh_productos',b);
     cerrar(); toast('Guardado · ya está en el catálogo'); this.vRecetas(); },
   async prodDel(id){ if(!this._okBorrar())return; await DEL('kruh_recetas?producto_id=eq.'+id); await DEL('kruh_productos?id=eq.'+id); cerrar(); toast('Eliminado'); this.vRecetas(); },
@@ -372,21 +373,23 @@ const App={
     const salBy={}; movs.forEach(m=>{ if(m.tipo==='salida' && new Date(m.creado_en)>=d30){ salBy[m.producto_id]=(salBy[m.producto_id]||0)+(+m.cantidad||0);} });
     const tab=this._invTab||'exist'; this._invTab=tab;
     const cobRows=prods.map(p=>{ const cons=(salBy[p.id]||0)/30; const dias=cons>0?(+p.existencias||0)/cons:null; return {p,cons,dias}; });
-    const bajos=cobRows.filter(r=>r.dias!==null && r.dias<3);
-    this.set(`<h1>Inventario</h1><div class="sub">Sube producción; los pedidos descuentan solo. El índice de cobertura te dice para cuántos días alcanza.</div>
+    const bajoMin=prods.filter(p=>(+p.inv_min||0)>0 && (+p.existencias||0)<=(+p.inv_min||0));
+    this.set(`<h1>Inventario</h1><div class="sub">Sube producción; los pedidos descuentan solo. Alerta cuando un producto baja de su mínimo.</div>
+      ${bajoMin.length?`<div class="card" style="border-left:4px solid var(--bad);background:var(--badbg)"><b style="color:var(--bad)">⚠️ ${bajoMin.length} producto(s) en o bajo el mínimo</b><div style="font-size:12.5px;margin-top:4px">${bajoMin.map(p=>esc(p.nombre)+' ('+num(p.existencias)+'/'+num(p.inv_min)+')').join(' · ')}</div></div>`:''}
       <div class="kpis"><div class="kpi"><b>${prods.length}</b><span>Productos</span></div>
-        <div class="kpi ${bajos.length?'':''}"><b style="color:${bajos.length?'var(--bad)':'var(--ok)'}">${bajos.length}</b><span>Cobertura &lt; 3 días</span></div>
+        <div class="kpi"><b style="color:${bajoMin.length?'var(--bad)':'var(--ok)'}">${bajoMin.length}</b><span>Bajo mínimo</span></div>
         <div class="kpi dark"><b>${money(prods.reduce((a,p)=>a+(+p.existencias||0)*(+p.precio||0),0))}</b><span>Valor en existencias</span></div></div>
-      <div class="row" style="gap:6px;margin-bottom:10px"><button class="et ${tab==='exist'?'on':''}" onclick="App._invTab='exist';App.vInventario()">Existencias + cobertura</button>
+      <div class="row" style="gap:6px;margin-bottom:10px"><button class="et ${tab==='exist'?'on':''}" onclick="App._invTab='exist';App.vInventario()">Existencias</button>
         <button class="et ${tab==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button></div>
       ${tab==='exist'?
-        (prods.length?`<div class="grid" style="grid-template-columns:repeat(2,1fr)">${cobRows.map(({p,cons,dias})=>{ const pct=dias===null?0:Math.min(100,dias/7*100); const col=dias===null?'var(--mut)':(dias<3?'var(--bad)':(dias<7?'var(--warn)':'var(--ok)'));
-          return `<div class="card" style="padding:11px 12px;margin:0"><div style="font-weight:700;font-size:13px;line-height:1.2">${esc(p.nombre)}</div>
-            <div class="row" style="justify-content:space-between;margin-top:3px"><b style="font-size:18px">${num(p.existencias)} <small class="dim" style="font-size:11px;font-weight:400">${esc(p.unidad||'')}</small></b><span style="font-size:12px;color:${col};font-weight:700">${dias===null?'—':dias.toFixed(0)+'d'}</span></div>
-            <div class="bar" style="margin-top:5px"><i style="width:${pct}%;background:${col}"></i></div>
+        (prods.length?`<div class="grid" style="grid-template-columns:repeat(2,1fr)">${cobRows.map(({p,cons,dias})=>{ const bm=(+p.inv_min||0)>0&&(+p.existencias||0)<=(+p.inv_min||0); const pct=dias===null?0:Math.min(100,dias/7*100); const col=bm?'var(--bad)':(dias===null?'var(--mut)':(dias<3?'var(--bad)':(dias<7?'var(--warn)':'var(--ok)')));
+          return `<div class="card" style="padding:11px 12px;margin:0;${bm?'border:1px solid var(--bad)':''}"><div style="font-weight:700;font-size:13px;line-height:1.2">${esc(p.nombre)}</div>
+            <div class="row" style="justify-content:space-between;margin-top:3px"><b style="font-size:18px;color:${bm?'var(--bad)':'var(--ink)'}">${num(p.existencias)} <small class="dim" style="font-size:11px;font-weight:400">${esc(p.unidad||'')}</small></b><span style="font-size:11px;color:${col};font-weight:700">${dias===null?'':dias.toFixed(0)+'d'}</span></div>
+            <div class="dim" style="font-size:10.5px">mín ${num(p.inv_min)}${bm?' · <b style="color:var(--bad)">BAJO</b>':''}</div>
+            <div class="bar" style="margin-top:4px"><i style="width:${pct}%;background:${col}"></i></div>
             <div class="row" style="gap:5px;margin-top:8px"><button class="btn acc sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','entrada')">＋</button>
               <button class="btn gh sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','salida')">−</button></div></div>`;}).join('')}</div>`:'<div class="empty">Sin productos.</div>')
-        : (movs.length?movs.slice(0,200).map(m=>{const p=prods.find(x=>x.id===m.producto_id);return `<div class="item"><div class="top"><div><div class="nm">${m.tipo==='entrada'?'⬆️':'⬇️'} ${esc(p?p.nombre:'—')}</div><div class="mt">${esc(m.motivo||'')} · ${(m.creado_en||'').slice(0,16).replace('T',' ')}</div></div><div class="nm" style="color:${m.tipo==='entrada'?'var(--ok)':'var(--bad)'}">${m.tipo==='entrada'?'+':'−'}${num(m.cantidad)}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')}`);
+        : (movs.length?movs.slice(0,300).map(m=>{const p=prods.find(x=>x.id===m.producto_id);return `<div class="item"><div class="top"><div><div class="nm">${m.tipo==='entrada'?'⬆️':'⬇️'} ${esc(p?p.nombre:'—')}</div><div class="mt">${esc(m.motivo||'')} · 📅 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div><div class="nm" style="color:${m.tipo==='entrada'?'var(--ok)':'var(--bad)'}">${m.tipo==='entrada'?'+':'−'}${num(m.cantidad)}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')}`);
   },
   movModal(id,tipo){ const p=(this._prods||[]).find(x=>x.id===id)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${tipo==='entrada'?'Subir producción':'Registrar salida/merma'} · ${esc(p.nombre||'')}</h3>
