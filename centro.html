@@ -160,29 +160,36 @@ async vResumen(){
   const inf=(await api('nc_infra?select=*&limit=1'))[0]||null;
   const segBy={}; cuentas.forEach(c=>segBy[c.cliente]=(segBy[c.cliente]||0)+(+c.seguidores||0));
   const emp=[
-   {n:'Feroz',bot:'feroz',d:'Botas de dotación · distribuidores',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=feroz'},
-   {n:'Smart',bot:'smart',d:'Envases herméticos · B2B',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=smart'},
-   {n:'KRUH',bot:null,d:'Panadería → restaurante',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/kruh/'},
-   {n:'Fresco a tu Casa',bot:null,d:'Modalidad propia NC · mercado fresco a domicilio (1er cliente: CODABAS)',u:'https://negocioscuanticoscol-create.github.io/DeCodabasATuCasa/'},
-   {n:'FES Fueling',bot:null,d:'ERP repuestos cisternas',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/fesfueling/'},
-   {n:'ZARRAT',bot:null,d:'Atelier de moda a la medida',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/zarrat/'},
+   {n:'Feroz',g:'app',bot:'feroz',d:'Botas de dotación · distribuidores',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=feroz'},
+   {n:'Smart',g:'app',bot:'smart',d:'Envases herméticos · B2B',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=smart'},
+   {n:'Fresco a tu Casa',g:'app',bot:null,d:'Mercado fresco a domicilio (1er cliente: CODABAS)',u:'https://negocioscuanticoscol-create.github.io/DeCodabasATuCasa/'},
+   {n:'ZARRAT',g:'cli',bot:null,d:'Atelier de moda a la medida',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/zarrat/'},
+   {n:'FES Fueling',g:'cli',bot:null,d:'ERP repuestos cisternas',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/fesfueling/'},
+   {n:'KRUH',g:'cli',bot:null,d:'Panadería → restaurante',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/kruh/'},
   ];
   const totLeads=(leadsBy.smart||0)+(leadsBy.feroz||0);
   const totSeg=cuentas.reduce((a,c)=>a+(+c.seguidores||0),0);
-  $('main').innerHTML=`<h1>📊 Resumen · todas las empresas</h1>
-    <div class="sub">La foto de Negocios Cuánticos en un vistazo.</div>
+  const nApp=emp.filter(e=>e.g==='app').length, nCli=emp.filter(e=>e.g==='cli').length;
+  const card=e=>{ const lm=e.bot?(leadsBy[e.bot]||0):null; const seg=segBy[e.n]||0;
+    return `<div class="empc" ${e.u?`onclick="window.open('${e.u}','_blank')" style="cursor:pointer"`:''}>
+      <div class="en">${esc(e.n)}</div><div class="ed">${esc(e.d)}</div>
+      <div style="display:flex;gap:14px;margin-top:10px;font-size:12.5px">
+        ${lm!=null?`<span>💬 <b style="color:var(--ok)">${nm(lm)}</b> leads/mes</span>`:'<span style="color:var(--faint)">sin bot</span>'}
+        ${seg?`<span>👥 <b>${nm(seg)}</b></span>`:''}</div>
+      ${e.u?'<span class="go">Abrir →</span>':''}</div>`; };
+  const grupo=g=>`<div class="emp">${emp.filter(e=>e.g===g).map(card).join('')}</div>`;
+  const sech='font-size:14px;font-weight:800;margin:22px 0 8px;letter-spacing:.3px';
+  $('main').innerHTML=`<h1>📊 Resumen · Negocios Cuánticos</h1>
+    <div class="sub">La foto de NC en un vistazo.</div>
     <div class="kpis">
       <div class="kpi ok"><b>${nm(totLeads)}</b><span>Leads de bots este mes</span></div>
       <div class="kpi acc"><b>${nm(totSeg)}</b><span>Seguidores (total)</span></div>
-      <div class="kpi azul"><b>${emp.length}</b><span>Empresas</span></div>
+      <div class="kpi azul"><b>${nApp} · ${nCli}</b><span>Apps propias · Clientes</span></div>
     </div>
-    <div class="emp">${emp.map(e=>{ const lm=e.bot?(leadsBy[e.bot]||0):null; const seg=segBy[e.n]||0;
-      return `<div class="empc" ${e.u?`onclick="window.open('${e.u}','_blank')" style="cursor:pointer"`:''}>
-        <div class="en">${esc(e.n)}</div><div class="ed">${esc(e.d)}</div>
-        <div style="display:flex;gap:14px;margin-top:10px;font-size:12.5px">
-          ${lm!=null?`<span>💬 <b style="color:var(--ok)">${nm(lm)}</b> leads/mes</span>`:'<span style="color:var(--faint)">sin bot</span>'}
-          ${seg?`<span>👥 <b>${nm(seg)}</b></span>`:''}</div>
-        ${e.u?'<span class="go">Abrir →</span>':''}</div>`; }).join('')}</div>
+    <h2 style="${sech}">👥 Clientes <span style="color:var(--faint);font-weight:600">· Motor Cuántico</span></h2>
+    ${grupo('cli')}
+    <h2 style="${sech}">📱 Aplicaciones <span style="color:var(--faint);font-weight:600">· plataformas propias NC</span></h2>
+    ${grupo('app')}
     ${inf?(()=>{ const bar=(pct,warn80)=>`<div style="height:9px;background:#ece8e0;border-radius:6px;overflow:hidden;margin-top:5px"><i style="display:block;height:100%;width:${Math.min(100,pct)}%;background:${pct>=80?'#d22':(pct>=60?'#e8a30c':'#2e9e4f')}"></i></div>`;
       const cli=Object.entries(inf.por_cliente||{}).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc(k)} <b>${v}MB</b>`).join(' · ');
       const alerta=inf.db_pct>=80||inf.storage_pct>=80;
