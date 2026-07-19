@@ -272,8 +272,9 @@ const App={
   /* ===================== PEDIDOS (catálogo con foto + carrito) ===================== */
   async vPedidos(){
     this.loading();
-    const [prods,peds]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_pedidos?order=creado_en.desc&limit=100')]);
+    const [prods,peds,leads]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_pedidos?order=creado_en.desc&limit=100'),GET('kruh_leads?select=nombre,telefono&limit=3000')]);
     this._prods=prods; this._peds=peds; this._cart=this._cart||{};
+    this._telMap={}; leads.forEach(l=>{ const t=(l.telefono||'').replace(/\D/g,''); if(t)this._telMap[t]=l.nombre; });
     this._pedPaint();
   },
   _pedPaint(){
@@ -293,7 +294,7 @@ const App={
         <div style="flex:0 0 228px;position:sticky;top:58px" class="card">
           <div style="font-family:Fraunces,serif;font-size:17px;margin-bottom:8px">La cuenta</div>
           <input id="pd_cli" placeholder="Cliente" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App._cartCli=this.value">
-          <input id="pd_tel" placeholder="Teléfono" value="${esc(this._cartTel||'')}" oninput="App._cartTel=this.value">
+          <input id="pd_tel" placeholder="Teléfono" value="${esc(this._cartTel||'')}" oninput="App._cartTel=this.value;App.pedTelLookup(this.value)">
           <div style="margin-top:10px;font-size:13px">
             <div class="row" style="justify-content:space-between"><span class="dim">Productos</span><b>${nItems}</b></div>
             <div class="row" style="justify-content:space-between"><span class="dim">Subtotal</span><b>${money(sub)}</b></div>
@@ -310,6 +311,7 @@ const App={
         <div class="mt">${it.map(i=>esc(i.nombre)+' ×'+i.qty).join(' · ')||''} · 📅 ${(p.creado_en||'').slice(0,10)}</div></div>
         <div class="nm" style="color:var(--acc)">${money(p.total)}</div></div></div>`;}).join(''):'<div class="empty">Aún sin pedidos guardados.</div>'}`);
   },
+  pedTelLookup(v){ const t=(v||'').replace(/\D/g,''); if(t.length<7)return; const nom=(this._telMap||{})[t]; if(nom){ this._cartCli=nom; if($('pd_cli'))$('pd_cli').value=nom; } },
   cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value;
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
   async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; let total=0;
@@ -377,13 +379,12 @@ const App={
       <div class="row" style="gap:6px;margin-bottom:10px"><button class="et ${tab==='exist'?'on':''}" onclick="App._invTab='exist';App.vInventario()">Existencias + cobertura</button>
         <button class="et ${tab==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button></div>
       ${tab==='exist'?
-        (prods.length?cobRows.map(({p,cons,dias})=>{ const pct=dias===null?0:Math.min(100,dias/7*100); const col=dias===null?'var(--mut)':(dias<3?'var(--bad)':(dias<7?'var(--warn)':'var(--ok)'));
-          return `<div class="item"><div class="top"><div><div class="nm">${esc(p.nombre)}</div>
-            <div class="mt">Existencias: <b>${num(p.existencias)}</b> ${esc(p.unidad||'')} · consumo ~${cons.toFixed(1)}/día</div></div>
-            <div style="text-align:right"><div class="nm" style="color:${col}">${dias===null?'sin ventas':dias.toFixed(1)+' días'}</div><span class="hint">cobertura</span></div></div>
-            <div class="bar"><i style="width:${pct}%;background:${col}"></i></div>
-            <div class="row" style="margin-top:9px"><button class="btn acc sm" onclick="App.movModal('${p.id}','entrada')">＋ Producción</button>
-              <button class="btn gh sm" onclick="App.movModal('${p.id}','salida')">− Salida/merma</button></div></div>`;}).join(''):'<div class="empty">Sin productos.</div>')
+        (prods.length?`<div class="grid" style="grid-template-columns:repeat(2,1fr)">${cobRows.map(({p,cons,dias})=>{ const pct=dias===null?0:Math.min(100,dias/7*100); const col=dias===null?'var(--mut)':(dias<3?'var(--bad)':(dias<7?'var(--warn)':'var(--ok)'));
+          return `<div class="card" style="padding:11px 12px;margin:0"><div style="font-weight:700;font-size:13px;line-height:1.2">${esc(p.nombre)}</div>
+            <div class="row" style="justify-content:space-between;margin-top:3px"><b style="font-size:18px">${num(p.existencias)} <small class="dim" style="font-size:11px;font-weight:400">${esc(p.unidad||'')}</small></b><span style="font-size:12px;color:${col};font-weight:700">${dias===null?'—':dias.toFixed(0)+'d'}</span></div>
+            <div class="bar" style="margin-top:5px"><i style="width:${pct}%;background:${col}"></i></div>
+            <div class="row" style="gap:5px;margin-top:8px"><button class="btn acc sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','entrada')">＋</button>
+              <button class="btn gh sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','salida')">−</button></div></div>`;}).join('')}</div>`:'<div class="empty">Sin productos.</div>')
         : (movs.length?movs.slice(0,200).map(m=>{const p=prods.find(x=>x.id===m.producto_id);return `<div class="item"><div class="top"><div><div class="nm">${m.tipo==='entrada'?'⬆️':'⬇️'} ${esc(p?p.nombre:'—')}</div><div class="mt">${esc(m.motivo||'')} · ${(m.creado_en||'').slice(0,16).replace('T',' ')}</div></div><div class="nm" style="color:${m.tipo==='entrada'?'var(--ok)':'var(--bad)'}">${m.tipo==='entrada'?'+':'−'}${num(m.cantidad)}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')}`);
   },
   movModal(id,tipo){ const p=(this._prods||[]).find(x=>x.id===id)||{};
@@ -399,21 +400,63 @@ const App={
   /* ===================== PROVEEDORES ===================== */
   async vProveedores(){
     this.loading();
-    const provs=await GET('kruh_proveedores?order=categoria,nombre&limit=2000'); this._provs=provs;
-    const cats=[...new Set(provs.map(p=>p.categoria||'Sin categoría'))];
-    this.set(`<h1>Proveedores</h1><div class="sub">Directorio de restaurante · qué provee, categoría, condiciones de pago y contacto</div>
-      <button class="btn acc" onclick="App.provModal()">＋ Nuevo proveedor</button>
-      ${provs.length?cats.map(cat=>`<div style="margin-top:14px"><div class="tag" style="margin-bottom:8px">${esc(cat)}</div>
-        ${provs.filter(p=>(p.categoria||'Sin categoría')===cat).map(p=>`<div class="item" style="cursor:pointer" onclick="App._provOpen=App._provOpen==='${p.id}'?'':'${p.id}';App.vProveedores()">
-        <div class="top"><div><div class="nm">${esc(p.nombre)}</div><div class="mt">${esc(p.provee||'—')}${p.telefono?' · 📱 '+esc(p.telefono):''}</div></div>
-        <span class="tag">${p.valor?money(p.valor)+'/'+esc(p.unidad||'und'):'—'}</span></div>
-        ${this._provOpen===p.id?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px;font-size:13px;line-height:1.7">
-          <div><b>Provee:</b> ${esc(p.provee||'—')} · <b>Unidad:</b> ${esc(p.unidad||'—')} · <b>Valor:</b> ${money(p.valor)}</div>
-          <div><b>NIT:</b> ${esc(p.nit||'—')} · <b>Pago:</b> ${esc(p.condicion_pago||'—')}${p.dias_credito?' ('+p.dias_credito+' días)':''}</div>
-          <div><b>Frecuencia:</b> ${esc(p.frecuencia||'—')} · <b>Pedido mín.:</b> ${p.pedido_minimo?money(p.pedido_minimo):'—'}</div>
-          <div><b>Contacto:</b> ${esc(p.contacto||'—')}${p.email?' · '+esc(p.email):''}</div>${p.notas?`<div><b>Notas:</b> ${esc(p.notas)}</div>`:''}
-          <button class="btn gh sm" style="margin-top:8px" onclick="event.stopPropagation();App.provModal('${p.id}')">✎ Editar</button></div>`:''}</div>`).join('')}</div>`).join(''):'<div class="empty">Sin proveedores aún.</div>'}`);
+    const [provs,pp]=await Promise.all([GET('kruh_proveedores?order=categoria,nombre&limit=2000'),GET('kruh_prov_productos?order=nombre&limit=5000')]);
+    this._provs=provs; this._pp=pp;
+    const ppBy={}; pp.forEach(x=>{(ppBy[x.proveedor_id]=ppBy[x.proveedor_id]||[]).push(x);});
+    const caj=this._provTab||'dir';
+    this.set(`<h1>Proveedores</h1><div class="sub">Directorio y registro de compras de materia prima</div>
+      <div class="row" style="gap:10px;margin-bottom:12px">
+        <div class="cajon ${caj==='dir'?'on':''}" onclick="App._provTab='dir';App.vProveedores()"><b>${provs.length}</b>🚚 Proveedores</div>
+        <div class="cajon ${caj==='compra'?'on':''}" onclick="App._provTab='compra';App.vProveedores()">🛒 Registrar materia prima</div></div>
+      ${caj==='compra'?this._provCompraHTML(provs):this._provDirHTML(provs,ppBy)}`);
   },
+  _provDirHTML(provs,ppBy){
+    const cats=[...new Set(provs.map(p=>p.categoria||'Sin categoría'))];
+    return `<button class="btn acc" onclick="App.provModal()">＋ Registrar proveedor</button>
+      ${provs.length?cats.map(cat=>`<div style="margin-top:14px"><div class="tag" style="margin-bottom:8px">${esc(cat)}</div>
+        ${provs.filter(p=>(p.categoria||'Sin categoría')===cat).map(p=>{const prods=ppBy[p.id]||[];return `<div class="item" style="cursor:pointer" onclick="App._provOpen=App._provOpen==='${p.id}'?'':'${p.id}';App.vProveedores()">
+        <div class="top"><div><div class="nm">${esc(p.nombre)}</div><div class="mt">${prods.length} producto(s)${p.telefono?' · 📱 '+esc(p.telefono):''}</div></div>
+        <span class="tag">${esc(p.condicion_pago||'')}</span></div>
+        ${this._provOpen===p.id?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px;font-size:13px;line-height:1.6" onclick="event.stopPropagation()">
+          <div><b>NIT:</b> ${esc(p.nit||'—')} · <b>Pago:</b> ${esc(p.condicion_pago||'—')}${p.dias_credito?' ('+p.dias_credito+'d)':''} · <b>Frec.:</b> ${esc(p.frecuencia||'—')}</div>
+          <div><b>Contacto:</b> ${esc(p.contacto||'—')}${p.email?' · '+esc(p.email):''}</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mut);margin:8px 0 4px">Productos que provee</div>
+          ${prods.length?prods.map(x=>`<div class="row" style="justify-content:space-between;padding:2px 0"><span>• ${esc(x.nombre)} <small class="dim">${money(x.valor)}/${esc(x.unidad||'kg')}</small></span><span style="white-space:nowrap"><a onclick="App.provProdModal('${p.id}','${x.id}')" style="color:var(--acc);cursor:pointer;margin-right:6px">✎</a><a onclick="App.provProdDel('${x.id}')" style="color:var(--bad);cursor:pointer">✕</a></span></div>`).join(''):'<div class="hint">Sin productos aún.</div>'}
+          <button class="btn gh sm full" onclick="App.provProdModal('${p.id}')">＋ Agregar producto</button>
+          <button class="btn gh sm" style="margin-top:8px" onclick="App.provModal('${p.id}')">✎ Editar proveedor</button></div>`:''}</div>`;}).join('')}</div>`).join(''):'<div class="empty">Sin proveedores aún.</div>'}`;
+  },
+  _provCompraHTML(provs){
+    return `<div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:8px">Registrar compra de materia prima</div>
+      <label>1. Llama al proveedor</label>
+      <select id="cp_prov" onchange="App.cpProds()"><option value="">— elige proveedor —</option>${provs.map(p=>`<option value="${p.id}">${esc(p.nombre)}</option>`).join('')}</select>
+      <div id="cp_wrap" style="display:none;margin-top:8px">
+        <label>2. Escoge el producto que tiene</label>
+        <select id="cp_prod" onchange="App.cpPre()"></select>
+        <div class="g2"><div><label>Cantidad</label><input id="cp_cant" type="number"></div>
+        <div><label>Precio x unidad</label><input id="cp_precio" type="number"></div></div>
+        <button class="btn acc full" onclick="App.cpSave()">Registrar compra → materia prima</button></div></div>
+      <div class="hint">La compra suma al stock de materia prima y actualiza su costo, que alimenta las recetas.</div>`;
+  },
+  cpProds(){ const pid=$('cp_prov').value, prods=(this._pp||[]).filter(x=>x.proveedor_id===pid), w=$('cp_wrap'); if(!pid){w.style.display='none';return;} w.style.display='block';
+    $('cp_prod').innerHTML=prods.length?prods.map(x=>`<option value="${x.id}" data-n="${esc(x.nombre)}" data-uni="${esc(x.unidad||'kg')}" data-val="${x.valor||0}">${esc(x.nombre)} · ${money(x.valor)}/${esc(x.unidad||'kg')}</option>`).join(''):'<option value="">— sin productos; agrégalos en el directorio del proveedor —</option>'; this.cpPre(); },
+  cpPre(){ const s=$('cp_prod'), o=s&&s.options[s.selectedIndex]; if(o&&o.dataset&&o.dataset.val&&$('cp_precio')&&!$('cp_precio').value)$('cp_precio').value=o.dataset.val; },
+  async cpSave(){ const s=$('cp_prod'), o=s.options[s.selectedIndex]; if(!o||!o.value){alert('Escoge un producto');return;}
+    const cant=+$('cp_cant').value||0, precio=+$('cp_precio').value||0; if(cant<=0){alert('Pon la cantidad');return;}
+    const pid=$('cp_prov').value, provNom=((this._provs||[]).find(x=>x.id===pid)||{}).nombre||'';
+    const ex=(await GET('kruh_materiaprima?prov_producto_id=eq.'+o.value+'&select=id,existencias'))[0];
+    if(ex) await PATCH('kruh_materiaprima?id=eq.'+ex.id,{existencias:(+ex.existencias||0)+cant,costo_unit:precio,proveedor:provNom});
+    else await POST('kruh_materiaprima',{nombre:o.dataset.n,unidad:o.dataset.uni,existencias:cant,costo_unit:precio,proveedor_id:pid,proveedor:provNom,prov_producto_id:o.value});
+    toast('Compra registrada · materia prima actualizada'); this.go('materiaprima'); },
+  provProdModal(provId,id){ const x=(this._pp||[]).find(y=>y.id===id)||{};
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Agregar'} producto del proveedor</h3>
+      <label>Producto</label><input id="pp_nom" value="${esc(x.nombre||'')}" placeholder="Harina de trigo…">
+      <div class="g2"><div><label>Unidad</label><input id="pp_uni" value="${esc(x.unidad||'kg')}"></div>
+      <div><label>Valor</label><input id="pp_val" type="number" value="${x.valor||0}"></div></div>
+      <button class="btn acc full" onclick="App.provProdSave('${provId}','${id||''}')">Guardar</button>`); },
+  async provProdSave(provId,id){ const nom=$('pp_nom').value.trim(); if(!nom){alert('Producto');return;}
+    const provNom=((this._provs||[]).find(x=>x.id===provId)||{}).nombre||'', b={proveedor_id:provId,proveedor:provNom,nombre:nom,unidad:$('pp_uni').value.trim()||'kg',valor:+$('pp_val').value||0};
+    if(id)await PATCH('kruh_prov_productos?id=eq.'+id,b); else await POST('kruh_prov_productos',b); cerrar(); toast('Producto guardado'); this.vProveedores(); },
+  async provProdDel(id){ if(!this._okBorrar())return; await DEL('kruh_prov_productos?id=eq.'+id); this.vProveedores(); },
   provModal(id){ const p=(this._provs||[]).find(x=>x.id===id)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Nuevo'} proveedor</h3>
       <div class="g2"><div><label>Nombre / Empresa</label><input id="pv_nom" value="${esc(p.nombre||'')}"></div>
@@ -442,18 +485,27 @@ const App={
     this._mp=mp; this._provs=provs;
     const bajos=mp.filter(m=>(+m.existencias||0)<=(+m.stock_min||0)&&(+m.stock_min||0)>0);
     const valor=mp.reduce((a,m)=>a+(+m.existencias||0)*(+m.costo_unit||0),0);
+    const caj=this._mpTab||'lista';
     this.set(`<h1>Materia prima</h1><div class="sub">Insumos que compras a proveedores · stock, costo y mínimo</div>
       <div class="kpis"><div class="kpi"><b>${mp.length}</b><span>Insumos</span></div>
         <div class="kpi"><b style="color:${bajos.length?'var(--bad)':'var(--ok)'}">${bajos.length}</b><span>Bajo mínimo</span></div>
         <div class="kpi dark"><b>${money(valor)}</b><span>Valor en materia prima</span></div></div>
-      <button class="btn acc" onclick="App.mpModal()">＋ Nuevo insumo</button>
-      <div style="margin-top:12px">${mp.length?mp.map(m=>{const bajo=(+m.existencias||0)<=(+m.stock_min||0)&&(+m.stock_min||0)>0;return `<div class="item" style="${bajo?'border-left:3px solid var(--bad)':''}"><div class="top"><div>
+      <div class="row" style="gap:10px;margin-bottom:12px">
+        <div class="cajon ${caj==='lista'?'on':''}" onclick="App._mpTab='lista';App.vMateriaPrima()">📦 Insumos</div>
+        <div class="cajon ${caj==='nuevo'?'on':''}" onclick="App._mpTab='nuevo';App.vMateriaPrima()">＋ Nuevo insumo</div></div>
+      ${caj==='nuevo'?this._mpNuevoHTML(provs):this._mpListaHTML(mp)}`);
+  },
+  _mpNuevoHTML(provs){ return `<div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:8px">Nuevo insumo</div>
+    <div class="g2"><div><label>Nombre</label><input id="mp_nom"></div><div><label>Categoría</label><input id="mp_cat" placeholder="Harinas, Lácteos…"></div></div>
+    <div class="g3"><div><label>Unidad</label><input id="mp_uni" value="kg"></div><div><label>Costo x unidad</label><input id="mp_cu" type="number" value="0"></div><div><label>Stock mínimo</label><input id="mp_min" type="number" value="0"></div></div>
+    <label>Proveedor</label><select id="mp_prov"><option value="">—</option>${provs.map(pv=>`<option value="${pv.id}" data-n="${esc(pv.nombre)}">${esc(pv.nombre)}</option>`).join('')}</select>
+    <button class="btn acc full" onclick="App.mpSave('')">Guardar insumo</button></div>`; },
+  _mpListaHTML(mp){ return `${mp.length?mp.map(m=>{const bajo=(+m.existencias||0)<=(+m.stock_min||0)&&(+m.stock_min||0)>0;return `<div class="item" style="${bajo?'border-left:3px solid var(--bad)':''}"><div class="top"><div>
         <div class="nm">${esc(m.nombre)}</div><div class="mt">${esc(m.categoria||'')}${m.proveedor?' · 🚚 '+esc(m.proveedor):''} · ${money(m.costo_unit)}/${esc(m.unidad||'kg')}</div></div>
         <div style="text-align:right"><div class="nm" style="color:${bajo?'var(--bad)':'var(--ink)'}">${num(m.existencias)} ${esc(m.unidad||'kg')}</div>${bajo?'<span class="tag pe">bajo</span>':''}</div></div>
         <div class="row" style="margin-top:9px"><button class="btn acc sm" onclick="App.mpMov('${m.id}','entrada')">＋ Compra</button>
           <button class="btn gh sm" onclick="App.mpMov('${m.id}','salida')">− Consumo</button>
-          ${this.esAdmin?`<button class="btn gh sm" onclick="App.mpModal('${m.id}')">✎</button>`:''}</div></div>`;}).join(''):'<div class="empty">Sin materia prima. Agrega el primer insumo.</div>'}</div>`);
-  },
+          <button class="btn gh sm" onclick="App.mpModal('${m.id}')">✎ Editar</button></div></div>`;}).join(''):'<div class="empty">Sin materia prima. Crea el primer insumo o regístralo desde una compra en Proveedores.</div>'}`; },
   mpModal(id){ const m=(this._mp||[]).find(x=>x.id===id)||{}, provs=this._provs||[];
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Nuevo'} insumo</h3>
       <div class="g2"><div><label>Nombre</label><input id="mp_nom" value="${esc(m.nombre||'')}"></div>
@@ -465,7 +517,7 @@ const App={
       <button class="btn acc full" onclick="App.mpSave('${id||''}')">Guardar</button>
       ${id?`<button class="btn gh full" style="color:var(--bad)" onclick="App.mpDel('${id}')">Eliminar</button>`:''}`); },
   async mpSave(id){ const s=$('mp_prov'), o=s.options[s.selectedIndex], b={nombre:$('mp_nom').value.trim(),categoria:$('mp_cat').value.trim(),unidad:$('mp_uni').value.trim()||'kg',costo_unit:+$('mp_cu').value||0,stock_min:+$('mp_min').value||0,proveedor_id:s.value||null,proveedor:s.value?o.dataset.n:null};
-    if(!b.nombre){alert('Nombre');return;} if(id)await PATCH('kruh_materiaprima?id=eq.'+id,b); else await POST('kruh_materiaprima',b); cerrar(); toast('Guardado'); this.vMateriaPrima(); },
+    if(!b.nombre){alert('Nombre');return;} if(id)await PATCH('kruh_materiaprima?id=eq.'+id,b); else await POST('kruh_materiaprima',b); cerrar(); toast('Guardado'); this._mpTab='lista'; this.vMateriaPrima(); },
   async mpDel(id){ if(!this._okBorrar())return; await DEL('kruh_materiaprima?id=eq.'+id); cerrar(); this.vMateriaPrima(); },
   mpMov(id,tipo){ const m=(this._mp||[]).find(x=>x.id===id)||{}; const v=prompt((tipo==='entrada'?'Cantidad que ENTRA':'Cantidad que se CONSUME')+' ('+(m.unidad||'kg')+'):'); if(v===null)return; const q=+v||0; if(q<=0)return;
     const nueva=(+m.existencias||0)+(tipo==='entrada'?q:-q); PATCH('kruh_materiaprima?id=eq.'+id,{existencias:nueva}).then(()=>{toast('Stock actualizado');this.vMateriaPrima();}); },
