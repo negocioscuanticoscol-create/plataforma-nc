@@ -105,6 +105,7 @@ const App={
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
   ROLES:['admin','gerencia','cajera','panadero','bodeguero','chef'],
   get esAdmin(){ return this.rol==='admin'; },
+  get puedeGestionar(){ return this.rol==='admin'||this.rol==='gerencia'; },
   _tabsRol(){ return (this.rol==='admin'||this.rol==='gerencia')?this.TABS.map(t=>t[0]):((this._permisos||{})[this.rol]||['dashboard']); },
   _primeraTab(){ const t=this._tabsRol(); return t.includes('dashboard')?'dashboard':(t[0]||'dashboard'); },
   async init(){ this.rol=sessionStorage.getItem('kruh_rol')||'';
@@ -158,9 +159,9 @@ const App={
       <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
       ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=es?ventasM:(+m.ventas||0),cc=es?costo:(+m.costo||0),mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':''}</div>
         <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''} · meta ${money(mt)}</div></div>
-        ${this.esAdmin?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
+        ${this.puedeGestionar?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
         <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div></div>`;}).join('')}
-      ${this.esAdmin?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
+      ${this.puedeGestionar?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
   },
   dashModal(mes){ const m=(this._dash||[]).find(x=>x.mes===mes)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${mes?'Editar '+esc(mes):'Nuevo mes'}</h3>
@@ -286,7 +287,7 @@ const App={
       <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div style="flex:1;min-width:250px"><div class="grid" style="grid-template-columns:repeat(2,1fr)">
           ${prods.length?prods.map(p=>{const q=cart[p.id]||0;return `<div class="pcard">
-            ${this.esAdmin?`<label class="pimg" style="cursor:pointer;${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:'flex-direction:column;color:var(--acc);font-size:22px'}">${p.foto_url?'':'📷<span style="font-size:10px;font-weight:700;margin-top:2px">Agregar foto</span>'}<input type="file" accept="image/*" style="display:none" onchange="App.subirFoto(this,'${p.id}')"></label>`:`<div class="pimg" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'🥖'}</div>`}
+            ${this.puedeGestionar?`<label class="pimg" style="cursor:pointer;${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:'flex-direction:column;color:var(--acc);font-size:22px'}">${p.foto_url?'':'📷<span style="font-size:10px;font-weight:700;margin-top:2px">Agregar foto</span>'}<input type="file" accept="image/*" style="display:none" onchange="App.subirFoto(this,'${p.id}')"></label>`:`<div class="pimg" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'🥖'}</div>`}
             <div class="pin"><div class="pn">${esc(p.nombre)}</div><div class="pp">${money(p.precio)}</div>
               <div class="stp"><button onclick="App.cartSet('${p.id}',-1)">−</button><b>${q}</b><button onclick="App.cartSet('${p.id}',1)">＋</button></div></div>
           </div>`;}).join(''):'<div class="empty">No hay productos. Créalos en Recetas.</div>'}
