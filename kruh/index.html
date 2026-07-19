@@ -183,8 +183,9 @@ const App={
   /* ===================== RECETAS = HOJA DE COSTOS ===================== */
   async vRecetas(){
     this.loading();
-    const [prods,recs,provs,pasos]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_recetas?order=creado_en&limit=5000'),GET('kruh_proveedores?order=nombre&limit=2000'),GET('kruh_pasos?order=orden,creado_en&limit=5000')]);
-    this._prods=prods; this._provs=provs;
+    const [prods,recs,provs,pasos,mp]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_recetas?order=creado_en&limit=5000'),GET('kruh_proveedores?order=nombre&limit=2000'),GET('kruh_pasos?order=orden,creado_en&limit=5000'),GET('kruh_materiaprima?order=nombre&limit=2000')]);
+    this._prods=prods; this._provs=provs; this._mp=mp;
+    this._recsAll=recs;
     const rBy={}; recs.forEach(r=>{(rBy[r.producto_id]=rBy[r.producto_id]||[]).push(r);});
     const pBy={}; pasos.forEach(s=>{(pBy[s.producto_id]=pBy[s.producto_id]||[]).push(s);});
     const cats=[...new Set(prods.map(p=>p.categoria||'Sin categoría'))];
@@ -202,11 +203,11 @@ const App={
               ${this.esAdmin?`<button class="btn gh sm" onclick="App.prodModal('${p.id}')">✎</button>`:''}</div>
             <div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px">
               <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Ingredientes</div>
-              ${rr.length?rr.map(r=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0"><span>• ${esc(r.ingrediente)} <small class="dim">${num(r.cantidad)} ${esc(r.unidad||'')}</small></span><span>${money((+r.cantidad||0)*(+r.costo_unit||0))} ${this.esAdmin?`<a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:5px">✕</a>`:''}</span></div>`).join(''):'<div class="hint">Sin ingredientes.</div>'}
-              ${this.esAdmin?`<button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Adicionar ingrediente</button>`:''}</div>
+              ${rr.length?rr.map(r=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0"><span>• ${esc(r.ingrediente)} <small class="dim">${num(r.cantidad)} ${esc(r.unidad||'')}</small></span><span style="white-space:nowrap">${money((+r.cantidad||0)*(+r.costo_unit||0))} <a onclick="App.recModal('${p.id}','${r.id}')" style="color:var(--acc);cursor:pointer;margin-left:5px">✎</a> <a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:2px">✕</a></span></div>`).join(''):'<div class="hint">Sin ingredientes.</div>'}
+              <button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Adicionar ingrediente</button></div>
             <div style="margin-top:9px;border-top:1px dashed var(--line);padding-top:9px">
               <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Pasos de elaboración</div>
-              ${(pBy[p.id]||[]).map((s,i)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0;align-items:flex-start"><span><b>${i+1}.</b> ${esc(s.texto)}</span><a onclick="App.pasoDel('${s.id}')" style="color:var(--bad);cursor:pointer;flex:none">✕</a></div>`).join('')||'<div class="hint">Sin pasos.</div>'}
+              ${(pBy[p.id]||[]).map((s,i)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0;align-items:flex-start"><span><b>${i+1}.</b> ${esc(s.texto)}</span><span style="flex:none;white-space:nowrap"><a onclick="App.pasoEdit('${s.id}')" style="color:var(--acc);cursor:pointer;margin-right:6px">✎</a><a onclick="App.pasoDel('${s.id}')" style="color:var(--bad);cursor:pointer">✕</a></span></div>`).join('')||'<div class="hint">Sin pasos.</div>'}
               <button class="btn gh sm full" onclick="App.pasoAdd('${p.id}')">＋ Adicionar paso</button></div>
             <div style="margin-top:10px;background:var(--paper);border-radius:9px;padding:9px 11px;font-size:12.5px">
               <div class="row" style="justify-content:space-between"><span class="dim">Costo ingredientes</span><b>${money(costo)}</b></div>
@@ -238,25 +239,27 @@ const App={
     if(!b.nombre){alert('Ponle nombre');return;} if(id) await PATCH('kruh_productos?id=eq.'+id,b); else await POST('kruh_productos',b);
     cerrar(); toast('Guardado · ya está en el catálogo'); this.vRecetas(); },
   async prodDel(id){ if(!this._okBorrar())return; await DEL('kruh_recetas?producto_id=eq.'+id); await DEL('kruh_productos?id=eq.'+id); cerrar(); toast('Eliminado'); this.vRecetas(); },
-  recModal(pid){ const provs=this._provs||[];
-    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Agregar ingrediente</h3>
-      <label>Ingrediente</label><input id="r_ing">
-      <label>Proveedor (opcional · trae el costo)</label>
-      <select id="r_prov" onchange="App.recProv()"><option value="">— manual —</option>${provs.map(pv=>`<option value="${pv.id}" data-val="${pv.valor||0}" data-uni="${esc(pv.unidad||'')}" data-pro="${esc(pv.provee||'')}">${esc(pv.nombre)} (${esc(pv.provee||'')})</option>`).join('')}</select>
-      <div class="g3"><div><label>Cantidad</label><input id="r_cant" type="number" oninput="App.recSub()"></div>
-      <div><label>Unidad</label><input id="r_uni" placeholder="g, ml, und"></div>
-      <div><label>Costo x unidad</label><input id="r_cu" type="number" value="0" oninput="App.recSub()"></div></div>
-      <div class="hint" id="r_sub">Subtotal: $0</div>
-      <button class="btn acc full" onclick="App.recSave('${pid}')">Agregar</button>`);
+  recModal(pid,ingId){ const mp=this._mp||[], r=ingId?((this._recsAll||[]).find(x=>x.id===ingId)||{}):{};
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${ingId?'Editar':'Agregar'} ingrediente</h3>
+      <label>Materia prima (trae el costo de lo que compraste)</label>
+      <select id="r_mp" onchange="App.recMp()"><option value="">— manual —</option>${mp.map(m=>`<option value="${m.id}" data-n="${esc(m.nombre)}" data-cu="${m.costo_unit||0}" data-uni="${esc(m.unidad||'')}">${esc(m.nombre)} · ${money(m.costo_unit)}/${esc(m.unidad||'kg')}</option>`).join('')}</select>
+      <label>Ingrediente</label><input id="r_ing" value="${esc(r.ingrediente||'')}">
+      <div class="g3"><div><label>Peso / cantidad</label><input id="r_cant" type="number" value="${r.cantidad||''}" oninput="App.recSub()"></div>
+      <div><label>Unidad</label><input id="r_uni" value="${esc(r.unidad||'')}" placeholder="g, ml, und"></div>
+      <div><label>Costo x unidad</label><input id="r_cu" type="number" value="${r.costo_unit||0}" oninput="App.recSub()"></div></div>
+      <div class="hint" id="r_sub">Subtotal: ${money((+r.cantidad||0)*(+r.costo_unit||0))}</div>
+      <button class="btn acc full" onclick="App.recSave('${pid}','${ingId||''}')">${ingId?'Guardar':'Agregar'}</button>`);
   },
   recSub(){ if($('r_sub'))$('r_sub').textContent='Subtotal: '+money((+($('r_cant').value)||0)*(+($('r_cu').value)||0)); },
-  recProv(){ const s=$('r_prov'), o=s.options[s.selectedIndex]; if(!o||!o.value)return; $('r_cu').value=o.dataset.val||0; if(!$('r_uni').value)$('r_uni').value=o.dataset.uni||''; if(!$('r_ing').value)$('r_ing').value=o.dataset.pro||''; this.recSub(); },
-  async recSave(pid){ const ing=$('r_ing').value.trim(); if(!ing){alert('Ingrediente');return;}
-    await POST('kruh_recetas',{producto_id:pid,ingrediente:ing,cantidad:+$('r_cant').value||0,unidad:$('r_uni').value.trim(),costo_unit:+$('r_cu').value||0,proveedor_id:$('r_prov').value||null});
-    cerrar(); toast('Ingrediente agregado'); this.vRecetas(); },
+  recMp(){ const s=$('r_mp'), o=s.options[s.selectedIndex]; if(!o||!o.value)return; if(!$('r_ing').value)$('r_ing').value=o.dataset.n||''; $('r_cu').value=o.dataset.cu||0; if(!$('r_uni').value)$('r_uni').value=o.dataset.uni||''; this.recSub(); },
+  async recSave(pid,ingId){ const ing=$('r_ing').value.trim(); if(!ing){alert('Ingrediente');return;}
+    const b={producto_id:pid,ingrediente:ing,cantidad:+$('r_cant').value||0,unidad:$('r_uni').value.trim(),costo_unit:+$('r_cu').value||0};
+    if(ingId)await PATCH('kruh_recetas?id=eq.'+ingId,b); else await POST('kruh_recetas',b);
+    cerrar(); toast(ingId?'Ingrediente actualizado':'Ingrediente agregado'); this.vRecetas(); },
   async recDel(id){ await DEL('kruh_recetas?id=eq.'+id); this.vRecetas(); },
   async pasoAdd(pid){ const t=prompt('Paso de elaboración:'); if(!t||!t.trim())return; const n=(await GET('kruh_pasos?producto_id=eq.'+pid+'&select=id')).length; await POST('kruh_pasos',{producto_id:pid,texto:t.trim(),orden:n+1}); toast('Paso agregado'); this.vRecetas(); },
   async pasoDel(id){ await DEL('kruh_pasos?id=eq.'+id); this.vRecetas(); },
+  async pasoEdit(id){ const cur=((await GET('kruh_pasos?id=eq.'+id+'&select=texto'))[0]||{}).texto||''; const t=prompt('Editar paso:',cur); if(t===null)return; await PATCH('kruh_pasos?id=eq.'+id,{texto:t.trim()}); toast('Paso actualizado'); this.vRecetas(); },
   async subirFoto(input,prodId){ const f=input.files&&input.files[0]; if(!f)return;
     const ext=(f.name.split('.').pop()||'jpg').toLowerCase(), path='p-'+(prodId||'nuevo')+'-'+Date.now()+'.'+ext;
     toast('Subiendo foto…');
