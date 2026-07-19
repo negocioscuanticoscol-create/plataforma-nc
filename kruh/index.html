@@ -190,7 +190,7 @@ const App={
     const pBy={}; pasos.forEach(s=>{(pBy[s.producto_id]=pBy[s.producto_id]||[]).push(s);});
     const cats=[...new Set(prods.map(p=>p.categoria||'Sin categoría'))];
     this.set(`<h1>Recetas y costos</h1><div class="sub">Producto → peso/presentación → ingredientes con costo → proceso → costo, precio, IVA y margen</div>
-      ${this.esAdmin?`<button class="btn acc" onclick="App.prodModal()">＋ Nuevo producto</button>`:'<div class="hint">Modo Gerencia: puedes ver recetas y costos, pero solo Admin los edita.</div>'}
+      <button class="btn acc" onclick="App.prodModal()">＋ Nuevo producto</button>
       ${prods.length?cats.map(cat=>`<div style="margin-top:16px"><div class="tag" style="margin-bottom:8px">${esc(cat)}</div>
         <div class="grid">${prods.filter(p=>(p.categoria||'Sin categoría')===cat).map(p=>{
           const rr=rBy[p.id]||[];
@@ -200,7 +200,7 @@ const App={
           return `<div class="card">
             <div class="top" style="display:flex;justify-content:space-between"><div><div class="nm">${esc(p.nombre)}</div>
               <div class="mt">${p.peso?num(p.peso)+' '+esc(p.unidad||'g')+' · ':''}${esc(p.presentacion||'')} <span class="tag ${p.perecedero?'pe':'np'}">${p.perecedero?'Perecedero':'No perecedero'}</span></div></div>
-              ${this.esAdmin?`<button class="btn gh sm" onclick="App.prodModal('${p.id}')">✎</button>`:''}</div>
+              <button class="btn gh sm" onclick="App.prodModal('${p.id}')">✎</button></div>
             <div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px">
               <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Ingredientes</div>
               ${rr.length?rr.map(r=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0"><span>• ${esc(r.ingrediente)} <small class="dim">${num(r.cantidad)} ${esc(r.unidad||'')}</small></span><span style="white-space:nowrap">${money((+r.cantidad||0)*(+r.costo_unit||0))} <a onclick="App.recModal('${p.id}','${r.id}')" style="color:var(--acc);cursor:pointer;margin-left:5px">✎</a> <a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:2px">✕</a></span></div>`).join(''):'<div class="hint">Sin ingredientes.</div>'}
