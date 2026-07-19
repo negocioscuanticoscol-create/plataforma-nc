@@ -157,10 +157,12 @@ async _leadsMes(){
 async vResumen(){
   const leadsBy=await this._leadsMes();
   const cuentas=await api('nc_mkt_cuentas?select=cliente,seguidores&limit=500');
+  const inf=(await api('nc_infra?select=*&limit=1'))[0]||null;
   const segBy={}; cuentas.forEach(c=>segBy[c.cliente]=(segBy[c.cliente]||0)+(+c.seguidores||0));
   const emp=[
    {n:'Feroz',bot:'feroz',d:'Botas de dotación · distribuidores',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=feroz'},
    {n:'Smart',bot:'smart',d:'Envases herméticos · B2B',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=smart'},
+   {n:'KRUH',bot:null,d:'Panadería → restaurante',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/kruh/'},
    {n:'Epheta',bot:null,d:'Aseo · en construcción',u:null},
    {n:'FES Fueling',bot:null,d:'ERP repuestos cisternas',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/fesfueling/'},
    {n:'ZARRAT',bot:null,d:'Atelier de moda a la medida',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/zarrat/'},
@@ -180,7 +182,17 @@ async vResumen(){
         <div style="display:flex;gap:14px;margin-top:10px;font-size:12.5px">
           ${lm!=null?`<span>💬 <b style="color:var(--ok)">${nm(lm)}</b> leads/mes</span>`:'<span style="color:var(--faint)">sin bot</span>'}
           ${seg?`<span>👥 <b>${nm(seg)}</b></span>`:''}</div>
-        ${e.u?'<span class="go">Abrir →</span>':''}</div>`; }).join('')}</div>`;
+        ${e.u?'<span class="go">Abrir →</span>':''}</div>`; }).join('')}</div>
+    ${inf?(()=>{ const bar=(pct,warn80)=>`<div style="height:9px;background:#ece8e0;border-radius:6px;overflow:hidden;margin-top:5px"><i style="display:block;height:100%;width:${Math.min(100,pct)}%;background:${pct>=80?'#d22':(pct>=60?'#e8a30c':'#2e9e4f')}"></i></div>`;
+      const cli=Object.entries(inf.por_cliente||{}).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc(k)} <b>${v}MB</b>`).join(' · ');
+      const alerta=inf.db_pct>=80||inf.storage_pct>=80;
+      return `<div class="card" style="margin-top:16px;${alerta?'border-left:4px solid #d22':''}">
+        <b>🗄️ Infraestructura (Supabase)</b> <span style="font-size:11px;color:var(--faint)">· actualizado ${new Date(inf.actualizado).toLocaleString('es-CO',{dateStyle:'short',timeStyle:'short'})} · el vigilante avisa al 80%</span>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:10px">
+          <div style="flex:1;min-width:190px"><div style="font-size:12px;color:var(--faint)">Base de datos</div><div style="font-weight:800;font-size:19px">${inf.db_pct}% <small style="font-weight:400;color:var(--faint)">de 500 MB · ${inf.db_mb} MB</small></div>${bar(inf.db_pct)}</div>
+          <div style="flex:1;min-width:190px"><div style="font-size:12px;color:var(--faint)">Storage</div><div style="font-weight:800;font-size:19px">${inf.storage_pct}% <small style="font-weight:400;color:var(--faint)">de 1 GB · ${inf.storage_mb} MB</small></div>${bar(inf.storage_pct)}</div>
+        </div>
+        <div style="font-size:12px;color:var(--faint);margin-top:11px">Peso por cliente: ${cli}</div></div>`; })():''}`;
 },
 
 async vMarketing(){
