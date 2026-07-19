@@ -66,7 +66,7 @@ const App = {
     if(this.perfil.activo===false){ await this.sb.auth.signOut(); alert('🔒 Este acceso fue bloqueado por el administrador.'); location.reload(); return; }
     // 🏢 restricción por empresa: si el perfil tiene una empresa asignada, solo entra a esa (admin/gerente entran a todas)
     if(this.perfil.empresa && this.perfil.empresa!==window.NC_EMPRESA && !['admin','gerente','director'].includes(this.perfil.rol)){
-      const dest={feroz:'Feroz',smart:'Smart',epheta:'Epheta'}[this.perfil.empresa]||this.perfil.empresa;
+      const dest={feroz:'Feroz',smart:'Smart'}[this.perfil.empresa]||this.perfil.empresa;
       await this.sb.auth.signOut();
       alert('🔒 Tu acceso es solo para '+dest+'. Entra por el enlace de '+dest+' (?empresa='+this.perfil.empresa+').');
       location.href = location.pathname+'?empresa='+this.perfil.empresa; return;
@@ -1530,8 +1530,7 @@ const App = {
   },
   _listasPrecios(){ const e=window.NC_EMPRESA||'feroz'; return ({
       smart:[['0','L1 Muestras'],['1','L2 Pyme'],['2','L3 Mayorista'],['3','L4 Distribuidor'],['4','L5 Convenio']],
-      feroz:[['0','Distribuidor']],
-      epheta:[['0','General']]
+      feroz:[['0','Distribuidor']]
     })[e]||[['0','General']]; },
   _listasOptions(){ return this._listasPrecios().map(l=>`<option value="${l[0]}">${l[1]}</option>`).join(''); },
   _na(s){ return (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim(); },

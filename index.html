@@ -108,12 +108,11 @@
   .spin{text-align:center;padding:30px;color:var(--suave)}
 </style>
 <script>
-/* Tema por empresa: Feroz=naranja · Smart=azul (línea catálogo) · Epheta=verde */
+/* Tema por empresa: Feroz=naranja · Smart=azul (línea catálogo) */
 (function(){
   var emp=(new URLSearchParams(location.search).get('empresa')||'feroz').toLowerCase();
   var T={feroz:{a:'#E8620C',b:'#ff7a1a',n:'Feroz'},
-         smart:{a:'#2563eb',b:'#3b82f6',n:'Smart Envases'},
-         epheta:{a:'#16a085',b:'#1abc9c',n:'Epheta'}}[emp]||{a:'#E8620C',b:'#ff7a1a',n:'Feroz'};
+         smart:{a:'#2563eb',b:'#3b82f6',n:'Smart Envases'}}[emp]||{a:'#E8620C',b:'#ff7a1a',n:'Feroz'};
   window.NC_EMPRESA=emp; window.NC_BRAND=T.n;
   var s=document.documentElement.style;
   s.setProperty('--naranja',T.a); s.setProperty('--naranja2',T.b);

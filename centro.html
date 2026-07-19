@@ -163,7 +163,6 @@ async vResumen(){
    {n:'Feroz',bot:'feroz',d:'Botas de dotación · distribuidores',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=feroz'},
    {n:'Smart',bot:'smart',d:'Envases herméticos · B2B',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=smart'},
    {n:'KRUH',bot:null,d:'Panadería → restaurante',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/kruh/'},
-   {n:'Epheta',bot:null,d:'Aseo · en construcción',u:null},
    {n:'FES Fueling',bot:null,d:'ERP repuestos cisternas',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/fesfueling/'},
    {n:'ZARRAT',bot:null,d:'Atelier de moda a la medida',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/zarrat/'},
   ];
@@ -249,7 +248,7 @@ async upd(id,campo,val){
   if(campo==='seguidores') this.vMarketing();
 },
 async addCuenta(){
-  const cl=prompt('Marca / cliente (ej: Smart, Epheta, un cliente nuevo):'); if(!cl) return;
+  const cl=prompt('Marca / cliente (ej: Smart, KRUH, un cliente nuevo):'); if(!cl) return;
   const red=prompt('Red (Instagram, Facebook, TikTok, WhatsApp):','Instagram'); if(!red) return;
   await post('nc_mkt_cuentas',{cliente:cl.trim(),red:red.trim(),orden:99});
   toast('Agregada'); this.vMarketing();
