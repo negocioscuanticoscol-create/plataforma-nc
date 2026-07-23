@@ -1107,7 +1107,10 @@ function autofillCot(){
   if(!cotId) return;
   fetch(SBU+'/rest/v1/nc_cotizaciones?id=eq.'+cotId,{headers:{apikey:SBK,Authorization:'Bearer '+SBK}}).then(r=>r.json()).then(arr=>{
     const c=arr&&arr[0]; if(!c) return; const d=c.datos||{};
-    if(d.tarifa_flete) fleteTarifaFijada=d.tarifa_flete;   // respeta la tarifa con que se hizo; no la recalcula
+    // Respeta la tarifa con que se hizo; no la recalcula. Si la cotización no trae
+    // el campo es porque se guardó ANTES del 23/07/2026, o sea bajo la política vieja:
+    // se le honra el flete anterior aunque el cliente no esté en la lista.
+    fleteTarifaFijada = d.tarifa_flete || 'legacy';
     const esJur=d.tipo_cliente==='jur'; setTipo(esJur?'jur':'nat');
     const sv=(id,val)=>{const el=document.getElementById(id); if(el&&val) el.value=val;};
     if(esJur){ sv('rut',d.cedula_nit); sv('rsoc',d.empresa); sv('rec',d.contacto||d.empresa); sv('telj',d.celular); sv('emlj',d.correo); sv('dirj',d.dir_factura); sv('barj',d.barrio_factura); sv('ciuj',d.ciudad_factura); sv('depj',d.dep_factura); }
