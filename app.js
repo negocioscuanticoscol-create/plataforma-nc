@@ -493,7 +493,6 @@ const App = {
       return {best:titt(o.best), doc:o.doc, cel:(((this._cliByDoc||{})[o.doc]||{}).celular)||(this._celByName||{})[norm(o.best)]||'', veces, acum, ultimoValor, ultimaTxt:numM(ultima), frecTxt: months.length<2?'1ª compra':(frec<=1?'mensual':'cada ~'+frec+' meses'), proxTxt: prox?numM(prox):'—', atrasado: !!(prox && prox<nowM),
         mesesSin: ultima?(nowM-ultima):99};   // meses cumplidos sin comprar → alimenta los cajones de abajo
     }).sort((a,b)=> a.atrasado!==b.atrasado ? (a.atrasado?-1:1) : b.veces-a.veces);
-    const atrasados=this._cliAnalitico.filter(c=>c.atrasado).length;
     this.set(`<h1>Clientes · Smart</h1><div class="sub">Dashboard de clientes · perfil meta y recurrencia</div>
       <div class="kpis">
         <div class="kpi naranja"><b>${cli.length}</b><span>Clientes</span></div>
@@ -513,25 +512,25 @@ const App = {
           <span style="display:flex;align-items:center;gap:9px"><b>${cl(o.v)}</b> · <span style="color:var(--verde)">${cl(o.c)}</span><span ${o.esteMes?'':`onclick="App.recompraToggle('${esc(ref)}')"`} id="bola-${esc(ref).replace(/[^a-zA-Z0-9]/g,'')}" title="${o.esteMes?'Compró este mes → contactado ✓':'Marca que ya lo contacté este mes (clic)'}" style="display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid #16a34a;background:${on?'#16a34a':'#fff'};flex:none;${o.esteMes?'':'cursor:pointer'}"></span></span>
         </div>`;}).join('')||'<div class="empty">Sin datos</div>'}
       </div>
-      <div style="margin:16px 0 6px"><h2 style="font-size:15px">🚨 Clientes que estamos perdiendo</h2>
-        <div style="font-size:11.5px;color:#667;margin:4px 0 10px">Cada cliente cae en un solo cajón, según hace cuánto compró por última vez. La base guarda el <b>mes</b> de la venta, no el día, así que los cajones van por meses cumplidos. Ábrelos para ver quiénes son y llamarlos.</div></div>
+      <div style="margin:16px 0 6px"><h2 style="font-size:15px">📊 Clientes por hace cuánto compraron</h2>
+        <div style="font-size:11.5px;color:#667;margin:4px 0 10px">Los ${this._cliAnalitico.length} clientes con compras, cada uno en un solo cajón según su última compra. La base guarda el <b>mes</b> de la venta, no el día, así que van por meses cumplidos. Ábrelos para ver quiénes son y llamarlos.</div></div>
+      ${this._cliCajon('✅ Compraron este mes', 'al día', 0, '#16a34a')}
       ${this._cliCajon('⏳ 1 mes sin comprar', '~30 días', 1, '#f59e0b')}
       ${this._cliCajon('⚠️ 2 meses sin comprar', '~60 días', 2, '#ea580c')}
-      ${this._cliCajon('🚨 3 meses o más sin comprar', '+90 días', 3, '#dc2626')}
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 4px"><h2 style="font-size:15px">📋 Todos los clientes · frecuencia y pronóstico</h2>${atrasados?`<span class="badge" style="background:#fde8e8;color:#b3261e">⚠️ ${atrasados} atrasados</span>`:''}</div>
-      <input id="cq" placeholder="🔍 Buscar cliente…" style="margin:0 0 10px;padding:10px;border:1px solid var(--linea);border-radius:8px;width:100%;box-sizing:border-box" oninput="App._filtrarCli()">
-      <div id="cliList">${this._cliAnaRows(this._cliAnalitico)}</div>`);
+      ${this._cliCajon('🚨 3 meses o más sin comprar', '+90 días', 3, '#dc2626')}`);
   },
-  /* Cajón de inactividad. gap=3 significa "3 o más meses" (el último cajón acumula la cola). */
+  /* Cajón por última compra. gap=0 son los que ya compraron este mes y gap=3 son
+     "3 o más meses": el último cajón acumula toda la cola. Entre los cuatro cae
+     el 100% de los clientes con compras, cada uno una sola vez. */
   _cliCajon(titulo, subt, gap, color){
     const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
-    const arr=(this._cliAnalitico||[]).filter(c=> gap>=3 ? c.mesesSin>=3 : c.mesesSin===gap)
+    const arr=(this._cliAnalitico||[]).filter(c=> gap>=3 ? c.mesesSin>=3 : (gap===0 ? c.mesesSin<=0 : c.mesesSin===gap))
       .sort((a,b)=>b.acum-a.acum);   // primero los que más plata han dejado: son los que más duele perder
     const plata=arr.reduce((a,c)=>a+c.acum,0);
     return `<details class="card" style="border-left:4px solid ${color};margin-bottom:10px;padding:0">
       <summary style="cursor:pointer;padding:12px 14px;font-size:14px;font-weight:700;color:var(--dark)">${titulo}
         <span style="color:${color}">· ${arr.length} cliente${arr.length===1?'':'s'}</span>
-        <span style="font-weight:500;font-size:11.5px;color:#667">· ${subt}${arr.length?' · '+cl(plata)+' acumulados en juego':''}</span></summary>
+        <span style="font-weight:500;font-size:11.5px;color:#667">· ${subt}${arr.length?' · '+cl(plata)+(gap===0?' acumulados':' acumulados en juego'):''}</span></summary>
       <div style="padding:0 12px 12px">${arr.length?this._cliAnaRows(arr):'<div class="empty">Ninguno acá 🎉</div>'}</div>
     </details>`;
   },
@@ -546,7 +545,6 @@ const App = {
           ${tel?`<a class="btn-sm" href="https://wa.me/57${tel}" target="_blank" style="background:#25d366;color:#fff">📱 WhatsApp</a><a class="btn-sm" href="tel:${esc(cel)}" style="background:#2f6fed;color:#fff">📞 Llamar</a>`:`<button class="btn-sm" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa" onclick="App.cliSmartTel('${esc(c.doc||'')}')">➕ Tel</button>`}
         </div></div>`;}).join('');
   },
-  _filtrarCli(){ const i=$('cq'); const q=(i&&i.value||'').toLowerCase(); const f=(this._cliAnalitico||[]).filter(c=>(c.best+' '+c.doc).toLowerCase().includes(q)); const w=$('cliList'); if(w) w.innerHTML=this._cliAnaRows(f); },
   async recompraToggle(ref){
     const mes=this._mesActual||''; const set=this._contactadoMes||(this._contactadoMes=new Set());
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
