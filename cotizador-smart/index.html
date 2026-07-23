@@ -397,7 +397,6 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">Subtotal sin IVA</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-sub">-</span></div>
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">IVA 19%</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-iva">-</span></div>
         <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--t2)">Flete <span id="s-cajas" style="font-size:10px;color:var(--t3)"></span></span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500;color:var(--acc)" id="s-flete">-</span></div>
-        <div id="s-tarifa" style="display:none;margin-top:6px;font-size:11px;font-weight:700;border-radius:7px;padding:4px 9px;line-height:1.35"></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 15px;background:var(--gl);border-top:2px solid var(--gm)">
         <span style="font-size:13px;font-weight:700;color:var(--dark)">Total a pagar</span>
@@ -863,18 +862,6 @@ function buildResumen(){
   document.getElementById('s-flete').textContent= fleteDisplay ? (fleteDisplay.label) : fmt(flete);
   const cajasLabel=!fleteDisplay&&totalPacas>0?(totalPacas+` paca${totalPacas>1?'s':''}${cajasResiduo>0?' + '+cajasResiduo+' caja resid.':''}`):!fleteDisplay&&cajas?`(${cajas} caja${cajas>1?'s':''})`:'' ;
   document.getElementById('s-cajas').textContent=cajasLabel?`(${cajasLabel})`:'';
-  // Qué tarifa de flete se está aplicando — visible para el vendedor, no una sorpresa para el cliente
-  const tarBox=document.getElementById('s-tarifa');
-  if(tarBox){
-    if(fleteDisplay){ tarBox.style.display='none'; }   // al cobro / transporte propio: no aplica
-    else if(esFleteLegacy()){
-      tarBox.style.display='block'; tarBox.style.background='#e8f5ee'; tarBox.style.color='#1a5c35'; tarBox.style.border='1.5px solid var(--gm)';
-      tarBox.textContent='🤝 Cliente antiguo — mantiene tarifa de flete anterior ($65.000 paca · $140.000 PetMulti)';
-    } else {
-      tarBox.style.display='block'; tarBox.style.background='#fff3cd'; tarBox.style.color='#7a5800'; tarBox.style.border='1.5px solid var(--acc)';
-      tarBox.textContent='📦 Tarifa de flete 2026 — $101.000 paca · $176.000 PetMulti (+$36.000 por paca)';
-    }
-  }
   document.getElementById('s-total').textContent=fmt(grand);
   const envio=getEnvio(); const contacto=getContacto(); const empresa=getEmpresa(); const tel=getTel();
   const clienteRows=tipo==='nat'?[['Empresa / Negocio',empresa],['Contacto',contacto],['Cédula',g('ced')],['Celular',tel],['Correo',g('eml')]]:[['Empresa',empresa],['NIT',g('rut')],['Contacto',contacto],['Celular',tel]];
