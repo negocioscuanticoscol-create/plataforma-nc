@@ -397,6 +397,7 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">Subtotal sin IVA</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-sub">-</span></div>
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">IVA 19%</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-iva">-</span></div>
         <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--t2)">Flete <span id="s-cajas" style="font-size:10px;color:var(--t3)"></span></span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500;color:var(--acc)" id="s-flete">-</span></div>
+        <div id="s-tarifa" style="display:none;margin-top:6px;font-size:11px;font-weight:700;border-radius:7px;padding:4px 9px;line-height:1.35"></div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;padding:13px 15px;background:var(--gl);border-top:2px solid var(--gm)">
         <span style="font-size:13px;font-weight:700;color:var(--dark)">Total a pagar</span>
@@ -531,8 +532,74 @@ function genFolio(){
   const n=new Date();
   return 'SP-'+n.getFullYear()+String(n.getMonth()+1).padStart(2,'0')+String(n.getDate()).padStart(2,'0')+'-'+String(n.getHours()).padStart(2,'0')+String(n.getMinutes()).padStart(2,'0');
 }
+/* ── POLÍTICA DE FLETE · corte 23/07/2026 ─────────────────────────────────────
+   Los clientes que a esa fecha YA habían comprado más de $600.000 acumulados
+   conservan la tarifa vieja de flete. Todos los demás —incluidos los que ya
+   compraron pero no llegaron a los $600.000— y todo cliente nuevo pagan
+   +$36.000 por paca completa.
+   José decidió el 23/07/2026 subir además al beneficio los 6 casos que quedaron
+   entre $425.000 y $582.000, o sea el corte real de esa tanda fue $425.959.
+   La lista está CONGELADA a propósito: es una foto del pasado, NO se recalcula.
+   Si se recalculara, un cliente nuevo que compre $700.000 mañana se ascendería
+   solo a la tarifa vieja, que es justo lo que no queremos.
+   Fuente: nc_ventas + pedidos de nc_cotizaciones sumados al 23/07/2026.
+   Se identifica por cédula/NIT (solo dígitos, se ignoran puntos y espacios). */
+const FLETE_LEGACY_DOCS=new Set([
+  '11266042742','16359436',  // Lácteos Tuluá — quedó partido en dos documentos
+  '8220030400','822003040',  // La Catira Industria Láctea — ídem
+  '9818968641','9018968641', // Juan David Carvajal — la plata está en el 981…, el NIT bueno es el 901…
+  '37844272',                // RCA Agrícola
+  '1061700244',              // María Angélica Golondrino Quilindo
+  '9015349788',              // Industrias Alimenticias Carvajal SAS
+  '9014598259',              // Envaplas de Colombia SAS
+  '1082779956',              // Laura Daniela Semanate Salamanca
+  '39275029',                // Miriam Soledad Correa
+  '900533935',               // Antioqueña de Quesos SAS
+  '901857134',               // Super Alimentos
+  '1099217586',              // Santander de Alimentos
+  '1053793810',              // Johan Sebastián Piedrahita Velásquez
+  '35419520',                // Liliana Wagner Prieto
+  '1100400475',              // Humberto José de la Ossa
+  '1076657236',              // Laura Cristina Rojas Castro
+  '9018271118',              // Industria de Alimentos Artesanales SAS
+  '1017251459',              // Elena Carolina Hincapié Bareño
+  '523944367',               // Suculentos (Nancy Maldonado)
+  '1036600368',              // Edwin Jaramillo Cárdenas
+  '1040748902',              // Daniela Hernández
+  '50999454',                // Regina Arrieta Puche
+  '1007409529',              // Erika Liceth Torres
+  '9012339951',              // Mateo Gutiérrez
+  '9019655903',              // Montaña Group
+  '30505769',                // Agrocomercial
+  '9002417772',              // Propongo Producciones SAS
+  '1072267644',              // Bio Primo
+  '46377930',                // Alcira Arismendi Fuentes
+  // — Los del borde, subidos al beneficio a mano (23/07/2026). Estaban entre
+  //   $425.000 y $582.000, o sea NO pasaban los $600.000 por su cuenta.
+  //   "Agroindustrias el Bosque" ($581.730) no lleva documento propio: es la
+  //   razón social de Juan David Carvajal, ya cubierto arriba con sus dos NIT.
+  '8001428204',              // Doña Leche Alimentos SA · $541.717
+  '9012025521',              // Luz Adriana Loaiza · $531.600
+  '1077142499',              // Elite Shops · $465.943
+  '24730968',                // Maryluz Gallego · $448.038
+  '9019640718'               // Grupo Fesya SAS · $425.959
+]);
+const FLETE_PACA_LEGACY=65000,     FLETE_PACA_NUEVA=101000;    // Flexipack / Nueva Ref
+const FLETE_PACA_PM_LEGACY=140000, FLETE_PACA_PM_NUEVA=176000; // PetMulti
+const FLETE_CAJA=36500;   // residuo fuera de paca y mínimo por cotización — NO sube
+let fleteTarifaFijada=null;   // al reabrir una cotización guardada manda la tarifa con que se hizo
+
+function docActual(){ return (tipo==='nat'?g('ced'):g('rut')).replace(/\D/g,''); }
+function esFleteLegacy(){
+  if(fleteTarifaFijada) return fleteTarifaFijada==='legacy';   // cotización ya guardada: no cambia sola
+  return FLETE_LEGACY_DOCS.has(docActual());
+}
+
 function calcFlete(selItems){
-  if(!selItems || selItems.length===0) return 36500;
+  const legacy=esFleteLegacy();
+  const precioPaca   = legacy?FLETE_PACA_LEGACY:FLETE_PACA_NUEVA;
+  const precioPacaPM = legacy?FLETE_PACA_PM_LEGACY:FLETE_PACA_PM_NUEVA;
+  if(!selItems || selItems.length===0) return FLETE_CAJA;
   const items = selItems.filter(s=>s.prod.id!=='pm1000');   // pm1000: transporte INCLUIDO en el precio → no suma flete
   if(items.length===0) return 0;                            // solo pm1000 → flete 0 (todo incluido)
   let totalFlete=0;
@@ -541,15 +608,14 @@ function calcFlete(selItems){
     const pkSize=s.prod.pk;
     const pacasCompletas=Math.floor(s.qty/pkSize);
     const residuo=s.qty % pkSize;
-    // PetMulti (pm) = $140.000/paca | Flexipack y nuevas = $65.000/paca
     const esPM = s.prod.id.startsWith('pm');
-    totalFlete += pacasCompletas*(esPM ? 140000 : 65000);
+    totalFlete += pacasCompletas*(esPM ? precioPacaPM : precioPaca);
     totalResiduoUds += residuo;
   });
   // Fuera de paca: $36.500 por cada 200 uds o fracción
   const cajasResiduo=Math.ceil(totalResiduoUds/200);
-  totalFlete += cajasResiduo*36500;
-  return Math.max(36500, totalFlete);
+  totalFlete += cajasResiduo*FLETE_CAJA;
+  return Math.max(FLETE_CAJA, totalFlete);
 }
 function toggleAli(el){
   el.classList.toggle('on');
@@ -797,6 +863,18 @@ function buildResumen(){
   document.getElementById('s-flete').textContent= fleteDisplay ? (fleteDisplay.label) : fmt(flete);
   const cajasLabel=!fleteDisplay&&totalPacas>0?(totalPacas+` paca${totalPacas>1?'s':''}${cajasResiduo>0?' + '+cajasResiduo+' caja resid.':''}`):!fleteDisplay&&cajas?`(${cajas} caja${cajas>1?'s':''})`:'' ;
   document.getElementById('s-cajas').textContent=cajasLabel?`(${cajasLabel})`:'';
+  // Qué tarifa de flete se está aplicando — visible para el vendedor, no una sorpresa para el cliente
+  const tarBox=document.getElementById('s-tarifa');
+  if(tarBox){
+    if(fleteDisplay){ tarBox.style.display='none'; }   // al cobro / transporte propio: no aplica
+    else if(esFleteLegacy()){
+      tarBox.style.display='block'; tarBox.style.background='#e8f5ee'; tarBox.style.color='#1a5c35'; tarBox.style.border='1.5px solid var(--gm)';
+      tarBox.textContent='🤝 Cliente antiguo — mantiene tarifa de flete anterior ($65.000 paca · $140.000 PetMulti)';
+    } else {
+      tarBox.style.display='block'; tarBox.style.background='#fff3cd'; tarBox.style.color='#7a5800'; tarBox.style.border='1.5px solid var(--acc)';
+      tarBox.textContent='📦 Tarifa de flete 2026 — $101.000 paca · $176.000 PetMulti (+$36.000 por paca)';
+    }
+  }
   document.getElementById('s-total').textContent=fmt(grand);
   const envio=getEnvio(); const contacto=getContacto(); const empresa=getEmpresa(); const tel=getTel();
   const clienteRows=tipo==='nat'?[['Empresa / Negocio',empresa],['Contacto',contacto],['Cédula',g('ced')],['Celular',tel],['Correo',g('eml')]]:[['Empresa',empresa],['NIT',g('rut')],['Contacto',contacto],['Celular',tel]];
@@ -911,6 +989,7 @@ async function registrarEnSheets(estadoCot, irAPedidos){
     subtotal_sin_iva: Math.round(subBase),
     iva: Math.round(iva),
     flete: Math.round(fleteCalc),
+    tarifa_flete: esFleteLegacy()?'legacy':'2026',   // con qué política se cotizó — para auditar y para no recalcular al reabrir
     tipo_transporte: tipoTransporte,
     total: Math.round(grand),
     comision: Math.round(calcComision(sel)),
@@ -1028,6 +1107,7 @@ function autofillCot(){
   if(!cotId) return;
   fetch(SBU+'/rest/v1/nc_cotizaciones?id=eq.'+cotId,{headers:{apikey:SBK,Authorization:'Bearer '+SBK}}).then(r=>r.json()).then(arr=>{
     const c=arr&&arr[0]; if(!c) return; const d=c.datos||{};
+    if(d.tarifa_flete) fleteTarifaFijada=d.tarifa_flete;   // respeta la tarifa con que se hizo; no la recalcula
     const esJur=d.tipo_cliente==='jur'; setTipo(esJur?'jur':'nat');
     const sv=(id,val)=>{const el=document.getElementById(id); if(el&&val) el.value=val;};
     if(esJur){ sv('rut',d.cedula_nit); sv('rsoc',d.empresa); sv('rec',d.contacto||d.empresa); sv('telj',d.celular); sv('emlj',d.correo); sv('dirj',d.dir_factura); sv('barj',d.barrio_factura); sv('ciuj',d.ciudad_factura); sv('depj',d.dep_factura); }
