@@ -513,14 +513,14 @@ const App = {
           <span style="display:flex;align-items:center;gap:9px"><b>${cl(o.v)}</b> · <span style="color:var(--verde)">${cl(o.c)}</span><span ${o.esteMes?'':`onclick="App.recompraToggle('${esc(ref)}')"`} id="bola-${esc(ref).replace(/[^a-zA-Z0-9]/g,'')}" title="${o.esteMes?'Compró este mes → contactado ✓':'Marca que ya lo contacté este mes (clic)'}" style="display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid #16a34a;background:${on?'#16a34a':'#fff'};flex:none;${o.esteMes?'':'cursor:pointer'}"></span></span>
         </div>`;}).join('')||'<div class="empty">Sin datos</div>'}
       </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin:8px 0 4px"><h2 style="font-size:15px">📋 Clientes · frecuencia y pronóstico</h2>${atrasados?`<span class="badge" style="background:#fde8e8;color:#b3261e">⚠️ ${atrasados} atrasados</span>`:''}</div>
-      <input id="cq" placeholder="🔍 Buscar cliente…" style="margin:0 0 10px;padding:10px;border:1px solid var(--linea);border-radius:8px;width:100%;box-sizing:border-box" oninput="App._filtrarCli()">
-      <div id="cliList">${this._cliAnaRows(this._cliAnalitico)}</div>
-      <div style="margin:20px 0 6px"><h2 style="font-size:15px">🚨 Clientes que estamos perdiendo</h2>
+      <div style="margin:16px 0 6px"><h2 style="font-size:15px">🚨 Clientes que estamos perdiendo</h2>
         <div style="font-size:11.5px;color:#667;margin:4px 0 10px">Cada cliente cae en un solo cajón, según hace cuánto compró por última vez. La base guarda el <b>mes</b> de la venta, no el día, así que los cajones van por meses cumplidos. Ábrelos para ver quiénes son y llamarlos.</div></div>
       ${this._cliCajon('⏳ 1 mes sin comprar', '~30 días', 1, '#f59e0b')}
       ${this._cliCajon('⚠️ 2 meses sin comprar', '~60 días', 2, '#ea580c')}
-      ${this._cliCajon('🚨 3 meses o más sin comprar', '+90 días', 3, '#dc2626')}`);
+      ${this._cliCajon('🚨 3 meses o más sin comprar', '+90 días', 3, '#dc2626')}
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin:18px 0 4px"><h2 style="font-size:15px">📋 Todos los clientes · frecuencia y pronóstico</h2>${atrasados?`<span class="badge" style="background:#fde8e8;color:#b3261e">⚠️ ${atrasados} atrasados</span>`:''}</div>
+      <input id="cq" placeholder="🔍 Buscar cliente…" style="margin:0 0 10px;padding:10px;border:1px solid var(--linea);border-radius:8px;width:100%;box-sizing:border-box" oninput="App._filtrarCli()">
+      <div id="cliList">${this._cliAnaRows(this._cliAnalitico)}</div>`);
   },
   /* Cajón de inactividad. gap=3 significa "3 o más meses" (el último cajón acumula la cola). */
   _cliCajon(titulo, subt, gap, color){
