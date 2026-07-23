@@ -453,7 +453,7 @@ const App = {
     let cli=[], ventas=[];
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_clientes?empresa=eq.smart&order=nombre.asc&limit=2000',{headers:H}); const j=await r.json(); cli=Array.isArray(j)?j:[]; }catch(e){}
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&select=documento,cliente,total_vendido,comision_bruta,mes,pedidos_mes,estado_pago&limit=3000',{headers:H}); const j=await r.json(); ventas=Array.isArray(j)?j:[]; }catch(e){}
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&select=documento,cliente,total_vendido,comision_bruta,mes,pedidos_mes,estado_pago,es_kit,creado_en&limit=3000',{headers:H}); const j=await r.json(); ventas=Array.isArray(j)?j:[]; }catch(e){}
     const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     const norm=s=>(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\b(SAS|LTDA|SA|EU)\b/g,' ').replace(/\s+/g,' ').trim();
     const titt=s=>(s||'').toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
@@ -480,7 +480,7 @@ const App = {
     const MM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; const numM=n=>n?MM[n%12]+'-'+Math.floor(n/12):'—';
     const nowM=mNum(mesActual);
     const byCli={};
-    vReal.forEach(v=>{ const k=norm(v.cliente); if(!k)return; const o=(byCli[k]=byCli[k]||{rows:[],best:v.cliente,bv:-1,doc:v.documento||''}); o.rows.push(v); const tv=+v.total_vendido||0; if(tv>o.bv){o.bv=tv;o.best=v.cliente;o.doc=v.documento||o.doc;} });
+    vReal.forEach(v=>{ const k=norm(v.cliente); if(!k)return; const o=(byCli[k]=byCli[k]||{rows:[],best:v.cliente,bv:-1,doc:v.documento||'',k}); o.rows.push(v); const tv=+v.total_vendido||0; if(tv>o.bv){o.bv=tv;o.best=v.cliente;o.doc=v.documento||o.doc;} });
     this._cliAnalitico=Object.values(byCli).map(o=>{
       const months=[...new Set(o.rows.map(r=>mNum(r.mes)).filter(Boolean))].sort((a,b)=>a-b);
       const veces=o.rows.reduce((a,r)=>a+(+r.pedidos_mes||1),0);
@@ -490,10 +490,18 @@ const App = {
       const acum=o.rows.reduce((a,r)=>a+(+r.total_vendido||0),0);   // valor acumulado (todas sus compras)
       let ultRow=null,ultN=-1; o.rows.forEach(r=>{ const n=mNum(r.mes); if(n>=ultN){ultN=n;ultRow=r;} });   // último pedido
       const ultimoValor=+((ultRow&&ultRow.total_vendido))||0;
-      return {best:titt(o.best), doc:o.doc, cel:(((this._cliByDoc||{})[o.doc]||{}).celular)||(this._celByName||{})[norm(o.best)]||'', veces, acum, ultimoValor, ultimaTxt:numM(ultima), frecTxt: months.length<2?'1ª compra':(frec<=1?'mensual':'cada ~'+frec+' meses'), proxTxt: prox?numM(prox):'—', atrasado: !!(prox && prox<nowM),
+      return {best:titt(o.best), doc:o.doc, ref:o.doc||o.k, cel:(((this._cliByDoc||{})[o.doc]||{}).celular)||(this._celByName||{})[norm(o.best)]||'', veces, acum, ultimoValor, ultimaTxt:numM(ultima), frecTxt: months.length<2?'1ª compra':(frec<=1?'mensual':'cada ~'+frec+' meses'), proxTxt: prox?numM(prox):'—', atrasado: !!(prox && prox<nowM),
         mesesSin: ultima?(nowM-ultima):99};   // meses cumplidos sin comprar → alimenta los cajones de abajo
     }).sort((a,b)=> a.atrasado!==b.atrasado ? (a.atrasado?-1:1) : b.veces-a.veces);
+    // ── Kits sin segunda compra: clientes cuya ÚNICA compra registrada es un kit ──
+    //    (compraron el muestrario y nunca volvieron → prospecto tibio para convertir)
+    const byKit={}; vReal.forEach(v=>{ const k=norm(v.cliente); if(!k)return; (byKit[k]=byKit[k]||[]).push(v); });
+    this._kitsSin2=Object.entries(byKit).filter(([k,rows])=>rows.length===1 && rows[0].es_kit===true).map(([k,rows])=>{
+      const r=rows[0], doc=r.documento||'';
+      return {best:titt(r.cliente), doc, ref:doc||k, fecha:(r.creado_en||'').slice(0,10), mes:r.mes||'', cel:(((this._cliByDoc||{})[doc]||{}).celular)||(this._celByName||{})[k]||''};
+    }).sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));   // más reciente primero → más antiguo
     this.set(`<h1>Clientes · Smart</h1><div class="sub">Dashboard de clientes · perfil meta y recurrencia</div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn-sm" style="background:#fde8e8;color:#b3261e;border:1px solid #f5c2c2" onclick="App.recompraReset()">↺ Reiniciar seguimiento</button></div>
       <div class="kpis">
         <div class="kpi naranja"><b>${cli.length}</b><span>Clientes</span></div>
         <div class="kpi verde"><b>${recurrentes}</b><span>Recurrentes (repiten 2+ meses)</span></div>
@@ -507,10 +515,14 @@ const App = {
       </div>
       <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-size:15px;margin-bottom:4px">🏆 Clientes de más de $700.000 · barrido de llamadas</h2><button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="window.print()">🖨️ Imprimir</button></div>
         <div style="font-size:11.5px;color:#667;margin-bottom:8px">Todos los que acumulan más de <b>$700.000</b> en compras (${Object.values(porCli).filter(o=>o.v>700000).length}) · 🟢 ya pidió en ${mesActual} · ⚪ no este mes　|　🟢 bolita = <b>ya lo contacté</b> (clic) · ⚪ por contactar</div>
-        ${Object.entries(porCli).filter(([k,o])=>o.v>700000).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>{ const ref=o.doc||k; const cli2=(this._cliByDoc||{})[o.doc]||{}; const cel=((cli2.celular||(this._celByName||{})[k]||'')+''); const tel=cel.replace(/\D/g,''); const on=o.esteMes||(this._contactadoMes||new Set()).has(ref); return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-bottom:1px solid var(--linea);font-size:13px;border-radius:6px;${o.esteMes?'background:#e7f7ee':''}">
+        ${Object.entries(porCli).filter(([k,o])=>o.v>700000).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>{ const ref=o.doc||k; const cli2=(this._cliByDoc||{})[o.doc]||{}; const cel=((cli2.celular||(this._celByName||{})[k]||'')+''); const tel=cel.replace(/\D/g,''); return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-bottom:1px solid var(--linea);font-size:13px;border-radius:6px;${o.esteMes?'background:#e7f7ee':''}">
           <span>${o.esteMes?'🟢':'⚪'} ${esc(titt(o.best))}${cel?` · <span style="color:#445;font-weight:600">📱 ${esc(cel)}</span>`:` · <button onclick="App.cliSmartTel('${esc(o.doc||'')}')" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa;border-radius:7px;padding:2px 8px;font-size:11px;cursor:pointer">➕ Tel</button>`}</span>
-          <span style="display:flex;align-items:center;gap:9px"><b>${cl(o.v)}</b> <small style="color:var(--gristxt);font-weight:700" title="compras registradas">(${o.n})</small> · <span style="color:var(--verde)">${cl(o.c)}</span><span ${o.esteMes?'':`onclick="App.recompraToggle('${esc(ref)}')"`} id="bola-${esc(ref).replace(/[^a-zA-Z0-9]/g,'')}" title="${o.esteMes?'Compró este mes → contactado ✓':'Marca que ya lo contacté este mes (clic)'}" style="display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid #16a34a;background:${on?'#16a34a':'#fff'};flex:none;${o.esteMes?'':'cursor:pointer'}"></span></span>
+          <span style="display:flex;align-items:center;gap:9px"><b>${cl(o.v)}</b> <small style="color:var(--gristxt);font-weight:700" title="compras registradas">(${o.n})</small> · <span style="color:var(--verde)">${cl(o.c)}</span>${this._bola(ref)}</span>
         </div>`;}).join('')||'<div class="empty">Sin datos</div>'}
+      </div>
+      <div class="card"><h2 style="font-size:15px;margin-bottom:4px">🧪 Kits sin segunda compra</h2>
+        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Clientes cuya única compra fue un kit de muestras y aún no recompran (${this._kitsSin2.length}). Del más reciente al más antiguo. 🟢 bolita = ya lo contacté (clic).</div>
+        ${this._kitsRows(this._kitsSin2)}
       </div>
       <div style="margin:16px 0 6px"><h2 style="font-size:15px">📊 Clientes por hace cuánto compraron</h2>
         <div style="font-size:11.5px;color:#667;margin:4px 0 10px">Los ${this._cliAnalitico.length} clientes con compras, cada uno en un solo cajón según su última compra. La base guarda el <b>mes</b> de la venta, no el día, así que van por meses cumplidos. Ábrelos para ver quiénes son y llamarlos.</div></div>
@@ -539,11 +551,26 @@ const App = {
     const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     return arr.map(c=>{ const cel=(c.cel||''); const tel=(cel+'').replace(/\D/g,'');
       return `<div class="item" style="${c.atrasado?'border-left:3px solid var(--rojo)':''}"><div class="top"><div><div class="nom">${esc(c.best)} <small style="color:var(--gristxt);font-weight:700">(${c.veces})</small>${cel?` · <span style="font-size:12px;color:#445;font-weight:600">📱 ${esc(cel)}</span>`:''}</div>
-        <div class="meta">💰 acumulado <b>${cl(c.acum)}</b> · 📦 último ${cl(c.ultimoValor)} (${c.ultimaTxt}) · 🔁 ${c.frecTxt}${c.proxTxt!=='—'?' · 🔮 próx '+c.proxTxt:''}${c.atrasado?' · <b style="color:var(--rojo)">⚠️ atrasado</b>':''}</div></div></div>
+        <div class="meta">💰 acumulado <b>${cl(c.acum)}</b> · 📦 último ${cl(c.ultimoValor)} (${c.ultimaTxt}) · 🔁 ${c.frecTxt}${c.proxTxt!=='—'?' · 🔮 próx '+c.proxTxt:''}${c.atrasado?' · <b style="color:var(--rojo)">⚠️ atrasado</b>':''}</div></div>${this._bola(c.ref)}</div>
         <div class="acciones-item">
           <button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.cotAbrir('${esc(c.doc)}')">🧮 Cotizar</button>
           ${tel?`<a class="btn-sm" href="https://wa.me/57${tel}" target="_blank" style="background:#25d366;color:#fff">📱 WhatsApp</a><a class="btn-sm" href="tel:${esc(cel)}" style="background:#2f6fed;color:#fff">📞 Llamar</a>`:`<button class="btn-sm" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa" onclick="App.cliSmartTel('${esc(c.doc||'')}')">➕ Tel</button>`}
         </div></div>`;}).join('');
+  },
+  /* Bolita de seguimiento reutilizable — misma en $700k, kits y cajones.
+     data-ref permite que un mismo cliente que aparezca en dos secciones (ej: un
+     kit-cliente sale también en su cajón) se pinte en las dos al hacer clic. */
+  _bola(ref){
+    const on=(this._contactadoMes||new Set()).has(ref);
+    return `<span class="bolita" data-ref="${esc(String(ref))}" onclick="App.recompraToggle('${esc(String(ref))}')" title="Marca / desmarca que ya lo contacté (clic)" style="display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid #16a34a;background:${on?'#16a34a':'#fff'};flex:none;cursor:pointer"></span>`;
+  },
+  _kitsRows(arr){
+    if(!arr||!arr.length) return '<div class="empty">Ningún kit pendiente de segunda compra 🎉</div>';
+    return arr.map(o=>{ const cel=(o.cel||'')+''; const tel=cel.replace(/\D/g,'');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 9px;border-bottom:1px solid var(--linea);font-size:13px">
+        <span>🧪 ${esc(o.best)}${cel?` · <span style="color:#445;font-weight:600">📱 ${esc(cel)}</span>`:''} · <small style="color:#889">🗓️ ${esc(o.fecha||o.mes||'—')}</small></span>
+        <span style="display:flex;align-items:center;gap:8px">${tel?`<a class="btn-sm" href="https://wa.me/57${tel}" target="_blank" style="background:#25d366;color:#fff;padding:4px 9px">📱</a>`:`<button class="btn-sm" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa;padding:3px 8px;font-size:11px" onclick="App.cliSmartTel('${esc(o.doc||'')}')">➕ Tel</button>`}<button class="btn-sm" style="background:var(--naranja);color:#fff;padding:4px 9px" onclick="App.cotAbrir('${esc(o.doc||'')}')" title="Cotizar">🧮</button>${this._bola(o.ref)}</span>
+      </div>`;}).join('');
   },
   async recompraToggle(ref){
     const mes=this._mesActual||''; const set=this._contactadoMes||(this._contactadoMes=new Set());
@@ -551,8 +578,19 @@ const App = {
     try{
       if(set.has(ref)){ await fetch(this._SBU()+'/rest/v1/nc_recompra_contacto?empresa=eq.smart&ref=eq.'+encodeURIComponent(ref),{method:'DELETE',headers:H}); set.delete(ref); }
       else { await fetch(this._SBU()+'/rest/v1/nc_recompra_contacto?on_conflict=empresa,ref',{method:'POST',headers:{...H,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:'smart',ref,mes})}); set.add(ref); }
-      const el=document.getElementById('bola-'+ref.replace(/[^a-zA-Z0-9]/g,'')); if(el) el.style.background=set.has(ref)?'#16a34a':'#fff';
+      const bg=set.has(ref)?'#16a34a':'#fff';
+      document.querySelectorAll('.bolita').forEach(el=>{ if(el.getAttribute('data-ref')===String(ref)) el.style.background=bg; });
     }catch(e){}
+  },
+  /* Reinicia TODO el seguimiento del mes: borra las marcas de contacto y deja
+     todas las bolitas sin color (las tres secciones a la vez). */
+  async recompraReset(){
+    if(!confirm('¿Reiniciar el seguimiento? Todas las bolitas (más de $700k, kits y cajones) quedan sin marcar.')) return;
+    const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
+    try{ await fetch(this._SBU()+'/rest/v1/nc_recompra_contacto?empresa=eq.smart',{method:'DELETE',headers:H}); }catch(e){}
+    this._contactadoMes=new Set();
+    document.querySelectorAll('.bolita').forEach(el=>el.style.background='#fff');
+    this._toast('↺ Seguimiento reiniciado');
   },
   async cliSmartTel(doc){
     if(!doc){ alert('Este cliente no tiene documento en la base para guardar el teléfono.'); return; }
