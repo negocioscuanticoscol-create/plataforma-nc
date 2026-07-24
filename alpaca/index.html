@@ -39,12 +39,12 @@
   .topbar .who{text-align:right;font-size:12px;line-height:1.3}
   .topbar .rol{display:inline-block;background:var(--negro);color:#fff;font-size:10px;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
   .logout{background:none;border:none;color:var(--suave);font-size:12px;cursor:pointer;margin-left:10px}
-  #main{flex:1;padding:14px 14px 110px}
+  #main{flex:1;padding:14px 14px 148px}
   h1{font-size:19px;margin-bottom:4px}
   .sub{color:var(--suave);font-size:13px;margin-bottom:14px}
 
-  #nav{position:fixed;bottom:0;left:0;right:0;max-width:720px;margin:0 auto;background:#fff;border-top:1px solid var(--linea);display:flex;z-index:20}
-  #nav button{flex:1;background:none;border:none;padding:9px 2px 10px;font-size:10.5px;color:var(--suave);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+  #nav{position:fixed;bottom:0;left:0;right:0;max-width:720px;margin:0 auto;background:#fff;border-top:1px solid var(--linea);display:flex;flex-wrap:wrap;z-index:20}
+  #nav button{flex:1 1 20%;min-width:62px;background:none;border:none;padding:8px 2px 9px;font-size:10px;color:var(--suave);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;border-top:1px solid #f4f5f7}
   #nav button .ic{font-size:20px}
   #nav button.active{color:var(--rojo);font-weight:700}
 
@@ -136,13 +136,24 @@ const App = {
     document.getElementById('login').classList.add('hide');
     document.getElementById('app').classList.remove('hide');
     document.getElementById('rol').textContent = this.rol;
-    this.pintarNav(); this.go(this.esAdmin()?'productos':'catalogo');
+    this.pintarNav(); this.go('panel');
   },
 
   pintarNav(){
-    const items = this.esAdmin()
-      ? [['productos','📦','Productos'],['catalogo','📋','Catálogo'],['cotizar','🧮','Cotizar']]
-      : [['catalogo','📋','Catálogo'],['cotizar','🧮','Cotizar']];
+    // Mismas pestañas que Feroz + las propias de calzado (Productos, Catálogo)
+    const TABS=[
+      ['panel','📈','Panel'],
+      ['productos','👟','Productos'],   // solo admin
+      ['catalogo','📋','Catálogo'],
+      ['cotizar','🧮','Cotizar'],
+      ['clientes','👥','Clientes'],
+      ['pedidos','📦','Pedidos'],
+      ['despachos','🚚','Despachos'],
+      ['cartera','💳','Cartera'],
+      ['crm','📇','CRM'],
+      ['planta','🏭','Planta'],
+    ];
+    const items = TABS.filter(t=> this.esAdmin() || t[0]!=='productos');
     document.getElementById('nav').innerHTML = items.map(([v,ic,t])=>
       `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
   },
@@ -150,7 +161,60 @@ const App = {
     this.view=view;
     document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.v===view));
     window.scrollTo(0,0);
-    ({productos:this.vProductos, catalogo:this.vCatalogo, cotizar:this.vCotizar}[view]||this.vCatalogo).call(this);
+    ({panel:this.vPanel, productos:this.vProductos, catalogo:this.vCatalogo, cotizar:this.vCotizar,
+      clientes:this.vClientes, pedidos:this.vPedidos, despachos:this.vDespachos, cartera:this.vCartera,
+      crm:this.vCrm, planta:this.vPlanta}[view]||this.vPanel).call(this);
+  },
+  _soon(icon,title,desc){
+    this.set(`<h1>${title}</h1>
+      <div class="card" style="text-align:center;padding:36px 18px">
+        <div style="font-size:46px">${icon}</div>
+        <div style="font-weight:800;margin-top:10px;font-size:16px">${title} · Calzado Alpaca</div>
+        <div class="sub" style="margin-top:8px">${desc}</div>
+        <div style="margin-top:12px;display:inline-block;background:#fff4e5;color:var(--amber);font-weight:700;font-size:12px;padding:6px 14px;border-radius:20px">🔧 Próximamente</div>
+      </div>`);
+  },
+  vPedidos(){ this._soon('📦','Pedidos','Aquí verás los pedidos confirmados, con su curva de tallas y estado de producción.'); },
+  vDespachos(){ this._soon('🚚','Despachos','Seguimiento de envíos y entregas a los clientes de calzado.'); },
+  vCartera(){ this._soon('💳','Cartera','Estado de pagos y cartera por cliente.'); },
+  vCrm(){ this._soon('📇','CRM','Seguimiento comercial: prospectos, recompra y remarketing.'); },
+  vPlanta(){ this._soon('🏭','Planta','Producción e inventario de referencias por talla.'); },
+
+  /* ---------- PANEL (resumen) ---------- */
+  vPanel(){
+    const prods=this._load(), clis=this._loadCli();
+    this.set(`<h1>Panel · Alpaca</h1><div class="sub">Resumen de la operación</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div class="card" style="margin:0;text-align:center"><div style="font-size:32px;font-weight:800;color:var(--rojo)">${prods.length}</div><div class="col">Productos en catálogo</div></div>
+        <div class="card" style="margin:0;text-align:center"><div style="font-size:32px;font-weight:800">${clis.length}</div><div class="col">Clientes</div></div>
+      </div>
+      <div class="card" style="background:linear-gradient(135deg,#15171c,#2a2d34);color:#fff;border:none">
+        <div class="logo" style="margin-bottom:8px"><span class="mark">A</span><span class="txt"><b style="color:#fff">ALPACA</b><span>Los Indestructibles</span></span></div>
+        <div style="opacity:.82;font-size:12.5px;line-height:1.5">Plataforma de gestión para comercializadora de calzado. Crea tus referencias, arma el catálogo con 4 listas de precio y cotiza en segundos.</div>
+      </div>`);
+  },
+
+  /* ---------- CLIENTES ---------- */
+  _loadCli(){ try{ return JSON.parse(localStorage.getItem('alpaca_clientes')||'[]'); }catch(e){ return []; } },
+  _saveCli(a){ localStorage.setItem('alpaca_clientes', JSON.stringify(a)); },
+  guardarCli(){
+    const g=id=>(document.getElementById(id).value||'').trim();
+    const nom=g('cl_nom'); if(!nom){ alert('Escribe el nombre del cliente.'); return; }
+    const a=this._loadCli(); a.unshift({id:'c'+Date.now(),nom,tel:g('cl_tel'),ciu:g('cl_ciu'),nit:g('cl_nit')});
+    this._saveCli(a); this.toast('✅ Cliente agregado'); this.vClientes();
+  },
+  borrarCli(id){ if(!confirm('¿Eliminar este cliente?'))return; this._saveCli(this._loadCli().filter(c=>c.id!==id)); this.toast('Eliminado'); this.vClientes(); },
+  vClientes(){
+    const arr=this._loadCli(); const admin=this.esAdmin();
+    this.set(`<h1>Clientes</h1><div class="sub">${arr.length} cliente${arr.length===1?'':'s'} de Alpaca</div>
+      ${admin?`<div class="card">
+        <div class="row2"><div><label>Nombre / negocio</label><input id="cl_nom" class="field" placeholder="Ej: Calzado El Éxito"></div><div><label>Celular</label><input id="cl_tel" class="field" placeholder="300..."></div></div>
+        <div class="row2"><div><label>Ciudad</label><input id="cl_ciu" class="field"></div><div><label>NIT / CC</label><input id="cl_nit" class="field"></div></div>
+        <button class="btn-sm btn-rojo" style="width:100%;padding:12px;margin-top:12px" onclick="App.guardarCli()">＋ Agregar cliente</button></div>`:''}
+      ${arr.length? arr.map(c=>`<div class="prod"><div class="top">
+        <div><div class="ref">${this.esc(c.nom)}</div><div class="col">${this.esc(c.ciu||'—')}${c.nit?' · '+this.esc(c.nit):''}${c.tel?' · '+this.esc(c.tel):''}</div></div>
+        <div style="display:flex;gap:6px">${c.tel?`<a class="btn-sm" style="background:#25d366;color:#fff" href="https://wa.me/57${(c.tel+'').replace(/\D/g,'')}" target="_blank">📱</a>`:''}${admin?`<button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.borrarCli('${c.id}')">🗑</button>`:''}</div>
+      </div></div>`).join('') : '<div class="empty">Aún no hay clientes.'+(admin?' Agrega el primero arriba.':'')+'</div>'}`);
   },
   set(html){ document.getElementById('main').innerHTML = html; },
   fmt(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
