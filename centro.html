@@ -166,6 +166,7 @@ async vResumen(){
    {n:'ZARRAT',g:'cli',bot:null,d:'Atelier de moda a la medida',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/zarrat/'},
    {n:'FES Fueling',g:'cli',bot:null,d:'ERP repuestos cisternas',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/fesfueling/'},
    {n:'KRUH',g:'cli',bot:null,d:'Panadería → restaurante',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/kruh/'},
+   {n:'Calzado Alpaca',g:'cli',bot:null,d:'Comercializadora de calzado · Los Indestructibles',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/alpaca/'},
   ];
   const totLeads=(leadsBy.smart||0)+(leadsBy.feroz||0);
   const totSeg=cuentas.reduce((a,c)=>a+(+c.seguidores||0),0);
@@ -268,6 +269,7 @@ vEmpresas(){
    ['Smart','Envases herméticos · B2B','https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=smart'],
    ['FES Fueling','ERP repuestos cisternas','https://negocioscuanticoscol-create.github.io/plataforma-nc/fesfueling/'],
    ['ZARRAT','Atelier de moda a la medida','https://negocioscuanticoscol-create.github.io/plataforma-nc/zarrat/'],
+   ['Calzado Alpaca','Comercializadora de calzado','https://negocioscuanticoscol-create.github.io/plataforma-nc/alpaca/'],
   ];
   $('main').innerHTML=`<h1>🏢 Empresas</h1><div class="sub">Entra a la operación de cada una.</div>
     <div class="emp">${emp.map(([n,d,u])=>`<a class="empc" href="${u}" target="_blank"><div class="en">${esc(n)}</div><div class="ed">${esc(d)}</div><span class="go">Abrir →</span></a>`).join('')}</div>`;
