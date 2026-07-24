@@ -118,10 +118,34 @@ const App = {
   TALLAS:[34,35,36,37,38,39,40,41,42,43,44,45],
   rol:'', view:'productos', _tallaSel:[], _editId:null,
 
-  /* ---------- persistencia local (demo) ---------- */
-  _key(){ return 'alpaca_productos'; },
-  _load(){ try{ return JSON.parse(localStorage.getItem(this._key())||'[]'); }catch(e){ return []; } },
-  _save(arr){ localStorage.setItem(this._key(), JSON.stringify(arr)); },
+  /* ---------- datos: Supabase (persistente) con respaldo local ---------- */
+  SB:'https://fnayedgvamxktxfvywwl.supabase.co',
+  KEY:'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',
+  _online:false, _prods:[], _clis:[],
+  _H(){ return {apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':'application/json'}; },
+  _loadLocal(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } },
+  _saveLocal(k,a){ try{ localStorage.setItem(k,JSON.stringify(a)); }catch(e){} },
+  async _sync(){   // trae ambas tablas a memoria; si no existen todavía, cae a local
+    try{
+      const [rp,rc]=await Promise.all([
+        fetch(this.SB+'/rest/v1/alpaca_productos?select=*&order=creado_en.desc&limit=5000',{headers:this._H()}),
+        fetch(this.SB+'/rest/v1/alpaca_clientes?select=*&order=creado_en.desc&limit=5000',{headers:this._H()})
+      ]);
+      if(rp.ok && rc.ok){ this._prods=await rp.json(); this._clis=await rc.json(); this._online=true; return; }
+    }catch(e){}
+    this._online=false;
+    this._prods=this._loadLocal('alpaca_productos');
+    this._clis=this._loadLocal('alpaca_clientes');
+  },
+  _load(){ return this._prods||[]; },
+  async _put(tabla,row,cacheArr){   // upsert por id; en local guarda todo el arreglo
+    if(this._online){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)}); }catch(e){} }
+    else { this._saveLocal(tabla,cacheArr); }
+  },
+  async _del(tabla,id,cacheArr){
+    if(this._online){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:this._H()}); }catch(e){} }
+    else { this._saveLocal(tabla,cacheArr); }
+  },
 
   /* ---------- acceso ---------- */
   login(){
@@ -132,10 +156,12 @@ const App = {
   },
   logout(){ sessionStorage.removeItem('alpaca_rol'); this.rol=''; location.reload(); },
   esAdmin(){ return this.rol==='admin'; },
-  _start(){
+  async _start(){
     document.getElementById('login').classList.add('hide');
     document.getElementById('app').classList.remove('hide');
     document.getElementById('rol').textContent = this.rol;
+    document.getElementById('main').innerHTML='<div style="text-align:center;padding:44px;color:#999">Cargando…</div>';
+    await this._sync();
     this.pintarNav(); this.go('panel');
   },
 
@@ -191,19 +217,21 @@ const App = {
       <div class="card" style="background:linear-gradient(135deg,#15171c,#2a2d34);color:#fff;border:none">
         <div class="logo" style="margin-bottom:8px"><span class="mark">A</span><span class="txt"><b style="color:#fff">ALPACA</b><span>Los Indestructibles</span></span></div>
         <div style="opacity:.82;font-size:12.5px;line-height:1.5">Plataforma de gestión para comercializadora de calzado. Crea tus referencias, arma el catálogo con 4 listas de precio y cotiza en segundos.</div>
-      </div>`);
+      </div>
+      ${this._online
+        ? '<div style="text-align:center;font-size:11.5px;color:var(--verde);font-weight:700;margin-top:2px">☁️ Datos sincronizados en la nube (Supabase)</div>'
+        : '<div style="text-align:center;font-size:11.5px;color:var(--amber);font-weight:700;margin-top:2px">💾 Modo local — falta crear las tablas alpaca_* para sincronizar en la nube</div>'}`);
   },
 
   /* ---------- CLIENTES ---------- */
-  _loadCli(){ try{ return JSON.parse(localStorage.getItem('alpaca_clientes')||'[]'); }catch(e){ return []; } },
-  _saveCli(a){ localStorage.setItem('alpaca_clientes', JSON.stringify(a)); },
-  guardarCli(){
+  _loadCli(){ return this._clis||[]; },
+  async guardarCli(){
     const g=id=>(document.getElementById(id).value||'').trim();
     const nom=g('cl_nom'); if(!nom){ alert('Escribe el nombre del cliente.'); return; }
-    const a=this._loadCli(); a.unshift({id:'c'+Date.now(),nom,tel:g('cl_tel'),ciu:g('cl_ciu'),nit:g('cl_nit')});
-    this._saveCli(a); this.toast('✅ Cliente agregado'); this.vClientes();
+    const c={id:'c'+Date.now(),nom,tel:g('cl_tel'),ciu:g('cl_ciu'),nit:g('cl_nit')};
+    this._clis.unshift(c); await this._put('alpaca_clientes',c,this._clis); this.toast('✅ Cliente agregado'); this.vClientes();
   },
-  borrarCli(id){ if(!confirm('¿Eliminar este cliente?'))return; this._saveCli(this._loadCli().filter(c=>c.id!==id)); this.toast('Eliminado'); this.vClientes(); },
+  async borrarCli(id){ if(!confirm('¿Eliminar este cliente?'))return; this._clis=this._clis.filter(c=>c.id!==id); await this._del('alpaca_clientes',id,this._clis); this.toast('Eliminado'); this.vClientes(); },
   vClientes(){
     const arr=this._loadCli(); const admin=this.esAdmin();
     this.set(`<h1>Clientes</h1><div class="sub">${arr.length} cliente${arr.length===1?'':'s'} de Alpaca</div>
@@ -257,7 +285,7 @@ const App = {
       </div>`);
   },
   toggleTalla(t,el){ const i=this._tallaSel.indexOf(t); if(i<0)this._tallaSel.push(t); else this._tallaSel.splice(i,1); el.classList.toggle('on'); },
-  guardar(){
+  async guardar(){
     const g=id=>(document.getElementById(id).value||'').trim();
     const ref=g('f_ref'); if(!ref){ alert('Escribe la referencia.'); return; }
     const listas=[0,1,2,3].map(i=>+g('f_l'+i)||0);
@@ -267,15 +295,14 @@ const App = {
       ref, color:g('f_color'), tallas:[...this._tallaSel].sort((a,b)=>a-b),
       compra:+g('f_compra')||0, listas
     };
-    const arr=this._load();
-    const i=arr.findIndex(p=>p.id===prod.id);
-    if(i>=0) arr[i]=prod; else arr.unshift(prod);
-    this._save(arr); this._editId=null;
+    const i=this._prods.findIndex(p=>p.id===prod.id);
+    if(i>=0) this._prods[i]=prod; else this._prods.unshift(prod);
+    await this._put('alpaca_productos',prod,this._prods); this._editId=null;
     this.toast(i>=0?'Producto actualizado':'✅ Producto creado');
     this.go('catalogo');
   },
   editar(id){ this._editId=id; this.go('productos'); },
-  borrar(id){ if(!confirm('¿Eliminar este producto?'))return; this._save(this._load().filter(p=>p.id!==id)); this.toast('Eliminado'); this.go('catalogo'); },
+  async borrar(id){ if(!confirm('¿Eliminar este producto?'))return; this._prods=this._prods.filter(p=>p.id!==id); await this._del('alpaca_productos',id,this._prods); this.toast('Eliminado'); this.go('catalogo'); },
 
   /* ---------- CATÁLOGO ---------- */
   vCatalogo(){
