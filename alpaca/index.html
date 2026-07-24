@@ -122,22 +122,26 @@ const App = {
   /* ---------- datos: Supabase (persistente) con respaldo local ---------- */
   SB:'https://fnayedgvamxktxfvywwl.supabase.co',
   KEY:'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',
-  _online:false, _prods:[], _clis:[],
+  _online:false, _prods:[], _clis:[], _peds:[],
   _H(){ return {apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':'application/json'}; },
   _loadLocal(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } },
   _saveLocal(k,a){ try{ localStorage.setItem(k,JSON.stringify(a)); }catch(e){} },
   async _sync(){   // trae ambas tablas a memoria; si no existen todavía, cae a local
     try{
-      const [rp,rc]=await Promise.all([
+      const [rp,rc,rd]=await Promise.all([
         fetch(this.SB+'/rest/v1/alpaca_productos?select=*&order=creado_en.desc&limit=5000',{headers:this._H()}),
-        fetch(this.SB+'/rest/v1/alpaca_clientes?select=*&order=creado_en.desc&limit=5000',{headers:this._H()})
+        fetch(this.SB+'/rest/v1/alpaca_clientes?select=*&order=creado_en.desc&limit=5000',{headers:this._H()}),
+        fetch(this.SB+'/rest/v1/alpaca_pedidos?select=*&order=creado_en.desc&limit=5000',{headers:this._H()})
       ]);
-      if(rp.ok && rc.ok){ this._prods=await rp.json(); this._clis=await rc.json(); this._online=true; return; }
+      if(rp.ok && rc.ok && rd.ok){ this._prods=await rp.json(); this._clis=await rc.json(); this._peds=await rd.json(); this._online=true; return; }
     }catch(e){}
     this._online=false;
     this._prods=this._loadLocal('alpaca_productos');
     this._clis=this._loadLocal('alpaca_clientes');
+    this._peds=this._loadLocal('alpaca_pedidos');
   },
+  _folio(){ const n=new Date(),p=x=>String(x).padStart(2,'0'); return 'ALP-'+n.getFullYear()+p(n.getMonth()+1)+p(n.getDate())+'-'+p(n.getHours())+p(n.getMinutes())+p(n.getSeconds()); },
+  _hoy(){ const n=new Date(),p=x=>String(x).padStart(2,'0'); return p(n.getDate())+'/'+p(n.getMonth()+1)+'/'+n.getFullYear(); },
   _load(){ return this._prods||[]; },
   async _put(tabla,row,cacheArr){   // upsert por id; en local guarda todo el arreglo
     if(this._online){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)}); }catch(e){} }
@@ -201,9 +205,31 @@ const App = {
         <div style="margin-top:12px;display:inline-block;background:#fff4e5;color:var(--amber);font-weight:700;font-size:12px;padding:6px 14px;border-radius:20px">🔧 Próximamente</div>
       </div>`);
   },
-  vPedidos(){ this._soon('📦','Pedidos','Aquí verás los pedidos confirmados, con su curva de tallas y estado de producción.'); },
-  vDespachos(){ this._soon('🚚','Despachos','Seguimiento de envíos y entregas a los clientes de calzado.'); },
-  vCartera(){ this._soon('💳','Cartera','Estado de pagos y cartera por cliente.'); },
+  /* ---------- FLUJO DE PEDIDOS (cotización → pedido → despacho → cartera) ---------- */
+  _stage(estado){ return (this._peds||[]).filter(p=>p.estado===estado); },
+  _pedCard(p,next,nextLabel,admin){
+    const items=(p.items||[]).map(it=>{
+      const curva=Object.entries(it.curva||{}).map(([t,q])=>`T${t}:${q}`).join(' ');
+      return `<div style="margin-top:4px"><b>${this.esc(it.ref)}</b>${it.color?' · '+this.esc(it.color):''} — ${it.pares} pares × ${this.fmt(it.precio)} <span style="color:#999">(${it.lista||''})</span><div style="font-size:11px;color:#999">${curva}</div></div>`;
+    }).join('');
+    return `<div class="prod">
+      <div class="top"><div><div class="ref">${this.esc(p.cliente)}</div><div class="col">${this.esc(p.folio)} · ${this.esc(p.fecha||'')}</div></div>
+        <div style="text-align:right"><div style="font-weight:800;color:var(--rojo);font-size:16px">${this.fmt(p.total)}</div><div class="col">${p.pares} pares</div></div></div>
+      <div style="font-size:12.5px;color:#555">${items}</div>
+      ${admin?`<div class="acc">${next?`<button class="btn-sm btn-rojo" onclick="App.avanzar('${p.id}','${next}')">${nextLabel} →</button>`:`<button class="btn-sm" style="background:var(--verde);color:#fff" onclick="App.avanzar('${p.id}','pagado')">✓ Marcar pagado</button>`}<button class="btn-sm btn-gris" onclick="App.borrarPed('${p.id}')">🗑</button></div>`:''}
+    </div>`;
+  },
+  _stageView(estado,titulo,sub,next,nextLabel){
+    const arr=this._stage(estado); const admin=this.esAdmin();
+    const tot=arr.reduce((a,p)=>a+(+p.total||0),0);
+    this.set(`<h1>${titulo}</h1><div class="sub">${sub} · ${arr.length} pedido${arr.length===1?'':'s'}${arr.length?' · '+this.fmt(tot):''}</div>
+      ${arr.length?arr.map(p=>this._pedCard(p,next,nextLabel,admin)).join(''):'<div class="empty">Sin pedidos en esta etapa.</div>'}`);
+  },
+  vPedidos(){ this._stageView('pedido','📦 Pedidos','Confirmados, listos para despachar','despacho','Pasar a despacho'); },
+  vDespachos(){ this._stageView('despacho','🚚 Despachos','En camino al cliente','cartera','Pasar a cartera'); },
+  vCartera(){ this._stageView('cartera','💳 Cartera','Entregados, pendientes de pago',null,'Marcar pagado'); },
+  async avanzar(id,next){ const p=(this._peds||[]).find(x=>x.id===id); if(!p)return; p.estado=next; await this._put('alpaca_pedidos',p,this._peds); if(next==='pagado')this._peds=this._peds.filter(x=>x.id!==id); this.toast('Pedido movido'); this.go(this.view); },
+  async borrarPed(id){ if(!confirm('¿Eliminar este pedido?'))return; this._peds=this._peds.filter(p=>p.id!==id); await this._del('alpaca_pedidos',id,this._peds); this.toast('Eliminado'); this.go(this.view); },
   vCrm(){ this._soon('📇','CRM','Seguimiento comercial: prospectos, recompra y remarketing.'); },
   vPlanta(){ this._soon('🏭','Planta','Producción e inventario de referencias por talla.'); },
 
@@ -221,7 +247,11 @@ const App = {
       </div>
       ${this._online
         ? '<div style="text-align:center;font-size:11.5px;color:var(--verde);font-weight:700;margin-top:2px">☁️ Datos sincronizados en la nube (Supabase)</div>'
-        : '<div style="text-align:center;font-size:11.5px;color:var(--amber);font-weight:700;margin-top:2px">💾 Modo local — falta crear las tablas alpaca_* para sincronizar en la nube</div>'}`);
+        : '<div style="text-align:center;font-size:11.5px;color:var(--amber);font-weight:700;margin-top:2px">💾 Modo local — falta crear las tablas alpaca_* para sincronizar en la nube</div>'}
+      ${this.esAdmin()?`<div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn-sm btn-gris" style="flex:1;padding:11px" onclick="App.sembrarDemo()">🎬 Cargar datos de demostración</button>
+        <button class="btn-sm" style="padding:11px;background:#fde8e8;color:#b3261e" onclick="App.limpiarDemo()">Borrar todo</button>
+      </div>`:''}`);
   },
 
   /* ---------- CLIENTES ---------- */
@@ -378,9 +408,53 @@ const App = {
           <div><div style="font-size:12px;color:var(--suave)">Total pares <b id="c_pares">0</b></div><div style="font-size:12px;color:var(--suave)">Precio unit. <b id="c_unit">$0</b></div></div>
           <div style="text-align:right"><div style="font-size:12px;color:var(--suave)">Total</div><div id="c_total" style="font-size:24px;font-weight:800;color:var(--rojo);font-family:'IBM Plex Mono',monospace">$0</div></div>
         </div>
-        <button class="btn-sm btn-rojo" style="width:100%;padding:13px;margin-top:12px" onclick="App.cotWA()">📱 Enviar por WhatsApp</button>
-      </div>`);
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn-sm btn-rojo" style="flex:1;padding:13px" onclick="App.guardarCot()">💾 Guardar cotización</button>
+          <button class="btn-sm btn-gris" style="padding:13px" onclick="App.cotWA()" title="Enviar por WhatsApp">📱</button>
+        </div>
+      </div>
+      ${(()=>{ const cots=this._stage('cotizacion'); return cots.length?'<h2 style="font-size:15px;margin:10px 0 8px">📝 Cotizaciones en cola ('+cots.length+')</h2>'+cots.map(p=>this._pedCard(p,'pedido','Pasar a pedido',this.esAdmin())).join(''):''; })()}`);
     this._cotTallas();
+  },
+  async guardarCot(){
+    const p=this._cotProd(); if(!p) return;
+    const g=id=>{ const e=document.getElementById(id); return e?(e.value||'').trim():''; };
+    const cli=g('c_cli')||'Cliente sin nombre';
+    const li=+document.getElementById('c_lista').value||0; const unit=p.listas[li]||0;
+    const curva={}; let pares=0;
+    document.querySelectorAll('#c_tallas input').forEach(i=>{ const q=+i.value||0; if(q>0){ curva[i.dataset.t]=q; pares+=q; } });
+    if(!pares){ alert('Pon cantidades por talla.'); return; }
+    const order={ id:'o'+Date.now(), folio:this._folio(), cliente:cli, estado:'cotizacion',
+      items:[{ref:p.ref,color:p.color,lista:this.LISTAS[li],precio:unit,curva,pares,subtotal:pares*unit}], total:pares*unit, pares, fecha:this._hoy() };
+    this._peds.unshift(order); await this._put('alpaca_pedidos',order,this._peds);
+    this.toast('✅ Cotización guardada'); this.go('cotizar');
+  },
+  /* Reparte N pares entre las tallas de forma pareja (para sembrar la demo) */
+  _curva(tallas,total){ const c={},n=tallas.length,base=Math.floor(total/n); let rem=total-base*n; tallas.forEach((t,i)=>{ c[t]=base+(i<rem?1:0); }); return c; },
+  async sembrarDemo(){
+    if(!confirm('Cargar datos de demostración: 1 cliente distribuidor, 3 referencias y 4 pedidos de la gran dotación (uno en cada etapa)?')) return;
+    const P=[
+      {id:'seed1',ref:'701 Bota Operario',color:'Negro',tallas:[36,37,38,39,40,41,42,43,44],compra:48000,listas:[89000,82000,75000,69000]},
+      {id:'seed2',ref:'707 Bota Ingeniero',color:'Café',tallas:[38,39,40,41,42,43,44],compra:78000,listas:[139000,129000,119000,109000]},
+      {id:'seed3',ref:'703 Botín Dieléctrico',color:'Negro',tallas:[37,38,39,40,41,42,43],compra:62000,listas:[109000,99000,92000,85000]},
+    ];
+    const cli={id:'seedcli',nom:'Distribuidora La Gran Dotación S.A.S',tel:'3105557788',tipo:'distribuidor',tipo_persona:'juridica',
+      datos:{razon_social:'Distribuidora La Gran Dotación S.A.S',rut:'901555777-3',recibe:'Carlos Mejía',celular:'3105557788',direccion:'Zona Franca Bogotá, Bodega 14'}};
+    const mk=(estado,prod,pares,idx)=>{ const unit=prod.listas[0]; return {id:'seed_'+estado, folio:'ALP-DOT-'+String(idx).padStart(3,'0'), cliente:cli.nom, estado,
+      items:[{ref:prod.ref,color:prod.color,lista:this.LISTAS[0],precio:unit,curva:this._curva(prod.tallas,pares),pares,subtotal:pares*unit}], total:pares*unit, pares, fecha:this._hoy()}; };
+    for(const p of P){ if(!this._prods.find(x=>x.id===p.id)){ this._prods.unshift(p); await this._put('alpaca_productos',p,this._prods); } }
+    if(!this._clis.find(x=>x.id===cli.id)){ this._clis.unshift(cli); await this._put('alpaca_clientes',cli,this._clis); }
+    // MISMO cliente, cantidades distintas, una en cada etapa del flujo
+    const orders=[ mk('cotizacion',P[0],200,1), mk('pedido',P[0],120,2), mk('despacho',P[1],80,3), mk('cartera',P[2],60,4) ];
+    for(const o of orders){ if(!this._peds.find(x=>x.id===o.id)){ this._peds.unshift(o); await this._put('alpaca_pedidos',o,this._peds); } }
+    this.toast('✅ Datos de demostración cargados'); this.go('panel');
+  },
+  async limpiarDemo(){
+    if(!confirm('¿Borrar TODOS los productos, clientes y pedidos de Alpaca?')) return;
+    if(this._online){ for(const t of ['alpaca_pedidos','alpaca_productos','alpaca_clientes']){ try{ await fetch(this.SB+'/rest/v1/'+t+'?id=neq.__none__',{method:'DELETE',headers:this._H()}); }catch(e){} } }
+    this._peds=[]; this._prods=[]; this._clis=[];
+    this._saveLocal('alpaca_pedidos',[]); this._saveLocal('alpaca_productos',[]); this._saveLocal('alpaca_clientes',[]);
+    this.toast('Todo borrado'); this.go('panel');
   },
   _cotProd(){ return this._load().find(p=>p.id===document.getElementById('c_prod').value); },
   _cotTallas(){
