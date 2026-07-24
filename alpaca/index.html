@@ -171,13 +171,13 @@ const App = {
       ['panel','📈','Panel'],
       ['productos','👟','Productos'],   // solo admin
       ['catalogo','📋','Catálogo'],
-      ['cotizar','🧮','Cotizar'],
       ['clientes','👥','Clientes'],
+      ['cotizar','🧮','Cotizar'],
       ['pedidos','📦','Pedidos'],
       ['despachos','🚚','Despachos'],
       ['cartera','💳','Cartera'],
-      ['crm','📇','CRM'],
       ['planta','🏭','Planta'],
+      ['crm','📇','CRM'],
     ];
     const items = TABS.filter(t=> this.esAdmin() || t[0]!=='productos');
     document.getElementById('nav').innerHTML = items.map(([v,ic,t])=>
