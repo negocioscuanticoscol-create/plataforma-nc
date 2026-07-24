@@ -1808,7 +1808,10 @@ const App = {
     // y quedó corto en meses recientes (jun a la mitad, jul en 0). Tomamos el MAYOR
     // de las dos por mes para no subcontar; ene–may sin pedidos siguen desde ventas_ref.
     const _pedUdsBy={}; _peds.forEach(pp=>{ const d=pp.datos||{}; const dt=new Date(pp.creado_en); const mm=_M3[dt.getMonth()]+'-'+dt.getFullYear(); _pedUdsBy[mm]=(_pedUdsBy[mm]||0)+(+d.total_uds||0); });
-    Object.keys(_pedUdsBy).forEach(mm=>{ _envBy[mm]=Math.max(_envBy[mm]||0, _pedUdsBy[mm]); });
+    // Para CUALQUIER mes con pedidos reales, esos mandan (fuente viva). nc_ventas_ref
+    // (legado) solo cubre meses viejos sin pedidos. Así los meses NUEVOS se
+    // autocorrigen solos, sin que nadie tenga que actualizar la tabla vieja.
+    Object.keys(_pedUdsBy).forEach(mm=>{ if(_pedUdsBy[mm]>0) _envBy[mm]=_pedUdsBy[mm]; });
     const _rmap={}; _resumen.forEach(r=>{ if(r.mes)_rmap[r.mes]=r; });
     let _regBase=0; _resumen.forEach(r=>{ const rr=+r.clientes_registrados||0; if(rr>_regBase)_regBase=rr; });
     const _mesesSet=new Set(); _resumen.forEach(r=>r.mes&&_mesesSet.add(r.mes)); Object.keys(_kitBy).forEach(m=>_mesesSet.add(m)); Object.keys(_nuevoBy).forEach(m=>_mesesSet.add(m)); Object.keys(_ventBy).forEach(m=>_mesesSet.add(m));
