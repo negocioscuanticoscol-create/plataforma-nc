@@ -1800,10 +1800,15 @@ const App = {
     const _ventBy={}, _recurSet={}, _m300={};
     _ventas.forEach(x=>{ const m=x.mes, k=(x.cliente||'').trim().toUpperCase(), tv=+x.total_vendido||0; if(!m)return; _ventBy[m]=(_ventBy[m]||0)+tv; if(k && _first[k] && _first[k].o<_mNum(m)) (_recurSet[m]=_recurSet[m]||new Set()).add(k); if(k && tv>300000) (_m300[m]=_m300[m]||new Set()).add(k); });
     let _ref=[]; try{ const rf=await fetch(this._SBU()+'/rest/v1/nc_ventas_ref?empresa=eq.smart&select=mes,unidades&limit=5000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jf=await rf.json(); _ref=Array.isArray(jf)?jf:[]; }catch(e){}
-    const _envBy={}; _ref.forEach(r=>{ const q=String(r.mes||'').split('-'); if(q.length===2 && +q[1]>=1){ _envBy[_M3[(+q[1])-1]+'-'+q[0]]=(+r.unidades||0); } });
+    // nc_ventas_ref trae UNA fila por referencia por mes → hay que SUMAR todas las del
+    // mes, no asignar (antes se quedaba solo con la última ref → subcontaba enorme).
+    const _envBy={}; _ref.forEach(r=>{ const q=String(r.mes||'').split('-'); if(q.length===2 && +q[1]>=1){ const _k=_M3[(+q[1])-1]+'-'+q[0]; _envBy[_k]=(_envBy[_k]||0)+(+r.unidades||0); } });
     let _peds=[]; try{ const rpp=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.smart&estado=eq.pedido&select=creado_en,datos&limit=4000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jpp=await rpp.json(); _peds=Array.isArray(jpp)?jpp:[]; }catch(e){}
-    let _uAct=0; _peds.forEach(pp=>{ const d=pp.datos||{}; const dt=new Date(pp.creado_en); const mm=_M3[dt.getMonth()]+'-'+dt.getFullYear(); if(mm===_mesAct) _uAct+=(+d.total_uds||0); });
-    if(_uAct && !_envBy[_mesAct]) _envBy[_mesAct]=_uAct;
+    // Envases por mes desde los PEDIDOS reales (fuente viva). nc_ventas_ref es legado
+    // y quedó corto en meses recientes (jun a la mitad, jul en 0). Tomamos el MAYOR
+    // de las dos por mes para no subcontar; ene–may sin pedidos siguen desde ventas_ref.
+    const _pedUdsBy={}; _peds.forEach(pp=>{ const d=pp.datos||{}; const dt=new Date(pp.creado_en); const mm=_M3[dt.getMonth()]+'-'+dt.getFullYear(); _pedUdsBy[mm]=(_pedUdsBy[mm]||0)+(+d.total_uds||0); });
+    Object.keys(_pedUdsBy).forEach(mm=>{ _envBy[mm]=Math.max(_envBy[mm]||0, _pedUdsBy[mm]); });
     const _rmap={}; _resumen.forEach(r=>{ if(r.mes)_rmap[r.mes]=r; });
     let _regBase=0; _resumen.forEach(r=>{ const rr=+r.clientes_registrados||0; if(rr>_regBase)_regBase=rr; });
     const _mesesSet=new Set(); _resumen.forEach(r=>r.mes&&_mesesSet.add(r.mes)); Object.keys(_kitBy).forEach(m=>_mesesSet.add(m)); Object.keys(_nuevoBy).forEach(m=>_mesesSet.add(m)); Object.keys(_ventBy).forEach(m=>_mesesSet.add(m));
