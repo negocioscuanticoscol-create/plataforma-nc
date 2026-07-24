@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Calzado Alpaca</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --rojo:#d81f26; --rojo2:#f0353c; --negro:#15171c; --gris:#f4f5f7;
+    --verde:#2e9e4f; --amber:#b45309; --linea:#e3e5ea; --texto:#1d1f24; --suave:#6b7280;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:'IBM Plex Sans',-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--gris);color:var(--texto);font-variant-numeric:slashed-zero}
+  input,select,textarea,button{font-family:inherit;font-size:16px}
+  .hide{display:none!important}
+
+  /* LOGIN */
+  #login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:linear-gradient(160deg,#1b1d22,#2a2d34)}
+  #login .card{background:#fff;border-radius:18px;padding:30px 26px;width:100%;max-width:380px;box-shadow:0 12px 40px rgba(0,0,0,.35);text-align:center}
+  .logo{display:inline-flex;align-items:center;gap:10px;margin-bottom:6px}
+  .logo .mark{width:46px;height:46px;border-radius:50%;background:var(--rojo);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:24px;font-style:italic}
+  .logo .txt{text-align:left;line-height:1}
+  .logo .txt b{font-size:20px;font-weight:800;letter-spacing:.5px}
+  .logo .txt span{display:block;font-size:10px;color:var(--suave);text-transform:uppercase;letter-spacing:2px;margin-top:2px}
+  #login .sub{color:var(--suave);font-size:13px;margin:14px 0 18px}
+  #login input{width:100%;padding:14px;border:1.5px solid var(--linea);border-radius:11px;text-align:center}
+  #login input:focus{outline:none;border-color:var(--rojo)}
+  .btn{width:100%;padding:15px;border:none;border-radius:11px;font-weight:700;cursor:pointer;margin-top:14px}
+  .btn-main{background:var(--rojo);color:#fff}
+  .btn-main:active{background:#b3181e}
+  #login .err{margin-top:12px;font-size:13px;color:var(--rojo);display:none}
+
+  /* SHELL */
+  #app{min-height:100vh;display:flex;flex-direction:column;max-width:720px;margin:0 auto;background:var(--gris)}
+  .topbar{background:#fff;border-bottom:3px solid var(--rojo);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
+  .topbar .logo .mark{width:34px;height:34px;font-size:18px}
+  .topbar .logo .txt b{font-size:16px}
+  .topbar .who{text-align:right;font-size:12px;line-height:1.3}
+  .topbar .rol{display:inline-block;background:var(--negro);color:#fff;font-size:10px;padding:2px 8px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
+  .logout{background:none;border:none;color:var(--suave);font-size:12px;cursor:pointer;margin-left:10px}
+  #main{flex:1;padding:14px 14px 110px}
+  h1{font-size:19px;margin-bottom:4px}
+  .sub{color:var(--suave);font-size:13px;margin-bottom:14px}
+
+  #nav{position:fixed;bottom:0;left:0;right:0;max-width:720px;margin:0 auto;background:#fff;border-top:1px solid var(--linea);display:flex;z-index:20}
+  #nav button{flex:1;background:none;border:none;padding:9px 2px 10px;font-size:10.5px;color:var(--suave);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+  #nav button .ic{font-size:20px}
+  #nav button.active{color:var(--rojo);font-weight:700}
+
+  .card{background:#fff;border:1px solid var(--linea);border-radius:14px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px}
+  .field{width:100%;padding:12px;border:1.5px solid var(--linea);border-radius:10px;background:#fff}
+  .field:focus{outline:none;border-color:var(--rojo)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hint{font-size:12px;color:var(--suave);margin-top:4px}
+  .btn-sm{padding:9px 14px;border-radius:9px;border:none;font-weight:700;font-size:13px;cursor:pointer}
+  .btn-rojo{background:var(--rojo);color:#fff}
+  .btn-gris{background:#eef1f5;color:#555}
+
+  .tallas{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:6px}
+  .talla{padding:9px 0;text-align:center;border:1.5px solid var(--linea);border-radius:9px;font-weight:700;font-size:13px;cursor:pointer;user-select:none;background:#fff}
+  .talla.on{background:var(--rojo);color:#fff;border-color:var(--rojo)}
+
+  .listas{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+  .lista-box{border:1.5px solid var(--linea);border-radius:10px;padding:8px 10px}
+  .lista-box .ln{font-size:11px;font-weight:700;color:var(--suave);text-transform:uppercase;letter-spacing:.5px}
+  .lista-box input{width:100%;border:none;padding:4px 0;font-size:16px;font-weight:600}
+  .lista-box input:focus{outline:none}
+
+  .prod{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:13px;margin-bottom:10px}
+  .prod .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .prod .ref{font-weight:800;font-size:16px}
+  .prod .col{font-size:12px;color:var(--suave)}
+  .chip{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;background:#f1f1f4;color:#555;margin:2px 3px 0 0}
+  .precios{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+  .pbox{background:#fafbfc;border:1px solid var(--linea);border-radius:8px;padding:5px 9px;text-align:center;min-width:64px}
+  .pbox .pl{font-size:9.5px;color:var(--suave);text-transform:uppercase;letter-spacing:.4px;font-weight:700}
+  .pbox .pv{font-size:14px;font-weight:800;font-family:'IBM Plex Mono',monospace}
+  .pbox.compra{background:#fff4e5} .pbox.compra .pv{color:var(--amber)}
+  .pbox.margen{background:#e7f6ec} .pbox.margen .pv{color:var(--verde)}
+  .acc{margin-top:10px;display:flex;gap:8px}
+  .empty{text-align:center;color:var(--suave);padding:40px 10px;font-size:14px}
+  .toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);background:var(--negro);color:#fff;padding:11px 18px;border-radius:11px;font-size:13.5px;z-index:99;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+  table{width:100%;border-collapse:collapse}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="card">
+    <div class="logo"><span class="mark">A</span><span class="txt"><b>ALPACA</b><span>Los Indestructibles</span></span></div>
+    <div class="sub">Comercializadora Alpaca · Calzado<br>Ingresa tu clave de acceso</div>
+    <input id="lg" type="password" placeholder="Clave" onkeydown="if(event.key==='Enter')App.login()">
+    <button class="btn btn-main" onclick="App.login()">Entrar</button>
+    <div class="err" id="lgerr">Clave incorrecta</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+  <div class="topbar">
+    <div class="logo"><span class="mark">A</span><span class="txt"><b>ALPACA</b></span></div>
+    <div style="display:flex;align-items:center">
+      <div class="who"><span class="rol" id="rol"></span></div>
+      <button class="logout" onclick="App.logout()">Salir</button>
+    </div>
+  </div>
+  <div id="main"></div>
+  <div id="nav"></div>
+</div>
+
+<script>
+const App = {
+  PASS:{ admin:'alpacaadmin2026', cliente:'alpaca2026' },
+  LISTAS:['Lista 1','Lista 2','Lista 3','Lista 4'],
+  TALLAS:[34,35,36,37,38,39,40,41,42,43,44,45],
+  rol:'', view:'productos', _tallaSel:[], _editId:null,
+
+  /* ---------- persistencia local (demo) ---------- */
+  _key(){ return 'alpaca_productos'; },
+  _load(){ try{ return JSON.parse(localStorage.getItem(this._key())||'[]'); }catch(e){ return []; } },
+  _save(arr){ localStorage.setItem(this._key(), JSON.stringify(arr)); },
+
+  /* ---------- acceso ---------- */
+  login(){
+    const p=(document.getElementById('lg').value||'').trim(); let rol='';
+    for(const k in this.PASS){ if(p===this.PASS[k]) rol=k; }
+    if(!rol){ document.getElementById('lgerr').style.display='block'; return; }
+    this.rol=rol; sessionStorage.setItem('alpaca_rol',rol); this._start();
+  },
+  logout(){ sessionStorage.removeItem('alpaca_rol'); this.rol=''; location.reload(); },
+  esAdmin(){ return this.rol==='admin'; },
+  _start(){
+    document.getElementById('login').classList.add('hide');
+    document.getElementById('app').classList.remove('hide');
+    document.getElementById('rol').textContent = this.rol;
+    this.pintarNav(); this.go(this.esAdmin()?'productos':'catalogo');
+  },
+
+  pintarNav(){
+    const items = this.esAdmin()
+      ? [['productos','📦','Productos'],['catalogo','📋','Catálogo'],['cotizar','🧮','Cotizar']]
+      : [['catalogo','📋','Catálogo'],['cotizar','🧮','Cotizar']];
+    document.getElementById('nav').innerHTML = items.map(([v,ic,t])=>
+      `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
+  },
+  go(view){
+    this.view=view;
+    document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.v===view));
+    window.scrollTo(0,0);
+    ({productos:this.vProductos, catalogo:this.vCatalogo, cotizar:this.vCotizar}[view]||this.vCatalogo).call(this);
+  },
+  set(html){ document.getElementById('main').innerHTML = html; },
+  fmt(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
+  esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
+  toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); },
+
+  /* ---------- CREAR / EDITAR PRODUCTO (solo admin) ---------- */
+  vProductos(){
+    if(!this.esAdmin()) return this.go('catalogo');
+    const ed = this._editId ? this._load().find(p=>p.id===this._editId) : null;
+    this._tallaSel = ed ? [...ed.tallas] : [];
+    const L = ed ? ed.listas : [0,0,0,0];
+    this.set(`
+      <h1>${ed?'Editar':'Crear'} producto</h1>
+      <div class="sub">Referencia de calzado · define color, tallas y precios.</div>
+      <div class="card">
+        <label>Referencia (REF)</label>
+        <input id="f_ref" class="field" placeholder="Ej: 701 Bota Operario" value="${ed?this.esc(ed.ref):''}">
+        <div class="row2">
+          <div><label>Color</label><input id="f_color" class="field" placeholder="Negro" value="${ed?this.esc(ed.color):''}"></div>
+          <div><label>Precio de compra</label><input id="f_compra" class="field" type="number" inputmode="numeric" placeholder="0" value="${ed?ed.compra:''}"></div>
+        </div>
+
+        <label>Tallas en que viene</label>
+        <div class="tallas" id="f_tallas">
+          ${this.TALLAS.map(t=>`<div class="talla${this._tallaSel.includes(t)?' on':''}" onclick="App.toggleTalla(${t},this)">${t}</div>`).join('')}
+        </div>
+        <div class="hint">Toca las tallas disponibles para esta referencia.</div>
+
+        <label>Precios de venta · 4 listas</label>
+        <div class="listas">
+          ${this.LISTAS.map((nm,i)=>`<div class="lista-box"><div class="ln">${nm}</div><input type="number" inputmode="numeric" id="f_l${i}" placeholder="0" value="${L[i]||''}"></div>`).join('')}
+        </div>
+        <div class="hint">Cada lista es un precio de venta distinto (detal, mayorista, distribuidor, especial…).</div>
+
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn-sm btn-rojo" style="flex:1;padding:13px" onclick="App.guardar()">${ed?'Guardar cambios':'＋ Crear producto'}</button>
+          ${ed?`<button class="btn-sm btn-gris" style="padding:13px" onclick="App._editId=null;App.go('productos')">Cancelar</button>`:''}
+        </div>
+      </div>`);
+  },
+  toggleTalla(t,el){ const i=this._tallaSel.indexOf(t); if(i<0)this._tallaSel.push(t); else this._tallaSel.splice(i,1); el.classList.toggle('on'); },
+  guardar(){
+    const g=id=>(document.getElementById(id).value||'').trim();
+    const ref=g('f_ref'); if(!ref){ alert('Escribe la referencia.'); return; }
+    const listas=[0,1,2,3].map(i=>+g('f_l'+i)||0);
+    if(!listas.some(x=>x>0)){ alert('Pon al menos un precio de venta.'); return; }
+    const prod={
+      id:this._editId||('p'+Date.now()),
+      ref, color:g('f_color'), tallas:[...this._tallaSel].sort((a,b)=>a-b),
+      compra:+g('f_compra')||0, listas
+    };
+    const arr=this._load();
+    const i=arr.findIndex(p=>p.id===prod.id);
+    if(i>=0) arr[i]=prod; else arr.unshift(prod);
+    this._save(arr); this._editId=null;
+    this.toast(i>=0?'Producto actualizado':'✅ Producto creado');
+    this.go('catalogo');
+  },
+  editar(id){ this._editId=id; this.go('productos'); },
+  borrar(id){ if(!confirm('¿Eliminar este producto?'))return; this._save(this._load().filter(p=>p.id!==id)); this.toast('Eliminado'); this.go('catalogo'); },
+
+  /* ---------- CATÁLOGO ---------- */
+  vCatalogo(){
+    const arr=this._load(); const admin=this.esAdmin();
+    const filas = !arr.length ? '<div class="empty">Aún no hay productos.'+(admin?' Crea el primero en la pestaña Productos.':'')+'</div>'
+      : arr.map(p=>{
+        const margen = p.compra>0 ? Math.round(((p.listas[0]-p.compra)/p.listas[0])*100) : null;
+        const tallas = p.tallas.length ? p.tallas.map(t=>`<span class="chip">${t}</span>`).join('') : '<span class="col">sin tallas</span>';
+        return `<div class="prod">
+          <div class="top">
+            <div><div class="ref">${this.esc(p.ref)}</div><div class="col">${this.esc(p.color||'—')}</div></div>
+            ${admin?`<div style="display:flex;gap:6px"><button class="btn-sm btn-gris" onclick="App.editar('${p.id}')">✎</button><button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.borrar('${p.id}')">🗑</button></div>`:''}
+          </div>
+          <div style="margin-top:7px">${tallas}</div>
+          <div class="precios">
+            ${admin&&p.compra>0?`<div class="pbox compra"><div class="pl">Compra</div><div class="pv">${this.fmt(p.compra)}</div></div>`:''}
+            ${this.LISTAS.map((nm,i)=>`<div class="pbox"><div class="pl">${nm}</div><div class="pv">${this.fmt(p.listas[i])}</div></div>`).join('')}
+            ${admin&&margen!=null?`<div class="pbox margen"><div class="pl">Margen L1</div><div class="pv">${margen}%</div></div>`:''}
+          </div>
+        </div>`;
+      }).join('');
+    this.set(`<h1>Catálogo</h1><div class="sub">${arr.length} referencia${arr.length===1?'':'s'} · Calzado Alpaca${admin?'':' · precios de venta'}</div>${filas}`);
+  },
+
+  /* ---------- COTIZAR ---------- */
+  vCotizar(){
+    const arr=this._load();
+    if(!arr.length) return this.set(`<h1>Cotizar</h1><div class="empty">Primero crea productos en el catálogo.</div>`);
+    const opts=arr.map(p=>`<option value="${p.id}">${this.esc(p.ref)}${p.color?' · '+this.esc(p.color):''}</option>`).join('');
+    const listaOpts=this.LISTAS.map((nm,i)=>`<option value="${i}">${nm}</option>`).join('');
+    this.set(`
+      <h1>Cotizar</h1><div class="sub">Arma una cotización con los productos del catálogo.</div>
+      <div class="card">
+        <label>Cliente</label><input id="c_cli" class="field" placeholder="Nombre del cliente">
+        <label>Producto</label><select id="c_prod" class="field" onchange="App._cotTallas()">${opts}</select>
+        <label>Lista de precios</label><select id="c_lista" class="field" onchange="App._cotCalc()">${listaOpts}</select>
+        <label>Pares por talla</label>
+        <div id="c_tallas" class="tallas" style="grid-template-columns:repeat(4,1fr)"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:2px solid var(--linea)">
+          <div><div style="font-size:12px;color:var(--suave)">Total pares <b id="c_pares">0</b></div><div style="font-size:12px;color:var(--suave)">Precio unit. <b id="c_unit">$0</b></div></div>
+          <div style="text-align:right"><div style="font-size:12px;color:var(--suave)">Total</div><div id="c_total" style="font-size:24px;font-weight:800;color:var(--rojo);font-family:'IBM Plex Mono',monospace">$0</div></div>
+        </div>
+        <button class="btn-sm btn-rojo" style="width:100%;padding:13px;margin-top:12px" onclick="App.cotWA()">📱 Enviar por WhatsApp</button>
+      </div>`);
+    this._cotTallas();
+  },
+  _cotProd(){ return this._load().find(p=>p.id===document.getElementById('c_prod').value); },
+  _cotTallas(){
+    const p=this._cotProd(); const cont=document.getElementById('c_tallas');
+    cont.innerHTML = (p&&p.tallas.length?p.tallas:this.TALLAS).map(t=>
+      `<div class="lista-box" style="text-align:center;padding:5px"><div class="ln">T${t}</div><input type="number" inputmode="numeric" min="0" placeholder="0" data-t="${t}" oninput="App._cotCalc()" style="text-align:center"></div>`).join('');
+    this._cotCalc();
+  },
+  _cotCalc(){
+    const p=this._cotProd(); if(!p) return;
+    const li=+document.getElementById('c_lista').value||0; const unit=p.listas[li]||0;
+    let pares=0; document.querySelectorAll('#c_tallas input').forEach(i=>pares+=+i.value||0);
+    document.getElementById('c_pares').textContent=pares;
+    document.getElementById('c_unit').textContent=this.fmt(unit);
+    document.getElementById('c_total').textContent=this.fmt(pares*unit);
+  },
+  cotWA(){
+    const p=this._cotProd(); if(!p) return;
+    const cli=(document.getElementById('c_cli').value||'').trim();
+    const li=+document.getElementById('c_lista').value||0; const unit=p.listas[li]||0;
+    const curva=[...document.querySelectorAll('#c_tallas input')].filter(i=>+i.value>0).map(i=>`T${i.dataset.t}:${i.value}`).join(' ');
+    let pares=0; document.querySelectorAll('#c_tallas input').forEach(i=>pares+=+i.value||0);
+    if(!pares){ alert('Pon cantidades por talla.'); return; }
+    const msg=`👟 COTIZACIÓN · CALZADO ALPACA\n━━━━━━━━━━━━━━━━━━\n${cli?'Cliente: '+cli+'\n':''}Ref: ${p.ref}${p.color?' · '+p.color:''}\n${this.LISTAS[li]} · ${this.fmt(unit)} c/par\nCurva: ${curva}\nTotal: ${pares} pares = ${this.fmt(pares*unit)}`;
+    window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+  }
+};
+(function(){ const r=sessionStorage.getItem('alpaca_rol'); if(r&&App.PASS[r]){ App.rol=r; App._start(); } else { setTimeout(()=>{const e=document.getElementById('lg');if(e)e.focus();},80); } })();
+</script>
+</body>
+</html>
