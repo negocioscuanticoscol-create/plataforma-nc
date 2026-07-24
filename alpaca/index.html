@@ -116,7 +116,8 @@ const App = {
   PASS:{ admin:'alpacaadmin2026', cliente:'alpaca2026' },
   LISTAS:['Lista 1','Lista 2','Lista 3','Lista 4'],
   TALLAS:[34,35,36,37,38,39,40,41,42,43,44,45],
-  rol:'', view:'productos', _tallaSel:[], _editId:null,
+  rol:'', view:'productos', _tallaSel:[], _editId:null, _cliTP:'natural',
+  TIPOS:[['distribuidor','Distribuidor'],['final','Cliente final'],['dotacion','Dotación'],['registrado','Registrado']],
 
   /* ---------- datos: Supabase (persistente) con respaldo local ---------- */
   SB:'https://fnayedgvamxktxfvywwl.supabase.co',
@@ -225,24 +226,56 @@ const App = {
 
   /* ---------- CLIENTES ---------- */
   _loadCli(){ return this._clis||[]; },
+  setCliTP(t){ this._cliTP=t; this.vClientes(); },
   async guardarCli(){
-    const g=id=>(document.getElementById(id).value||'').trim();
-    const nom=g('cl_nom'); if(!nom){ alert('Escribe el nombre del cliente.'); return; }
-    const c={id:'c'+Date.now(),nom,tel:g('cl_tel'),ciu:g('cl_ciu'),nit:g('cl_nit')};
+    const g=id=>{ const e=document.getElementById(id); return e?(e.value||'').trim():''; };
+    const tp=this._cliTP, tipo=g('cl_tipo'); let nom,tel,datos;
+    if(tp==='natural'){
+      nom=g('cl_nombre'); if(!nom){ alert('Escribe el nombre completo.'); return; }
+      tel=g('cl_celular');
+      datos={nombre:nom,celular:tel,cedula:g('cl_cedula'),correo:g('cl_correo'),direccion:g('cl_direccion'),barrio:g('cl_barrio'),departamento:g('cl_depto')};
+    } else {
+      nom=g('cl_razon'); if(!nom){ alert('Escribe la razón social.'); return; }
+      tel=g('cl_celular');
+      datos={razon_social:nom,rut:g('cl_rut'),recibe:g('cl_recibe'),celular:tel,direccion:g('cl_direccion')};
+    }
+    const c={id:'c'+Date.now(),nom,tel,tipo,tipo_persona:tp,datos};
     this._clis.unshift(c); await this._put('alpaca_clientes',c,this._clis); this.toast('✅ Cliente agregado'); this.vClientes();
   },
   async borrarCli(id){ if(!confirm('¿Eliminar este cliente?'))return; this._clis=this._clis.filter(c=>c.id!==id); await this._del('alpaca_clientes',id,this._clis); this.toast('Eliminado'); this.vClientes(); },
   vClientes(){
-    const arr=this._loadCli(); const admin=this.esAdmin();
-    this.set(`<h1>Clientes</h1><div class="sub">${arr.length} cliente${arr.length===1?'':'s'} de Alpaca</div>
-      ${admin?`<div class="card">
-        <div class="row2"><div><label>Nombre / negocio</label><input id="cl_nom" class="field" placeholder="Ej: Calzado El Éxito"></div><div><label>Celular</label><input id="cl_tel" class="field" placeholder="300..."></div></div>
-        <div class="row2"><div><label>Ciudad</label><input id="cl_ciu" class="field"></div><div><label>NIT / CC</label><input id="cl_nit" class="field"></div></div>
-        <button class="btn-sm btn-rojo" style="width:100%;padding:12px;margin-top:12px" onclick="App.guardarCli()">＋ Agregar cliente</button></div>`:''}
-      ${arr.length? arr.map(c=>`<div class="prod"><div class="top">
-        <div><div class="ref">${this.esc(c.nom)}</div><div class="col">${this.esc(c.ciu||'—')}${c.nit?' · '+this.esc(c.nit):''}${c.tel?' · '+this.esc(c.tel):''}</div></div>
-        <div style="display:flex;gap:6px">${c.tel?`<a class="btn-sm" style="background:#25d366;color:#fff" href="https://wa.me/57${(c.tel+'').replace(/\D/g,'')}" target="_blank">📱</a>`:''}${admin?`<button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.borrarCli('${c.id}')">🗑</button>`:''}</div>
-      </div></div>`).join('') : '<div class="empty">Aún no hay clientes.'+(admin?' Agrega el primero arriba.':'')+'</div>'}`);
+    const arr=this._loadCli(); const admin=this.esAdmin(); const tp=this._cliTP;
+    const nat=`
+      <div class="row2"><div><label>Nombre completo</label><input id="cl_nombre" class="field"></div><div><label>Celular</label><input id="cl_celular" class="field" placeholder="300..."></div></div>
+      <div class="row2"><div><label>Cédula de ciudadanía</label><input id="cl_cedula" class="field"></div><div><label>Correo</label><input id="cl_correo" class="field" type="email"></div></div>
+      <label>Dirección completa</label><input id="cl_direccion" class="field">
+      <div class="row2"><div><label>Barrio</label><input id="cl_barrio" class="field"></div><div><label>Departamento</label><input id="cl_depto" class="field"></div></div>`;
+    const jur=`
+      <div class="row2"><div><label>Razón social</label><input id="cl_razon" class="field"></div><div><label>RUT</label><input id="cl_rut" class="field"></div></div>
+      <div class="row2"><div><label>Persona que recibe</label><input id="cl_recibe" class="field"></div><div><label>Celular</label><input id="cl_celular" class="field" placeholder="300..."></div></div>
+      <label>Dirección completa del lugar de entrega</label><input id="cl_direccion" class="field">`;
+    const form = admin ? `<div class="card">
+        <label>Tipo de persona</label>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn-sm ${tp==='natural'?'btn-rojo':'btn-gris'}" style="flex:1;padding:11px" onclick="App.setCliTP('natural')">Persona natural</button>
+          <button class="btn-sm ${tp==='juridica'?'btn-rojo':'btn-gris'}" style="flex:1;padding:11px" onclick="App.setCliTP('juridica')">Persona jurídica</button>
+        </div>
+        <label>Tipo de cliente</label>
+        <select id="cl_tipo" class="field">${this.TIPOS.map(([v,t])=>`<option value="${v}">${t}</option>`).join('')}</select>
+        ${tp==='natural'?nat:jur}
+        <button class="btn-sm btn-rojo" style="width:100%;padding:12px;margin-top:14px" onclick="App.guardarCli()">＋ Agregar cliente</button>
+      </div>` : '';
+    const tipoTxt=t=>({distribuidor:'Distribuidor',final:'Cliente final',dotacion:'Dotación',registrado:'Registrado'}[t]||t||'');
+    const lista = arr.length ? arr.map(c=>{
+      const d=c.datos||c; const tel=((c.tel||d.celular||'')+'');
+      const sub=[ c.tipo_persona==='juridica'?(d.rut?'RUT '+d.rut:''):(d.cedula?'CC '+d.cedula:(c.nit?'CC '+c.nit:'')), d.correo, d.departamento||d.ciudad||c.ciu||d.barrio ].filter(Boolean).join(' · ');
+      return `<div class="prod"><div class="top">
+        <div><div class="ref">${this.esc(c.nom)}</div><div class="col">${this.esc(sub||'—')}</div>
+          <div style="margin-top:5px">${c.tipo?`<span class="chip">${tipoTxt(c.tipo)}</span>`:''}<span class="chip">${c.tipo_persona==='juridica'?'Jurídica':'Natural'}</span></div></div>
+        <div style="display:flex;gap:6px">${tel?`<a class="btn-sm" style="background:#25d366;color:#fff" href="https://wa.me/57${tel.replace(/\D/g,'')}" target="_blank">📱</a>`:''}${admin?`<button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.borrarCli('${c.id}')">🗑</button>`:''}</div>
+      </div></div>`;
+    }).join('') : '<div class="empty">Aún no hay clientes.'+(admin?' Agrega el primero arriba.':'')+'</div>';
+    this.set(`<h1>Clientes</h1><div class="sub">${arr.length} cliente${arr.length===1?'':'s'} de Alpaca</div>${form}${lista}`);
   },
   set(html){ document.getElementById('main').innerHTML = html; },
   fmt(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
