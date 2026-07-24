@@ -155,13 +155,12 @@ const App = {
   // sub-barra (pastillas) de la pestaña actual → integra los secundarios DENTRO de su pestaña
   _subnav(){
     const g=this._grupoDe(this.view); if(!g) return '';
-    const items=(this._GRUPOS[g]||[]).filter(i=>(this._permitidos||[]).includes(i[0]))
-      .filter(i=>!(window.NC_EMPRESA==='smart' && i[0]==='ventas'));   // Smart no tiene vista Ventas: quita la pestaña (confunde y salta a Panel)
+    const items=(this._GRUPOS[g]||[]).filter(i=>(this._permitidos||[]).includes(i[0]));
     if(items.length<2) return '';
     return `<div style="display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;-webkit-overflow-scrolling:touch">${items.map(([v,ic,t])=>`<button onclick="App.go('${v}')" style="flex:0 0 auto;padding:7px 13px;border-radius:18px;border:none;font-weight:700;font-size:12.5px;cursor:pointer;background:${v===this.view?'var(--naranja);color:#fff':'#eef1f5;color:#555'}">${ic} ${t}</button>`).join('')}</div>`;
   },
   _GRUPOS:{
-    panel:[['panel','📈','Panel'],['ventas','💰','Ventas'],['dashboard','📊','Resultados']],
+    panel:[['panel','📈','Panel'],['dashboard','📊','Resultados']],
     clientes:[['clientes','👥','Clientes'],['cobertura','🗺️','Cobertura'],['ventas','💰','Ventas'],['autopedido','🛒','Autopedido']],
   },
   _grupoDe(view){ for(const g in this._GRUPOS){ if(this._GRUPOS[g].some(i=>i[0]===view)) return g; } return null; },
