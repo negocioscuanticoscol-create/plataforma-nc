@@ -223,13 +223,14 @@ const App = {
   pintarNav(){
     // Cliente: SOLO Starting Point. Admin: toda la botonería.
     const TABS = this.esAdmin()
-      ? [['inicio','✦','Starting'],['resultados','📊','Resultados'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['stock','🏬','Stock'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM']]
+      ? [['resultados','📊','Resultados'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['stock','🏬','Stock'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM']]
       : [['inicio','✦','Starting Point']];
     document.getElementById('nav').innerHTML = TABS.map(([v,ic,t])=>
       `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
   },
   go(view){
     if(!this.esAdmin() && view!=='inicio') view='inicio';
+    if(this.esAdmin() && view==='inicio') view='resultados';   // admin ya no usa Starting
     this.view=view;
     document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.v===view));
     window.scrollTo(0,0);
