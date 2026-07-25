@@ -307,6 +307,16 @@ const App = {
           <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">📸 Redes sociales</span><input id="cn_rs" class="field" style="flex:1.3" placeholder="% o $/mes"></div>
           <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">🛒 Marketplaces</span><input id="cn_mkt" class="field" style="flex:1.3" placeholder="% o $/mes"></div>
           <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">🤝 Distribuidores / mayoreo</span><input id="cn_dist" class="field" style="flex:1.3" placeholder="% o $/mes"></div>
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">🏭 Maquilas</span><input id="cn_maq" class="field" style="flex:1.3" placeholder="% o $/mes"></div>
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">🏢 Clientes fábrica</span><input id="cn_fab" class="field" style="flex:1.3" placeholder="% o $/mes"></div>
+        </div>
+      </div>
+      <div class="card"><label>Ventas actuales (últimos 3 meses)</label>
+        <div class="hint" style="margin-bottom:10px">Total facturado por mes, aprox.</div>
+        <div style="display:grid;gap:9px">
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">📅 Mes actual</span><input id="va_m1" class="field" style="flex:1.3" placeholder="$/mes"></div>
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">📅 Mes anterior</span><input id="va_m2" class="field" style="flex:1.3" placeholder="$/mes"></div>
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">📅 Hace 2 meses</span><input id="va_m3" class="field" style="flex:1.3" placeholder="$/mes"></div>
         </div>
       </div>
       <div class="card"><label>¿Qué es lo que más le preocuparía si la empresa empieza a apoyarse en IA?</label><textarea id="d_pre" class="field" style="min-height:60px"></textarea></div>
@@ -328,7 +338,8 @@ const App = {
     const datosAlto=pDatos>=7, iaAlto=pIA>=11;
     const rec={ id:'d'+Date.now()+Math.floor(Math.random()*999), nombre:nom, cargo:g('d_car'), area:g('d_dep'), funciones:g('d_fun'),
       preocupacion:g('d_pre'), software:{inventarios:g('sw_inv'),pedidos:g('sw_ped'),picking:g('sw_pick'),delivery:g('sw_del'),cotizaciones:g('sw_cot'),leads:g('sw_lead')},
-      canales:{pdv:g('cn_pdv'),web:g('cn_web'),whatsapp:g('cn_wa'),redes:g('cn_rs'),marketplaces:g('cn_mkt'),distribuidores:g('cn_dist')},
+      canales:{pdv:g('cn_pdv'),web:g('cn_web'),whatsapp:g('cn_wa'),redes:g('cn_rs'),marketplaces:g('cn_mkt'),distribuidores:g('cn_dist'),maquilas:g('cn_maq'),fabrica:g('cn_fab')},
+      ventas_mes:{actual:g('va_m1'),anterior:g('va_m2'),hace2:g('va_m3')},
       puntaje_datos:pDatos, puntaje_ia:pIA, perfil:perfil.n, esceptico:esce,
       madurez:datosAlto?'Datos ordenados':'Datos dispersos', clave_lectura:this.D_MAT[(datosAlto?'a':'b')+(iaAlto?'a':'b')],
       detalle_a:detA, detalle_b:detB, creado_en:new Date().toISOString() };
@@ -348,7 +359,8 @@ const App = {
         <div style="font-size:13px;color:var(--ink);margin-top:10px;line-height:1.55;background:var(--accent-soft);border-radius:8px;padding:11px 13px"><b>Cómo abordarlo:</b> ${this.esc(d.clave_lectura||'')}</div>
         ${d.funciones?`<div style="font-size:12.5px;color:var(--faint);margin-top:7px">Funciones: ${this.esc(d.funciones)}</div>`:''}
         ${d.software?`<div style="font-size:12.5px;color:var(--faint);margin-top:4px">Software hoy: 📦 ${this.esc(d.software.inventarios||'—')} · 🧾 ${this.esc(d.software.pedidos||'—')} · 📤 ${this.esc(d.software.picking||'—')} · 🚚 ${this.esc(d.software.delivery||'—')} · 🧮 ${this.esc(d.software.cotizaciones||'—')} · 📇 ${this.esc(d.software.leads||'—')}</div>`:''}
-        ${d.canales?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Ventas x canal: 🏪 ${this.esc(d.canales.pdv||'—')} · 🌐 ${this.esc(d.canales.web||'—')} · 💬 ${this.esc(d.canales.whatsapp||'—')} · 📸 ${this.esc(d.canales.redes||'—')} · 🛒 ${this.esc(d.canales.marketplaces||'—')} · 🤝 ${this.esc(d.canales.distribuidores||'—')}</div>`:''}
+        ${d.canales?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Ventas x canal: 🏪 ${this.esc(d.canales.pdv||'—')} · 🌐 ${this.esc(d.canales.web||'—')} · 💬 ${this.esc(d.canales.whatsapp||'—')} · 📸 ${this.esc(d.canales.redes||'—')} · 🛒 ${this.esc(d.canales.marketplaces||'—')} · 🤝 ${this.esc(d.canales.distribuidores||'—')} · 🏭 ${this.esc(d.canales.maquilas||'—')} · 🏢 ${this.esc(d.canales.fabrica||'—')}</div>`:''}
+        ${d.ventas_mes?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Ventas mes: 📅 actual ${this.esc(d.ventas_mes.actual||'—')} · anterior ${this.esc(d.ventas_mes.anterior||'—')} · hace 2 ${this.esc(d.ventas_mes.hace2||'—')}</div>`:''}
         ${d.preocupacion?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Le preocupa: ${this.esc(d.preocupacion)}</div>`:''}
       </div>`).join('') : '<div class="empty">Aún nadie ha llenado el diagnóstico. Cuando los invitados entren con su clave y lo completen, aparecen aquí.</div>'}`);
   },
