@@ -210,7 +210,7 @@ const App = {
   pintarNav(){
     // Cliente: SOLO Starting Point. Admin: toda la botonería.
     const TABS = this.esAdmin()
-      ? [['inicio','✦','Starting'],['resultados','📊','Resultados'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM']]
+      ? [['inicio','✦','Starting'],['resultados','📊','Resultados'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['stock','🏬','Stock'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM']]
       : [['inicio','✦','Starting Point']];
     document.getElementById('nav').innerHTML = TABS.map(([v,ic,t])=>
       `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
@@ -221,7 +221,7 @@ const App = {
     document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.v===view));
     window.scrollTo(0,0);
     ({inicio:this.vInicio, resultados:this.vResultados, panel:this.vPanel, productos:this.vProductos, catalogo:this.vCatalogo,
-      clientes:this.vClientes, cotizar:this.vCotizar, pedidos:this.vPedidos, despachos:this.vDespachos,
+      stock:this.vStock, clientes:this.vClientes, cotizar:this.vCotizar, pedidos:this.vPedidos, despachos:this.vDespachos,
       cartera:this.vCartera, crm:this.vCrm}[view]||this.vInicio).call(this);
   },
   set(html){ document.getElementById('main').innerHTML = html; },
@@ -286,6 +286,16 @@ const App = {
       ${q(this.D_A,'a',0)}
       <div style="font-family:var(--serif);color:var(--accent2);margin:22px 0 8px;font-size:15px">Parte 2 · Su experiencia</div>
       ${q(this.D_B,'b',this.D_A.length)}
+      <div style="font-family:var(--serif);color:var(--accent2);margin:22px 0 8px;font-size:15px">Parte 3 · Su operación hoy</div>
+      <div class="card"><label>¿En qué software vive hoy cada proceso?</label>
+        <div class="hint" style="margin-bottom:10px">Escriba el programa que usan, o "a mano" / "Excel" / "ninguno".</div>
+        <div style="display:grid;gap:9px">
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">📦 Inventarios</span><input id="sw_inv" class="field" style="flex:1.3" placeholder="¿Software?"></div>
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">🧾 Pedidos</span><input id="sw_ped" class="field" style="flex:1.3" placeholder="¿Software?"></div>
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">📤 Picking &amp; packing</span><input id="sw_pick" class="field" style="flex:1.3" placeholder="¿Software?"></div>
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">🚚 Delivery / entregas</span><input id="sw_del" class="field" style="flex:1.3" placeholder="¿Software?"></div>
+        </div>
+      </div>
       <div class="card"><label>¿Qué es lo que más le preocuparía si la empresa empieza a apoyarse en IA?</label><textarea id="d_pre" class="field" style="min-height:60px"></textarea></div>
       <button class="btn-sm btn-ink" style="width:100%;padding:14px" onclick="App.guardarDiag()">Enviar respuestas</button>
       <div id="d_err" class="hint" style="color:var(--bad);display:none;text-align:center;margin-top:8px">Falta el nombre y responder todas las preguntas.</div>`);
@@ -304,7 +314,8 @@ const App = {
     let perfil=this.D_PERF[this.D_PERF.length-1]; for(const pp of this.D_PERF){if(pIA<=pp.max){perfil=pp;break;}}
     const datosAlto=pDatos>=7, iaAlto=pIA>=11;
     const rec={ id:'d'+Date.now()+Math.floor(Math.random()*999), nombre:nom, cargo:g('d_car'), area:g('d_dep'), funciones:g('d_fun'),
-      preocupacion:g('d_pre'), puntaje_datos:pDatos, puntaje_ia:pIA, perfil:perfil.n, esceptico:esce,
+      preocupacion:g('d_pre'), software:{inventarios:g('sw_inv'),pedidos:g('sw_ped'),picking:g('sw_pick'),delivery:g('sw_del')},
+      puntaje_datos:pDatos, puntaje_ia:pIA, perfil:perfil.n, esceptico:esce,
       madurez:datosAlto?'Datos ordenados':'Datos dispersos', clave_lectura:this.D_MAT[(datosAlto?'a':'b')+(iaAlto?'a':'b')],
       detalle_a:detA, detalle_b:detB, creado_en:new Date().toISOString() };
     this._diag.unshift(rec); await this._put('soleparis_diagnostico',rec,this._diag);
@@ -322,6 +333,7 @@ const App = {
         <div class="meta"><span class="pchip ${d.madurez==='Datos ordenados'?'stock':'cost'}">${this.esc(d.madurez)} · ${d.puntaje_datos}/12</span>${d.esceptico?'<span class="pchip cost">⚠ Escéptico</span>':''}</div>
         <div style="font-size:13px;color:var(--ink);margin-top:10px;line-height:1.55;background:var(--accent-soft);border-radius:8px;padding:11px 13px"><b>Cómo abordarlo:</b> ${this.esc(d.clave_lectura||'')}</div>
         ${d.funciones?`<div style="font-size:12.5px;color:var(--faint);margin-top:7px">Funciones: ${this.esc(d.funciones)}</div>`:''}
+        ${d.software?`<div style="font-size:12.5px;color:var(--faint);margin-top:4px">Software hoy: 📦 ${this.esc(d.software.inventarios||'—')} · 🧾 ${this.esc(d.software.pedidos||'—')} · 📤 ${this.esc(d.software.picking||'—')} · 🚚 ${this.esc(d.software.delivery||'—')}</div>`:''}
         ${d.preocupacion?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Le preocupa: ${this.esc(d.preocupacion)}</div>`:''}
       </div>`).join('') : '<div class="empty">Aún nadie ha llenado el diagnóstico. Cuando los invitados entren con su clave y lo completen, aparecen aquí.</div>'}`);
   },
@@ -353,7 +365,10 @@ const App = {
           <div><label>Precio de venta</label><input id="f_pv" class="field" type="number" inputmode="numeric" value="${ed?ed.precio_venta:''}"></div>
           <div><label>Precio de costo</label><input id="f_pc" class="field" type="number" inputmode="numeric" placeholder="pendiente" value="${ed&&ed.precio_costo?ed.precio_costo:''}"></div>
         </div>
-        <div><label>Inventario (uds)</label><input id="f_st" class="field" type="number" inputmode="numeric" value="${ed&&ed.stock!=null?ed.stock:''}"></div>
+        <div class="row2">
+          <div><label>Stock local</label><input id="f_sl" class="field" type="number" inputmode="numeric" value="${ed&&ed.stock_local!=null?ed.stock_local:''}"></div>
+          <div><label>Stock bodega</label><input id="f_sb" class="field" type="number" inputmode="numeric" value="${ed&&ed.stock_bodega!=null?ed.stock_bodega:''}"></div>
+        </div>
         <div style="display:flex;gap:8px;margin-top:14px">
           <button class="btn-sm btn-ink" style="flex:1;padding:13px" onclick="App.guardarProd()">${ed?'Guardar':'＋ Crear'}</button>
           ${ed?`<button class="btn-sm btn-line" style="padding:13px" onclick="App._editId=null;App.go('productos')">Cancelar</button>`:''}
@@ -365,7 +380,7 @@ const App = {
     const g=id=>(document.getElementById(id).value||'').trim();
     const nom=g('f_nom'); if(!nom){ alert('Escribe el nombre.'); return; }
     const prod={ id:this._editId||('p'+Date.now()), nombre:nom, categoria:g('f_cat'), presentacion:g('f_pres'),
-      precio_venta:+g('f_pv')||0, precio_costo:+g('f_pc')||0, stock:+g('f_st')||0 };
+      precio_venta:+g('f_pv')||0, precio_costo:+g('f_pc')||0, stock_local:+g('f_sl')||0, stock_bodega:+g('f_sb')||0 };
     const i=this._prods.findIndex(p=>p.id===prod.id);
     if(i>=0) this._prods[i]=prod; else this._prods.unshift(prod);
     await this._put('soleparis_productos',prod,this._prods); this._editId=null;
@@ -388,7 +403,7 @@ const App = {
           <div class="meta">
             ${admin&&p.precio_costo>0?`<span class="pchip cost">costo ${this.fmt(p.precio_costo)}</span>`:''}
             ${admin&&margen!=null?`<span class="pchip">margen ${margen}%</span>`:''}
-            ${admin&&p.stock!=null?`<span class="pchip stock">stock ${p.stock}</span>`:''}
+            ${admin?`<span class="pchip stock">stock ${this._stockTot(p)}</span>`:''}
           </div>
           ${admin?`<div style="display:flex;gap:6px;margin-top:10px"><button class="btn-sm btn-line" onclick="App.editar('${p.id}')">✎ Editar</button><button class="btn-sm" style="background:#fbece9;color:#b3564b" onclick="App.borrar('${p.id}')">🗑</button></div>`:''}
         </div>`;
@@ -396,6 +411,36 @@ const App = {
     this.set(`<h1>Catálogo</h1><div class="sub">${arr.length} de ${this._prods.length} · Sole Paris</div>
       <div class="cats">${cats.map(ct=>`<div class="cat${this._cat===ct?' on':''}" onclick="App._cat='${ct}';App.go('catalogo')">${ct||'Todos'}</div>`).join('')}</div>
       ${filas}`);
+  },
+
+  /* ---------- INVENTARIO / STOCK ---------- */
+  _stockTot(p){ return (+p.stock_local||0)+(+p.stock_bodega||0); },
+  vStock(){
+    const arr=this._prods;
+    const tLoc=arr.reduce((a,p)=>a+(+p.stock_local||0),0), tBod=arr.reduce((a,p)=>a+(+p.stock_bodega||0),0);
+    this.set(`<h1>Inventario</h1><div class="sub">${arr.length} referencias · stock local + bodega</div>
+      <div class="kpis" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="kpi"><b>${tLoc}</b><span>Local</span></div>
+        <div class="kpi"><b>${tBod}</b><span>Bodega</span></div>
+        <div class="kpi"><b>${tLoc+tBod}</b><span>Total</span></div>
+      </div>
+      ${!arr.length?'<div class="empty">Sin productos.</div>':`
+      <div class="card" style="padding:6px 0">
+        <div style="display:flex;font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.5px;padding:6px 14px;font-weight:600"><div style="flex:1">Producto</div><div style="width:54px;text-align:center">Local</div><div style="width:54px;text-align:center">Bodega</div><div style="width:48px;text-align:right;padding-right:14px">Total</div></div>
+        ${arr.map(p=>`<div style="display:flex;align-items:center;gap:5px;padding:8px 14px;border-top:1px solid var(--line)">
+          <div style="flex:1;font-size:12.5px;line-height:1.25">${this.esc(p.nombre)}<div style="font-size:10px;color:var(--faint)">${this.esc(p.categoria)}</div></div>
+          <input type="number" inputmode="numeric" value="${+p.stock_local||0}" onchange="App.stockSet('${p.id}','local',this.value)" style="width:52px;text-align:center;padding:6px 4px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+          <input type="number" inputmode="numeric" value="${+p.stock_bodega||0}" onchange="App.stockSet('${p.id}','bodega',this.value)" style="width:52px;text-align:center;padding:6px 4px;border:1px solid var(--line);border-radius:7px;font-size:13px">
+          <div style="width:48px;text-align:right;padding-right:8px;font-weight:700;font-family:var(--serif);color:var(--accent2)">${this._stockTot(p)}</div>
+        </div>`).join('')}
+      </div>
+      <div class="hint">Escribe en local o bodega y el total se ajusta solo. Se guarda al salir del campo.</div>`}`);
+  },
+  async stockSet(id,campo,val){
+    const p=this._prods.find(x=>x.id===id); if(!p)return;
+    if(campo==='local') p.stock_local=+val||0; else p.stock_bodega=+val||0;
+    await this._put('soleparis_productos',p,this._prods);
+    this.vStock();
   },
 
   /* ---------- CLIENTES ---------- */
@@ -463,7 +508,8 @@ const App = {
     for(const [nombre,categoria,pres,pv] of CAT){
       const id='sp'+(idx+1);
       if(!this._prods.find(x=>x.id===id)){
-        const prod={id,nombre,categoria,presentacion:pres,precio_venta:pv,precio_costo:0,stock:stockDemo[idx]||10};
+        const tot=stockDemo[idx]||10, loc=Math.round(tot*0.35);
+        const prod={id,nombre,categoria,presentacion:pres,precio_venta:pv,precio_costo:0,stock_local:loc,stock_bodega:tot-loc};
         this._prods.push(prod); await this._put('soleparis_productos',prod,this._prods);
       }
       idx++;
