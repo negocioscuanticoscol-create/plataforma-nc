@@ -1,6 +1,13 @@
 # Playbook interno de autogestión (privado, NO publicar en GitHub Pages)
 _PLAYBOOK/
 
+# Tokens / secretos — NUNCA publicar (defensa extra por si se mueven de _PLAYBOOK)
+_token.txt
+*token*.txt
+_secret*
+.env
+.env.*
+
 # NUNCA publicar: scripts con credenciales / dev
 _run_schema.py
 _*.py
