@@ -168,10 +168,23 @@ const App = {
   async _fetchTable(t){
     try{
       const r=await fetch(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc&limit=5000',{headers:this._H()});
-      if(r.ok){ this._onl[t]=true; const d=await r.json(); this._saveLocal(t,d); return d; }
+      if(r.ok){ this._onl[t]=true; return await this._reconcile(t, await r.json()); }
     }catch(e){}
     this._onl[t]=false;
     return this._loadLocal(t);
+  },
+  // Sube a la nube lo que haya quedado guardado solo en local (y devuelve todo unido)
+  async _reconcile(t, cloudArr){
+    const local=this._loadLocal(t);
+    const cloudIds=new Set(cloudArr.map(x=>x&&x.id));
+    const missing=local.filter(x=>x&&x.id&&!cloudIds.has(x.id));
+    for(const row of missing){
+      try{ await fetch(this.SB+'/rest/v1/'+t+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)}); }catch(e){}
+    }
+    const merged = missing.length ? [...missing, ...cloudArr] : cloudArr;
+    merged.sort((a,b)=>String((b&&b.creado_en)||'').localeCompare(String((a&&a.creado_en)||'')));
+    this._saveLocal(t, merged);
+    return merged;
   },
   async _sync(){
     this._prods=await this._fetchTable('soleparis_productos');
