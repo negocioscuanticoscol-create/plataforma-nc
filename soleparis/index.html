@@ -258,7 +258,6 @@ const App = {
       <div class="sub">Los invitados que entran con clave ven el diagnóstico. Aquí administras todo.</div>
       <div class="step"><div class="n">📊</div><div><div class="t">Diagnóstico de invitados</div><div class="d">${this._diag.length} persona${this._diag.length===1?'':'s'} lo ${this._diag.length===1?'ha':'han'} llenado. Ve los resultados en la pestaña <b>Resultados</b> (solo tú los ves).</div></div></div>
       <div class="step"><div class="n">🧴</div><div><div class="t">Tu catálogo real</div><div class="d">Los ${this._prods.length} productos de Sole Paris con sus precios de venta.</div></div></div>
-      <div class="step"><div class="n">🔒</div><div><div class="t">Data aislada</div><div class="d">Nada se cruza con otras marcas. 100% de Sole Paris.</div></div></div>
       <div style="text-align:center;font-size:11.5px;font-weight:600;margin:14px 0 4px;color:${this._online?'var(--ok)':'var(--warn)'}">${this._online?'☁️ Datos en la nube (Supabase)':'💾 Modo local — falta crear las tablas soleparis_*'}</div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn-sm btn-ink" style="flex:1;padding:12px" onclick="App.sembrar()">✦ Cargar catálogo + demo</button>
