@@ -161,31 +161,31 @@ const App = {
   /* ---------- datos: Supabase (aislado) con respaldo local ---------- */
   SB:'https://fnayedgvamxktxfvywwl.supabase.co',
   KEY:'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',
-  _online:false, _prods:[], _clis:[],
+  _online:false, _onl:{}, _prods:[], _clis:[],
   _H(){ return {apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':'application/json'}; },
   _loadLocal(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } },
   _saveLocal(k,a){ try{ localStorage.setItem(k,JSON.stringify(a)); }catch(e){} },
-  async _sync(){
+  async _fetchTable(t){
     try{
-      const [rp,rc,rd]=await Promise.all([
-        fetch(this.SB+'/rest/v1/soleparis_productos?select=*&order=creado_en.desc&limit=5000',{headers:this._H()}),
-        fetch(this.SB+'/rest/v1/soleparis_clientes?select=*&order=creado_en.desc&limit=5000',{headers:this._H()}),
-        fetch(this.SB+'/rest/v1/soleparis_diagnostico?select=*&order=creado_en.desc&limit=5000',{headers:this._H()})
-      ]);
-      if(rp.ok && rc.ok){ this._prods=await rp.json(); this._clis=await rc.json(); this._diag=(rd&&rd.ok)?await rd.json():[]; this._online=true; return; }
+      const r=await fetch(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc&limit=5000',{headers:this._H()});
+      if(r.ok){ this._onl[t]=true; const d=await r.json(); this._saveLocal(t,d); return d; }
     }catch(e){}
-    this._online=false;
-    this._prods=this._loadLocal('soleparis_productos');
-    this._clis=this._loadLocal('soleparis_clientes');
-    this._diag=this._loadLocal('soleparis_diagnostico');
+    this._onl[t]=false;
+    return this._loadLocal(t);
+  },
+  async _sync(){
+    this._prods=await this._fetchTable('soleparis_productos');
+    this._clis =await this._fetchTable('soleparis_clientes');
+    this._diag =await this._fetchTable('soleparis_diagnostico');
+    this._online = !!(this._onl.soleparis_productos||this._onl.soleparis_clientes||this._onl.soleparis_diagnostico);
   },
   async _put(tabla,row,cacheArr){
-    if(this._online){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)}); }catch(e){} }
-    else { this._saveLocal(tabla,cacheArr); }
+    this._saveLocal(tabla,cacheArr);   // respaldo local SIEMPRE
+    if(this._onl[tabla]){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)}); }catch(e){} }
   },
   async _del(tabla,id,cacheArr){
-    if(this._online){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:this._H()}); }catch(e){} }
-    else { this._saveLocal(tabla,cacheArr); }
+    this._saveLocal(tabla,cacheArr);
+    if(this._onl[tabla]){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:this._H()}); }catch(e){} }
   },
 
   /* ---------- acceso ---------- */
