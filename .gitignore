@@ -1,3 +1,6 @@
+# Playbook interno de autogestión (privado, NO publicar en GitHub Pages)
+_PLAYBOOK/
+
 # NUNCA publicar: scripts con credenciales / dev
 _run_schema.py
 _*.py
