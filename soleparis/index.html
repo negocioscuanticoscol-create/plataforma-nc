@@ -129,6 +129,34 @@ const App = {
   PASS:{ 'soleadmin2026':'admin', 'soleparis1':'cliente','soleparis2':'cliente','soleparis3':'cliente','soleparis4':'cliente','soleparis5':'cliente' },
   CATS:['Facial','Capilar','Corporal','Ojos','Labios','Kit','Tarjeta'],
   rol:'', view:'inicio', _cat:'', _editId:null,
+  _diag:[], _dResp:{a:{},b:{},tools:{}},
+  D_TOOLS:["ChatGPT","Gemini","Copilot","Claude","Perplexity","DeepSeek","Ninguna"],
+  D_A:[
+   {c:"Archivos con data",t:"¿Maneja archivos con información de su trabajo? Excel, informes, bases de datos.",
+    o:[{t:"No, esa información la tiene otra persona",v:0,corta:true},{t:"Sí, pero yo solo los lleno; no los analizo",v:1},{t:"Sí, y los reviso yo mismo",v:2},{t:"Sí, y de ahí salen decisiones de mi área",v:3}]},
+   {c:"Cómo los analiza",t:"¿Cómo los analiza?",
+    o:[{t:"No los analizo, solo los guardo o envío",v:0},{t:"Los leo a ojo y saco conclusiones",v:1},{t:"Con fórmulas, filtros o tablas dinámicas",v:2},{t:"Con un tablero que cruza varias fuentes",v:3}]},
+   {c:"Con quién los discute",t:"¿Con quién discute esos resultados?",
+    o:[{t:"Con nadie, quedan en mi computador",v:0},{t:"Con mi jefe, cuando me los pide",v:1},{t:"En reunión de área, periódica",v:2},{t:"Con varias áreas, la decisión nos toca a todos",v:3}]},
+   {c:"Cada cuánto deciden",t:"¿Cada cuánto se decide con base en esos resultados?",
+    o:[{t:"Rara vez o nunca",v:0},{t:"Solo cuando hay un problema encima",v:1},{t:"Una vez al mes",v:2},{t:"Cada semana o más seguido",v:3}]}
+  ],
+  D_B:[
+   {c:"Tarea repetitiva",t:"Le piden reducir a la mitad el tiempo de una tarea repetitiva. ¿Por dónde empieza?",
+    o:[{t:"Redistribuyendo el trabajo o pidiendo más personal",v:0},{t:"Buscando una herramienta que lo haga más rápido",v:1},{t:"Documentando el proceso para delegarlo o repetirlo",v:2},{t:"Probando con una IA y ajustando cómo se lo pido",v:3}]},
+   {c:"Confianza en cifras",t:"Una IA le entrega un informe con cifras de su empresa. ¿Qué hace primero?",
+    o:[{t:"Nunca he usado una para eso",v:0},{t:"No lo usaría: se inventan los datos",v:0,f:"esceptico"},{t:"Lo uso, para eso lo pedí",v:1},{t:"Reviso contra la fuente y si cuadra, lo uso",v:2},{t:"Reviso de dónde salió cada dato; si no lo rastreo, no lo uso",v:3}]},
+   {c:"Manejo de fallos",t:"Cuando le pide algo a una IA y no sirve, ¿qué pasa?",
+    o:[{t:"No uso ninguna",v:0},{t:"Me pasa casi siempre, por eso dejé de intentarlo",v:1,f:"esceptico"},{t:"A veces pasa, y cambio cómo se lo pido",v:2},{t:"Casi no me pasa, le doy contexto y ejemplos desde el inicio",v:3}]},
+   {c:"Dónde aportaría",t:"En su trabajo, ¿dónde ayudaría más una herramienta así?",
+    o:[{t:"No le veo dónde encajaría",v:0},{t:"Redactando correos y textos",v:1},{t:"Ordenando y resumiendo información regada",v:2},{t:"Analizando lo que tenemos y diciéndonos qué decidir",v:3}]},
+   {c:"Experiencia real",t:"¿Cuál frase se parece más a lo que ha hecho con una IA?",
+    o:[{t:"Nunca he usado una",v:0},{t:"Le he hecho preguntas y responde",v:1},{t:"Le he dado documentos míos para que trabaje sobre ellos",v:2},{t:"He armado algo que volví a usar varias veces sin rehacerlo",v:3}]},
+   {c:"Automatización actual",t:"Hoy, ¿qué tanto de su trabajo pasa sin que usted lo haga a mano?",
+    o:[{t:"Nada, todo lo hago yo",v:0},{t:"Tengo plantillas o fórmulas de Excel",v:1},{t:"Hay correos o mensajes automáticos",v:2},{t:"Hay reportes o tareas que se generan solos",v:3}]}
+  ],
+  D_PERF:[{max:5,n:"Observador",d:"Sin contacto real con estas herramientas."},{max:10,n:"Usuario",d:"Usa IA de vez en cuando, sobre todo textos."},{max:14,n:"Aplicado",d:"Entiende contexto y límites."},{max:18,n:"Avanzado",d:"Piensa en procesos y repetición."}],
+  D_MAT:{aa:"El que se la sabe. Tiene datos ordenados y entiende la herramienta. Dele un rol en la implementación.",ab:"El mejor cliente posible. Ya decide con sus datos; solo no sabe qué más se puede. Haga el demo sobre sus propios archivos.",ba:"Conoce la herramienta pero no tiene con qué alimentarla. Véndale el diagnóstico primero, no el motor.",bb:"Punto de partida en cero. Muestre resultado, no proceso: una sola cosa que hoy toma horas y sale en un minuto."},
 
   /* ---------- datos: Supabase (aislado) con respaldo local ---------- */
   SB:'https://fnayedgvamxktxfvywwl.supabase.co',
@@ -139,15 +167,17 @@ const App = {
   _saveLocal(k,a){ try{ localStorage.setItem(k,JSON.stringify(a)); }catch(e){} },
   async _sync(){
     try{
-      const [rp,rc]=await Promise.all([
+      const [rp,rc,rd]=await Promise.all([
         fetch(this.SB+'/rest/v1/soleparis_productos?select=*&order=creado_en.desc&limit=5000',{headers:this._H()}),
-        fetch(this.SB+'/rest/v1/soleparis_clientes?select=*&order=creado_en.desc&limit=5000',{headers:this._H()})
+        fetch(this.SB+'/rest/v1/soleparis_clientes?select=*&order=creado_en.desc&limit=5000',{headers:this._H()}),
+        fetch(this.SB+'/rest/v1/soleparis_diagnostico?select=*&order=creado_en.desc&limit=5000',{headers:this._H()})
       ]);
-      if(rp.ok && rc.ok){ this._prods=await rp.json(); this._clis=await rc.json(); this._online=true; return; }
+      if(rp.ok && rc.ok){ this._prods=await rp.json(); this._clis=await rc.json(); this._diag=(rd&&rd.ok)?await rd.json():[]; this._online=true; return; }
     }catch(e){}
     this._online=false;
     this._prods=this._loadLocal('soleparis_productos');
     this._clis=this._loadLocal('soleparis_clientes');
+    this._diag=this._loadLocal('soleparis_diagnostico');
   },
   async _put(tabla,row,cacheArr){
     if(this._online){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)}); }catch(e){} }
@@ -179,7 +209,7 @@ const App = {
   pintarNav(){
     // Cliente: SOLO Starting Point. Admin: toda la botonería.
     const TABS = this.esAdmin()
-      ? [['inicio','✦','Starting'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM']]
+      ? [['inicio','✦','Starting'],['resultados','📊','Resultados'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM']]
       : [['inicio','✦','Starting Point']];
     document.getElementById('nav').innerHTML = TABS.map(([v,ic,t])=>
       `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
@@ -189,7 +219,7 @@ const App = {
     this.view=view;
     document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.v===view));
     window.scrollTo(0,0);
-    ({inicio:this.vInicio, panel:this.vPanel, productos:this.vProductos, catalogo:this.vCatalogo,
+    ({inicio:this.vInicio, resultados:this.vResultados, panel:this.vPanel, productos:this.vProductos, catalogo:this.vCatalogo,
       clientes:this.vClientes, cotizar:this.vCotizar, pedidos:this.vPedidos, despachos:this.vDespachos,
       cartera:this.vCartera, crm:this.vCrm}[view]||this.vInicio).call(this);
   },
@@ -216,26 +246,84 @@ const App = {
 
   /* ---------- STARTING POINT ---------- */
   vInicio(){
-    const admin=this.esAdmin();
+    if(!this.esAdmin()) return this.vDiagForm();   // invitado → formulario de diagnóstico
     this.set(`
       <div class="hero">
         <img src="https://soleparis.com/cdn/shop/files/1_2_b2654e9a-7df3-46ba-88a2-3df29f21dec3.png?width=400" alt="" onerror="this.style.display='none'">
         <span class="word">SOLE PARIS</span>
         <span class="tag">Dermocosmética</span>
-        <p>Bienvenido a tu plataforma de gestión. Aquí vive tu catálogo, tus clientes y tu operación — toda tu información en un solo lugar, y solo tuya.</p>
+        <p>Tu plataforma de gestión. Catálogo, clientes y operación — todo aislado y solo tuyo.</p>
       </div>
-      <h1 style="font-size:19px">Starting Point</h1>
-      <div class="sub">${admin?'Punto de partida. Desde acá organizamos todo.':'Estás en la vista de invitado. Muy pronto verás aquí tu operación completa.'}</div>
-      <div class="step"><div class="n">1</div><div><div class="t">Tu catálogo real, ya cargado</div><div class="d">Los ${this._prods.length} productos de Sole Paris con sus precios de venta.</div></div></div>
-      <div class="step"><div class="n">2</div><div><div class="t">Tus clientes y pedidos</div><div class="d">Registra clientes, arma cotizaciones y sigue cada pedido.</div></div></div>
-      <div class="step"><div class="n">3</div><div><div class="t">Tu data, aislada y segura</div><div class="d">Nada se cruza con otras marcas. Tu información es 100% tuya.</div></div></div>
-      ${admin?`
+      <h1 style="font-size:19px">Starting Point · Admin</h1>
+      <div class="sub">Los invitados que entran con clave ven el diagnóstico. Aquí administras todo.</div>
+      <div class="step"><div class="n">📊</div><div><div class="t">Diagnóstico de invitados</div><div class="d">${this._diag.length} persona${this._diag.length===1?'':'s'} lo ${this._diag.length===1?'ha':'han'} llenado. Ve los resultados en la pestaña <b>Resultados</b> (solo tú los ves).</div></div></div>
+      <div class="step"><div class="n">🧴</div><div><div class="t">Tu catálogo real</div><div class="d">Los ${this._prods.length} productos de Sole Paris con sus precios de venta.</div></div></div>
+      <div class="step"><div class="n">🔒</div><div><div class="t">Data aislada</div><div class="d">Nada se cruza con otras marcas. 100% de Sole Paris.</div></div></div>
       <div style="text-align:center;font-size:11.5px;font-weight:600;margin:14px 0 4px;color:${this._online?'var(--ok)':'var(--warn)'}">${this._online?'☁️ Datos en la nube (Supabase)':'💾 Modo local — falta crear las tablas soleparis_*'}</div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn-sm btn-ink" style="flex:1;padding:12px" onclick="App.sembrar()">✦ Cargar catálogo Sole Paris + demo</button>
+        <button class="btn-sm btn-ink" style="flex:1;padding:12px" onclick="App.sembrar()">✦ Cargar catálogo + demo</button>
         <button class="btn-sm" style="padding:12px;background:#fbece9;color:#b3564b" onclick="App.limpiar()">Borrar todo</button>
-      </div>`:''}
+      </div>
     `);
+  },
+
+  /* ---------- DIAGNÓSTICO (lo que ve el invitado) ---------- */
+  vDiagForm(){
+    this._dResp={a:{},b:{},tools:{}};
+    const q=(lista,pref,base)=>lista.map((qq,i)=>`
+      <div class="card"><div style="font-weight:600;font-size:14.5px;margin-bottom:10px"><span style="color:var(--accent2);font-family:var(--serif)">${base+i+1}.</span> ${this.esc(qq.t)}</div>
+      ${qq.o.map((o,j)=>`<div class="opt" onclick="App.diagPick('${pref}',${i},${j},this)" style="display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border:1px solid var(--line);border-radius:9px;margin-bottom:7px;cursor:pointer;font-size:14px"><span class="dot" style="width:16px;height:16px;border-radius:50%;border:2px solid var(--line);flex:none;margin-top:2px"></span><span>${this.esc(o.t)}</span></div>`).join('')}
+      </div>`).join('');
+    this.set(`
+      <div class="hero"><span class="word">SOLE PARIS</span><span class="tag">Antes de la demostración</span><p>Tres minutos. Nos sirve para preparar la sesión con ejemplos que de verdad le sirvan a su área. No hay respuestas correctas.</p></div>
+      <h1 style="font-size:19px">Sus datos</h1><div class="sub">Solo para saber con quién hablamos.</div>
+      <div class="card">
+        <div class="row2"><div><label>Nombre completo</label><input id="d_nom" class="field"></div><div><label>Cargo</label><input id="d_car" class="field"></div></div>
+        <label>Departamento o área</label><input id="d_dep" class="field">
+        <label>Sus funciones más relevantes</label><textarea id="d_fun" class="field" style="min-height:70px" placeholder="Las tres o cuatro cosas que más ocupan su día."></textarea>
+      </div>
+      <div style="font-family:var(--serif);color:var(--accent2);margin:22px 0 8px;font-size:15px">Parte 1 · Su información</div>
+      ${q(this.D_A,'a',0)}
+      <div style="font-family:var(--serif);color:var(--accent2);margin:22px 0 8px;font-size:15px">Parte 2 · Su experiencia</div>
+      ${q(this.D_B,'b',this.D_A.length)}
+      <div class="card"><label>¿Qué es lo que más le preocuparía si la empresa empieza a apoyarse en IA?</label><textarea id="d_pre" class="field" style="min-height:60px"></textarea></div>
+      <button class="btn-sm btn-ink" style="width:100%;padding:14px" onclick="App.guardarDiag()">Enviar respuestas</button>
+      <div id="d_err" class="hint" style="color:var(--bad);display:none;text-align:center;margin-top:8px">Falta el nombre y responder todas las preguntas.</div>`);
+  },
+  diagPick(pref,qi,ji,el){
+    this._dResp[pref][qi]=ji;
+    el.parentElement.querySelectorAll('.opt').forEach(o=>{o.style.borderColor='var(--line)';o.style.background='#fff';const d=o.querySelector('.dot');if(d){d.style.background='#fff';d.style.borderColor='var(--line)';}});
+    el.style.borderColor='var(--accent)';el.style.background='var(--accent-soft)';const dot=el.querySelector('.dot');if(dot){dot.style.background='var(--accent)';dot.style.borderColor='var(--accent)';}
+  },
+  async guardarDiag(){
+    const g=id=>(document.getElementById(id).value||'').trim();
+    const nom=g('d_nom');
+    if(!nom || Object.keys(this._dResp.a).length<this.D_A.length || Object.keys(this._dResp.b).length<this.D_B.length){ document.getElementById('d_err').style.display='block'; return; }
+    let pDatos=0,detA=[]; this.D_A.forEach((qq,i)=>{const o=qq.o[this._dResp.a[i]];pDatos+=o.v;detA.push({tema:qq.c,r:o.t,v:o.v});});
+    let pIA=0,detB=[],esce=false; this.D_B.forEach((qq,i)=>{const o=qq.o[this._dResp.b[i]];pIA+=o.v;if(o.f==='esceptico')esce=true;detB.push({tema:qq.c,r:o.t,v:o.v});});
+    let perfil=this.D_PERF[this.D_PERF.length-1]; for(const pp of this.D_PERF){if(pIA<=pp.max){perfil=pp;break;}}
+    const datosAlto=pDatos>=7, iaAlto=pIA>=11;
+    const rec={ id:'d'+Date.now()+Math.floor(Math.random()*999), nombre:nom, cargo:g('d_car'), area:g('d_dep'), funciones:g('d_fun'),
+      preocupacion:g('d_pre'), puntaje_datos:pDatos, puntaje_ia:pIA, perfil:perfil.n, esceptico:esce,
+      madurez:datosAlto?'Datos ordenados':'Datos dispersos', clave_lectura:this.D_MAT[(datosAlto?'a':'b')+(iaAlto?'a':'b')],
+      detalle_a:detA, detalle_b:detB, creado_en:new Date().toISOString() };
+    this._diag.unshift(rec); await this._put('soleparis_diagnostico',rec,this._diag);
+    this.set(`<div class="hero"><span class="word">SOLE PARIS</span><span class="tag">Gracias</span><p>Listo, ${this.esc(nom.split(' ')[0])}. Con esto preparamos la demostración pensando en su área. Nos vemos en la sesión.</p></div>
+      <div style="text-align:center"><button class="btn-sm btn-line" style="padding:12px 22px" onclick="App.vDiagForm()">Registrar a otra persona</button></div>`);
+  },
+
+  /* ---------- RESULTADOS (solo admin) ---------- */
+  vResultados(){
+    const arr=this._diag||[];
+    this.set(`<h1>Resultados</h1><div class="sub">${arr.length} diagnóstico${arr.length===1?'':'s'} · visible solo para admin</div>
+      ${arr.length? arr.map(d=>`<div class="prod">
+        <div class="top"><div><div class="nm">${this.esc(d.nombre)}</div><div class="ct">${this.esc(d.cargo||'')}${d.area?' · '+this.esc(d.area):''}</div></div>
+        <div class="pv" style="font-size:13px"><span class="pchip" style="background:var(--accent-soft);color:var(--accent2)">IA ${this.esc(d.perfil)} · ${d.puntaje_ia}/18</span></div></div>
+        <div class="meta"><span class="pchip ${d.madurez==='Datos ordenados'?'stock':'cost'}">${this.esc(d.madurez)} · ${d.puntaje_datos}/12</span>${d.esceptico?'<span class="pchip cost">⚠ Escéptico</span>':''}</div>
+        <div style="font-size:13px;color:var(--ink);margin-top:10px;line-height:1.55;background:var(--accent-soft);border-radius:8px;padding:11px 13px"><b>Cómo abordarlo:</b> ${this.esc(d.clave_lectura||'')}</div>
+        ${d.funciones?`<div style="font-size:12.5px;color:var(--faint);margin-top:7px">Funciones: ${this.esc(d.funciones)}</div>`:''}
+        ${d.preocupacion?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Le preocupa: ${this.esc(d.preocupacion)}</div>`:''}
+      </div>`).join('') : '<div class="empty">Aún nadie ha llenado el diagnóstico. Cuando los invitados entren con su clave y lo completen, aparecen aquí.</div>'}`);
   },
 
   /* ---------- PANEL ---------- */
