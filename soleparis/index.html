@@ -126,7 +126,7 @@
 <script>
 const App = {
   // 1 admin (ve todo) + 5 claves de cliente (solo Starting Point)
-  PASS:{ 'soleadmin2026':'admin', 'soleparis1':'cliente','soleparis2':'cliente','soleparis3':'cliente','soleparis4':'cliente','soleparis5':'cliente' },
+  PASS:{ 'soleadmin2026':'admin', 'solegerencia2026':'gerencia', 'soleparis1':'cliente','soleparis2':'cliente','soleparis3':'cliente','soleparis4':'cliente','soleparis5':'cliente' },
   CATS:['Facial','Capilar','Corporal','Ojos','Labios','Kit','Tarjeta'],
   rol:'', view:'inicio', _cat:'', _editId:null,
   _diag:[], _dResp:{a:{},b:{},tools:{}},
@@ -196,7 +196,7 @@ const App = {
     this.rol=rol; sessionStorage.setItem('sole_rol',rol); this._start();
   },
   logout(){ sessionStorage.removeItem('sole_rol'); this.rol=''; location.reload(); },
-  esAdmin(){ return this.rol==='admin'; },
+  esAdmin(){ return this.rol==='admin'||this.rol==='gerencia'; },
   async _start(){
     document.getElementById('login').classList.add('hide');
     document.getElementById('app').classList.remove('hide');
