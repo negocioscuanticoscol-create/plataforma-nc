@@ -203,6 +203,7 @@ const App = {
     document.getElementById('rol').textContent = this.rol==='admin'?'Admin':'Invitado';
     document.getElementById('main').innerHTML='<div style="text-align:center;padding:44px;color:#a99f93">Cargando…</div>';
     await this._sync();
+    if(!this._prods.length){ await this._seedProductos(); }   // el catálogo aparece lleno solo, sin botón
     this.pintarNav(); this.go('inicio');
   },
 
@@ -443,8 +444,7 @@ const App = {
   },
 
   /* ---------- SEMBRAR CATÁLOGO REAL + DEMO ---------- */
-  async sembrar(){
-    if(!confirm('Cargar el catálogo real de Sole Paris (36 productos con precio de venta), inventario de demostración y 2 clientes de prueba?')) return;
+  async _seedProductos(){
     const CAT=[
       ['CREMA ACLARANTE CORPORAL','Corporal','',99900],['KIT ANTIFATIGA','Kit','',419700],['KIT LONGEVIDAD','Kit','',419600],
       ['KIT ANTICASPA MEN','Kit','',279700],['KIT ANTICASPA WOMAN','Kit','',279700],['KIT ANTICAIDA MEN','Kit','',309700],
@@ -468,6 +468,10 @@ const App = {
       }
       idx++;
     }
+  },
+  async sembrar(){
+    if(!confirm('Recargar el catálogo de Sole Paris (36 productos) y 2 clientes de prueba?')) return;
+    await this._seedProductos();
     const clis=[
       {id:'sc1',nombre:'Spa Belleza Natural',tel:'3105557788',ciudad:'Bogotá',tipo:'Spa / estética'},
       {id:'sc2',nombre:'Dra. Camila Restrepo (Dermatología)',tel:'3128889900',ciudad:'Medellín',tipo:'Dermatólogo'}
