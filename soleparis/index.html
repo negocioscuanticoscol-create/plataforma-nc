@@ -294,6 +294,8 @@ const App = {
           <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">🧾 Pedidos</span><input id="sw_ped" class="field" style="flex:1.3" placeholder="¿Software?"></div>
           <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">📤 Picking &amp; packing</span><input id="sw_pick" class="field" style="flex:1.3" placeholder="¿Software?"></div>
           <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">🚚 Delivery / entregas</span><input id="sw_del" class="field" style="flex:1.3" placeholder="¿Software?"></div>
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">🧮 Cotizaciones</span><input id="sw_cot" class="field" style="flex:1.3" placeholder="¿Software?"></div>
+          <div style="display:flex;align-items:center;gap:9px"><span style="flex:.9;font-size:13.5px">📇 Leads</span><input id="sw_lead" class="field" style="flex:1.3" placeholder="¿Software?"></div>
         </div>
       </div>
       <div class="card"><label>¿Qué es lo que más le preocuparía si la empresa empieza a apoyarse en IA?</label><textarea id="d_pre" class="field" style="min-height:60px"></textarea></div>
@@ -314,7 +316,7 @@ const App = {
     let perfil=this.D_PERF[this.D_PERF.length-1]; for(const pp of this.D_PERF){if(pIA<=pp.max){perfil=pp;break;}}
     const datosAlto=pDatos>=7, iaAlto=pIA>=11;
     const rec={ id:'d'+Date.now()+Math.floor(Math.random()*999), nombre:nom, cargo:g('d_car'), area:g('d_dep'), funciones:g('d_fun'),
-      preocupacion:g('d_pre'), software:{inventarios:g('sw_inv'),pedidos:g('sw_ped'),picking:g('sw_pick'),delivery:g('sw_del')},
+      preocupacion:g('d_pre'), software:{inventarios:g('sw_inv'),pedidos:g('sw_ped'),picking:g('sw_pick'),delivery:g('sw_del'),cotizaciones:g('sw_cot'),leads:g('sw_lead')},
       puntaje_datos:pDatos, puntaje_ia:pIA, perfil:perfil.n, esceptico:esce,
       madurez:datosAlto?'Datos ordenados':'Datos dispersos', clave_lectura:this.D_MAT[(datosAlto?'a':'b')+(iaAlto?'a':'b')],
       detalle_a:detA, detalle_b:detB, creado_en:new Date().toISOString() };
@@ -333,7 +335,7 @@ const App = {
         <div class="meta"><span class="pchip ${d.madurez==='Datos ordenados'?'stock':'cost'}">${this.esc(d.madurez)} · ${d.puntaje_datos}/12</span>${d.esceptico?'<span class="pchip cost">⚠ Escéptico</span>':''}</div>
         <div style="font-size:13px;color:var(--ink);margin-top:10px;line-height:1.55;background:var(--accent-soft);border-radius:8px;padding:11px 13px"><b>Cómo abordarlo:</b> ${this.esc(d.clave_lectura||'')}</div>
         ${d.funciones?`<div style="font-size:12.5px;color:var(--faint);margin-top:7px">Funciones: ${this.esc(d.funciones)}</div>`:''}
-        ${d.software?`<div style="font-size:12.5px;color:var(--faint);margin-top:4px">Software hoy: 📦 ${this.esc(d.software.inventarios||'—')} · 🧾 ${this.esc(d.software.pedidos||'—')} · 📤 ${this.esc(d.software.picking||'—')} · 🚚 ${this.esc(d.software.delivery||'—')}</div>`:''}
+        ${d.software?`<div style="font-size:12.5px;color:var(--faint);margin-top:4px">Software hoy: 📦 ${this.esc(d.software.inventarios||'—')} · 🧾 ${this.esc(d.software.pedidos||'—')} · 📤 ${this.esc(d.software.picking||'—')} · 🚚 ${this.esc(d.software.delivery||'—')} · 🧮 ${this.esc(d.software.cotizaciones||'—')} · 📇 ${this.esc(d.software.leads||'—')}</div>`:''}
         ${d.preocupacion?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Le preocupa: ${this.esc(d.preocupacion)}</div>`:''}
       </div>`).join('') : '<div class="empty">Aún nadie ha llenado el diagnóstico. Cuando los invitados entren con su clave y lo completen, aparecen aquí.</div>'}`);
   },
