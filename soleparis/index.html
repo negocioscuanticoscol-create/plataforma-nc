@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sole Paris</title>
+<style>
+  :root{
+    --bg:#f7f3ef; --surface:#ffffff; --surface2:#f2ebe4; --line:#e7ded4;
+    --ink:#221d19; --muted:#8a8075; --faint:#a99f93;
+    --accent:#a9836a; --accent2:#8f6a53; --accent-soft:#f0e7de;
+    --ok:#5a8a5e; --warn:#b1802f; --bad:#b3564b;
+    --serif:Georgia,'Times New Roman',serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{font-family:var(--sans);background:var(--bg);color:var(--ink);font-size:16px}
+  input,select,textarea,button{font-family:inherit;font-size:16px}
+  .hide{display:none!important}
+
+  /* LOGIN */
+  #login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px;background:linear-gradient(170deg,#f7f3ef,#efe6dc)}
+  #login .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:34px 28px;width:100%;max-width:380px;text-align:center;box-shadow:0 18px 44px rgba(90,70,55,.12)}
+  .brand{display:inline-flex;flex-direction:column;align-items:center;gap:8px}
+  .brand img{height:46px;object-fit:contain}
+  .brand .word{font-family:var(--serif);font-size:24px;letter-spacing:3px;font-weight:400;color:var(--ink)}
+  .brand .word b{font-weight:600}
+  .brand .tag{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--faint)}
+  #login .sub{color:var(--muted);font-size:13px;margin:16px 0 18px}
+  #login input{width:100%;padding:14px;border:1.5px solid var(--line);border-radius:11px;text-align:center;letter-spacing:1px}
+  #login input:focus{outline:none;border-color:var(--accent)}
+  .btn{width:100%;padding:15px;border:none;border-radius:11px;font-weight:600;cursor:pointer;margin-top:14px;letter-spacing:.5px}
+  .btn-main{background:var(--ink);color:#fff}
+  .btn-main:active{background:#000}
+  #login .err{margin-top:12px;font-size:13px;color:var(--bad);display:none}
+
+  /* SHELL */
+  #app{min-height:100vh;display:flex;flex-direction:column;max-width:760px;margin:0 auto;background:var(--bg)}
+  .topbar{background:#fff;border-bottom:1px solid var(--line);padding:11px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
+  .topbar .brand{flex-direction:row;gap:9px}
+  .topbar .brand img{height:26px}
+  .topbar .brand .word{font-size:16px;letter-spacing:2px}
+  .topbar .rol{display:inline-block;background:var(--accent-soft);color:var(--accent2);font-size:10px;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+  .logout{background:none;border:none;color:var(--faint);font-size:12px;cursor:pointer;margin-left:10px}
+  #main{flex:1;padding:16px 16px 150px}
+  h1{font-family:var(--serif);font-size:23px;font-weight:400;margin-bottom:4px;letter-spacing:.3px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:16px}
+
+  #nav{position:fixed;bottom:0;left:0;right:0;max-width:760px;margin:0 auto;background:#fff;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;z-index:20}
+  #nav button{flex:1 1 20%;min-width:64px;background:none;border:none;border-top:1px solid #f5efe8;padding:8px 2px 9px;font-size:10px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+  #nav button .ic{font-size:19px}
+  #nav button.active{color:var(--accent2);font-weight:700}
+
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+  label{display:block;font-size:13px;font-weight:600;margin:12px 0 5px}
+  .field{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:10px;background:#fff}
+  .field:focus{outline:none;border-color:var(--accent)}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .btn-sm{padding:9px 14px;border-radius:9px;border:none;font-weight:600;font-size:13px;cursor:pointer}
+  .btn-ink{background:var(--ink);color:#fff}
+  .btn-line{background:#fff;color:var(--ink);border:1px solid var(--line)}
+
+  .cats{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
+  .cat{flex:0 0 auto;padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:#fff;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+  .cat.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  .prod{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+  .prod .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .prod .nm{font-weight:600;font-size:14.5px;line-height:1.3}
+  .prod .ct{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+  .prod .pv{font-family:var(--serif);font-size:18px;font-weight:600;color:var(--accent2);white-space:nowrap}
+  .prod .meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;font-size:11.5px;color:var(--muted)}
+  .pchip{background:var(--surface2);border-radius:7px;padding:3px 9px}
+  .pchip.cost{background:#f6ede4;color:var(--warn)}
+  .pchip.stock{background:#eef3ee;color:var(--ok)}
+
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center}
+  .kpi b{display:block;font-family:var(--serif);font-size:28px;color:var(--ink)}
+  .kpi span{font-size:12px;color:var(--muted)}
+  .empty{text-align:center;color:var(--muted);padding:40px 12px;font-size:14px}
+  .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:11px;font-size:13.5px;z-index:99}
+
+  /* starting point */
+  .hero{background:linear-gradient(160deg,#2a231d,#4a3b30);color:#fff;border-radius:16px;padding:26px 22px;margin-bottom:14px;text-align:center}
+  .hero img{height:40px;margin-bottom:10px}
+  .hero .word{font-family:var(--serif);font-size:26px;letter-spacing:4px;display:block;margin-bottom:4px}
+  .hero .tag{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:#d8c4b2}
+  .hero p{color:#e6dccf;font-size:14px;margin-top:12px;line-height:1.6}
+  .step{display:flex;gap:12px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:9px}
+  .step .n{width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent2);font-family:var(--serif);font-weight:600;display:flex;align-items:center;justify-content:center;flex:none}
+  .step .t{font-weight:600;font-size:14px} .step .d{font-size:12.5px;color:var(--muted);margin-top:2px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="card">
+    <div class="brand">
+      <img src="https://soleparis.com/cdn/shop/files/1_2_b2654e9a-7df3-46ba-88a2-3df29f21dec3.png?width=400" alt="Sole Paris" onerror="this.style.display='none'">
+      <span class="word">SOLE<b> PARIS</b></span>
+      <span class="tag">Dermocosmética</span>
+    </div>
+    <div class="sub">Plataforma de gestión · ingresa tu clave</div>
+    <input id="lg" type="password" placeholder="Clave" onkeydown="if(event.key==='Enter')App.login()">
+    <button class="btn btn-main" onclick="App.login()">Entrar</button>
+    <div class="err" id="lgerr">Clave incorrecta</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hide">
+  <div class="topbar">
+    <div class="brand"><img src="https://soleparis.com/cdn/shop/files/1_2_b2654e9a-7df3-46ba-88a2-3df29f21dec3.png?width=300" alt="" onerror="this.style.display='none'"><span class="word">SOLE PARIS</span></div>
+    <div style="display:flex;align-items:center">
+      <span class="rol" id="rol"></span>
+      <button class="logout" onclick="App.logout()">Salir</button>
+    </div>
+  </div>
+  <div id="main"></div>
+  <div id="nav"></div>
+</div>
+
+<script>
+const App = {
+  // 1 admin (ve todo) + 5 claves de cliente (solo Starting Point)
+  PASS:{ 'soleadmin2026':'admin', 'soleparis1':'cliente','soleparis2':'cliente','soleparis3':'cliente','soleparis4':'cliente','soleparis5':'cliente' },
+  CATS:['Facial','Capilar','Corporal','Ojos','Labios','Kit','Tarjeta'],
+  rol:'', view:'inicio', _cat:'', _editId:null,
+
+  /* ---------- datos: Supabase (aislado) con respaldo local ---------- */
+  SB:'https://fnayedgvamxktxfvywwl.supabase.co',
+  KEY:'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',
+  _online:false, _prods:[], _clis:[],
+  _H(){ return {apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':'application/json'}; },
+  _loadLocal(k){ try{ return JSON.parse(localStorage.getItem(k)||'[]'); }catch(e){ return []; } },
+  _saveLocal(k,a){ try{ localStorage.setItem(k,JSON.stringify(a)); }catch(e){} },
+  async _sync(){
+    try{
+      const [rp,rc]=await Promise.all([
+        fetch(this.SB+'/rest/v1/soleparis_productos?select=*&order=creado_en.desc&limit=5000',{headers:this._H()}),
+        fetch(this.SB+'/rest/v1/soleparis_clientes?select=*&order=creado_en.desc&limit=5000',{headers:this._H()})
+      ]);
+      if(rp.ok && rc.ok){ this._prods=await rp.json(); this._clis=await rc.json(); this._online=true; return; }
+    }catch(e){}
+    this._online=false;
+    this._prods=this._loadLocal('soleparis_productos');
+    this._clis=this._loadLocal('soleparis_clientes');
+  },
+  async _put(tabla,row,cacheArr){
+    if(this._online){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)}); }catch(e){} }
+    else { this._saveLocal(tabla,cacheArr); }
+  },
+  async _del(tabla,id,cacheArr){
+    if(this._online){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:this._H()}); }catch(e){} }
+    else { this._saveLocal(tabla,cacheArr); }
+  },
+
+  /* ---------- acceso ---------- */
+  login(){
+    const p=(document.getElementById('lg').value||'').trim();
+    const rol=this.PASS[p];
+    if(!rol){ document.getElementById('lgerr').style.display='block'; return; }
+    this.rol=rol; sessionStorage.setItem('sole_rol',rol); this._start();
+  },
+  logout(){ sessionStorage.removeItem('sole_rol'); this.rol=''; location.reload(); },
+  esAdmin(){ return this.rol==='admin'; },
+  async _start(){
+    document.getElementById('login').classList.add('hide');
+    document.getElementById('app').classList.remove('hide');
+    document.getElementById('rol').textContent = this.rol==='admin'?'Admin':'Invitado';
+    document.getElementById('main').innerHTML='<div style="text-align:center;padding:44px;color:#a99f93">Cargando…</div>';
+    await this._sync();
+    this.pintarNav(); this.go('inicio');
+  },
+
+  pintarNav(){
+    // Cliente: SOLO Starting Point. Admin: toda la botonería.
+    const TABS = this.esAdmin()
+      ? [['inicio','✦','Starting'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM']]
+      : [['inicio','✦','Starting Point']];
+    document.getElementById('nav').innerHTML = TABS.map(([v,ic,t])=>
+      `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
+  },
+  go(view){
+    if(!this.esAdmin() && view!=='inicio') view='inicio';
+    this.view=view;
+    document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.v===view));
+    window.scrollTo(0,0);
+    ({inicio:this.vInicio, panel:this.vPanel, productos:this.vProductos, catalogo:this.vCatalogo,
+      clientes:this.vClientes, cotizar:this.vCotizar, pedidos:this.vPedidos, despachos:this.vDespachos,
+      cartera:this.vCartera, crm:this.vCrm}[view]||this.vInicio).call(this);
+  },
+  set(html){ document.getElementById('main').innerHTML = html; },
+  fmt(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
+  esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
+  toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); },
+  _load(){ return this._prods||[]; },
+  _loadCli(){ return this._clis||[]; },
+
+  _soon(icon,title,desc){
+    this.set(`<h1>${title}</h1>
+      <div class="card" style="text-align:center;padding:38px 18px">
+        <div style="font-size:44px">${icon}</div>
+        <div style="font-weight:600;margin-top:10px;font-size:16px">${title} · Sole Paris</div>
+        <div class="sub" style="margin-top:8px">${desc}</div>
+        <div style="margin-top:12px;display:inline-block;background:var(--accent-soft);color:var(--accent2);font-weight:600;font-size:12px;padding:6px 14px;border-radius:20px">Próximamente</div>
+      </div>`);
+  },
+  vPedidos(){ this._soon('📦','Pedidos','Aquí verás los pedidos confirmados de cada cliente.'); },
+  vDespachos(){ this._soon('🚚','Despachos','Seguimiento de envíos y entregas.'); },
+  vCartera(){ this._soon('💳','Cartera','Estado de pagos y cartera por cliente.'); },
+  vCrm(){ this._soon('📇','CRM','Seguimiento comercial y recompra.'); },
+
+  /* ---------- STARTING POINT ---------- */
+  vInicio(){
+    const admin=this.esAdmin();
+    this.set(`
+      <div class="hero">
+        <img src="https://soleparis.com/cdn/shop/files/1_2_b2654e9a-7df3-46ba-88a2-3df29f21dec3.png?width=400" alt="" onerror="this.style.display='none'">
+        <span class="word">SOLE PARIS</span>
+        <span class="tag">Dermocosmética</span>
+        <p>Bienvenido a tu plataforma de gestión. Aquí vive tu catálogo, tus clientes y tu operación — toda tu información en un solo lugar, y solo tuya.</p>
+      </div>
+      <h1 style="font-size:19px">Starting Point</h1>
+      <div class="sub">${admin?'Punto de partida. Desde acá organizamos todo.':'Estás en la vista de invitado. Muy pronto verás aquí tu operación completa.'}</div>
+      <div class="step"><div class="n">1</div><div><div class="t">Tu catálogo real, ya cargado</div><div class="d">Los ${this._prods.length} productos de Sole Paris con sus precios de venta.</div></div></div>
+      <div class="step"><div class="n">2</div><div><div class="t">Tus clientes y pedidos</div><div class="d">Registra clientes, arma cotizaciones y sigue cada pedido.</div></div></div>
+      <div class="step"><div class="n">3</div><div><div class="t">Tu data, aislada y segura</div><div class="d">Nada se cruza con otras marcas. Tu información es 100% tuya.</div></div></div>
+      ${admin?`
+      <div style="text-align:center;font-size:11.5px;font-weight:600;margin:14px 0 4px;color:${this._online?'var(--ok)':'var(--warn)'}">${this._online?'☁️ Datos en la nube (Supabase)':'💾 Modo local — falta crear las tablas soleparis_*'}</div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-sm btn-ink" style="flex:1;padding:12px" onclick="App.sembrar()">✦ Cargar catálogo Sole Paris + demo</button>
+        <button class="btn-sm" style="padding:12px;background:#fbece9;color:#b3564b" onclick="App.limpiar()">Borrar todo</button>
+      </div>`:''}
+    `);
+  },
+
+  /* ---------- PANEL ---------- */
+  vPanel(){
+    const p=this._prods, c=this._clis;
+    const val=p.reduce((a,x)=>a+(+x.precio_venta||0),0);
+    this.set(`<h1>Panel</h1><div class="sub">Resumen de la operación</div>
+      <div class="kpis">
+        <div class="kpi"><b>${p.length}</b><span>Productos</span></div>
+        <div class="kpi"><b>${c.length}</b><span>Clientes</span></div>
+      </div>
+      <div class="card"><div class="sub" style="margin:0">Catálogo cargado</div><div style="font-weight:600;margin-top:4px">${p.length} referencias · ${this.CATS.filter(ct=>p.some(x=>x.categoria===ct)).length} categorías</div></div>
+      <div class="hero" style="text-align:left"><span class="word" style="font-size:20px">SOLE PARIS</span><p>Dermocosmética · plataforma de gestión. Catálogo, clientes, cotizaciones y operación, todo aislado y solo tuyo.</p></div>`);
+  },
+
+  /* ---------- PRODUCTOS (crear/editar) ---------- */
+  vProductos(){
+    const ed=this._editId?this._prods.find(p=>p.id===this._editId):null;
+    this.set(`<h1>${ed?'Editar':'Nuevo'} producto</h1><div class="sub">Referencia de dermocosmética.</div>
+      <div class="card">
+        <label>Nombre</label><input id="f_nom" class="field" placeholder="Ej: Pure Vitamin C · Serum" value="${ed?this.esc(ed.nombre):''}">
+        <div class="row2">
+          <div><label>Categoría</label><select id="f_cat" class="field">${this.CATS.map(ct=>`<option ${ed&&ed.categoria===ct?'selected':''}>${ct}</option>`).join('')}</select></div>
+          <div><label>Presentación</label><input id="f_pres" class="field" placeholder="30 ml" value="${ed?this.esc(ed.presentacion||''):''}"></div>
+        </div>
+        <div class="row2">
+          <div><label>Precio de venta</label><input id="f_pv" class="field" type="number" inputmode="numeric" value="${ed?ed.precio_venta:''}"></div>
+          <div><label>Precio de costo</label><input id="f_pc" class="field" type="number" inputmode="numeric" placeholder="pendiente" value="${ed&&ed.precio_costo?ed.precio_costo:''}"></div>
+        </div>
+        <div><label>Inventario (uds)</label><input id="f_st" class="field" type="number" inputmode="numeric" value="${ed&&ed.stock!=null?ed.stock:''}"></div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn-sm btn-ink" style="flex:1;padding:13px" onclick="App.guardarProd()">${ed?'Guardar':'＋ Crear'}</button>
+          ${ed?`<button class="btn-sm btn-line" style="padding:13px" onclick="App._editId=null;App.go('productos')">Cancelar</button>`:''}
+        </div>
+      </div>
+      <div class="hint">El precio de costo queda pendiente — lo agregas cuando lo tengas.</div>`);
+  },
+  async guardarProd(){
+    const g=id=>(document.getElementById(id).value||'').trim();
+    const nom=g('f_nom'); if(!nom){ alert('Escribe el nombre.'); return; }
+    const prod={ id:this._editId||('p'+Date.now()), nombre:nom, categoria:g('f_cat'), presentacion:g('f_pres'),
+      precio_venta:+g('f_pv')||0, precio_costo:+g('f_pc')||0, stock:+g('f_st')||0 };
+    const i=this._prods.findIndex(p=>p.id===prod.id);
+    if(i>=0) this._prods[i]=prod; else this._prods.unshift(prod);
+    await this._put('soleparis_productos',prod,this._prods); this._editId=null;
+    this.toast(i>=0?'Producto actualizado':'✦ Producto creado'); this.go('catalogo');
+  },
+  editar(id){ this._editId=id; this.go('productos'); },
+  async borrar(id){ if(!confirm('¿Eliminar este producto?'))return; this._prods=this._prods.filter(p=>p.id!==id); await this._del('soleparis_productos',id,this._prods); this.toast('Eliminado'); this.go('catalogo'); },
+
+  /* ---------- CATÁLOGO ---------- */
+  vCatalogo(){
+    const admin=this.esAdmin();
+    const cats=['',...this.CATS.filter(ct=>this._prods.some(p=>p.categoria===ct))];
+    let arr=this._prods; if(this._cat) arr=arr.filter(p=>p.categoria===this._cat);
+    const filas = !arr.length ? '<div class="empty">Aún no hay productos.'+(admin?' Cárgalos desde el Starting Point.':'')+'</div>'
+      : arr.map(p=>{
+        const margen = (admin && p.precio_costo>0)? Math.round(((p.precio_venta-p.precio_costo)/p.precio_venta)*100):null;
+        return `<div class="prod"><div class="top">
+          <div><div class="nm">${this.esc(p.nombre)}</div><div class="ct">${this.esc(p.categoria||'')}${p.presentacion?' · '+this.esc(p.presentacion):''}</div></div>
+          <div class="pv">${this.fmt(p.precio_venta)}</div></div>
+          <div class="meta">
+            ${admin&&p.precio_costo>0?`<span class="pchip cost">costo ${this.fmt(p.precio_costo)}</span>`:''}
+            ${admin&&margen!=null?`<span class="pchip">margen ${margen}%</span>`:''}
+            ${admin&&p.stock!=null?`<span class="pchip stock">stock ${p.stock}</span>`:''}
+          </div>
+          ${admin?`<div style="display:flex;gap:6px;margin-top:10px"><button class="btn-sm btn-line" onclick="App.editar('${p.id}')">✎ Editar</button><button class="btn-sm" style="background:#fbece9;color:#b3564b" onclick="App.borrar('${p.id}')">🗑</button></div>`:''}
+        </div>`;
+      }).join('');
+    this.set(`<h1>Catálogo</h1><div class="sub">${arr.length} de ${this._prods.length} · Sole Paris</div>
+      <div class="cats">${cats.map(ct=>`<div class="cat${this._cat===ct?' on':''}" onclick="App._cat='${ct}';App.go('catalogo')">${ct||'Todos'}</div>`).join('')}</div>
+      ${filas}`);
+  },
+
+  /* ---------- CLIENTES ---------- */
+  vClientes(){
+    const arr=this._loadCli();
+    this.set(`<h1>Clientes</h1><div class="sub">${arr.length} cliente${arr.length===1?'':'s'}</div>
+      <div class="card">
+        <div class="row2"><div><label>Nombre / negocio</label><input id="cl_nom" class="field"></div><div><label>Celular</label><input id="cl_tel" class="field"></div></div>
+        <div class="row2"><div><label>Ciudad</label><input id="cl_ciu" class="field"></div><div><label>Tipo</label><select id="cl_tipo" class="field"><option>Spa / estética</option><option>Dermatólogo</option><option>Distribuidor</option><option>Cliente final</option></select></div></div>
+        <button class="btn-sm btn-ink" style="width:100%;padding:12px;margin-top:12px" onclick="App.guardarCli()">＋ Agregar cliente</button>
+      </div>
+      ${arr.length? arr.map(c=>`<div class="prod"><div class="top"><div><div class="nm">${this.esc(c.nombre)}</div><div class="ct">${this.esc(c.tipo||'')}${c.ciudad?' · '+this.esc(c.ciudad):''}${c.tel?' · '+this.esc(c.tel):''}</div></div>${c.tel?`<a class="btn-sm" style="background:#eef3ee;color:#5a8a5e" href="https://wa.me/57${(c.tel+'').replace(/\\D/g,'')}" target="_blank">📱</a>`:''}</div></div>`).join('') : '<div class="empty">Aún no hay clientes.</div>'}`);
+  },
+  async guardarCli(){
+    const g=id=>(document.getElementById(id).value||'').trim();
+    const nom=g('cl_nom'); if(!nom){ alert('Escribe el nombre.'); return; }
+    const c={id:'c'+Date.now(),nombre:nom,tel:g('cl_tel'),ciudad:g('cl_ciu'),tipo:g('cl_tipo')};
+    this._clis.unshift(c); await this._put('soleparis_clientes',c,this._clis); this.toast('✦ Cliente agregado'); this.vClientes();
+  },
+
+  /* ---------- COTIZAR ---------- */
+  vCotizar(){
+    const arr=this._prods;
+    if(!arr.length) return this.set(`<h1>Cotizar</h1><div class="empty">Primero carga el catálogo.</div>`);
+    const opts=arr.map(p=>`<option value="${p.id}">${this.esc(p.nombre)} · ${this.fmt(p.precio_venta)}</option>`).join('');
+    this.set(`<h1>Cotizar</h1><div class="sub">Arma una cotización con el catálogo.</div>
+      <div class="card">
+        <label>Cliente</label><input id="c_cli" class="field" placeholder="Nombre del cliente">
+        <label>Producto</label><select id="c_prod" class="field" onchange="App._cotCalc()">${opts}</select>
+        <label>Cantidad</label><input id="c_qty" class="field" type="number" inputmode="numeric" value="1" oninput="App._cotCalc()">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
+          <div class="sub" style="margin:0">Total</div>
+          <div id="c_total" style="font-family:var(--serif);font-size:24px;font-weight:600;color:var(--accent2)">$0</div>
+        </div>
+        <button class="btn-sm btn-ink" style="width:100%;padding:13px;margin-top:12px" onclick="App.cotWA()">📱 Enviar por WhatsApp</button>
+      </div>`);
+    this._cotCalc();
+  },
+  _cotProd(){ return this._prods.find(p=>p.id===document.getElementById('c_prod').value); },
+  _cotCalc(){ const p=this._cotProd(); if(!p)return; const q=+document.getElementById('c_qty').value||0; document.getElementById('c_total').textContent=this.fmt(q*(p.precio_venta||0)); },
+  cotWA(){
+    const p=this._cotProd(); if(!p)return; const q=+document.getElementById('c_qty').value||0; if(!q){alert('Pon la cantidad.');return;}
+    const cli=(document.getElementById('c_cli').value||'').trim();
+    const msg=`✦ COTIZACIÓN · SOLE PARIS\n━━━━━━━━━━━━━━━\n${cli?'Cliente: '+cli+'\n':''}${p.nombre}${p.presentacion?' ('+p.presentacion+')':''}\n${q} uds × ${this.fmt(p.precio_venta)} = ${this.fmt(q*p.precio_venta)}`;
+    window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+  },
+
+  /* ---------- SEMBRAR CATÁLOGO REAL + DEMO ---------- */
+  async sembrar(){
+    if(!confirm('Cargar el catálogo real de Sole Paris (36 productos con precio de venta), inventario de demostración y 2 clientes de prueba?')) return;
+    const CAT=[
+      ['CREMA ACLARANTE CORPORAL','Corporal','',99900],['KIT ANTIFATIGA','Kit','',419700],['KIT LONGEVIDAD','Kit','',419600],
+      ['KIT ANTICASPA MEN','Kit','',279700],['KIT ANTICASPA WOMAN','Kit','',279700],['KIT ANTICAIDA MEN','Kit','',309700],
+      ['KIT ANTICAIDA WOMAN','Kit','',309700],['ACEITE CORPORAL','Corporal','',99900],['CONTORNO DE OJOS SOLE PARIS','Ojos','',139900],
+      ['SCALP SCRUB','Capilar','',119900],['NANOPÉPTIDOS CAPILARES','Capilar','',149900],['KIT ACNÉ CONTROL','Kit','',259600],
+      ['FACIAL BUBBLES BHA + AHA','Facial','',79900],['DÚO ANTIMANCHAS · PIELES MADURAS','Facial','',239800],['DOSIST CREAM · HIDRATANTE','Facial','',69900],
+      ['DÚO ANTIEDAD · RENOVACIÓN CELULAR','Facial','',279800],['KIT ANTIEDAD','Kit','',429600],['PURE VITAMIN C · SERUM ANTIARRUGAS','Facial','30 ml',139900],
+      ['DÚO REPARADOR INTENSIVO PUNTAS','Capilar','',139800],['DÚO MANCHAS','Facial','',179800],['DÚO ACNÉ CONTROL','Facial','',139800],
+      ['NANORETINOL ENCAPSULADO · SERUM ANTIEDAD','Facial','',139900],['Tarjeta Regalo Sole','Tarjeta','',120000],['KIT RECONSTRUCCIÓN CAPILAR','Kit','',259700],
+      ['KIT PIEL MIXTA','Kit','',329500],['CERA CAPILAR','Capilar','',39900],['KIT MANCHAS','Kit','',299600],['KIT ACNÉ CONTROL AHA & BHA','Kit','',299600],
+      ['AMPOLLETA CAPILAR','Capilar','',119900],['BLOQUEADOR SOLAR SPF 50','Facial','30 ml',79900],['SERUM ÁCIDO AZELAICO & TRANEXÁMICO','Facial','30 ml',99900],
+      ['KIT PIEL SECA','Kit','',329500],['KIT PIEL NORMAL','Kit','',349500],['KIT PIEL GRASA','Kit','',339500],['MAGIC LIP','Labios','',69900],['MAGIC LASH & EYEBROW','Ojos','',129900]
+    ];
+    const stockDemo=[42,8,6,15,14,11,13,30,22,18,20,9,55,12,60,10,7,26,16,19,24,21,40,10,9,70,12,11,17,48,33,10,9,10,50,28];
+    let idx=0;
+    for(const [nombre,categoria,pres,pv] of CAT){
+      const id='sp'+(idx+1);
+      if(!this._prods.find(x=>x.id===id)){
+        const prod={id,nombre,categoria,presentacion:pres,precio_venta:pv,precio_costo:0,stock:stockDemo[idx]||10};
+        this._prods.push(prod); await this._put('soleparis_productos',prod,this._prods);
+      }
+      idx++;
+    }
+    const clis=[
+      {id:'sc1',nombre:'Spa Belleza Natural',tel:'3105557788',ciudad:'Bogotá',tipo:'Spa / estética'},
+      {id:'sc2',nombre:'Dra. Camila Restrepo (Dermatología)',tel:'3128889900',ciudad:'Medellín',tipo:'Dermatólogo'}
+    ];
+    for(const c of clis){ if(!this._clis.find(x=>x.id===c.id)){ this._clis.unshift(c); await this._put('soleparis_clientes',c,this._clis); } }
+    this.toast('✦ Catálogo Sole Paris cargado'); this.go('catalogo');
+  },
+  async limpiar(){
+    if(!confirm('¿Borrar TODOS los productos y clientes de Sole Paris?')) return;
+    if(this._online){ for(const t of ['soleparis_productos','soleparis_clientes']){ try{ await fetch(this.SB+'/rest/v1/'+t+'?id=neq.__none__',{method:'DELETE',headers:this._H()}); }catch(e){} } }
+    this._prods=[]; this._clis=[]; this._saveLocal('soleparis_productos',[]); this._saveLocal('soleparis_clientes',[]);
+    this.toast('Todo borrado'); this.go('inicio');
+  }
+};
+(function(){ const r=sessionStorage.getItem('sole_rol'); if(r&&Object.values(App.PASS).includes(r)){ App.rol=r; App._start(); } else { setTimeout(()=>{const e=document.getElementById('lg');if(e)e.focus();},80); } })();
+</script>
+</body>
+</html>
