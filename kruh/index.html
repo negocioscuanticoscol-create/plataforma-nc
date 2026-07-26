@@ -309,7 +309,7 @@ const App={
             <div class="row" style="justify-content:space-between;align-items:center"><span class="dim">Domicilio</span><input id="pd_dom" type="number" placeholder="0" value="${this._cartDom||''}" oninput="App.domSet(this.value)" style="width:92px;text-align:right;padding:5px 8px"></div>
             <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total</span><b id="pd_total" style="font-size:18px;color:var(--acc)">${money(total)}</b></div>
           </div>
-          <button class="btn acc full" onclick="App.pedGuardar()" ${nItems?'':'disabled style="opacity:.5"'}>Guardar pedido</button>
+          <button class="btn acc full" onclick="App.pedGuardar()" ${nItems?'':'disabled style="opacity:.5"'}>Generar pedido</button>
           <button class="btn gh full" style="margin-top:6px" onclick="App._cart={};App._cartDom=0;App._pedPaint()">Vaciar</button>
         </div>
       </div>
@@ -329,9 +329,11 @@ const App={
     if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0);
     const total=bruto+dom;
     await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});
-    for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:(+p.existencias||0)-it.qty}); }
+    const saldos=[];
+    for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); const nuevo=(+((p&&p.existencias)||0))-it.qty; if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:nuevo}); saldos.push({nombre:it.nombre,qty:it.qty,saldo:nuevo}); }
     await POST('kruh_ventas',{cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp});
-    this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; toast('Pedido guardado y descontado'); this.vPedidos(); },
+    this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; toast('Pedido generado'); await this.vPedidos();
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3><div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)')}">quedan ${s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`); },
 
   /* ===================== CRM (cajones: Comunidad / Nuevos → canal) ===================== */
   ETAPAS:['contactado','interesado','pedido','cliente'],
