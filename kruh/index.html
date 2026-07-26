@@ -965,12 +965,42 @@ const App={
     if(campo==='rubro'&&(this._esCompra(g)!==(this.view==='proveedores'))) return this._repintar();
     this.gasSuma(); },
   _repintar(){ return this.view==='proveedores'?this.vProveedores():this.vGastos(); },
-  async gasNueva(){ const mes=this._gasMes||this._mesActual();
-    const nuevo=await POST('kruh_gastos',{concepto:'',proveedor:'',factura:'',categoria:'',tiene_iva:false,base:0,iva:0,monto:0,fecha:this._diaDef(mes),forma_pago:'Efectivo',pagado:false});
-    if(!nuevo){ toast('⚠️ No se pudo crear el renglón'); return; }
-    await this.vGastos();
-    const filas=document.querySelectorAll('#main .tb tbody tr'), ult=filas[filas.length-1];
-    if(ult){ const i=ult.querySelectorAll('input')[1]; if(i){i.focus(); i.scrollIntoView({block:'center'});} } },
+  gasNueva(){ const mes=this._gasMes||this._mesActual(), hoy=this._diaDef(mes);
+    const rub=this.CATGASTO.includes(this._gasCajon)?this._gasCajon:'';
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Nuevo gasto</h3>
+      <div class="g2"><div><label>Fecha</label><input id="n_fecha" type="date" value="${esc(hoy)}"></div>
+      <div><label>Rubro</label><select id="n_rubro"><option value="">— escoge el rubro —</option>${this.CATGASTO.map(c=>`<option ${c===rub?'selected':''}>${esc(c)}</option>`).join('')}</select></div></div>
+      <div class="g2"><div><label>Proveedor / entidad</label><input id="n_prov" placeholder="Enel, Vanti, arrendador…"></div>
+      <div><label>N° factura</label><input id="n_fact" placeholder="Opcional"></div></div>
+      <label>Descripción</label><input id="n_desc" placeholder="Qué se pagó">
+      <div class="g3"><div><label>¿Tiene IVA?</label><select id="n_iva" onchange="App.gasNuevoCalc()"><option value="false">No</option><option value="true">Sí</option></select></div>
+      <div><label>Valor sin IVA</label><input id="n_base" type="number" placeholder="0" oninput="App.gasNuevoCalc()"></div>
+      <div><label>IVA</label><input id="n_ivav" type="number" placeholder="0" oninput="App.gasNuevoCalc()"></div></div>
+      <label>Total</label><input id="n_total" type="number" placeholder="0" style="font-weight:700;color:var(--acc)">
+      <div class="hint">El total se calcula solo (base + IVA); si la factura trae algo no gravado, lo puedes cambiar a mano.</div>
+      <div class="g3"><div><label>Método de pago</label><select id="n_fp">${this.FPAGO.map(f=>`<option>${f}</option>`).join('')}</select></div>
+      <div><label>Estado</label><select id="n_pag"><option value="true">✔ Pagado</option><option value="false">⏳ Pendiente</option></select></div>
+      <div><label>Fecha de pago</label><input id="n_fpago" type="date" value="${esc(hoy)}"></div></div>
+      <label>Notas</label><input id="n_nota">
+      <button class="btn acc full" onclick="App.gasNuevoSave()">Guardar gasto</button>`);
+    setTimeout(()=>{const e=$('n_prov'); if(e)e.focus();},60); },
+  gasNuevoCalc(){ const b=+($('n_base')||{}).value||0; let i=+($('n_ivav')||{}).value||0;
+    const con=($('n_iva')||{}).value==='true';
+    if(!con){ i=0; if($('n_ivav'))$('n_ivav').value=''; }
+    else if(!i&&b){ i=Math.round(b*this.IVAPCT/100); if($('n_ivav'))$('n_ivav').value=i; }
+    if($('n_total'))$('n_total').value=b+i; },
+  async gasNuevoSave(){ const rubro=$('n_rubro').value;
+    if(!rubro){ alert('Escoge el rubro para saber en qué cajón va'); return; }
+    const b={fecha:$('n_fecha').value||null,rubro,proveedor:$('n_prov').value.trim(),factura:$('n_fact').value.trim(),
+      concepto:$('n_desc').value.trim(),tiene_iva:$('n_iva').value==='true',base:+$('n_base').value||0,iva:+$('n_ivav').value||0,
+      monto:+$('n_total').value||((+$('n_base').value||0)+(+$('n_ivav').value||0)),
+      forma_pago:$('n_fp').value,pagado:$('n_pag').value==='true',fecha_pago:$('n_fpago').value||null,nota:$('n_nota').value.trim()};
+    if(!b.monto){ alert('Pon el valor del gasto'); return; }
+    const n=await POST('kruh_gastos',b);
+    if(!n){ toast('⚠️ No se pudo guardar el gasto'); return; }
+    if(b.fecha)this._gasMes=b.fecha.slice(0,7);
+    this._gasCajon=this._cajonDe(b);            // abre el cajón donde cayó
+    cerrar(); toast('Gasto guardado en '+((this.CAJONES.find(c=>c[0]===this._gasCajon)||[])[1]||'')); this.vGastos(); },
   async gasFijos(){ const mes=this._gasMes||this._mesActual(), f=this._diaDef(mes);
     const ya=(this._gastos||[]).filter(g=>this._gasFecha(g).slice(0,7)===mes).map(g=>(g.concepto||'').toLowerCase());
     const faltan=this.GASFIJOS.filter(c=>!ya.includes(c.toLowerCase()));
