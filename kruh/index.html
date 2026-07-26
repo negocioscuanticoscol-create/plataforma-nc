@@ -377,7 +377,12 @@ const App={
           <input id="pd_tel" placeholder="Teléfono" value="${esc(this._cartTel||'')}" oninput="App._cartTel=this.value;App.pedTelLookup(this.value)">
           <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value;App._pedPaint()">${this.FPPEDIDO.map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
           <div style="margin-top:10px;font-size:13px">
-            ${nItems?Object.keys(cart).map(id=>{const p=prods.find(x=>x.id===id);if(!p)return '';const q=cart[id];return `<div class="row" style="justify-content:space-between"><span class="dim">${esc(p.nombre)} ×${q}</span><span>${money((+p.precio||0)*q)}</span></div>`;}).join(''):'<div class="dim" style="text-align:center;padding:6px 0">Sin productos aún</div>'}
+            ${nItems?Object.keys(cart).map(id=>{const p=prods.find(x=>x.id===id);if(!p)return '';const q=cart[id];
+              return `<div class="row" style="justify-content:space-between;align-items:center;gap:5px;margin-bottom:2px">
+                <span class="dim" style="flex:1;line-height:1.2">${esc(p.nombre)}</span>
+                <input type="number" min="0" value="${q}" onchange="App.cartQty('${id}',this.value)" title="Cantidad" style="width:50px;text-align:center;padding:3px 4px;font-size:13px;font-weight:700">
+                <span style="width:74px;text-align:right">${money((+p.precio||0)*q)}</span></div>`;}).join('')
+              :'<div class="dim" style="text-align:center;padding:6px 0">Sin productos aún</div>'}
             <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span class="dim">${esTar?'Base (sin IVA)':'Subtotal'}</span><b id="pd_sub">${money(sub)}</b></div>
             <div class="row" style="justify-content:space-between;align-items:center"><span class="dim">Descuento</span><input id="pd_desc" type="number" placeholder="0" value="${this._cartDesc||''}" oninput="App.descSet(this.value)" style="width:92px;text-align:right;padding:5px 8px;color:var(--bad)"></div>
             <div class="row" id="pd_dline" style="justify-content:space-between;font-size:11.5px;color:var(--bad);${desc>0?'':'display:none'}"><span>− descuento</span><span id="pd_dval">−${money(desc)}</span></div>
@@ -394,6 +399,11 @@ const App={
   pedTelLookup(v){ const t=(v||'').replace(/\D/g,''); if(t.length<7)return; const nom=(this._telMap||{})[t]; if(nom){ this._cartCli=nom; if($('pd_cli'))$('pd_cli').value=nom; } },
   cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_desc'))this._cartDesc=+$('pd_desc').value||0; if($('pd_fp'))this._cartFP=$('pd_fp').value;
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
+  /* cantidad escrita a mano en la cuenta */
+  cartQty(id,v){ const q=Math.max(0,Math.round(+v||0)); this._cart=this._cart||{};
+    if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value;
+    if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_desc'))this._cartDesc=+$('pd_desc').value||0;
+    if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
   domSet(v){ this._cartDom=+v||0; this._recalc(); },
   descSet(v){ this._cartDesc=+v||0; this._recalc(); },
   /* recalcula la cuenta sin repintar, para no perder el cursor */
