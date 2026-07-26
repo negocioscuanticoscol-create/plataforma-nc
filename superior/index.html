@@ -125,7 +125,7 @@ const App={
   FIRMEZA:['Suave','Medio','Firme','Extra firme'],
   ESTPROG:['pendiente','en proceso','terminado','entregado'],
   rol:'', view:'dash',
-  _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],
+  _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],_lin:[],
 
   _H(){ return {apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':'application/json'}; },
   _loadLocal(k){ try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return [];} },
@@ -144,6 +144,7 @@ const App={
     this._ped=await this._fetch('superior_pedidos');
     this._prog=await this._fetch('superior_programacion');
     this._leads=await this._fetch('superior_leads');
+    this._lin=await this._fetch('superior_lineas');
     this._online=Object.values(this._onl).some(Boolean);
   },
   async _put(t,row,arr){ this._saveLocal(t,arr); if(this._onl[t]){ try{ await fetch(this.SB+'/rest/v1/'+t+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});}catch(e){} } },
@@ -154,10 +155,10 @@ const App={
   async _start(){ $('login').classList.add('hide'); $('app').classList.remove('hide');
     $('rol').innerHTML=(this.rol==='admin'?'Admin':'Operador')+' · <a onclick="App.logout()">salir</a>';
     $('main').innerHTML='<div class="empty">Cargando…</div>'; await this._sync(); this.pintarNav(); this.go('dash'); },
-  pintarNav(){ const T=[['dash','Dashboard'],['inv','Inventarios'],['ref','Referencias'],['cli','Cliente'],['crm','CRM'],['ped','Pedidos'],['prog','Programación']];
+  pintarNav(){ const T=[['dash','Dashboard'],['inv','Inventarios'],['ref','Referencias'],['cat','Catálogo'],['cli','Cliente'],['crm','CRM'],['ped','Pedidos'],['prog','Programación']];
     $('nav').innerHTML=T.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); window.scrollTo(0,0);
-    ({dash:this.vDash,inv:this.vInv,ref:this.vRef,cli:this.vCli,crm:this.vCrm,ped:this.vPed,prog:this.vProg}[v]||this.vDash).call(this); },
+    ({dash:this.vDash,inv:this.vInv,ref:this.vRef,cat:this.vCat,cli:this.vCli,crm:this.vCrm,ped:this.vPed,prog:this.vProg}[v]||this.vDash).call(this); },
   set(h){ $('main').innerHTML=h; },
   esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
   money(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
@@ -238,6 +239,59 @@ const App={
           <a onclick="App.invModal('${p.id}')" style="cursor:pointer;color:var(--mut)">✎</a></div>`).join('')}
         </div>`).join(''):'<div class="empty">Sin referencias.</div>'}`);
   },
+
+  /* ---------- CATÁLOGO (público con precios de venta) ---------- */
+  async catalogoPublico(){ $('login').classList.add('hide'); $('app').classList.remove('hide'); $('nav').style.display='none'; $('rol').innerHTML='';
+    $('main').innerHTML='<div class="empty">Cargando catálogo…</div>';
+    this._lin=await this._fetch('superior_lineas'); this._inv=await this._fetch('superior_inventario');
+    $('main').innerHTML=this._catalogoHTML(false); },
+  vCat(){ const link=location.origin+location.pathname+'?catalogo=1';
+    this.set(`<h1>Catálogo</h1><div class="sub">Así lo ven los clientes · comparte el link</div>
+      <div class="card"><label>Link para clientes</label>
+        <div class="row" style="gap:8px"><input readonly value="${link}" onclick="this.select()" style="font-size:12px">
+        <button class="btn gold sm" style="white-space:nowrap" onclick="navigator.clipboard.writeText('${link}');App.toast('Link copiado')">Copiar</button></div>
+        <div class="hint">Los clientes solo ven el catálogo con los <b>precios de venta</b> (se ponen en Referencias). Toca ✎ en cada línea para editar ficha y foto.</div></div>
+      ${this._catalogoHTML(true)}`); },
+  _catalogoHTML(admin){
+    const lineas=[...this._lin].filter(l=>admin||l.activo!==false).sort((a,b)=>(+a.orden||0)-(+b.orden||0));
+    const bySize={}; this._inv.forEach(p=>{const k=p.referencia||p.nombre;(bySize[k]=bySize[k]||[]).push(p);});
+    const head=`<div style="text-align:center;padding:8px 0 12px"><svg style="width:74px;height:74px"><use href="#swan"/></svg>
+      <div class="serif" style="color:var(--navy);font-size:22px;font-weight:700;line-height:1.05">EL NUEVO <span style="color:var(--gold)">SUPERIOR</span></div>
+      <div style="font-size:9px;letter-spacing:.4em;color:var(--gold);text-transform:uppercase;margin-top:2px">Colchones</div>
+      <div class="sub" style="margin-top:8px">Catálogo · garantía 5 años · fabricamos a la medida</div></div>`;
+    if(!lineas.length) return head+'<div class="empty">Catálogo en preparación.</div>';
+    const cards=lineas.map(l=>{ const sizes=(bySize[l.referencia]||[]).slice().sort((a,b)=>(+b.costo||0)-(+a.costo||0));
+      const precios=sizes.map(s=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--line2);font-size:13px"><span>${this.esc(s.tamano||'')}</span><b style="color:${+s.precio>0?'var(--navy)':'var(--mut)'}">${+s.precio>0?this.money(s.precio):'Consultar'}</b></div>`).join('');
+      return `<div class="card">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:92px;height:92px;flex:none;border-radius:10px;background:${l.foto_url?`center/cover no-repeat url('${this.esc(l.foto_url)}')`:'var(--goldsoft)'};display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:26px">${l.foto_url?'':'🛏️'}</div>
+          <div style="flex:1;min-width:0">
+            <div class="nm" style="font-size:15.5px">${this.esc(l.titulo||l.referencia)}</div>
+            <div class="mt">${this.esc(l.tipo||'')}${l.altura&&l.altura!=='—'?' · Altura '+this.esc(l.altura):''} ${l.garantia?`<span class="chip">🏅 ${this.esc(l.garantia)}</span>`:''}</div>
+            ${l.descripcion?`<div style="font-size:12.5px;color:var(--ink2);margin-top:4px">${this.esc(l.descripcion)}</div>`:''}
+          </div>
+          ${admin?`<a onclick="App.linModal('${l.id}')" style="cursor:pointer;color:var(--mut)">✎</a>`:''}
+        </div>
+        <div style="font-size:12px;color:var(--mut);margin-top:8px">${l.estructura?'<b>Estructura:</b> '+this.esc(l.estructura)+'<br>':''}${l.tela?'<b>Tela:</b> '+this.esc(l.tela):''}</div>
+        ${precios?`<div style="margin-top:8px">${precios}</div>`:''}
+      </div>`; }).join('');
+    return head+cards+`<div style="text-align:center;color:var(--mut);font-size:12px;padding:16px">📞 Fabricamos colchones para tu camión y a la medida · todas las marcas y modelos</div>`;
+  },
+  linModal(id){ const l=this._lin.find(x=>x.id===id)||{};
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">Editar ficha · ${this.esc(l.referencia||'')}</h3>
+      <label>Título</label><input id="ln_tit" value="${this.esc(l.titulo||'')}">
+      <div class="g2"><div><label>Tipo</label><input id="ln_tipo" value="${this.esc(l.tipo||'')}"></div>
+      <div><label>Altura</label><input id="ln_alt" value="${this.esc(l.altura||'')}"></div></div>
+      <label>Estructura</label><textarea id="ln_est">${this.esc(l.estructura||'')}</textarea>
+      <div class="g2"><div><label>Tela</label><input id="ln_tela" value="${this.esc(l.tela||'')}"></div>
+      <div><label>Garantía</label><input id="ln_gar" value="${this.esc(l.garantia||'')}"></div></div>
+      <label>Descripción</label><textarea id="ln_desc">${this.esc(l.descripcion||'')}</textarea>
+      <label>Foto (URL)</label><input id="ln_foto" value="${this.esc(l.foto_url||'')}" placeholder="https://...">
+      <label>Orden</label><input id="ln_ord" type="number" value="${l.orden||0}">
+      <button class="btn gold full" onclick="App.linSave('${id}')">Guardar</button>`); },
+  async linSave(id){ const l=this._lin.find(x=>x.id===id); if(!l)return; const g=x=>($(x).value||'').trim();
+    Object.assign(l,{titulo:g('ln_tit'),tipo:g('ln_tipo'),altura:g('ln_alt'),estructura:g('ln_est'),tela:g('ln_tela'),garantia:g('ln_gar'),descripcion:g('ln_desc'),foto_url:g('ln_foto'),orden:+$('ln_ord').value||0});
+    await this._put('superior_lineas',l,this._lin); cerrar(); this.toast('Ficha guardada'); this.vCat(); },
 
   /* ---------- CLIENTE (ficha técnica) ---------- */
   vCli(){ const arr=this._cli;
@@ -384,5 +438,7 @@ const App={
   async progEstado(id,e){ const p=this._prog.find(x=>x.id===id); if(!p)return; p.estado=e; await this._put('superior_programacion',p,this._prog); this.vProg(); },
   async progDel(id){ if(!confirm('¿Eliminar programación?'))return; this._prog=this._prog.filter(x=>x.id!==id); await this._del('superior_programacion',id,this._prog); this.vProg(); },
 };
-(function(){ const r=sessionStorage.getItem('sup_rol'); if(r&&Object.values(App.PASS).includes(r)){ App.rol=r; App._start(); } else { setTimeout(()=>{const e=$('lg');if(e)e.focus();},80); } })();
+(function(){ const q=new URLSearchParams(location.search);
+  if(q.has('catalogo')||q.has('cat')){ App.catalogoPublico(); return; }
+  const r=sessionStorage.getItem('sup_rol'); if(r&&Object.values(App.PASS).includes(r)){ App.rol=r; App._start(); } else { setTimeout(()=>{const e=$('lg');if(e)e.focus();},80); } })();
 </script>
