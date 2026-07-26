@@ -236,6 +236,7 @@ const App={
   },
   nav(){ const perm=this._tabsRol(); $('nav').innerHTML=this.TABS.filter(([v])=>perm.includes(v)).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
+    if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
     this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
     ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ $('main').className=''; $('main').innerHTML=h; },
@@ -1287,11 +1288,16 @@ const App={
   async vUsuarios(){
     if(!this.esAdmin) return this.set('<h1>Usuarios</h1><div class="empty">Solo el Admin gestiona usuarios.</div>');
     this.loading();
+    const ra=await fetch(SB+'/rest/v1/kruh_asesorias?order=inicio.desc&limit=2000',{headers:H});
+    const ase=ra.ok?await ra.json():null;
     const [us,pm]=await Promise.all([GET('kruh_usuarios?order=creado_en&limit=200'),GET('kruh_permisos?limit=50')]);
-    this._us=us; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]);
+    this._us=us; this._ase=ase||[]; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]);
+    const abierta=(ase||[]).find(a=>a.inicio&&!a.fin);
     const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos']];
     const RMAT=['cajera','panadero','bodeguero','chef'];
     this.set(`<h1>Usuarios y permisos</h1><div class="sub">Cada persona con su clave y rol · y qué pestaña ve cada rol</div>
+      ${this._aseBloque(ase,abierta)}
+      <h1 style="font-size:18px;margin-top:24px">Usuarios</h1>
       <button class="btn acc" onclick="App.usModal()">＋ Nuevo usuario</button>
       <div class="card" style="background:var(--paper);font-size:12.5px"><b>Claves base:</b> Admin → <code>kruhadmin2026</code> (ve todo) · Gerencia → <code>kruhgerencia2026</code> (ve todo).</div>
       <div>${us.length?us.map(u=>`<div class="item"><div class="top"><div><div class="nm">${esc(u.nombre)} <span class="tag ${u.rol==='admin'||u.rol==='gerencia'?'np':'pe'}" style="text-transform:capitalize">${esc(u.rol)}</span> ${u.activo===false?'<span class="tag">inactivo</span>':''}</div>
@@ -1302,7 +1308,106 @@ const App={
       ${RMAT.map(r=>`<div class="card"><b style="text-transform:capitalize;font-size:15px">${r}</b>
         <div style="margin-top:6px">${MODS.map(([mk,mn])=>`<label style="display:flex;align-items:center;gap:9px;padding:4px 0;font-size:13.5px;cursor:pointer"><input type="checkbox" data-rol="${r}" data-mod="${mk}" ${(this._permisos[r]||[]).includes(mk)?'checked':''} style="width:18px;height:18px;accent-color:var(--acc)">${mn}</label>`).join('')}</div></div>`).join('')}
       <button class="btn acc full" onclick="App.permGuardar()">Guardar permisos</button>`);
+    if(abierta) this._aseReloj(abierta);
   },
+
+  /* ===================== HORAS DE ASESORÍA (solo admin) ===================== */
+  ASETIPO:['Presencial','Virtual'],
+  SQLASE:['create table if not exists public.kruh_asesorias (',
+    '  id        uuid primary key default gen_random_uuid(),',
+    '  cliente   text,','  tipo      text default \'Presencial\',',
+    '  inicio    timestamptz,','  fin       timestamptz,','  nota      text,',
+    '  creado_en timestamptz default now()',');',
+    'create index if not exists kruh_asesorias_inicio_idx on public.kruh_asesorias (inicio desc);',
+    'alter table public.kruh_asesorias enable row level security;',
+    'drop policy if exists kruh_asesorias_all on public.kruh_asesorias;',
+    'create policy kruh_asesorias_all on public.kruh_asesorias',
+    '  for all to anon, authenticated using (true) with check (true);'],
+  _aseMin(a){ if(!a||!a.inicio)return 0; const f=a.fin?new Date(a.fin):new Date(); const d=(f-new Date(a.inicio))/60000; return d>0?d:0; },
+  _hhmm(min){ const h=Math.floor(min/60), m=Math.floor(min%60); return h+'h '+String(m).padStart(2,'0')+'m'; },
+  _hora(t){ if(!t)return '—'; const d=new Date(t); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); },
+  _aseReloj(a){ if(this._aseTick)clearInterval(this._aseTick);
+    const pinta=()=>{ const e=$('ase_reloj'); if(!e){clearInterval(this._aseTick);this._aseTick=null;return;} e.textContent=this._hhmm(this._aseMin(a)); };
+    pinta(); this._aseTick=setInterval(pinta,1000); },
+  _aseBloque(ase,abierta){
+    if(ase===null) return `<div class="card" style="border-left:4px solid var(--warn)">
+      <b style="color:var(--warn)">⚠️ Falta crear la tabla de asesorías</b>
+      <div style="font-size:13.5px;margin-top:5px">Es un paso de una sola vez: copia el SQL, pégalo en el SQL Editor de Supabase y dale Run.</div>
+      <div class="row" style="gap:8px;margin-top:10px">
+        <button class="btn acc" onclick="App.copiarSQLAse()">📋 Copiar el SQL</button>
+        <a class="btn" style="background:var(--ok);text-decoration:none" href="https://supabase.com/dashboard/project/fnayedgvamxktxfvywwl/sql/new" target="_blank">Abrir el SQL Editor ↗</a>
+        <button class="btn gh" onclick="App.vUsuarios()">Ya lo hice · reintentar</button></div>
+      <pre id="ase_sql" style="background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:11px;margin-top:11px;font-size:11.5px;overflow:auto">${esc(this.SQLASE.join('\n'))}</pre></div>`;
+    const cerradas=ase.filter(a=>a.fin);
+    const hoyK=this._diaKey(new Date()), mesK=hoyK.slice(0,7);
+    const minDe=l=>l.reduce((t,a)=>t+this._aseMin(a),0);
+    const delDia=cerradas.filter(a=>this._diaKey(a.inicio)===hoyK);
+    const delMes=cerradas.filter(a=>this._diaKey(a.inicio).slice(0,7)===mesK);
+    const pres=minDe(cerradas.filter(a=>a.tipo!=='Virtual')), virt=minDe(cerradas.filter(a=>a.tipo==='Virtual'));
+    const porDia={}; cerradas.forEach(a=>{const k=this._diaKey(a.inicio);(porDia[k]=porDia[k]||[]).push(a);});
+    const dias=Object.keys(porDia).sort().reverse().slice(0,20);
+    return `<h1 style="font-size:18px;margin-top:18px">⏱️ Horas de asesoría</h1>
+      <div class="sub">Le das iniciar cuando empiezas y terminar cuando paras · cada tramo queda como una sesión</div>
+      <div class="kpis">
+        <div class="kpi dark"><b>${this._hhmm(minDe(delDia))}</b><span>Hoy · ${delDia.length} sesión(es)</span></div>
+        <div class="kpi"><b>${this._hhmm(minDe(delMes))}</b><span>Este mes</span></div>
+        <div class="kpi"><b style="color:var(--acc)">${this._hhmm(minDe(cerradas))}</b><span>Acumulado total</span></div>
+        <div class="kpi"><b style="font-size:15px">🏠 ${this._hhmm(pres)}<br>💻 ${this._hhmm(virt)}</b><span>Presencial / Virtual</span></div>
+      </div>
+      ${abierta?`<div class="card" style="border:2px solid var(--ok);background:var(--okbg)">
+        <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div><div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ok)">● Sesión en curso · ${esc(abierta.tipo||'Presencial')}</div>
+            <div style="font-family:Fraunces,serif;font-size:34px;line-height:1.1" id="ase_reloj">0h 00m</div>
+            <div class="hint">${esc(abierta.cliente||'Sin cliente')} · empezó ${esc(this._hora(abierta.inicio))}</div></div>
+          <button class="btn" style="background:var(--bad);font-size:16px;padding:14px 22px" onclick="App.aseTerminar('${abierta.id}')">⏹ Terminar</button></div></div>`
+      :`<div class="card">
+        <div class="g3"><div><label>Cliente</label><input id="ase_cli" placeholder="A quién asesoras"></div>
+        <div><label>Tipo</label><select id="ase_tipo">${this.ASETIPO.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div><label>&nbsp;</label><button class="btn acc full" style="margin:0;font-size:15px;padding:11px" onclick="App.aseIniciar()">▶ Iniciar asesoría</button></div></div>
+        <div class="hint">¿Se te olvidó cronometrar? <a onclick="App.aseManual()" style="color:var(--acc);cursor:pointer;font-weight:700">Registrar una sesión a mano</a></div></div>`}
+      ${dias.length?dias.map(k=>{const l=porDia[k].slice().sort((a,b)=>String(a.inicio).localeCompare(String(b.inicio)));
+        const d=new Date(k+'T12:00:00');
+        return `<div class="item"><div class="top"><div><div class="nm">${esc(this.DOWC[d.getDay()])} ${d.getDate()} de ${esc((this.MESNOM[d.getMonth()+1]||'').toLowerCase())}</div>
+          <div class="mt">${l.length} sesión(es)</div></div>
+          <div class="nm" style="color:var(--acc)">${this._hhmm(minDe(l))}</div></div>
+          ${l.map((a,i)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:3px 0;border-top:1px solid var(--line2)">
+            <span>${i+1}ª · ${a.tipo==='Virtual'?'💻':'🏠'} ${esc(a.cliente||'—')} <small class="dim">${esc(this._hora(a.inicio))} → ${esc(this._hora(a.fin))}</small></span>
+            <span style="white-space:nowrap"><b>${this._hhmm(this._aseMin(a))}</b>
+              <a onclick="App.aseManual('${a.id}')" style="color:var(--acc);cursor:pointer;margin-left:7px">✎</a>
+              <a onclick="App.aseDel('${a.id}')" style="color:var(--bad);cursor:pointer;margin-left:3px">✕</a></span></div>`).join('')}
+        </div>`;}).join(''):'<div class="empty">Todavía no hay asesorías registradas.</div>'}`;
+  },
+  copiarSQLAse(){ const s=this.SQLASE.join('\n');
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(()=>toast('SQL copiado'),()=>toast('Cópialo a mano'));
+    else toast('Selecciónalo y cópialo'); },
+  async aseIniciar(){ const cli=($('ase_cli')?$('ase_cli').value:'').trim(), tipo=$('ase_tipo')?$('ase_tipo').value:'Presencial';
+    const r=await POST('kruh_asesorias',{cliente:cli,tipo,inicio:new Date().toISOString()});
+    if(!r){ toast('⚠️ No se pudo iniciar'); return; }
+    toast('▶ Asesoría iniciada'); this.vUsuarios(); },
+  async aseTerminar(id){ const r=await PATCH('kruh_asesorias?id=eq.'+id,{fin:new Date().toISOString()});
+    if(r&&!r.ok){ toast('⚠️ No se pudo cerrar la sesión'); return; }
+    if(this._aseTick){clearInterval(this._aseTick);this._aseTick=null;}
+    toast('⏹ Sesión guardada'); this.vUsuarios(); },
+  async aseDel(id){ if(!this._okBorrar())return; await DEL('kruh_asesorias?id=eq.'+id); this.vUsuarios(); },
+  aseManual(id){ const a=id?((this._ase||[]).find(x=>x.id===id)||{}):{};
+    const f=a.inicio?this._diaKey(a.inicio):this._diaKey(new Date());
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Registrar'} sesión de asesoría</h3>
+      <div class="g2"><div><label>Cliente</label><input id="am_cli" value="${esc(a.cliente||'')}"></div>
+      <div><label>Tipo</label><select id="am_tipo">${this.ASETIPO.map(t=>`<option ${a.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
+      <label>Fecha</label><input id="am_fecha" type="date" value="${esc(f)}">
+      <div class="g2"><div><label>Hora de inicio</label><input id="am_ini" type="time" value="${esc(a.inicio?this._hora(a.inicio):'')}"></div>
+      <div><label>Hora de fin</label><input id="am_fin" type="time" value="${esc(a.fin?this._hora(a.fin):'')}"></div></div>
+      <label>Nota</label><input id="am_nota" value="${esc(a.nota||'')}">
+      <div class="hint">Ejemplo: de 11:20 a 14:40 son 3h 20m. Si la sesión pasa de medianoche, regístrala como dos.</div>
+      <button class="btn acc full" onclick="App.aseManualSave('${id||''}')">Guardar sesión</button>`); },
+  async aseManualSave(id){ const f=$('am_fecha').value, hi=$('am_ini').value, hf=$('am_fin').value;
+    if(!f||!hi||!hf){ alert('Necesito la fecha y las dos horas'); return; }
+    const ini=new Date(f+'T'+hi+':00'), fin=new Date(f+'T'+hf+':00');
+    if(fin<=ini){ alert('La hora de fin debe ser posterior a la de inicio'); return; }
+    const b={cliente:$('am_cli').value.trim(),tipo:$('am_tipo').value,inicio:ini.toISOString(),fin:fin.toISOString(),nota:$('am_nota').value.trim()};
+    const r=id?await PATCH('kruh_asesorias?id=eq.'+id,b):await POST('kruh_asesorias',b);
+    if(!r||(r.ok===false)){ toast('⚠️ No se pudo guardar'); return; }
+    cerrar(); toast('Sesión guardada · '+this._hhmm((fin-ini)/60000)); this.vUsuarios(); },
   async permGuardar(){ const RMAT=['cajera','panadero','bodeguero','chef'], nuevo={}; RMAT.forEach(r=>nuevo[r]=[]);
     document.querySelectorAll('#main input[data-rol]').forEach(i=>{ if(i.checked)nuevo[i.dataset.rol].push(i.dataset.mod); });
     for(const r of RMAT){ await fetch(SB+'/rest/v1/kruh_permisos?on_conflict=rol',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({rol:r,tabs:nuevo[r],actualizado:new Date().toISOString()})}); }
