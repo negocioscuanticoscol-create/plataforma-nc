@@ -252,6 +252,8 @@ const App={
         <button class="btn gold sm" style="white-space:nowrap" onclick="navigator.clipboard.writeText('${link}');App.toast('Link copiado')">Copiar</button></div>
         <div class="hint">Los clientes solo ven el catálogo con los <b>precios de venta</b> (se ponen en Referencias). Toca ✎ en cada línea para editar ficha y foto.</div></div>
       ${this._catalogoHTML(true)}`); },
+  verFoto(url){ const d=document.createElement('div'); d.style.cssText='position:fixed;inset:0;background:rgba(11,28,61,.93);z-index:100;display:flex;align-items:center;justify-content:center;padding:10px;cursor:zoom-out'; d.onclick=()=>d.remove();
+    d.innerHTML=`<img src="${this.esc(url)}" style="max-width:96vw;max-height:94vh;border-radius:8px;box-shadow:0 12px 44px rgba(0,0,0,.55)"><div style="position:absolute;top:14px;right:18px;color:#fff;font-size:26px;font-weight:300">✕</div>`; document.body.appendChild(d); },
   _catalogoHTML(admin){
     const lineas=[...this._lin].filter(l=>admin||l.activo!==false).sort((a,b)=>(+a.orden||0)-(+b.orden||0));
     const bySize={}; this._inv.forEach(p=>{const k=p.referencia||p.nombre;(bySize[k]=bySize[k]||[]).push(p);});
@@ -263,7 +265,7 @@ const App={
     const cards=lineas.map(l=>{ const sizes=(bySize[l.referencia]||[]).slice().sort((a,b)=>(+b.costo||0)-(+a.costo||0));
       const precios=sizes.map(s=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-top:1px solid var(--line2);font-size:13px"><span>${this.esc(s.tamano||'')}</span><b style="color:${+s.precio>0?'var(--navy)':'var(--mut)'}">${+s.precio>0?this.money(s.precio):'Consultar'}</b></div>`).join('');
       return `<div class="card">
-        ${l.foto_url?`<img src="${this.esc(l.foto_url)}" alt="${this.esc(l.titulo||l.referencia)}" loading="lazy" style="width:100%;border-radius:10px;display:block;margin-bottom:8px">`:`<div style="height:130px;border-radius:10px;background:var(--goldsoft);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:30px;margin-bottom:8px">🛏️</div>`}
+        ${l.foto_url?`<img src="${this.esc(l.foto_url)}" alt="${this.esc(l.titulo||l.referencia)}" loading="lazy" onclick="App.verFoto('${this.esc(l.foto_url)}')" style="width:100%;border-radius:10px;display:block;margin-bottom:8px;cursor:zoom-in">`:`<div style="height:130px;border-radius:10px;background:var(--goldsoft);display:flex;align-items:center;justify-content:center;color:var(--gold);font-size:30px;margin-bottom:8px">🛏️</div>`}
         <div class="nm" style="font-size:16px">${this.esc(l.titulo||l.referencia)} ${l.garantia?`<span class="chip">🏅 ${this.esc(l.garantia)}</span>`:''}${admin?` <a onclick="App.linModal('${l.id}')" style="cursor:pointer;color:var(--mut);float:right">✎</a>`:''}</div>
         ${!l.foto_url?`<div class="mt">${this.esc(l.tipo||'')}${l.altura&&l.altura!=='—'?' · Altura '+this.esc(l.altura):''}</div>${l.estructura?`<div style="font-size:12px;color:var(--mut);margin-top:4px"><b>Estructura:</b> ${this.esc(l.estructura)}</div>`:''}${l.tela?`<div style="font-size:12px;color:var(--mut)"><b>Tela:</b> ${this.esc(l.tela)}</div>`:''}`:''}
         ${precios?`<div style="margin-top:8px"><div style="font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-bottom:2px">Precios</div>${precios}</div>`:''}
