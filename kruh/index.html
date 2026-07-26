@@ -282,10 +282,12 @@ const App={
   },
   _pedPaint(){
     const prods=this._prods||[], cart=this._cart||{};
-    let sub=0, iva=0, nItems=0;
-    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const b=(+p.precio||0)*q; sub+=b; iva+=b*(+p.iva_pct||0)/100; nItems+=q; }
+    const fp=this._cartFP||'Efectivo', esTar=/tarjeta/i.test(fp);
+    let sub=0, iva=0, nItems=0, bruto=0;
+    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line; nItems+=q;
+      if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
     const dom=+(this._cartDom||0); this._sub=sub; this._iva=iva;
-    const total=sub+iva+dom;
+    const total=bruto+dom;   // precios ya incluyen IVA: el total no cambia según forma de pago
     this.set(`<h1>Pedidos</h1><div class="sub">Toca − / + para armar el pedido; la cuenta se calcula al lado</div>
       <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div style="flex:1;min-width:250px"><div class="grid" style="grid-template-columns:repeat(2,1fr)">
@@ -299,11 +301,11 @@ const App={
           <div style="font-family:Fraunces,serif;font-size:17px;margin-bottom:8px">La cuenta</div>
           <input id="pd_cli" placeholder="Cliente" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App._cartCli=this.value">
           <input id="pd_tel" placeholder="Teléfono" value="${esc(this._cartTel||'')}" oninput="App._cartTel=this.value;App.pedTelLookup(this.value)">
-          <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value">${['Efectivo','Nequi','Tarjeta crédito','Transferencia'].map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
+          <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value;App._pedPaint()">${['Efectivo','Nequi','Tarjeta crédito','Transferencia'].map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
           <div style="margin-top:10px;font-size:13px">
             ${nItems?Object.keys(cart).map(id=>{const p=prods.find(x=>x.id===id);if(!p)return '';const q=cart[id];return `<div class="row" style="justify-content:space-between"><span class="dim">${esc(p.nombre)} ×${q}</span><span>${money((+p.precio||0)*q)}</span></div>`;}).join(''):'<div class="dim" style="text-align:center;padding:6px 0">Sin productos aún</div>'}
-            <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span class="dim">Subtotal</span><b>${money(sub)}</b></div>
-            <div class="row" style="justify-content:space-between"><span class="dim">IVA</span><span>${money(iva)}</span></div>
+            <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span class="dim">${esTar?'Base (sin IVA)':'Subtotal'}</span><b>${money(sub)}</b></div>
+            ${esTar?`<div class="row" style="justify-content:space-between"><span class="dim">IVA</span><span>${money(iva)}</span></div>`:''}
             <div class="row" style="justify-content:space-between;align-items:center"><span class="dim">Domicilio</span><input id="pd_dom" type="number" placeholder="0" value="${this._cartDom||''}" oninput="App.domSet(this.value)" style="width:92px;text-align:right;padding:5px 8px"></div>
             <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total</span><b id="pd_total" style="font-size:18px;color:var(--acc)">${money(total)}</b></div>
           </div>
@@ -321,10 +323,11 @@ const App={
   cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_fp'))this._cartFP=$('pd_fp').value;
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
   domSet(v){ this._cartDom=+v||0; const t=(this._sub||0)+(this._iva||0)+this._cartDom; if($('pd_total'))$('pd_total').textContent=money(t); },
-  async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; let sub=0, iva=0;
-    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const b=(+p.precio||0)*q; sub+=b; iva+=b*(+p.iva_pct||0)/100; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0}); }
-    if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0), fp=this._cartFP||'Efectivo';
-    const total=sub+iva+dom;
+  async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; const fp=this._cartFP||'Efectivo', esTar=/tarjeta/i.test(fp); let sub=0, iva=0, bruto=0;
+    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0});
+      if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
+    if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0);
+    const total=bruto+dom;
     await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});
     for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:(+p.existencias||0)-it.qty}); }
     await POST('kruh_ventas',{cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp});
