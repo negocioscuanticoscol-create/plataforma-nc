@@ -761,6 +761,7 @@ const App={
         <div class="kpi"><b>${arr.length}</b><span>Clientes registrados</span></div>
         <div class="kpi"><b style="color:var(--acc)">${arr.filter(o=>new Date(o.primera)>=mesIni).length}</b><span>Clientes nuevos (mes)</span></div>
         <div class="kpi"><b>${arr.filter(o=>o.estemes).length}</b><span>Activos (mes)</span></div></div>
+      ${this._ventaDia(mesV)}
       <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Formas de pago (mes)</div>
         <div class="row" style="justify-content:space-between"><span>💳 Tarjeta crédito</span><b>${money(tarTot)}</b></div>
         <div class="row" style="justify-content:space-between;font-size:11.5px;color:var(--mut)"><span>↳ base ${money(tarBase)} + IVA ${money(tarIva)}</span></div>
@@ -775,6 +776,35 @@ const App={
         <div class="row" style="gap:8px">
           <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div></div>`;}).join(''):'<div class="empty">Sin ventas. Se llenan solas con los Pedidos, o registra una aquí.</div>'}</div>
       ${this._resumenProductos(peds,mesIni)}`);
+  },
+  DOWC:['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],
+  _diaKey(d){ const x=new Date(d); return isNaN(x)?'':x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); },
+  _ventaDia(mesV){
+    const por={};
+    (mesV||[]).forEach(v=>{ const k=this._diaKey(v.creado_en); if(!k)return; const o=por[k]=por[k]||{t:0,n:0}; o.t+=+v.monto||0; o.n++; });
+    const hoyK=this._diaKey(new Date()), hoy=por[hoyK]||{t:0,n:0};
+    const dias=Object.keys(por).sort().reverse();
+    const max=Math.max(1,...dias.map(k=>por[k].t));
+    const conVenta=dias.filter(k=>por[k].t>0);
+    const prom=conVenta.length?conVenta.reduce((a,k)=>a+por[k].t,0)/conVenta.length:0;
+    const dif=prom>0?((hoy.t-prom)/prom*100):0;
+    const f=new Date();
+    return `<div class="card">
+      <div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div><div style="font-family:Fraunces,serif;font-size:17px">Venta de hoy</div>
+          <div class="hint">${esc(this.DOWC[f.getDay()])} ${f.getDate()} de ${esc((this.MESNOM[f.getMonth()+1]||'').toLowerCase())} · ${hoy.n} venta(s)</div></div>
+        <b style="font-size:27px;font-family:Fraunces,serif;color:var(--acc);line-height:1">${money(hoy.t)}</b></div>
+      ${prom>0?`<div class="hint" style="margin-top:6px">Promedio de los días con venta del mes: <b>${money(prom)}</b> · hoy va <b style="color:${dif>=0?'var(--ok)':'var(--bad)'}">${dif>0?'+':''}${dif.toFixed(0)}%</b></div>`:''}
+      <div style="border-top:1px solid var(--line);margin-top:10px;padding-top:9px">
+        <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:6px">Venta día por día</div>
+        ${dias.length?dias.map(k=>{const o=por[k], es=k===hoyK, d=new Date(k+'T12:00:00');
+          return `<div class="row" style="align-items:center;gap:8px;margin-bottom:4px">
+            <span style="width:74px;font-size:12px;${es?'font-weight:700;color:var(--acc)':'color:var(--mut)'}">${esc(this.DOWC[d.getDay()])} ${d.getDate()}${es?' · hoy':''}</span>
+            <div class="bar" style="flex:1"><i style="width:${Math.round(o.t/max*100)}%;background:${es?'var(--acc)':'var(--acc2)'}"></i></div>
+            <b style="font-size:12px;width:92px;text-align:right;${es?'color:var(--acc)':''}">${money(o.t)}</b>
+            <span class="dim" style="font-size:11px;width:26px;text-align:right">${o.n}</span></div>`;}).join('')
+          :'<div class="hint">Todavía no hay ventas este mes.</div>'}
+      </div></div>`;
   },
   _resumenProductos(peds,mesIni){
     const mesR={}, todoR={};
