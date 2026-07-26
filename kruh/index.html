@@ -721,7 +721,7 @@ const App={
   /* ===================== GASTOS (tabla del mes + cierre mensual) ===================== */
   GASFIJOS:['Luz','Agua','Arriendo','Gas','Internet','Teléfono','Nómina','Aseo'],
   FPAGO:['Efectivo','Nequi','Transferencia','Tarjeta crédito','Débito automático'],
-  CATGASTO:['Arriendo','Servicios públicos','Servicios profesionales','Tecnología y software','Nómina y aportes','Materia Prima','Empaques','Etiquetas y publicidad','Aseo y limpieza','Transporte y movilidad','Mantenimiento y locativos','Equipos y menaje','Impuestos y tasas','Papelería','Otros'],
+  CATGASTO:['Materia Prima','Empaques','Aseo','Transporte','Arriendo','Servicios públicos','Servicios profesionales','Tecnología y software','Nómina y aportes','Impuestos y tasas','Etiquetas y publicidad','Mantenimiento y locativos','Equipos y menaje','Papelería','Otros'],
   IVAPCT:19,
   _gasFecha(g){ return (g.fecha||g.creado_en||'').slice(0,10); },
   _ymNom(ym){ return this.MESNOM[+String(ym||'').slice(5,7)]||''; },
@@ -777,7 +777,7 @@ const App={
     const sum=f=>filas.reduce((a,g)=>a+(+g[f]||0),0);
     const total=sum('monto'), tBase=sum('base'), tIva=sum('iva');
     const pagado=filas.filter(g=>g.pagado!==false).reduce((a,g)=>a+(+g.monto||0),0), pend=total-pagado;
-    const cats=[...new Set(this.CATGASTO.concat(gastos.map(g=>g.categoria).filter(Boolean)))];
+    const cats=[...new Set(this.CATGASTO.concat(gastos.map(g=>g.rubro).filter(Boolean)))];
     const nom=this._ymNom(mes), drow=dash.find(d=>(d.mes||'').toLowerCase()===nom.toLowerCase())||{};
     const cerrado=!!drow.cerrado, ro=cerrado?'disabled':'';
     const cel=(g,campo,extra)=>`onchange="App.gasCell('${g.id}','${campo}',this.value)" ${ro} ${extra||''}`;
@@ -792,7 +792,7 @@ const App={
       <div class="tbwrap"><table class="tb">
         <thead><tr>
           <th style="min-width:130px">Fecha</th><th style="min-width:165px">Proveedor</th><th style="min-width:110px">N° factura</th>
-          <th style="min-width:135px">Categoría</th><th style="min-width:185px">Rubro</th><th style="min-width:170px">Descripción</th><th style="min-width:190px">Descripción adicional</th>
+          <th style="min-width:185px">Rubro</th><th style="min-width:170px">Descripción</th><th style="min-width:190px">Descripción adicional</th>
           <th style="min-width:85px">¿IVA?</th><th style="min-width:115px;text-align:right">Valor sin IVA</th>
           <th style="min-width:105px;text-align:right">IVA</th><th style="min-width:120px;text-align:right">Total</th>
           <th style="min-width:135px">Método de pago</th><th style="min-width:120px">Estado</th>
@@ -801,7 +801,6 @@ const App={
           <td><input type="date" value="${esc(g.fecha||this._gasFecha(g))}" ${cel(g,'fecha')}></td>
           <td><input value="${esc(g.proveedor||'')}" placeholder="Nombre del proveedor" ${cel(g,'proveedor')}></td>
           <td><input value="${esc(g.factura||'')}" placeholder="N°" ${cel(g,'factura')}></td>
-          <td><input list="g_cats" value="${esc(g.categoria||'')}" placeholder="Como venía…" ${cel(g,'categoria')}></td>
           <td><select ${cel(g,'rubro')}><option value="" ${g.rubro?'':'selected'}>— sin rubro —</option>${this.CATGASTO.map(c=>`<option ${g.rubro===c?'selected':''}>${esc(c)}</option>`).join('')}${g.rubro&&!this.CATGASTO.includes(g.rubro)?`<option selected>${esc(g.rubro)}</option>`:''}</select></td>
           <td><input value="${esc(g.concepto||'')}" placeholder="Qué se compró" ${cel(g,'concepto')}></td>
           <td><input value="${esc(g.detalle||'')}" placeholder="Detalle, periodo, observación…" ${cel(g,'detalle')}></td>
@@ -814,14 +813,14 @@ const App={
           <td><input type="date" value="${esc(g.fecha_pago||'')}" ${cel(g,'fecha_pago')}></td>
           <td><input value="${esc(g.nota||'')}" placeholder="—" ${cel(g,'nota')}></td>
           <td>${cerrado?'':`<a class="del" onclick="App.gasDel('${g.id}')">✕</a>`}</td></tr>`).join('')
-          :`<tr><td colspan="16" style="text-align:center;color:var(--mut);padding:26px 10px">Todavía no hay renglones en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> o a <b>＋ Cargar los fijos</b>.</td></tr>`}</tbody>
+          :`<tr><td colspan="15" style="text-align:center;color:var(--mut);padding:26px 10px">Todavía no hay renglones en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> o a <b>＋ Cargar los fijos</b>.</td></tr>`}</tbody>
         <tfoot>
-          <tr><td colspan="8" style="text-align:right">TOTALES DEL MES</td>
+          <tr><td colspan="7" style="text-align:right">TOTALES DEL MES</td>
             <td id="g_base" style="text-align:right">${money(tBase)}</td>
             <td id="g_iva" style="text-align:right">${money(tIva)}</td>
             <td id="g_total" style="text-align:right;font-size:17px;color:var(--acc)">${money(total)}</td>
             <td colspan="5"></td></tr>
-          <tr><td colspan="8" style="text-align:right;font-weight:400;color:var(--mut)">Pagado / Pendiente</td>
+          <tr><td colspan="7" style="text-align:right;font-weight:400;color:var(--mut)">Pagado / Pendiente</td>
             <td colspan="3" style="text-align:right;font-weight:400"><span style="color:var(--ok)">${money(pagado)}</span> / <span style="color:${pend?'var(--bad)':'var(--mut)'}">${money(pend)}</span></td>
             <td colspan="5"></td></tr>
         </tfoot></table></div>
@@ -891,9 +890,9 @@ const App={
     await this._dashSet(nom,{cerrado:false}); toast(nom+' reabierto'); this.vGastos(); },
   async gastosExcel(){ toast('Generando Excel…');
     const g=await GET('kruh_gastos?order=fecha.desc&limit=20000');
-    const cols=['Mes','Fecha','Proveedor','N° factura','Categoría','Rubro','Descripción','Descripción adicional','¿Tiene IVA?','Valor sin IVA','IVA','Valor total','Método de pago','Estado','Fecha de pago','Notas'];
+    const cols=['Mes','Fecha','Proveedor','N° factura','Rubro','Descripción','Descripción adicional','¿Tiene IVA?','Valor sin IVA','IVA','Valor total','Método de pago','Estado','Fecha de pago','Notas'];
     const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-    const rows=g.map(r=>[this._gasFecha(r).slice(0,7),this._gasFecha(r),r.proveedor||'',r.factura||'',r.categoria||'',r.rubro||'',r.concepto||'',r.detalle||'',(r.tiene_iva?'Sí':'No'),(+r.base||0),(+r.iva||0),(+r.monto||0),r.forma_pago||'',(r.pagado===false?'Pendiente':'Pagado'),r.fecha_pago||'',r.nota||''].map(q).join(';'));
+    const rows=g.map(r=>[this._gasFecha(r).slice(0,7),this._gasFecha(r),r.proveedor||'',r.factura||'',r.rubro||'',r.concepto||'',r.detalle||'',(r.tiene_iva?'Sí':'No'),(+r.base||0),(+r.iva||0),(+r.monto||0),r.forma_pago||'',(r.pagado===false?'Pendiente':'Pagado'),r.fecha_pago||'',r.nota||''].map(q).join(';'));
     const csv='﻿'+cols.map(q).join(';')+'\r\n'+rows.join('\r\n');
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     a.download='kruh-gastos.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
