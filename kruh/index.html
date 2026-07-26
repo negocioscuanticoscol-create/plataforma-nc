@@ -502,17 +502,52 @@ const App={
   /* ===================== PROVEEDORES ===================== */
   async vProveedores(){
     this.loading();
-    const [provs,pp]=await Promise.all([GET('kruh_proveedores?order=categoria,nombre&limit=2000'),GET('kruh_prov_productos?order=nombre&limit=5000')]);
-    this._provs=provs; this._pp=pp;
+    const [provs,pp,comp]=await Promise.all([GET('kruh_proveedores?order=categoria,nombre&limit=2000'),GET('kruh_prov_productos?order=nombre&limit=5000'),GET('kruh_gastos?order=fecha&limit=5000')]);
+    this._provs=provs; this._pp=pp; this._gastos=comp;
     const ppBy={}; pp.forEach(x=>{(ppBy[x.proveedor_id]=ppBy[x.proveedor_id]||[]).push(x);});
     const caj=this._provTab||'';
-    this.set(`<h1>Proveedores</h1><div class="sub">Directorio por cajón · toca uno para ver sus proveedores</div>
-      <div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap">
+    const mes=this._gasMes||this._mesActual(); this._gasMes=mes;
+    const compras=comp.filter(g=>this._esCompra(g));
+    const meses=[...new Set(compras.map(g=>this._gasFecha(g).slice(0,7)).filter(Boolean).concat([mes,this._mesActual()]))].sort().reverse();
+    const delMes=compras.filter(g=>this._gasFecha(g).slice(0,7)===mes)
+      .sort((a,b)=>(this._gasFecha(a)+(a.creado_en||'')).localeCompare(this._gasFecha(b)+(b.creado_en||'')));
+    const tc={}; this.CATCOMPRAS.forEach(c=>tc[c]={n:0,t:0});
+    delMes.forEach(g=>{ const k=this._catCompra(g); if(tc[k]){tc[k].n++; tc[k].t+=+g.monto||0;} });
+    const totMes=delMes.reduce((a,g)=>a+(+g.monto||0),0);
+    const filas=this.CATCOMPRAS.includes(caj)?delMes.filter(g=>this._catCompra(g)===caj):[];
+    const sum=f=>filas.reduce((a,g)=>a+(+g[f]||0),0);
+    const total=sum('monto'), tBase=sum('base'), tIva=sum('iva');
+    const pagado=filas.filter(g=>g.pagado!==false).reduce((a,g)=>a+(+g.monto||0),0), pend=total-pagado;
+    const nom=this._ymNom(mes);
+    this.set(`<h1>Proveedores</h1><div class="sub">Compras del mes por categoría · toca un cajón para ver sus facturas y sus proveedores</div>
+      <div class="row" style="gap:8px;margin-bottom:12px;align-items:center"><span class="dim" style="font-size:12px">Mes:</span>
+        <select onchange="App._gasMes=this.value;App.vProveedores()" style="width:auto">${meses.map(m=>`<option value="${esc(m)}" ${m===mes?'selected':''}>${esc(this._ymNom(m))} ${esc(m.slice(0,4))}</option>`).join('')}</select>
+        <span class="dim" style="font-size:12px;margin-left:auto">${delMes.length} compra(s) · ${money(totMes)} en ${esc(nom)}</span></div>
+      <div class="row" style="gap:10px;margin-bottom:14px;flex-wrap:wrap">
         ${this.CATCOMPRAS.map(c=>{const n=provs.filter(p=>this._catProv(p)===c).length;
-          return `<div class="cajon ${caj===c?'on':''}" onclick="App._provTab=App._provTab==='${esc(c)}'?'':'${esc(c)}';App.vProveedores()"><b>${n}</b>${esc(c)}</div>`;}).join('')}
+          return `<div class="cajon ${caj===c?'on':''}" onclick="App._provTab=App._provTab==='${esc(c)}'?'':'${esc(c)}';App.vProveedores()">
+            <b>${money(tc[c].t)}</b>${esc(c)}<div style="font-size:11px;opacity:.75">${tc[c].n} compra(s) · ${n} proveedor(es)</div></div>`;}).join('')}
         <div class="cajon ${caj==='compra'?'on':''}" onclick="App._provTab='compra';App.vProveedores()">🛒 Registrar compra</div></div>
-      ${caj==='compra'?this._provCompraHTML(provs):this._provDirHTML(provs,ppBy,caj)}`);
+      ${caj==='compra'?this._provCompraHTML(provs):(!caj?'<div class="empty">👆 Toca un cajón para ver sus compras y sus proveedores.</div>':`
+      <h1 style="font-size:17px">Compras de ${esc(caj)} · ${esc(nom)}</h1>
+      <div class="row" style="gap:8px;margin-bottom:10px"><button class="btn acc sm" onclick="App.compraNueva('${esc(caj)}')">＋ Nueva compra</button></div>
+      ${this._tbFacturas(filas,{rubros:this.CATCOMPRAS,colRubro:'Categoría',phConcepto:'Qué se compró',
+        vacio:`Sin compras de ${esc(caj)} en ${esc(nom)}. Dale a <b>＋ Nueva compra</b>.`,
+        titulo:'TOTALES DE '+esc(caj).toUpperCase(),tBase,tIva,total,pagado,pend})}
+      <h1 style="font-size:17px;margin-top:20px">Proveedores de ${esc(caj)}</h1>
+      ${this._provDirHTML(provs,ppBy,caj)}`)}`);
   },
+  _catCompra(g){ const c=String(g.rubro||'').toLowerCase();
+    if(/empaq|envase|frasco|desechab|bandeja/.test(c))return 'Empaques';
+    if(/aseo|limpiez|consumib/.test(c))return 'Consumibles aseo';
+    if(/etiqueta|sticker|rotul|publicid/.test(c))return 'Etiquetas';
+    return 'Materia prima'; },
+  async compraNueva(cat){ const mes=this._gasMes||this._mesActual();
+    const n=await POST('kruh_gastos',{concepto:'',proveedor:'',factura:'',rubro:cat,tiene_iva:false,base:0,iva:0,monto:0,fecha:this._diaDef(mes),forma_pago:'Efectivo',pagado:false});
+    if(!n){ toast('⚠️ No se pudo crear la compra'); return; }
+    await this.vProveedores();
+    const f=document.querySelectorAll('#main .tb tbody tr'), u=f[f.length-1];
+    if(u){ const i=u.querySelectorAll('input')[1]; if(i){i.focus(); i.scrollIntoView({block:'center'});} } },
   _catProv(p){ const c=String(p.categoria||'').toLowerCase();
     if(/empaq|envase|frasco|desechab|bandeja/.test(c))return 'Empaques';
     if(/aseo|limpiez|consumib/.test(c))return 'Consumibles aseo';
@@ -824,40 +859,8 @@ const App={
           <b>${money(tc[k].t)}</b>${t}<div style="font-size:11px;opacity:.75">${tc[k].n} registro(s)</div></div>`).join('')}</div>
       ${enCompras.length?`<div class="card" style="border-left:4px solid var(--acc2);font-size:13px">🛒 <b>${enCompras.length} registro(s)</b> de ${esc(nom)} por ${money(enCompras.reduce((a,g)=>a+(+g.monto||0),0))} quedaron fuera de Gastos: son materia prima, empaques, consumibles de aseo o etiquetas y esos van en <b>Compras</b>.</div>`:''}
       ${!caj?`<div class="empty">👆 Toca un cajón para abrirlo y ver sus gastos.</div>`:`
-      <div class="tbwrap"><table class="tb">
-        <thead><tr>
-          <th style="min-width:130px">Fecha</th><th style="min-width:165px">Proveedor</th><th style="min-width:110px">N° factura</th>
-          <th style="min-width:185px">Rubro</th><th style="min-width:200px">Descripción</th>
-          <th style="min-width:85px">¿IVA?</th><th style="min-width:115px;text-align:right">Valor sin IVA</th>
-          <th style="min-width:105px;text-align:right">IVA</th><th style="min-width:120px;text-align:right">Total</th>
-          <th style="min-width:135px">Método de pago</th><th style="min-width:120px">Estado</th>
-          <th style="min-width:130px">Fecha de pago</th><th style="min-width:150px">Notas</th><th></th></tr></thead>
-        <tbody>${filas.length?filas.map(g=>`<tr data-id="${g.id}">
-          <td><input type="date" value="${esc(g.fecha||this._gasFecha(g))}" ${cel(g,'fecha')}></td>
-          <td><input value="${esc(g.proveedor||'')}" placeholder="Nombre del proveedor" ${cel(g,'proveedor')}></td>
-          <td><input value="${esc(g.factura||'')}" placeholder="N°" ${cel(g,'factura')}></td>
-          <td><select ${cel(g,'rubro')}><option value="" ${g.rubro?'':'selected'}>— sin rubro —</option>${this.CATGASTO.map(c=>`<option ${g.rubro===c?'selected':''}>${esc(c)}</option>`).join('')}${g.rubro&&!this.CATGASTO.includes(g.rubro)?`<option selected>${esc(g.rubro)}</option>`:''}</select></td>
-          <td><input value="${esc(g.concepto||'')}" placeholder="Qué se pagó" ${cel(g,'concepto')}></td>
-          <td><select ${cel(g,'tiene_iva')}><option value="false" ${g.tiene_iva?'':'selected'}>No</option><option value="true" ${g.tiene_iva?'selected':''}>Sí</option></select></td>
-          <td><input type="number" data-f="base" value="${g.base||''}" placeholder="0" ${cel(g,'base','oninput="App.gasSuma()"')}></td>
-          <td><input type="number" data-f="iva" value="${g.iva||''}" placeholder="0" ${cel(g,'iva','oninput="App.gasSuma()"')}></td>
-          <td><input type="number" data-f="monto" value="${g.monto||''}" placeholder="0" style="color:var(--acc)" ${cel(g,'monto','oninput="App.gasSuma()"')}></td>
-          <td><select ${cel(g,'forma_pago')}>${this.FPAGO.map(f=>`<option ${g.forma_pago===f?'selected':''}>${f}</option>`).join('')}</select></td>
-          <td><select ${cel(g,'pagado')}><option value="true" ${g.pagado!==false?'selected':''}>✔ Pagado</option><option value="false" ${g.pagado===false?'selected':''}>⏳ Pendiente</option>${cerrado?'':'<option value="borrar">🗑 Eliminar</option>'}</select></td>
-          <td><input type="date" value="${esc(g.fecha_pago||'')}" ${cel(g,'fecha_pago')}></td>
-          <td><input value="${esc(g.nota||'')}" placeholder="—" ${cel(g,'nota')}></td>
-          <td>${cerrado?'':`<a class="del" onclick="App.gasDel('${g.id}')">✕</a>`}</td></tr>`).join('')
-          :`<tr><td colspan="14" style="text-align:center;color:var(--mut);padding:26px 10px">Este cajón no tiene gastos en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> y escoge su rubro.</td></tr>`}</tbody>
-        <tfoot>
-          <tr><td colspan="6" style="text-align:right">${caj==='todos'?'TOTALES DEL MES':'TOTALES DE '+esc(nomCaj).toUpperCase()}</td>
-            <td id="g_base" style="text-align:right">${money(tBase)}</td>
-            <td id="g_iva" style="text-align:right">${money(tIva)}</td>
-            <td id="g_total" style="text-align:right;font-size:17px;color:var(--acc)">${money(total)}</td>
-            <td colspan="5"></td></tr>
-          <tr><td colspan="6" style="text-align:right;font-weight:400;color:var(--mut)">Pagado / Pendiente</td>
-            <td colspan="3" style="text-align:right;font-weight:400"><span style="color:var(--ok)">${money(pagado)}</span> / <span style="color:${pend?'var(--bad)':'var(--mut)'}">${money(pend)}</span></td>
-            <td colspan="5"></td></tr>
-        </tfoot></table></div>
+      ${this._tbFacturas(filas,{ro,cerrado,rubros:this.CATGASTO,vacio:`Este cajón no tiene gastos en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> y escoge su rubro.`,
+        titulo:caj==='todos'?'TOTALES DEL MES':'TOTALES DE '+esc(nomCaj).toUpperCase(),tBase,tIva,total,pagado,pend})}
       ${filas.length?`<h1 style="font-size:17px;margin-top:20px">Resumen por rubro</h1>
       <div class="tbwrap"><table class="tb" style="min-width:460px">
         <thead><tr><th style="min-width:190px">Rubro</th><th style="text-align:right">Valor sin IVA</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th><th style="text-align:right">%</th></tr></thead>
@@ -872,6 +875,45 @@ const App={
       </table></div>`:''}
       ${cerrado||!todas.length?'':`<button class="btn full" style="margin-top:12px;background:var(--ok)" onclick="App.gasCerrar()">🔒 Cerrar ${esc(nom)} completo (${money(totMes)}) y pasarlo al Dashboard</button>`}`}
       <div class="hint">Cada casilla se guarda sola al salir de ella. Si pones <b>¿IVA? = Sí</b> y dejas el IVA vacío, lo calcula al ${this.IVAPCT}% y suma el Total; el Total lo puedes sobrescribir a mano cuando la factura traiga algo no gravado. Al cerrar el mes, el total pasa al Dashboard y la tabla se bloquea.</div>`);
+  },
+  /* tabla de facturas compartida por Gastos y por Compras (en Proveedores) */
+  _tbFacturas(filas,o){
+    const ro=o.ro||'', cerrado=o.cerrado, rubros=o.rubros||[];
+    const cel=(g,campo,extra)=>`onchange="App.gasCell('${g.id}','${campo}',this.value)" ${ro} ${extra||''}`;
+    return `<div class="tbwrap"><table class="tb">
+        <thead><tr>
+          <th style="min-width:130px">Fecha</th><th style="min-width:165px">Proveedor</th><th style="min-width:110px">N° factura</th>
+          <th style="min-width:185px">${esc(o.colRubro||'Rubro')}</th><th style="min-width:200px">Descripción</th>
+          <th style="min-width:85px">¿IVA?</th><th style="min-width:115px;text-align:right">Valor sin IVA</th>
+          <th style="min-width:105px;text-align:right">IVA</th><th style="min-width:120px;text-align:right">Total</th>
+          <th style="min-width:135px">Método de pago</th><th style="min-width:120px">Estado</th>
+          <th style="min-width:130px">Fecha de pago</th><th style="min-width:150px">Notas</th><th></th></tr></thead>
+        <tbody>${filas.length?filas.map(g=>`<tr data-id="${g.id}">
+          <td><input type="date" value="${esc(g.fecha||this._gasFecha(g))}" ${cel(g,'fecha')}></td>
+          <td><input value="${esc(g.proveedor||'')}" placeholder="Nombre del proveedor" ${cel(g,'proveedor')}></td>
+          <td><input value="${esc(g.factura||'')}" placeholder="N°" ${cel(g,'factura')}></td>
+          <td><select ${cel(g,'rubro')}><option value="" ${g.rubro?'':'selected'}>— sin rubro —</option>${rubros.map(c=>`<option ${g.rubro===c?'selected':''}>${esc(c)}</option>`).join('')}${g.rubro&&!rubros.includes(g.rubro)?`<option selected>${esc(g.rubro)}</option>`:''}</select></td>
+          <td><input value="${esc(g.concepto||'')}" placeholder="${esc(o.phConcepto||'Qué se pagó')}" ${cel(g,'concepto')}></td>
+          <td><select ${cel(g,'tiene_iva')}><option value="false" ${g.tiene_iva?'':'selected'}>No</option><option value="true" ${g.tiene_iva?'selected':''}>Sí</option></select></td>
+          <td><input type="number" data-f="base" value="${g.base||''}" placeholder="0" ${cel(g,'base','oninput="App.gasSuma()"')}></td>
+          <td><input type="number" data-f="iva" value="${g.iva||''}" placeholder="0" ${cel(g,'iva','oninput="App.gasSuma()"')}></td>
+          <td><input type="number" data-f="monto" value="${g.monto||''}" placeholder="0" style="color:var(--acc)" ${cel(g,'monto','oninput="App.gasSuma()"')}></td>
+          <td><select ${cel(g,'forma_pago')}>${this.FPAGO.map(f=>`<option ${g.forma_pago===f?'selected':''}>${f}</option>`).join('')}</select></td>
+          <td><select ${cel(g,'pagado')}><option value="true" ${g.pagado!==false?'selected':''}>✔ Pagado</option><option value="false" ${g.pagado===false?'selected':''}>⏳ Pendiente</option>${cerrado?'':'<option value="borrar">🗑 Eliminar</option>'}</select></td>
+          <td><input type="date" value="${esc(g.fecha_pago||'')}" ${cel(g,'fecha_pago')}></td>
+          <td><input value="${esc(g.nota||'')}" placeholder="—" ${cel(g,'nota')}></td>
+          <td>${cerrado?'':`<a class="del" onclick="App.gasDel('${g.id}')">✕</a>`}</td></tr>`).join('')
+          :`<tr><td colspan="14" style="text-align:center;color:var(--mut);padding:26px 10px">${o.vacio||'Sin registros.'}</td></tr>`}</tbody>
+        <tfoot>
+          <tr><td colspan="6" style="text-align:right">${esc(o.titulo||'TOTALES')}</td>
+            <td id="g_base" style="text-align:right">${money(o.tBase)}</td>
+            <td id="g_iva" style="text-align:right">${money(o.tIva)}</td>
+            <td id="g_total" style="text-align:right;font-size:17px;color:var(--acc)">${money(o.total)}</td>
+            <td colspan="5"></td></tr>
+          <tr><td colspan="6" style="text-align:right;font-weight:400;color:var(--mut)">Pagado / Pendiente</td>
+            <td colspan="3" style="text-align:right;font-weight:400"><span style="color:var(--ok)">${money(o.pagado)}</span> / <span style="color:${o.pend?'var(--bad)':'var(--mut)'}">${money(o.pend)}</span></td>
+            <td colspan="5"></td></tr>
+        </tfoot></table></div>`;
   },
   gasSuma(){ const s=f=>{let t=0;document.querySelectorAll('#main [data-f="'+f+'"]').forEach(i=>t+=+i.value||0);return t;};
     if($('g_base'))$('g_base').textContent=money(s('base'));
@@ -893,8 +935,10 @@ const App={
         if(iv)iv.value=g.iva||''; if(tt)tt.value=g.monto||''; } }
     const rp=await PATCH('kruh_gastos?id=eq.'+id,patch);
     if(rp&&!rp.ok){ toast('⚠️ NO se guardó ese dato — avísale a José'); }
-    if(campo==='fecha'&&v&&String(v).slice(0,7)!==this._gasMes){ toast('Se movió a '+this._ymNom(String(v).slice(0,7))); return this.vGastos(); }
+    if(campo==='fecha'&&v&&String(v).slice(0,7)!==this._gasMes){ toast('Se movió a '+this._ymNom(String(v).slice(0,7))); return this._repintar(); }
+    if(campo==='rubro'&&(this._esCompra(g)!==(this.view==='proveedores'))) return this._repintar();
     this.gasSuma(); },
+  _repintar(){ return this.view==='proveedores'?this.vProveedores():this.vGastos(); },
   async gasNueva(){ const mes=this._gasMes||this._mesActual();
     const nuevo=await POST('kruh_gastos',{concepto:'',proveedor:'',factura:'',categoria:'',tiene_iva:false,base:0,iva:0,monto:0,fecha:this._diaDef(mes),forma_pago:'Efectivo',pagado:false});
     if(!nuevo){ toast('⚠️ No se pudo crear el renglón'); return; }
@@ -908,8 +952,8 @@ const App={
     for(const c of faltan) await POST('kruh_gastos',{concepto:c,proveedor:'',factura:'',categoria:'Servicios',tiene_iva:false,base:0,iva:0,monto:0,fecha:f,forma_pago:'Efectivo',pagado:false});
     toast(faltan.length+' renglones creados'); this.vGastos(); },
   async gasDel(id){ const g=(this._gastos||[]).find(x=>x.id===id)||{};
-    if((+g.monto||0)>0 && !this._okBorrar()) return this.vGastos();
-    await DEL('kruh_gastos?id=eq.'+id); this._gastos=(this._gastos||[]).filter(x=>x.id!==id); this.vGastos(); },
+    if((+g.monto||0)>0 && !this._okBorrar()) return this._repintar();
+    await DEL('kruh_gastos?id=eq.'+id); this._gastos=(this._gastos||[]).filter(x=>x.id!==id); this._repintar(); },
   async _dashSet(mesNom,campos){ const ex=(await GET('kruh_dashboard?mes=eq.'+encodeURIComponent(mesNom)+'&select=id'))[0];
     if(ex) return PATCH('kruh_dashboard?id=eq.'+ex.id,campos);
     const o=this.MESNOM.indexOf(mesNom); return POST('kruh_dashboard',Object.assign({mes:mesNom,orden:o>0?o:99},campos)); },
