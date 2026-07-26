@@ -724,9 +724,42 @@ const App={
   _gasFecha(g){ return (g.fecha||g.creado_en||'').slice(0,10); },
   _ymNom(ym){ return this.MESNOM[+String(ym||'').slice(5,7)]||''; },
   _diaDef(ym){ const h=new Date(), hoy=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0'); return hoy.slice(0,7)===ym?hoy:ym+'-01'; },
+  SQLGASTOS:['create table if not exists public.kruh_gastos (',
+    '  id         uuid primary key default gen_random_uuid(),',
+    '  concepto   text,','  proveedor  text,','  monto      numeric not null default 0,',
+    '  fecha      date default current_date,','  forma_pago text,','  pagado     boolean default false,',
+    '  nota       text,','  creado_en  timestamptz default now()',');',
+    'create index if not exists kruh_gastos_fecha_idx on public.kruh_gastos (fecha desc);',
+    'alter table public.kruh_gastos enable row level security;',
+    'drop policy if exists kruh_gastos_all on public.kruh_gastos;',
+    'create policy kruh_gastos_all on public.kruh_gastos',
+    '  for all to anon, authenticated using (true) with check (true);','',
+    'alter table public.kruh_dashboard add column if not exists gastos  numeric default 0;',
+    'alter table public.kruh_dashboard add column if not exists cerrado boolean default false;'],
+  _sinTabla(){ const sql=this.SQLGASTOS.join('\n');
+    this.set(`<h1>Gastos</h1><div class="sub">Falta un paso para poder usar esta pestaña</div>
+      <div class="card" style="border-left:4px solid var(--warn)">
+        <b style="color:var(--warn)">⚠️ La tabla de gastos todavía no existe en la base de datos</b>
+        <div style="font-size:13.5px;margin-top:6px">Por eso no se guarda nada y no sale el botón de cerrar mes. Es un paso de una sola vez:</div>
+        <ol style="font-size:13.5px;margin:8px 0 0 18px;line-height:1.8">
+          <li>Copia el SQL con el botón de abajo.</li>
+          <li>Abre el <b>SQL Editor</b> de Supabase (botón verde).</li>
+          <li>Pega y dale <b>Run</b>.</li>
+          <li>Vuelve acá y recarga.</li></ol>
+        <div class="row" style="gap:8px;margin-top:12px">
+          <button class="btn acc" onclick="App.copiarSQL()">📋 Copiar el SQL</button>
+          <a class="btn" style="background:var(--ok);text-decoration:none;display:inline-block" href="https://supabase.com/dashboard/project/fnayedgvamxktxfvywwl/sql/new" target="_blank">Abrir el SQL Editor ↗</a>
+          <button class="btn gh" onclick="App.vGastos()">Ya lo hice · reintentar</button></div>
+        <pre id="g_sql" style="background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:11px;margin-top:11px;font-size:11.5px;overflow:auto;white-space:pre">${esc(sql)}</pre>
+      </div>`); },
+  copiarSQL(){ const sql=this.SQLGASTOS.join('\n');
+    if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(sql).then(()=>toast('SQL copiado · pégalo en Supabase'),()=>toast('Selecciónalo y cópialo a mano'));
+    else { const r=document.createRange(); r.selectNode($('g_sql')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); toast('Seleccionado · dale Ctrl+C'); } },
   async vGastos(){
     this.loading();
-    const [gastos,dash]=await Promise.all([GET('kruh_gastos?order=creado_en&limit=5000'),GET('kruh_dashboard?order=orden&limit=24')]);
+    const r=await fetch(SB+'/rest/v1/kruh_gastos?order=creado_en&limit=5000',{headers:H});
+    if(!r.ok) return this._sinTabla();
+    const [gastos,dash]=await Promise.all([r.json(),GET('kruh_dashboard?order=orden&limit=24')]);
     this._gastos=gastos;
     const mes=this._gasMes||this._mesActual(); this._gasMes=mes;
     const meses=[...new Set(gastos.map(g=>this._gasFecha(g).slice(0,7)).filter(Boolean).concat([mes,this._mesActual()]))].sort().reverse();
