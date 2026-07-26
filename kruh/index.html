@@ -435,14 +435,15 @@ const App={
   async vInventario(){
     this.loading();
     const [prods,movs,ventas]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_movimientos?order=creado_en.desc&limit=1000'),GET('kruh_ventas?select=monto,creado_en&limit=20000')]);
-    this._prods=prods;
+    this._prods=prods; this._musBy={}; this._musTot=0;
     // consumo diario prom (salidas ult 30 dias)
     const hoy=new Date(), d30=new Date(hoy-30*864e5);
     const salBy={}; movs.forEach(m=>{ if((m.tipo==='salida'||m.tipo==='muestra') && new Date(m.creado_en)>=d30){ salBy[m.producto_id]=(salBy[m.producto_id]||0)+(+m.cantidad||0);} });
     // muestras gratis del mes (descuentan inventario y se miden aparte)
     const mesIni0=new Date(hoy.getFullYear(),hoy.getMonth(),1);
-    const musBy={}; let musTot=0;
+    const musBy=this._musBy; let musTot=0;
     movs.forEach(m=>{ if(m.tipo==='muestra' && new Date(m.creado_en)>=mesIni0){ musBy[m.producto_id]=(musBy[m.producto_id]||0)+(+m.cantidad||0); musTot+=(+m.cantidad||0); } });
+    this._musTot=musTot;
     const tab=this._invTab||'exist'; this._invTab=tab;
     const cobRows=prods.map(p=>{ const cons=(salBy[p.id]||0)/30; const dias=cons>0?(+p.existencias||0)/cons:null; return {p,cons,dias}; });
     const bajoMin=prods.filter(p=>(+p.inv_min||0)>0 && (+p.existencias||0)<=(+p.inv_min||0));
@@ -478,7 +479,7 @@ const App={
       ${bajoMin.length?`<div class="card" style="border-left:4px solid var(--warn);background:var(--badbg)"><b style="color:var(--warn)">⚠️ ${bajoMin.length} producto(s) en o bajo el mínimo</b><div style="font-size:12.5px;margin-top:4px">${bajoMin.map(p=>esc(p.nombre)+' ('+num(p.existencias)+'/'+num(p.inv_min)+')').join(' · ')}</div></div>`:''}
       <div class="kpis"><div class="kpi"><b style="color:${negativos.length?'var(--bad)':'var(--ink)'}">${prods.length}</b><span>Productos</span></div>
         <div class="kpi"><b style="color:${bajoMin.length?'var(--bad)':'var(--ok)'}">${bajoMin.length}</b><span>Bajo mínimo</span></div>
-        <div class="kpi"><b style="color:var(--acc)">${num(musTot)}</b><span>🎁 Muestras del mes</span></div>
+        <div class="kpi"><b style="color:var(--acc)" id="kpi_mus">${num(musTot)}</b><span>🎁 Muestras del mes</span></div>
         <div class="kpi dark"><b>${money(prods.reduce((a,p)=>a+(+p.existencias||0)*(+p.precio||0),0))}</b><span>Valor en existencias</span></div></div>
       <div class="row" style="gap:6px;margin-bottom:10px"><button class="et ${tab==='exist'?'on':''}" onclick="App._invTab='exist';App.vInventario()">Existencias</button>
         <button class="et ${tab==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button>
@@ -486,17 +487,29 @@ const App={
       ${tab==='exist'?
         (prods.length?`<div class="grid" style="grid-template-columns:repeat(2,1fr)">${cobRows.map(({p,cons,dias})=>{ const bm=(+p.inv_min||0)>0&&(+p.existencias||0)<=(+p.inv_min||0); const pct=dias===null?0:Math.min(100,dias/7*100); const col=bm?'var(--bad)':(dias===null?'var(--mut)':(dias<3?'var(--bad)':(dias<7?'var(--warn)':'var(--ok)')));
           return `<div class="card" style="padding:11px 12px;margin:0;${bm?'border:1px solid var(--bad)':''}"><div style="font-weight:700;font-size:13px;line-height:1.2">${esc(p.nombre)}</div>
-            <div class="row" style="justify-content:space-between;margin-top:3px"><b style="font-size:18px;color:${bm?'var(--bad)':'var(--ink)'}">${num(p.existencias)} <small class="dim" style="font-size:11px;font-weight:400">${esc(p.unidad||'')}</small></b><span style="font-size:11px;color:${col};font-weight:700">${dias===null?'':dias.toFixed(0)+'d'}</span></div>
+            <div class="row" style="justify-content:space-between;margin-top:3px"><b style="font-size:18px;color:${bm?'var(--bad)':'var(--ink)'}"><span id="ex_${p.id}">${num(p.existencias)}</span> <small class="dim" style="font-size:11px;font-weight:400">${esc(p.unidad||'')}</small></b><span style="font-size:11px;color:${col};font-weight:700">${dias===null?'':dias.toFixed(0)+'d'}</span></div>
             <div style="font-size:10.5px;color:var(--ink);font-weight:600">Stock mínimo: ${num(p.inv_min)}${bm?' · <b style="color:var(--bad)">BAJO</b>':''}</div>
             <div class="bar" style="margin-top:4px"><i style="width:${pct}%;background:${col}"></i></div>
-            ${musBy[p.id]?`<div style="font-size:10.5px;color:var(--acc);font-weight:700;margin-top:4px">🎁 ${num(musBy[p.id])} en muestras este mes</div>`:''}
+            <div id="mu_${p.id}" style="font-size:10.5px;color:var(--acc);font-weight:700;margin-top:4px;${musBy[p.id]?'':'display:none'}">🎁 ${num(musBy[p.id]||0)} en muestras este mes</div>
             <div class="row" style="gap:5px;margin-top:8px"><button class="btn acc sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','entrada')">＋ Adicionar stock</button></div>
-            <div class="row" style="gap:5px;margin-top:5px">
-              <button class="btn gh sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','muestra')">🎁 Muestras</button>
+            <div class="row" style="gap:5px;margin-top:5px;align-items:center">
+              <span style="font-size:11px;color:var(--mut);flex:1">🎁 Muestras</span>
+              <button class="btn gh sm" style="padding:5px 12px;font-size:15px;font-weight:700" onclick="App.muestraMenos('${p.id}')">−</button>
               <button class="btn gh sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','salida')">− Descontar</button></div></div>`;}).join('')}</div>`:'<div class="empty">Sin productos.</div>')
         : tab==='mov'?(movs.length?movs.slice(0,300).map(m=>{const p=prods.find(x=>x.id===m.producto_id);const ic=m.tipo==='entrada'?'⬆️':(m.tipo==='muestra'?'🎁':'⬇️');const cl=m.tipo==='entrada'?'var(--ok)':(m.tipo==='muestra'?'var(--acc)':'var(--bad)');return `<div class="item"><div class="top"><div><div class="nm">${ic} ${esc(p?p.nombre:'—')}${m.tipo==='muestra'?' <span class="tag pe">muestra gratis</span>':''}</div><div class="mt">${esc(m.motivo||'')} · 📅 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div><div class="nm" style="color:${cl}">${m.tipo==='entrada'?'+':'−'}${num(m.cantidad)}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')
         : tendHTML}`);
   },
+  /* muestra gratis de a una, sin ventana: solo el − */
+  async muestraMenos(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return;
+    const nueva=(+p.existencias||0)-1; p.existencias=nueva;
+    this._musBy[id]=(this._musBy[id]||0)+1; this._musTot=(this._musTot||0)+1;
+    const ex=$('ex_'+id); if(ex){ ex.textContent=num(nueva); if(ex.parentElement)ex.parentElement.style.color=nueva<0?'var(--bad)':''; }
+    const mu=$('mu_'+id); if(mu){ mu.style.display='block'; mu.textContent='🎁 '+num(this._musBy[id])+' en muestras este mes'; }
+    const k=$('kpi_mus'); if(k)k.textContent=num(this._musTot);
+    toast('🎁 1 muestra · quedan '+num(nueva));
+    const mv=await POST('kruh_movimientos',{producto_id:id,tipo:'muestra',cantidad:1,motivo:'Muestra gratis'});
+    const up=await PATCH('kruh_productos?id=eq.'+id,{existencias:nueva});
+    if(!mv||(up&&!up.ok)) toast('⚠️ NO se guardó la muestra — recarga y revisa'); },
   movModal(id,tipo){ const p=(this._prods||[]).find(x=>x.id===id)||{};
     const T={entrada:['Adicionar stock','Producción del día'],muestra:['🎁 Muestras gratis','Muestra gratis'],salida:['Descontar (salida/merma)','Merma/ajuste']}[tipo]||['Movimiento',''];
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${T[0]} · ${esc(p.nombre||'')}</h3>
