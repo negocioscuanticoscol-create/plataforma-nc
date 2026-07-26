@@ -118,7 +118,9 @@ const App={
   ROLES:['admin','gerencia','cajera','panadero','bodeguero','chef'],
   get esAdmin(){ return this.rol==='admin'; },
   get puedeGestionar(){ return this.rol==='admin'||this.rol==='gerencia'; },
-  _tabsRol(){ if(this.rol==='admin') return this.TABS.map(t=>t[0]); const base=(this.rol==='gerencia')?this.TABS.map(t=>t[0]):((this._permisos||{})[this.rol]||['recetas']); return base.filter(v=>v!=='usuarios'&&v!=='dashboard'); },
+  _tabsRol(){ if(this.rol==='admin') return this.TABS.map(t=>t[0]);
+    if(this.rol==='gerencia') return this.TABS.map(t=>t[0]).filter(v=>v!=='usuarios');   // gerencia ve todo menos Usuarios
+    return ((this._permisos||{})[this.rol]||['recetas']).filter(v=>v!=='usuarios'&&v!=='dashboard'); },
   _primeraTab(){ const t=this._tabsRol(); return t.includes('dashboard')?'dashboard':(t[0]||'recetas'); },
   async init(){ this.rol=sessionStorage.getItem('kruh_rol')||'';
     try{ const [us,pm]=await Promise.all([GET('kruh_usuarios?select=nombre,rol,clave,activo&limit=200'),GET('kruh_permisos?limit=50')]); this._usuarios=us; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]); }catch(e){ this._usuarios=[]; this._permisos={}; }
