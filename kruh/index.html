@@ -723,6 +723,12 @@ const App={
   FPAGO:['Efectivo','Nequi','Transferencia','Tarjeta crédito','Débito automático'],
   CATGASTO:['Materia Prima','Empaques','Aseo','Transporte','Arriendo','Servicios públicos','Servicios profesionales','Tecnología y software','Nómina y aportes','Impuestos y tasas','Etiquetas y publicidad','Mantenimiento y locativos','Equipos y menaje','Papelería','Otros'],
   IVAPCT:19,
+  CAJONES:[['todos','📋 Todos'],['fijos','🏠 Gastos fijos'],['variables','🔄 Gastos variables'],['nomina','👷 Nómina'],['otros','🧾 Otros']],
+  RUBRO_CAJON:{'Arriendo':'fijos','Servicios públicos':'fijos','Servicios profesionales':'fijos','Tecnología y software':'fijos',
+    'Nómina y aportes':'nomina',
+    'Materia Prima':'variables','Empaques':'variables','Aseo':'variables','Transporte':'variables','Etiquetas y publicidad':'variables',
+    'Mantenimiento y locativos':'variables','Equipos y menaje':'variables','Papelería':'variables'},
+  _cajonDe(g){ return this.RUBRO_CAJON[g.rubro]||'otros'; },
   _gasFecha(g){ return (g.fecha||g.creado_en||'').slice(0,10); },
   _ymNom(ym){ return this.MESNOM[+String(ym||'').slice(5,7)]||''; },
   _diaDef(ym){ const h=new Date(), hoy=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0'); return hoy.slice(0,7)===ym?hoy:ym+'-01'; },
@@ -773,10 +779,16 @@ const App={
     this._gastos=gastos;
     const mes=this._gasMes||this._mesActual(); this._gasMes=mes;
     const meses=[...new Set(gastos.map(g=>this._gasFecha(g).slice(0,7)).filter(Boolean).concat([mes,this._mesActual()]))].sort().reverse();
-    const filas=gastos.filter(g=>this._gasFecha(g).slice(0,7)===mes).sort((a,b)=>(this._gasFecha(a)+(a.creado_en||'')).localeCompare(this._gasFecha(b)+(b.creado_en||'')));
+    const todas=gastos.filter(g=>this._gasFecha(g).slice(0,7)===mes).sort((a,b)=>(this._gasFecha(a)+(a.creado_en||'')).localeCompare(this._gasFecha(b)+(b.creado_en||'')));
+    const totMes=todas.reduce((a,g)=>a+(+g.monto||0),0);
+    const caj=this._gasCajon||'';
+    const tc={}; this.CAJONES.forEach(([k])=>tc[k]={n:0,t:0});
+    todas.forEach(g=>{ const k=this._cajonDe(g); if(tc[k]){tc[k].n++; tc[k].t+=+g.monto||0;} tc.todos.n++; tc.todos.t+=+g.monto||0; });
+    const filas=caj?(caj==='todos'?todas:todas.filter(g=>this._cajonDe(g)===caj)):[];
     const sum=f=>filas.reduce((a,g)=>a+(+g[f]||0),0);
     const total=sum('monto'), tBase=sum('base'), tIva=sum('iva');
     const pagado=filas.filter(g=>g.pagado!==false).reduce((a,g)=>a+(+g.monto||0),0), pend=total-pagado;
+    const nomCaj=((this.CAJONES.find(c=>c[0]===caj)||[])[1]||'').replace(/^\S+\s/,'');
     const cats=[...new Set(this.CATGASTO.concat(gastos.map(g=>g.rubro).filter(Boolean)))];
     const nom=this._ymNom(mes), drow=dash.find(d=>(d.mes||'').toLowerCase()===nom.toLowerCase())||{};
     const cerrado=!!drow.cerrado, ro=cerrado?'disabled':'';
@@ -785,10 +797,14 @@ const App={
       ${cerrado?`<div class="card" style="border-left:4px solid var(--ok);background:var(--okbg)"><b style="color:var(--ok)">🔒 ${esc(nom)} está cerrado</b> · total ${money(+drow.gastos||0)} ya grabado en el Dashboard.${this.puedeGestionar?` <a onclick="App.gasReabrir()" style="color:var(--acc);cursor:pointer;font-weight:700">reabrir</a>`:''}</div>`:''}
       <div class="row" style="gap:8px;margin-bottom:12px;align-items:center"><span class="dim" style="font-size:12px">Mes:</span>
         <select onchange="App._gasMes=this.value;App.vGastos()" style="width:auto">${meses.map(m=>`<option value="${esc(m)}" ${m===mes?'selected':''}>${esc(this._ymNom(m))} ${esc(m.slice(0,4))}</option>`).join('')}</select>
-        ${cerrado?'':`<button class="btn acc sm" onclick="App.gasNueva()">＋ Nuevo gasto</button>${filas.length?'':`<button class="btn gh sm" onclick="App.gasFijos()">＋ Cargar los fijos</button>`}`}
+        ${cerrado?'':`<button class="btn acc sm" onclick="App.gasNueva()">＋ Nuevo gasto</button>${todas.length?'':`<button class="btn gh sm" onclick="App.gasFijos()">＋ Cargar los fijos</button>`}`}
         <button class="btn gh sm" onclick="App.gastosExcel()">⬇ Excel</button>
-        <span class="dim" style="font-size:12px;margin-left:auto">${filas.length} registro(s)</span></div>
+        <span class="dim" style="font-size:12px;margin-left:auto">${todas.length} registro(s) · ${money(totMes)} en el mes</span></div>
       <datalist id="g_cats">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+      <div class="row" style="gap:10px;margin-bottom:14px;flex-wrap:wrap">${this.CAJONES.map(([k,t])=>`
+        <div class="cajon ${caj===k?'on':''}" onclick="App._gasCajon=App._gasCajon==='${k}'?'':'${k}';App.vGastos()">
+          <b>${money(tc[k].t)}</b>${t}<div style="font-size:11px;opacity:.75">${tc[k].n} registro(s)</div></div>`).join('')}</div>
+      ${!caj?`<div class="empty">👆 Toca un cajón para abrirlo y ver sus gastos.</div>`:`
       <div class="tbwrap"><table class="tb">
         <thead><tr>
           <th style="min-width:130px">Fecha</th><th style="min-width:165px">Proveedor</th><th style="min-width:110px">N° factura</th>
@@ -813,9 +829,9 @@ const App={
           <td><input type="date" value="${esc(g.fecha_pago||'')}" ${cel(g,'fecha_pago')}></td>
           <td><input value="${esc(g.nota||'')}" placeholder="—" ${cel(g,'nota')}></td>
           <td>${cerrado?'':`<a class="del" onclick="App.gasDel('${g.id}')">✕</a>`}</td></tr>`).join('')
-          :`<tr><td colspan="15" style="text-align:center;color:var(--mut);padding:26px 10px">Todavía no hay renglones en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> o a <b>＋ Cargar los fijos</b>.</td></tr>`}</tbody>
+          :`<tr><td colspan="15" style="text-align:center;color:var(--mut);padding:26px 10px">Este cajón no tiene gastos en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> y escoge su rubro.</td></tr>`}</tbody>
         <tfoot>
-          <tr><td colspan="7" style="text-align:right">TOTALES DEL MES</td>
+          <tr><td colspan="7" style="text-align:right">${caj==='todos'?'TOTALES DEL MES':'TOTALES DE '+esc(nomCaj).toUpperCase()}</td>
             <td id="g_base" style="text-align:right">${money(tBase)}</td>
             <td id="g_iva" style="text-align:right">${money(tIva)}</td>
             <td id="g_total" style="text-align:right;font-size:17px;color:var(--acc)">${money(total)}</td>
@@ -826,7 +842,7 @@ const App={
         </tfoot></table></div>
       ${filas.length?`<h1 style="font-size:17px;margin-top:20px">Resumen por rubro</h1>
       <div class="tbwrap"><table class="tb" style="min-width:460px">
-        <thead><tr><th style="min-width:190px">Rubro</th><th style="text-align:right">Valor sin IVA</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th><th style="text-align:right">% del mes</th></tr></thead>
+        <thead><tr><th style="min-width:190px">Rubro</th><th style="text-align:right">Valor sin IVA</th><th style="text-align:right">IVA</th><th style="text-align:right">Total</th><th style="text-align:right">%</th></tr></thead>
         <tbody>${(()=>{const R={};filas.forEach(g=>{const k=g.rubro||'— sin rubro —';(R[k]=R[k]||{b:0,i:0,t:0}).b+=+g.base||0;R[k].i+=+g.iva||0;R[k].t+=+g.monto||0;});
           return Object.entries(R).sort((a,b)=>b[1].t-a[1].t).map(([k,v])=>`<tr>
             <td style="padding-left:10px;font-weight:600">${esc(k)}</td>
@@ -836,7 +852,7 @@ const App={
             <td style="text-align:right;padding-right:10px;color:var(--mut)">${total>0?(v.t/total*100).toFixed(1):'0'}%</td></tr>`).join('');})()}</tbody>
         <tfoot><tr><td style="padding-left:10px">TOTAL</td><td style="text-align:right;padding-right:10px">${money(tBase)}</td><td style="text-align:right;padding-right:10px">${money(tIva)}</td><td style="text-align:right;padding-right:10px;color:var(--acc)">${money(total)}</td><td style="text-align:right;padding-right:10px">100%</td></tr></tfoot>
       </table></div>`:''}
-      ${cerrado||!filas.length?'':`<button class="btn full" style="margin-top:12px;background:var(--ok)" onclick="App.gasCerrar()">🔒 Cerrar ${esc(nom)} y pasarlo al Dashboard</button>`}
+      ${cerrado||!todas.length?'':`<button class="btn full" style="margin-top:12px;background:var(--ok)" onclick="App.gasCerrar()">🔒 Cerrar ${esc(nom)} completo (${money(totMes)}) y pasarlo al Dashboard</button>`}`}
       <div class="hint">Cada casilla se guarda sola al salir de ella. Si pones <b>¿IVA? = Sí</b> y dejas el IVA vacío, lo calcula al ${this.IVAPCT}% y suma el Total; el Total lo puedes sobrescribir a mano cuando la factura traiga algo no gravado. Al cerrar el mes, el total pasa al Dashboard y la tabla se bloquea.</div>`);
   },
   gasSuma(){ const s=f=>{let t=0;document.querySelectorAll('#main [data-f="'+f+'"]').forEach(i=>t+=+i.value||0);return t;};
