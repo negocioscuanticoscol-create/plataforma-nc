@@ -741,7 +741,7 @@ const App={
   /* ===================== VENTAS (clientes, estilo Smart) ===================== */
   async vVentas(){
     this.loading();
-    const [ventas,seg,peds]=await Promise.all([GET('kruh_ventas?order=creado_en.desc&limit=8000'),GET('kruh_seguimiento?limit=3000'),GET('kruh_pedidos?select=items,creado_en,forma_pago&limit=3000')]);
+    const [ventas,seg,peds,leads]=await Promise.all([GET('kruh_ventas?order=creado_en.desc&limit=8000'),GET('kruh_seguimiento?limit=3000'),GET('kruh_pedidos?select=items,creado_en,forma_pago&limit=3000'),GET('kruh_leads?select=creado_en&limit=5000')]);
     const segSet={}; seg.forEach(s=>segSet[s.cliente]=s.contactado);
     const mesIni=new Date(); mesIni.setDate(1); mesIni.setHours(0,0,0,0);
     const by={};
@@ -760,9 +760,10 @@ const App={
     const cliHoy=new Set(ventas.filter(v=>this._diaKey(v.creado_en)===hoyK).map(v=>(v.cliente||'—').trim())).size;
     this.set(`<h1>Ventas</h1><div class="sub">🟢 = compró este mes · el 2º círculo lo marcas tú cuando le hagas seguimiento por WhatsApp</div>
       <div class="kpis"><div class="kpi dark"><b>${money(totMes)}</b><span>Ventas del mes</span></div>
-        <div class="kpi"><b>${arr.length}</b><span>Clientes registrados</span></div>
-        <div class="kpi"><b style="color:var(--acc)">${arr.filter(o=>new Date(o.primera)>=mesIni).length}</b><span>Clientes nuevos (mes)</span></div>
-        <div class="kpi"><b>${arr.filter(o=>o.estemes).length}</b><span>Activos (mes)</span></div></div>
+        <div class="kpi"><b>${leads.length}</b><span>Clientes registrados (CRM)</span></div>
+        <div class="kpi"><b style="color:var(--acc)">${leads.filter(l=>new Date(l.creado_en)>=mesIni).length}</b><span>Registrados nuevos (mes)</span></div>
+        <div class="kpi"><b>${arr.filter(o=>o.estemes).length}</b><span>Compraron este mes</span></div>
+        <div class="kpi"><b>${arr.length}</b><span>Han comprado alguna vez</span></div></div>
       ${this._ventaDia(mesV)}
       <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Formas de pago (mes)</div>
         <div class="row" style="justify-content:space-between"><span>💳 Tarjeta crédito</span><b>${money(tarTot)}</b></div>
