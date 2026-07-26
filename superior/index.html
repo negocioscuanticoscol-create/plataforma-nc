@@ -154,10 +154,10 @@ const App={
   async _start(){ $('login').classList.add('hide'); $('app').classList.remove('hide');
     $('rol').innerHTML=(this.rol==='admin'?'Admin':'Operador')+' · <a onclick="App.logout()">salir</a>';
     $('main').innerHTML='<div class="empty">Cargando…</div>'; await this._sync(); this.pintarNav(); this.go('dash'); },
-  pintarNav(){ const T=[['dash','Dashboard'],['inv','Inventarios'],['cli','Cliente'],['crm','CRM'],['ped','Pedidos'],['prog','Programación']];
+  pintarNav(){ const T=[['dash','Dashboard'],['inv','Inventarios'],['ref','Referencias'],['cli','Cliente'],['crm','CRM'],['ped','Pedidos'],['prog','Programación']];
     $('nav').innerHTML=T.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); window.scrollTo(0,0);
-    ({dash:this.vDash,inv:this.vInv,cli:this.vCli,crm:this.vCrm,ped:this.vPed,prog:this.vProg}[v]||this.vDash).call(this); },
+    ({dash:this.vDash,inv:this.vInv,ref:this.vRef,cli:this.vCli,crm:this.vCrm,ped:this.vPed,prog:this.vProg}[v]||this.vDash).call(this); },
   set(h){ $('main').innerHTML=h; },
   esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
   money(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
@@ -205,18 +205,39 @@ const App={
       <div><label>Nombre / línea</label><input id="i_nom" value="${this.esc(p.nombre||'')}"></div></div>
       <div class="g2"><div><label>Tamaño</label><select id="i_tam">${this.TAMANOS.map(t=>`<option ${p.tamano===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><label>Material</label><input id="i_mat" value="${this.esc(p.material||'')}" placeholder="Resortes, espuma…"></div></div>
-      <div class="g3"><div><label>Precio</label><input id="i_pre" type="number" value="${p.precio||0}"></div>
-      <div><label>Existencias</label><input id="i_exi" type="number" value="${p.existencias||0}"></div>
+      <div class="g2"><div><label>Costo compra</label><input id="i_cos" type="number" value="${p.costo||0}"></div>
+      <div><label>Costo más económico</label><input id="i_cmin" type="number" value="${p.costo_min||0}"></div></div>
+      <label>Precio de venta</label><input id="i_pre" type="number" value="${p.precio||0}" placeholder="Pendiente por definir">
+      <div class="g2"><div><label>Existencias</label><input id="i_exi" type="number" value="${p.existencias||0}"></div>
       <div><label>Stock mínimo</label><input id="i_min" type="number" value="${p.minimo||0}"></div></div>
       <button class="btn gold full" onclick="App.invSave('${id||''}')">Guardar</button>`); },
   async invSave(id){ const g=x=>($(x).value||'').trim();
-    const row={id:id||('i'+Date.now()),referencia:g('i_ref'),nombre:g('i_nom'),tamano:$('i_tam').value,material:g('i_mat'),precio:+$('i_pre').value||0,existencias:+$('i_exi').value||0,minimo:+$('i_min').value||0,creado_en:(this._inv.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    const row={id:id||('i'+Date.now()),referencia:g('i_ref'),nombre:g('i_nom'),tamano:$('i_tam').value,material:g('i_mat'),costo:+$('i_cos').value||0,costo_min:+$('i_cmin').value||0,precio:+$('i_pre').value||0,existencias:+$('i_exi').value||0,minimo:+$('i_min').value||0,creado_en:(this._inv.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     if(!row.referencia&&!row.nombre){alert('Referencia o nombre');return;}
     const i=this._inv.findIndex(x=>x.id===row.id); if(i>=0)this._inv[i]=row; else this._inv.unshift(row);
     await this._put('superior_inventario',row,this._inv); cerrar(); this.toast('Guardado'); this.vInv(); },
   async invMov(id,delta){ const p=this._inv.find(x=>x.id===id); if(!p)return; const v=prompt((delta>0?'Cuántas ENTRAN':'Cuántas SALEN')+':'); if(v===null)return; const q=+v||0; if(q<=0)return;
     p.existencias=(+p.existencias||0)+delta*q; await this._put('superior_inventario',p,this._inv); this.toast('Stock actualizado'); this.vInv(); },
   async invDel(id){ if(!confirm('¿Eliminar referencia?'))return; this._inv=this._inv.filter(x=>x.id!==id); await this._del('superior_inventario',id,this._inv); this.vInv(); },
+
+  /* ---------- REFERENCIAS (creación / catálogo de precios) ---------- */
+  vRef(){ const arr=this._inv; const sinVenta=arr.filter(p=>!(+p.precio>0)).length;
+    // agrupar por referencia
+    const grupos={}; arr.forEach(p=>{(grupos[p.referencia||p.nombre||'—']=grupos[p.referencia||p.nombre||'—']||[]).push(p);});
+    this.set(`<h1>Referencias</h1><div class="sub">Catálogo de colchones · costo de compra y precio de venta</div>
+      <button class="btn gold" onclick="App.invModal()">＋ Nueva referencia</button>
+      ${sinVenta?`<div class="card" style="border-left:4px solid var(--warn);background:var(--goldsoft);margin-top:12px"><b style="color:var(--warn)">⚠️ ${sinVenta} referencia(s) sin precio de venta</b><div class="hint" style="color:var(--warn)">Los costos ya están cargados; falta definir el precio de venta.</div></div>`:''}
+      <div style="margin-top:12px">${Object.keys(grupos).length?Object.entries(grupos).map(([g,items])=>`<div class="card">
+        <div class="nm" style="font-size:16px;margin-bottom:6px">${this.esc(g)}</div>
+        <div style="font-size:10.5px;color:var(--mut);display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr auto;gap:6px;padding:0 2px 4px;font-weight:700;text-transform:uppercase;letter-spacing:.03em"><span>Tamaño</span><span style="text-align:right">Costo</span><span style="text-align:right">Mín.</span><span style="text-align:right">Venta</span><span></span></div>
+        ${items.map(p=>`<div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr auto;gap:6px;align-items:center;padding:6px 2px;border-top:1px solid var(--line2);font-size:13px">
+          <span>${this.esc(p.tamano||'')}</span>
+          <span style="text-align:right">${this.money(p.costo)}</span>
+          <span style="text-align:right;color:var(--mut)">${this.money(p.costo_min)}</span>
+          <span style="text-align:right;font-weight:700;color:${+p.precio>0?'var(--ok)':'var(--bad)'}">${+p.precio>0?this.money(p.precio):'—'}</span>
+          <a onclick="App.invModal('${p.id}')" style="cursor:pointer;color:var(--mut)">✎</a></div>`).join('')}
+        </div>`).join(''):'<div class="empty">Sin referencias.</div>'}`);
+  },
 
   /* ---------- CLIENTE (ficha técnica) ---------- */
   vCli(){ const arr=this._cli;
