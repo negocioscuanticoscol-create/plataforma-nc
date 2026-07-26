@@ -741,7 +741,8 @@ const App={
     'alter table public.kruh_gastos add column if not exists tiene_iva  boolean default false;',
     'alter table public.kruh_gastos add column if not exists base       numeric default 0;',
     'alter table public.kruh_gastos add column if not exists iva        numeric default 0;',
-    'alter table public.kruh_gastos add column if not exists fecha_pago date;','',
+    'alter table public.kruh_gastos add column if not exists fecha_pago date;',
+    'alter table public.kruh_gastos add column if not exists detalle    text;','',
     'alter table public.kruh_dashboard add column if not exists gastos  numeric default 0;',
     'alter table public.kruh_dashboard add column if not exists cerrado boolean default false;'],
   _sinTabla(){ const sql=this.SQLGASTOS.join('\n');
@@ -790,7 +791,7 @@ const App={
       <div class="tbwrap"><table class="tb">
         <thead><tr>
           <th style="min-width:130px">Fecha</th><th style="min-width:165px">Proveedor</th><th style="min-width:110px">N° factura</th>
-          <th style="min-width:135px">Categoría</th><th style="min-width:170px">Descripción</th>
+          <th style="min-width:135px">Categoría</th><th style="min-width:170px">Descripción</th><th style="min-width:190px">Descripción adicional</th>
           <th style="min-width:85px">¿IVA?</th><th style="min-width:115px;text-align:right">Valor sin IVA</th>
           <th style="min-width:105px;text-align:right">IVA</th><th style="min-width:120px;text-align:right">Total</th>
           <th style="min-width:135px">Método de pago</th><th style="min-width:120px">Estado</th>
@@ -801,6 +802,7 @@ const App={
           <td><input value="${esc(g.factura||'')}" placeholder="N°" ${cel(g,'factura')}></td>
           <td><input list="g_cats" value="${esc(g.categoria||'')}" placeholder="Materia Prima…" ${cel(g,'categoria')}></td>
           <td><input value="${esc(g.concepto||'')}" placeholder="Qué se compró" ${cel(g,'concepto')}></td>
+          <td><input value="${esc(g.detalle||'')}" placeholder="Detalle, periodo, observación…" ${cel(g,'detalle')}></td>
           <td><select ${cel(g,'tiene_iva')}><option value="false" ${g.tiene_iva?'':'selected'}>No</option><option value="true" ${g.tiene_iva?'selected':''}>Sí</option></select></td>
           <td><input type="number" data-f="base" value="${g.base||''}" placeholder="0" ${cel(g,'base','oninput="App.gasSuma()"')}></td>
           <td><input type="number" data-f="iva" value="${g.iva||''}" placeholder="0" ${cel(g,'iva','oninput="App.gasSuma()"')}></td>
@@ -810,14 +812,14 @@ const App={
           <td><input type="date" value="${esc(g.fecha_pago||'')}" ${cel(g,'fecha_pago')}></td>
           <td><input value="${esc(g.nota||'')}" placeholder="—" ${cel(g,'nota')}></td>
           <td>${cerrado?'':`<a class="del" onclick="App.gasDel('${g.id}')">✕</a>`}</td></tr>`).join('')
-          :`<tr><td colspan="14" style="text-align:center;color:var(--mut);padding:26px 10px">Todavía no hay renglones en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> o a <b>＋ Cargar los fijos</b>.</td></tr>`}</tbody>
+          :`<tr><td colspan="15" style="text-align:center;color:var(--mut);padding:26px 10px">Todavía no hay renglones en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> o a <b>＋ Cargar los fijos</b>.</td></tr>`}</tbody>
         <tfoot>
-          <tr><td colspan="6" style="text-align:right">TOTALES DEL MES</td>
+          <tr><td colspan="7" style="text-align:right">TOTALES DEL MES</td>
             <td id="g_base" style="text-align:right">${money(tBase)}</td>
             <td id="g_iva" style="text-align:right">${money(tIva)}</td>
             <td id="g_total" style="text-align:right;font-size:17px;color:var(--acc)">${money(total)}</td>
             <td colspan="5"></td></tr>
-          <tr><td colspan="6" style="text-align:right;font-weight:400;color:var(--mut)">Pagado / Pendiente</td>
+          <tr><td colspan="7" style="text-align:right;font-weight:400;color:var(--mut)">Pagado / Pendiente</td>
             <td colspan="3" style="text-align:right;font-weight:400"><span style="color:var(--ok)">${money(pagado)}</span> / <span style="color:${pend?'var(--bad)':'var(--mut)'}">${money(pend)}</span></td>
             <td colspan="5"></td></tr>
         </tfoot></table></div>
@@ -872,9 +874,9 @@ const App={
     await this._dashSet(nom,{cerrado:false}); toast(nom+' reabierto'); this.vGastos(); },
   async gastosExcel(){ toast('Generando Excel…');
     const g=await GET('kruh_gastos?order=fecha.desc&limit=20000');
-    const cols=['Mes','Fecha','Proveedor','N° factura','Categoría','Descripción','¿Tiene IVA?','Valor sin IVA','IVA','Valor total','Método de pago','Estado','Fecha de pago','Notas'];
+    const cols=['Mes','Fecha','Proveedor','N° factura','Categoría','Descripción','Descripción adicional','¿Tiene IVA?','Valor sin IVA','IVA','Valor total','Método de pago','Estado','Fecha de pago','Notas'];
     const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-    const rows=g.map(r=>[this._gasFecha(r).slice(0,7),this._gasFecha(r),r.proveedor||'',r.factura||'',r.categoria||'',r.concepto||'',(r.tiene_iva?'Sí':'No'),(+r.base||0),(+r.iva||0),(+r.monto||0),r.forma_pago||'',(r.pagado===false?'Pendiente':'Pagado'),r.fecha_pago||'',r.nota||''].map(q).join(';'));
+    const rows=g.map(r=>[this._gasFecha(r).slice(0,7),this._gasFecha(r),r.proveedor||'',r.factura||'',r.categoria||'',r.concepto||'',r.detalle||'',(r.tiene_iva?'Sí':'No'),(+r.base||0),(+r.iva||0),(+r.monto||0),r.forma_pago||'',(r.pagado===false?'Pendiente':'Pagado'),r.fecha_pago||'',r.nota||''].map(q).join(';'));
     const csv='﻿'+cols.map(q).join(';')+'\r\n'+rows.join('\r\n');
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     a.download='kruh-gastos.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
