@@ -305,19 +305,42 @@ const App={
   pedModal(id){ const p=this._ped.find(x=>x.id===id)||{};
     modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Tomar'} pedido</h3>
       <label>Referencia</label>
-      <select id="p_ref" onchange="App.pedRefPick()">${p.referencia&&!this._inv.some(it=>((it.referencia||it.nombre||'')+(it.tamano?' · '+it.tamano:''))===p.referencia)?`<option selected>${this.esc(p.referencia)}</option>`:''}<option value="">— seleccionar referencia —</option>${this._inv.map(it=>{const lab=(it.referencia||it.nombre||'')+(it.tamano?' · '+it.tamano:'');return `<option value="${it.id}" data-lab="${this.esc(lab)}" data-pre="${+it.precio||0}" ${p.referencia===lab?'selected':''}>${this.esc(lab)}</option>`;}).join('')}</select>
+      <select id="p_ref" onchange="App.pedRefPick()"><option value="">— seleccionar referencia —</option><option value="__medida__" ${p.referencia==='A la medida'?'selected':''}>📐 A la medida (personalizado)</option>${this._inv.map(it=>{const lab=(it.referencia||it.nombre||'')+(it.tamano?' · '+it.tamano:'');return `<option value="${it.id}" data-lab="${this.esc(lab)}" data-pre="${+it.precio||0}" data-tam="${this.esc(it.tamano||'')}" data-mat="${this.esc(it.material||'')}" ${p.referencia===lab?'selected':''}>${this.esc(lab)}</option>`;}).join('')}</select>
       <label>Total</label><input id="p_tot" type="number" value="${p.total||0}">
+      <div id="pd_medida" style="display:${p.referencia==='A la medida'?'block':'none'};border:1px dashed var(--gold);border-radius:10px;padding:10px;margin-top:8px;background:var(--goldsoft)">
+        <div style="font-weight:700;color:var(--warn);font-size:12px;margin-bottom:6px">📐 Variables de programación (a la medida)</div>
+        <div class="g2"><div><label>Tamaño</label><select id="pd_tam">${this.TAMANOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div><label>Alto (cm)</label><input id="pd_alto"></div></div>
+        <div class="g2"><div><label>Tipo</label><select id="pd_tipo">${this.TIPOCOL.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div><label>Firmeza</label><select id="pd_fir">${this.FIRMEZA.map(t=>`<option>${t}</option>`).join('')}</select></div></div>
+        <div class="g3"><div><label>Tela</label><input id="pd_tela"></div><div><label>Color</label><input id="pd_color"></div>
+        <div><label>Pillow</label><select id="pd_pil"><option>No</option><option>Sí</option></select></div></div>
+        <label>Observaciones</label><textarea id="pd_obs"></textarea>
+      </div>
       <label>Cliente</label><select id="p_cli">${this._cli.length?this._cli.map(c=>`<option value="${c.id}" ${p.cliente_id===c.id?'selected':''}>${this.esc(c.nombre)}${c.local_num?' (Local '+this.esc(c.local_num)+')':''}</option>`).join(''):'<option value="">— crea clientes primero —</option>'}</select>
       <div class="g2"><div><label>Tipo de transporte</label><select id="p_tra">${this.TRANSPORTE.map(t=>`<option ${p.tipo_transporte===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><label>Forma de pago</label><select id="p_pag">${this.PAGO.map(t=>`<option ${p.forma_pago===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
       <button class="btn gold full" onclick="App.pedSave('${id||''}')">Guardar pedido</button>`); },
-  pedRefPick(){ const s=$('p_ref'),o=s.options[s.selectedIndex]; if(o&&o.value&&$('p_tot')&&+(o.dataset.pre)>0)$('p_tot').value=o.dataset.pre; },
-  async pedSave(id){ const cliId=$('p_cli').value; const cliNom=(this._cli.find(x=>x.id===cliId)||{}).nombre||'';
-    const rs=$('p_ref'),ro=rs.options[rs.selectedIndex]; let refLab=''; if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
+  pedRefPick(){ const s=$('p_ref'),o=s.options[s.selectedIndex]; const med=s.value==='__medida__';
+    if($('pd_medida'))$('pd_medida').style.display=med?'block':'none';
+    if(!med && o && o.value && $('p_tot') && +(o.dataset.pre)>0)$('p_tot').value=o.dataset.pre; },
+  async pedSave(id){ const cliId=$('p_cli').value; const cliObj=this._cli.find(x=>x.id===cliId)||{}; const cliNom=cliObj.nombre||'';
+    const rs=$('p_ref'),ro=rs.options[rs.selectedIndex]; const medida=rs.value==='__medida__';
+    let refLab=''; if(medida)refLab='A la medida'; else if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
+    if(!refLab){alert('Selecciona una referencia');return;}
     const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,tipo_transporte:$('p_tra').value,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
-    if(!row.referencia){alert('Referencia');return;}
     const i=this._ped.findIndex(x=>x.id===row.id); if(i>=0)this._ped[i]=row; else this._ped.unshift(row);
-    await this._put('superior_pedidos',row,this._ped); cerrar(); this.toast('Pedido guardado'); this.vPed(); },
+    await this._put('superior_pedidos',row,this._ped);
+    // Nuevo pedido -> crear programación automática (a la medida con variables, o desde la referencia)
+    if(!id){ const inv=medida?null:this._inv.find(x=>x.id===rs.value); const g=x=>($(x)?$(x).value:'').trim();
+      const prog={id:'pg'+Date.now(),pedido_id:row.id,cliente:cliNom,local_num:cliObj.local_num||'',referencia:refLab,cantidad:1,
+        tamano:medida?$('pd_tam').value:(inv?inv.tamano:''), alto:medida?g('pd_alto'):'',
+        tipo:medida?$('pd_tipo').value:(inv?(inv.material||''):''), firmeza:medida?$('pd_fir').value:'',
+        tela:medida?g('pd_tela'):'', color:medida?g('pd_color'):'', pillow:medida?$('pd_pil').value:'No',
+        observaciones:medida?g('pd_obs'):'', estado:'pendiente', creado_en:new Date().toISOString()};
+      this._prog.unshift(prog); await this._put('superior_programacion',prog,this._prog);
+    }
+    cerrar(); this.toast(id?'Pedido actualizado':'Pedido guardado y enviado a programación'); this.go(id?'ped':'prog'); },
   async pedDel(id){ if(!confirm('¿Eliminar pedido?'))return; this._ped=this._ped.filter(x=>x.id!==id); await this._del('superior_pedidos',id,this._ped); this.vPed(); },
   pedProgramar(id){ const p=this._ped.find(x=>x.id===id); if(!p)return; this.progModal('',{pedido_id:id,cliente:p.cliente,local_num:(this._cli.find(x=>x.id===p.cliente_id)||{}).local_num||'',referencia:p.referencia}); },
 
