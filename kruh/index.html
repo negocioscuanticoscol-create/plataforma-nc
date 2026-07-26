@@ -342,11 +342,11 @@ const App={
   /* ===================== PEDIDOS (catálogo con foto + carrito) ===================== */
   async vPedidos(){
     this.loading();
-    const [prods,peds,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_pedidos?order=creado_en.desc&limit=100'),GET('kruh_leads?select=nombre,telefono&limit=3000'),GET('kruh_pedidos?select=items&limit=20000')]);
+    const [prods,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_leads?select=nombre,telefono&limit=3000'),GET('kruh_pedidos?select=items&limit=20000')]);
     // los que más se venden, de primeras
     const vend={}; hist.forEach(p=>(p.items||[]).forEach(i=>{ if(i.producto_id)vend[i.producto_id]=(vend[i.producto_id]||0)+(+i.qty||0); }));
     prods.sort((a,b)=>(vend[b.id]||0)-(vend[a.id]||0)||String(a.nombre||'').localeCompare(String(b.nombre||'')));
-    this._prods=prods; this._peds=peds; this._cart=this._cart||{};
+    this._prods=prods; this._cart=this._cart||{};
     this._telMap={}; leads.forEach(l=>{ const t=(l.telefono||'').replace(/\D/g,''); if(t)this._telMap[t]=l.nombre; });
     this._pedPaint();
   },
@@ -383,11 +383,7 @@ const App={
           <button class="btn gh full" style="margin-top:6px" onclick="App._cart={};App._cartDom=0;App._pedPaint()">Vaciar</button>
         </div>
       </div>
-      <h1 style="font-size:18px;margin-top:22px">Pedidos guardados</h1>
-      ${(this._peds||[]).length?this._peds.map(p=>{const it=(p.items||[]);const tel=(p.telefono||'').replace(/\D/g,'');return `<div class="item"><div class="top"><div>
-        <div class="nm">${esc(p.cliente||'—')} ${tel?`· <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-size:12px">📱</a>`:''}</div>
-        <div class="mt">${it.map(i=>esc(i.nombre)+' ×'+i.qty).join(' · ')||''}${p.domicilio?' · domicilio '+money(p.domicilio):''} · 📅 ${(p.creado_en||'').slice(0,10)}</div></div>
-        <div class="nm" style="color:var(--acc)">${money(p.total)}</div></div></div>`;}).join(''):'<div class="empty">Aún sin pedidos guardados.</div>'}`);
+      `);
   },
   pedTelLookup(v){ const t=(v||'').replace(/\D/g,''); if(t.length<7)return; const nom=(this._telMap||{})[t]; if(nom){ this._cartCli=nom; if($('pd_cli'))$('pd_cli').value=nom; } },
   cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_fp'))this._cartFP=$('pd_fp').value;
