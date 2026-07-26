@@ -433,34 +433,39 @@ const App={
         <div class="nm">${esc(l.nombre||'—')}${tel?` · <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-weight:600">${esc(l.telefono)}</a>`:''}</div>
         <div class="mt">${l.tipo==='comunidad'?'👥 comunidad':('✨ '+esc(l.canal||'local'))}${l.ciudad?' · '+esc(l.ciudad):''} · ${ult?'🛒 última compra '+ult.slice(0,10):'sin compras aún'}
           ${this._listaNueva(l)?'<span class="tag pe">🏷️ precios nuevos</span>':''}${l.infopromos?'<span class="tag">📣 promos</span>':''}</div></div>
-        <a onclick="App.leadDel('${l.id}')" style="color:var(--bad);cursor:pointer">✕</a></div>
+        <div class="row" style="gap:10px;flex:none"><a onclick="App.leadModal('${l.id}')" style="color:var(--acc);cursor:pointer;font-weight:700">✎</a>
+          <a onclick="App.leadDel('${l.id}')" style="color:var(--bad);cursor:pointer">✕</a></div></div>
         <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><span class="dim" style="font-size:11px;align-self:center">Compra:</span>${this.CATCOMPRA.map(c=>`<span class="et ${cats.includes(c)?'on':''}" onclick="App.leadCat('${l.id}','${c}')">${c}</span>`).join('')}</div></div>`;}).join(''):'<div class="empty">Sin leads en este cajón.</div>'}</div>`);
   },
   ORIGEN:[['registrado','Cliente registrado (comunidad)','comunidad','local'],['nuevo','Cliente nuevo (local)','nuevo','local'],['digital','Digital','nuevo','digital'],['organico','Orgánico','nuevo','organico']],
-  leadModal(){ const caj=this._crmCajon||'nuevos', defO=caj==='comunidad'?'registrado':'nuevo';
-    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Registro de cliente</h3>
-    <div class="g2"><div><label>Nombre</label><input id="l_nom"></div>
-    <div><label>Teléfono</label><input id="l_tel" inputmode="numeric" oninput="App.leadTel()" placeholder="3001234567"></div></div>
+  leadModal(id){ const l=id?((this._leads||[]).find(x=>x.id===id)||{}):{};
+    const caj=this._crmCajon||'nuevos';
+    const actual=this.ORIGEN.find(o=>o[2]===l.tipo&&o[3]===(l.canal||'local'));
+    const defO=id?((actual||[])[0]||'nuevo'):(caj==='comunidad'?'registrado':'nuevo');
+    this._leadDup=null; this._leadEdit=id||'';
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar cliente':'Registro de cliente'}</h3>
+    <div class="g2"><div><label>Nombre</label><input id="l_nom" value="${esc(l.nombre||'')}"></div>
+    <div><label>Teléfono</label><input id="l_tel" inputmode="numeric" oninput="App.leadTel()" placeholder="3001234567" value="${esc(l.telefono||'')}"></div></div>
     <div id="l_dup"></div>
-    <label>Dirección</label><input id="l_dir">
-    <div class="g2"><div><label>Ciudad</label><input id="l_ciu"></div><div><label>Instagram</label><input id="l_ig" placeholder="@usuario"></div></div>
-    <label>Cédula / Ciudadanía</label><input id="l_ced">
-    <label>Interés / notas</label><input id="l_int">
+    <label>Dirección</label><input id="l_dir" value="${esc(l.direccion||'')}">
+    <div class="g2"><div><label>Ciudad</label><input id="l_ciu" value="${esc(l.ciudad||'')}"></div><div><label>Instagram</label><input id="l_ig" placeholder="@usuario" value="${esc(l.instagram||'')}"></div></div>
+    <label>Cédula / Ciudadanía</label><input id="l_ced" value="${esc(l.cedula||'')}">
+    <label>Interés / notas</label><input id="l_int" value="${esc(l.interes||'')}">
     <label>Origen</label><select id="l_org">${this.ORIGEN.map(o=>`<option value="${o[0]}" ${o[0]===defO?'selected':''}>${o[1]}</option>`).join('')}</select>
     <div style="margin-top:11px;border:1.5px solid var(--acc);background:#fdf2e6;border-radius:11px;padding:11px 13px">
       <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);margin-bottom:7px">Socios del Club del Pan</div>
       <label style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:500;margin:0">
-        <input type="checkbox" id="l_promos" style="width:19px;height:19px;accent-color:var(--acc)">📣 Quiere info y promociones</label>
+        <input type="checkbox" id="l_promos" ${l.infopromos?'checked':''} style="width:19px;height:19px;accent-color:var(--acc)">📣 Quiere info y promociones</label>
       <label style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:14px;cursor:pointer;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:500;margin:0">
-        <input type="checkbox" id="l_nuevo" style="width:19px;height:19px;accent-color:var(--acc)">✨ Cliente nuevo</label>
+        <input type="checkbox" id="l_nuevo" ${l.cliente_nuevo?'checked':''} style="width:19px;height:19px;accent-color:var(--acc)">✨ Cliente nuevo</label>
     </div>
-    <button class="btn acc full" onclick="App.leadSave()">Guardar cliente</button>`); },
+    <button class="btn acc full" onclick="App.leadSave('${id||''}')">${id?'Guardar cambios':'Guardar cliente'}</button>`); },
   /* avisa si el teléfono ya está registrado en el CRM */
   _telKey(t){ const d=String(t||'').replace(/\D/g,''); return d.length>10?d.slice(-10):d; },
   leadTel(){ const d=$('l_dup'); if(!d)return;
     const k=this._telKey($('l_tel')?$('l_tel').value:'');
     if(k.length<7){ d.innerHTML=''; this._leadDup=null; return; }
-    const y=(this._leads||[]).find(l=>this._telKey(l.telefono)===k);
+    const y=(this._leads||[]).find(l=>l.id!==this._leadEdit&&this._telKey(l.telefono)===k);
     this._leadDup=y||null;
     d.innerHTML=y
       ? `<div style="margin:6px 0 2px;border:1.5px solid var(--bad);background:var(--badbg);border-radius:9px;padding:8px 11px;font-size:13px">
@@ -470,17 +475,22 @@ const App={
       : `<div style="margin:6px 0 2px;font-size:12.5px;color:var(--ok);font-weight:700">✔ Teléfono libre, no está registrado</div>`; },
   /* nueva lista: check de promos, check de cliente nuevo, u origen = Cliente nuevo */
   _listaNueva(l){ return !!(l.infopromos||l.cliente_nuevo||((l.tipo==='nuevo')&&((l.canal||'local')==='local'))); },
-  async leadSave(){ const org=this.ORIGEN.find(o=>o[0]===$('l_org').value)||['','','nuevo','local'];
+  async leadSave(id){ const org=this.ORIGEN.find(o=>o[0]===$('l_org').value)||['','','nuevo','local'];
     const b={nombre:$('l_nom').value.trim(),telefono:$('l_tel').value.trim(),direccion:$('l_dir').value.trim(),ciudad:$('l_ciu').value.trim(),instagram:$('l_ig').value.trim(),cedula:$('l_ced').value.trim(),interes:$('l_int').value.trim(),etapa:'contactado',tipo:org[2],canal:org[3],
       infopromos:!!($('l_promos')&&$('l_promos').checked), cliente_nuevo:!!($('l_nuevo')&&$('l_nuevo').checked)};
     if(!b.nombre){alert('Nombre');return;}
     const dup=this._leadDup;
     if(dup && !confirm('El teléfono '+($('l_tel').value||'')+' ya está registrado a nombre de '+(dup.nombre||'—')+'.\n\n¿Guardar de todos modos y dejarlo repetido?'))return;
-    let r=await POST('kruh_leads',b);
-    if(!r){ const {infopromos,cliente_nuevo,...base}=b; r=await POST('kruh_leads',base);   // faltan las columnas nuevas
-      if(r) toast('⚠️ Guardado, pero falta correr el SQL de precios'); }
-    if(!r){ toast('⚠️ No se pudo registrar el cliente'); return; }
-    this._leadDup=null; cerrar(); toast('Cliente registrado'); this.vCrm(); },
+    let r;
+    if(id){ r=await PATCH('kruh_leads?id=eq.'+id,b);
+      if(r&&!r.ok){ const {infopromos,cliente_nuevo,...base}=b; r=await PATCH('kruh_leads?id=eq.'+id,base);
+        if(r&&r.ok) toast('⚠️ Guardado, pero falta correr el SQL de socios'); }
+      if(!r||!r.ok){ toast('⚠️ No se pudo guardar el cliente'); return; } }
+    else { r=await POST('kruh_leads',b);
+      if(!r){ const {infopromos,cliente_nuevo,...base}=b; r=await POST('kruh_leads',base);   // faltan las columnas nuevas
+        if(r) toast('⚠️ Guardado, pero falta correr el SQL de socios'); }
+      if(!r){ toast('⚠️ No se pudo registrar el cliente'); return; } }
+    this._leadDup=null; cerrar(); toast(id?'Cliente actualizado':'Cliente registrado'); this.vCrm(); },
   async leadEtapa(id,e){ await PATCH('kruh_leads?id=eq.'+id,{etapa:e}); this.vCrm(); },
   async leadCat(id,cat){ const l=(this._leads||[]).find(x=>x.id===id)||{}; let cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);
     if(cats.includes(cat))cats=cats.filter(c=>c!==cat); else cats.push(cat); const val=cats.join(', ');
