@@ -71,6 +71,18 @@
   .cajon{flex:1;min-width:130px;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--card);cursor:pointer;text-align:center;box-shadow:var(--sh)}
   .cajon.on{background:var(--acc);color:#fff;border-color:var(--acc)}
   .cajon b{display:block;font-size:22px;font-family:Fraunces,serif}
+  .tbwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;box-shadow:var(--sh);background:var(--card)}
+  .tb{width:100%;border-collapse:collapse;font-size:13px;min-width:720px}
+  .tb th,.tb td{padding:6px 8px;border-bottom:1px solid var(--line2);text-align:left;vertical-align:middle}
+  .tb thead th{background:var(--paper);font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);white-space:nowrap;position:sticky;top:0}
+  .tb tbody tr:hover{background:#fffaf0}
+  .tb tfoot td{background:var(--paper);font-weight:700;border-bottom:none;border-top:2px solid var(--line);font-size:12.5px}
+  .tb input,.tb select{padding:6px 7px;font-size:13px;border-radius:7px;border:1px solid transparent;background:transparent;width:100%}
+  .tb input:hover,.tb select:hover{border-color:var(--line);background:#fff}
+  .tb input:focus,.tb select:focus{border-color:var(--acc);background:#fff}
+  .tb input:disabled,.tb select:disabled{color:var(--ink2);opacity:1;-webkit-text-fill-color:var(--ink2)}
+  .tb input[type=number]{text-align:right;font-weight:700}
+  .tb .del{color:var(--bad);cursor:pointer;font-weight:700;padding:0 4px}
   @media(max-width:640px){.g2,.g3{grid-template-columns:1fr}}
 </style>
 
@@ -129,7 +141,7 @@ const App={
   /* ===================== DASHBOARD ===================== */
   async vDashboard(){
     this.loading();
-    const [meses,leads,ventas,peds,recs]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en&limit=5000'),GET('kruh_ventas?select=monto,creado_en&limit=8000'),GET('kruh_pedidos?select=items,creado_en&limit=3000'),GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000')]);
+    const [meses,leads,ventas,peds,recs,gastos]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en&limit=5000'),GET('kruh_ventas?select=monto,creado_en&limit=8000'),GET('kruh_pedidos?select=items,creado_en&limit=3000'),GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000'),GET('kruh_gastos?select=monto,fecha,creado_en&limit=5000')]);
     this._dash=meses;
     const now=new Date(), cm=now.getMonth()+1, mesIni=new Date(now.getFullYear(),now.getMonth(),1), mesNom=this.MESNOM[cm]||'';
     const costoProd={}; recs.forEach(r=>{costoProd[r.producto_id]=(costoProd[r.producto_id]||0)+(+r.cantidad||0)*(+r.costo_unit||0);});
@@ -139,13 +151,20 @@ const App={
     const auto=liveVentas>0;
     const ventasM=auto?liveVentas:(+manual.ventas||0), costo=liveCosto>0?liveCosto:(+manual.costo||0);
     const ubruta=ventasM-costo, margen=ventasM>0?ubruta/ventasM*100:0, meta=+manual.meta||40000000;
+    const ymAct=now.getFullYear()+'-'+String(cm).padStart(2,'0');
+    const gastoLive=gastos.filter(g=>(g.fecha||g.creado_en||'').slice(0,7)===ymAct).reduce((a,g)=>a+(+g.monto||0),0);
+    const gastosM=manual.cerrado?(+manual.gastos||0):(gastoLive||(+manual.gastos||0));
+    const uneta=ubruta-gastosM;
     const acumMC=meses.reduce((a,m)=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();return a+((es?ventasM:(+m.ventas||0))-(es?costo:(+m.costo||0)));},0);
+    const acumGas=meses.reduce((a,m)=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();return a+(es?gastosM:(+m.gastos||0));},0);
     const registrados=leads.length, nuevosMes=leads.filter(l=>new Date(l.creado_en)>=mesIni).length;
     this.set(`<h1>Dashboard</h1><div class="sub">${esc(mesNom)} ${auto?'· <span style="color:var(--ok);font-weight:700">automático con las ventas del mes</span>':'· simulado (al ingresar pedidos se calcula solo)'} · meta ${money(meta)}</div>
       <div class="kpis">
         <div class="kpi dark"><b>${money(ventasM)}</b><span>Ventas del mes</span></div>
         <div class="kpi"><b>${money(costo)}</b><span>Costo</span></div>
         <div class="kpi"><b style="color:var(--ok)">${money(ubruta)}</b><span>Utilidad bruta</span></div>
+        <div class="kpi"><b style="color:var(--warn)">${money(gastosM)}</b><span>Gastos del mes${manual.cerrado?' 🔒':''}</span></div>
+        <div class="kpi"><b style="color:${uneta>=0?'var(--ok)':'var(--bad)'}">${money(uneta)}</b><span>Utilidad neta</span></div>
         <div class="kpi"><b>${margen.toFixed(0)}%</b><span>Margen contribución</span></div>
         <div class="kpi"><b>${registrados}</b><span>Clientes registrados</span></div>
         <div class="kpi"><b style="color:var(--acc)">${nuevosMes}</b><span>Clientes nuevos (mes)</span></div>
@@ -155,10 +174,13 @@ const App={
         <div class="hint">${meta>ventasM?('Faltan '+money(meta-ventasM)+' para la meta'):'¡Meta cumplida! 🎉'}</div></div>
       <div class="card"><div style="font-family:Fraunces,serif;font-size:16px">Margen de contribución acumulado</div>
         <b style="font-size:24px;color:var(--acc);font-family:Fraunces,serif">${money(acumMC)}</b>
-        <div class="hint">Suma de (ventas − costo) de todos los meses. Al cambiar precios de items, este acumulado se mueve.</div></div>
+        <div class="hint">Suma de (ventas − costo) de todos los meses. Al cambiar precios de items, este acumulado se mueve.</div>
+        <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:8px;padding-top:8px"><span class="dim">Gastos acumulados</span><b style="color:var(--warn)">${money(acumGas)}</b></div>
+        <div class="row" style="justify-content:space-between"><span>Utilidad neta acumulada</span><b style="color:${acumMC-acumGas>=0?'var(--ok)':'var(--bad)'}">${money(acumMC-acumGas)}</b></div></div>
       <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
-      ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=es?ventasM:(+m.ventas||0),cc=es?costo:(+m.costo||0),mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':''}</div>
-        <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''} · meta ${money(mt)}${es?` · <a onclick="App.dashDetalleMes()" style="color:var(--acc);cursor:pointer;font-weight:700">ver detalle →</a>`:''}</div></div>
+      ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=es?ventasM:(+m.ventas||0),cc=es?costo:(+m.costo||0),gg=es?gastosM:(+m.gastos||0),nn=v-cc-gg,mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':''}${m.cerrado?'<span class="tag">🔒 gastos cerrados</span>':''}</div>
+        <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''}${gg?' · gastos '+money(gg):''} · meta ${money(mt)}${es?` · <a onclick="App.dashDetalleMes()" style="color:var(--acc);cursor:pointer;font-weight:700">ver detalle →</a>`:''}</div>
+        <div class="mt">Utilidad neta <b style="color:${nn>=0?'var(--ok)':'var(--bad)'}">${money(nn)}</b></div></div>
         ${this.esAdmin?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
         <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div></div>`;}).join('')}
       ${this.esAdmin?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
@@ -696,74 +718,84 @@ const App={
     a.download='kruh-ventas-contabilidad.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
     toast('Excel descargado ('+v.length+' ventas)'); },
 
-  /* ===================== GASTOS (luz, agua, arriendo y demás) ===================== */
-  CATGASTO:['Luz','Agua','Arriendo','Gas','Internet','Teléfono','Nómina','Aseo','Mantenimiento','Impuestos','Transporte','Otros'],
-  ICOGASTO:{'Luz':'💡','Agua':'💧','Arriendo':'🏠','Gas':'🔥','Internet':'🌐','Teléfono':'📞','Nómina':'👷','Aseo':'🧼','Mantenimiento':'🔧','Impuestos':'🏛️','Transporte':'🚐','Otros':'🧾'},
+  /* ===================== GASTOS (tabla del mes + cierre mensual) ===================== */
+  GASFIJOS:['Luz','Agua','Arriendo','Gas','Internet','Teléfono','Nómina','Aseo'],
+  FPAGO:['Efectivo','Nequi','Transferencia','Tarjeta crédito','Débito automático'],
   _gasFecha(g){ return (g.fecha||g.creado_en||'').slice(0,10); },
+  _ymNom(ym){ return this.MESNOM[+String(ym||'').slice(5,7)]||''; },
+  _diaDef(ym){ const h=new Date(), hoy=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0'); return hoy.slice(0,7)===ym?hoy:ym+'-01'; },
   async vGastos(){
     this.loading();
-    const gastos=await GET('kruh_gastos?order=fecha.desc&limit=5000');
+    const [gastos,dash]=await Promise.all([GET('kruh_gastos?order=creado_en&limit=5000'),GET('kruh_dashboard?order=orden&limit=24')]);
     this._gastos=gastos;
     const mes=this._gasMes||this._mesActual(); this._gasMes=mes;
-    const meses=[...new Set(gastos.map(g=>this._gasFecha(g).slice(0,7)).filter(Boolean))].sort().reverse();
-    if(!meses.includes(mes))meses.unshift(mes);
-    const delMes=gastos.filter(g=>this._gasFecha(g).slice(0,7)===mes);
-    const cats=[...new Set(this.CATGASTO.concat(gastos.map(g=>g.categoria).filter(Boolean)))];
-    const cat=this._gasCat||'todos';
-    const totCat={}; delMes.forEach(g=>{ const c=g.categoria||'Otros'; totCat[c]=(totCat[c]||0)+(+g.monto||0); });
-    const total=delMes.reduce((a,g)=>a+(+g.monto||0),0);
-    const pend=delMes.filter(g=>g.pagado===false).reduce((a,g)=>a+(+g.monto||0),0);
-    const lista=(cat==='todos'?delMes:delMes.filter(g=>(g.categoria||'Otros')===cat)).slice().sort((a,b)=>this._gasFecha(b).localeCompare(this._gasFecha(a)));
-    this.set(`<h1>Gastos</h1><div class="sub">Luz, agua, arriendo y lo demás · se guardan por mes y por categoría</div>
-      <div class="kpis">
-        <div class="kpi dark"><b>${money(total)}</b><span>Gastos del mes</span></div>
-        <div class="kpi"><b>${delMes.length}</b><span>Registros del mes</span></div>
-        <div class="kpi"><b style="color:${pend?'var(--bad)':'var(--ok)'}">${money(pend)}</b><span>Pendiente por pagar</span></div>
-      </div>
+    const meses=[...new Set(gastos.map(g=>this._gasFecha(g).slice(0,7)).filter(Boolean).concat([mes,this._mesActual()]))].sort().reverse();
+    const filas=gastos.filter(g=>this._gasFecha(g).slice(0,7)===mes).sort((a,b)=>(a.creado_en||'').localeCompare(b.creado_en||''));
+    const total=filas.reduce((a,g)=>a+(+g.monto||0),0);
+    const pagado=filas.filter(g=>g.pagado!==false).reduce((a,g)=>a+(+g.monto||0),0), pend=total-pagado;
+    const nom=this._ymNom(mes), drow=dash.find(d=>(d.mes||'').toLowerCase()===nom.toLowerCase())||{};
+    const cerrado=!!drow.cerrado, ro=cerrado?'disabled':'';
+    this.set(`<h1>Gastos</h1><div class="sub">Llena la tabla renglón por renglón · abajo va la suma · al cerrar el mes queda grabado en el Dashboard</div>
+      ${cerrado?`<div class="card" style="border-left:4px solid var(--ok);background:var(--okbg)"><b style="color:var(--ok)">🔒 ${esc(nom)} está cerrado</b> · total ${money(+drow.gastos||0)} ya grabado en el Dashboard.${this.puedeGestionar?` <a onclick="App.gasReabrir()" style="color:var(--acc);cursor:pointer;font-weight:700">reabrir</a>`:''}</div>`:''}
       <div class="row" style="gap:8px;margin-bottom:12px;align-items:center"><span class="dim" style="font-size:12px">Mes:</span>
-        <select onchange="App._gasMes=this.value;App.vGastos()" style="width:auto">${meses.map(m=>`<option ${m===mes?'selected':''}>${esc(m)}</option>`).join('')}</select>
-        <button class="btn acc sm" onclick="App.gasModal()">＋ Registrar gasto</button>
+        <select onchange="App._gasMes=this.value;App.vGastos()" style="width:auto">${meses.map(m=>`<option value="${esc(m)}" ${m===mes?'selected':''}>${esc(this._ymNom(m))} ${esc(m.slice(0,4))}</option>`).join('')}</select>
+        ${cerrado?'':`<button class="btn acc sm" onclick="App.gasNueva()">＋ Nuevo gasto</button>${filas.length?'':`<button class="btn gh sm" onclick="App.gasFijos()">＋ Cargar los fijos</button>`}`}
         <button class="btn gh sm" onclick="App.gastosExcel()">⬇ Excel</button></div>
-      <div class="row" style="gap:6px;margin-bottom:12px">
-        <span class="et ${cat==='todos'?'on':''}" onclick="App._gasCat='todos';App.vGastos()">Todos (${money(total)})</span>
-        ${cats.map(c=>`<span class="et ${cat===c?'on':''}" onclick="App._gasCat='${esc(c)}';App.vGastos()">${this.ICOGASTO[c]||'🧾'} ${esc(c)}${totCat[c]?' · '+money(totCat[c]):''}</span>`).join('')}</div>
-      ${lista.length?lista.map(g=>`<div class="item" style="${g.pagado===false?'border-left:3px solid var(--warn)':''}"><div class="top"><div>
-        <div class="nm">${this.ICOGASTO[g.categoria]||'🧾'} ${esc(g.categoria||'Otros')}${g.concepto?' · '+esc(g.concepto):''} ${g.pagado===false?'<span class="tag pe">por pagar</span>':'<span class="tag np">pagado</span>'}</div>
-        <div class="mt">📅 ${esc(this._gasFecha(g))}${g.proveedor?' · '+esc(g.proveedor):''}${g.forma_pago?' · '+esc(g.forma_pago):''}${g.nota?' · '+esc(g.nota):''}</div></div>
-        <div style="text-align:right;white-space:nowrap"><div class="nm" style="color:var(--acc)">${money(g.monto)}</div>
-          <a onclick="App.gasModal('${g.id}')" style="color:var(--acc);cursor:pointer;margin-right:6px">✎</a><a onclick="App.gasDel('${g.id}')" style="color:var(--bad);cursor:pointer">✕</a></div></div></div>`).join('')
-        :'<div class="empty">Sin gastos en este mes/categoría. Registra el primero.</div>'}`);
+      <div class="tbwrap"><table class="tb">
+        <thead><tr><th style="min-width:150px">Gasto</th><th style="min-width:135px">Proveedor / entidad</th><th style="min-width:135px">Fecha</th><th style="min-width:135px">Forma de pago</th><th style="min-width:120px">Estado</th><th style="min-width:110px;text-align:right">Monto</th><th></th></tr></thead>
+        <tbody>${filas.length?filas.map(g=>`<tr>
+          <td><input value="${esc(g.concepto||'')}" placeholder="Luz, Agua, Arriendo…" ${ro} onchange="App.gasCell('${g.id}','concepto',this.value)"></td>
+          <td><input value="${esc(g.proveedor||'')}" placeholder="Codensa, EAAB…" ${ro} onchange="App.gasCell('${g.id}','proveedor',this.value)"></td>
+          <td><input type="date" value="${esc(g.fecha||this._gasFecha(g))}" ${ro} onchange="App.gasCell('${g.id}','fecha',this.value)"></td>
+          <td><select ${ro} onchange="App.gasCell('${g.id}','forma_pago',this.value)">${this.FPAGO.map(f=>`<option ${g.forma_pago===f?'selected':''}>${f}</option>`).join('')}</select></td>
+          <td><select ${ro} onchange="App.gasCell('${g.id}','pagado',this.value)"><option value="true" ${g.pagado!==false?'selected':''}>✔ Pagado</option><option value="false" ${g.pagado===false?'selected':''}>⏳ Pendiente</option></select></td>
+          <td><input type="number" data-monto value="${g.monto||''}" placeholder="0" ${ro} oninput="App.gasSuma()" onchange="App.gasCell('${g.id}','monto',this.value)"></td>
+          <td>${cerrado?'':`<a class="del" onclick="App.gasDel('${g.id}')">✕</a>`}</td></tr>`).join('')
+          :`<tr><td colspan="7" style="text-align:center;color:var(--mut);padding:26px 10px">Todavía no hay renglones en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> o a <b>＋ Cargar los fijos</b>.</td></tr>`}</tbody>
+        <tfoot>
+          <tr><td colspan="5" style="text-align:right">TOTAL GASTOS DEL MES</td><td id="g_total" style="text-align:right;font-size:17px;color:var(--acc)">${money(total)}</td><td></td></tr>
+          <tr><td colspan="5" style="text-align:right;font-weight:400;color:var(--mut)">Pagado / Pendiente</td><td style="text-align:right;font-weight:400"><span style="color:var(--ok)">${money(pagado)}</span> / <span style="color:${pend?'var(--bad)':'var(--mut)'}">${money(pend)}</span></td><td></td></tr>
+        </tfoot></table></div>
+      ${cerrado||!filas.length?'':`<button class="btn full" style="margin-top:12px;background:var(--ok)" onclick="App.gasCerrar()">🔒 Cerrar ${esc(nom)} y pasarlo al Dashboard</button>`}
+      <div class="hint">Cada renglón se guarda solo al salir de la casilla. Al cerrar el mes, el total queda grabado en el Dashboard y la tabla se bloquea; los meses se cierran uno por uno.</div>`);
   },
-  gasModal(id){ const g=(this._gastos||[]).find(x=>x.id===id)||{};
-    const cats=[...new Set(this.CATGASTO.concat((this._gastos||[]).map(x=>x.categoria).filter(Boolean)))];
-    const hoy=new Date(), fdef=g.fecha||this._gasFecha(g)||(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0'));
-    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Registrar'} gasto</h3>
-      <div class="g2"><div><label>Categoría</label>
-        <select id="g_cat" onchange="App.gasOtra()">${cats.map(c=>`<option ${g.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="__otra">＋ Otra…</option></select>
-        <input id="g_cat2" placeholder="Nombre de la categoría nueva" style="display:none;margin-top:6px"></div>
-      <div><label>Monto</label><input id="g_mon" type="number" value="${g.monto||''}" placeholder="0"></div></div>
-      <label>Concepto</label><input id="g_con" value="${esc(g.concepto||'')}" placeholder="Recibo de agosto, factura 1234…">
-      <div class="g2"><div><label>Fecha</label><input id="g_fec" type="date" value="${esc(fdef)}"></div>
-      <div><label>Proveedor / entidad</label><input id="g_prov" value="${esc(g.proveedor||'')}" placeholder="Codensa, EAAB, arrendador…"></div></div>
-      <div class="g2"><div><label>Forma de pago</label><select id="g_fp">${['Efectivo','Nequi','Transferencia','Tarjeta crédito','Débito automático'].map(f=>`<option ${g.forma_pago===f?'selected':''}>${f}</option>`).join('')}</select></div>
-      <div><label>¿Ya está pagado?</label><select id="g_pag"><option value="true" ${g.pagado!==false?'selected':''}>Sí</option><option value="false" ${g.pagado===false?'selected':''}>No, pendiente</option></select></div></div>
-      <label>Nota</label><input id="g_not" value="${esc(g.nota||'')}">
-      <button class="btn acc full" onclick="App.gasSave('${id||''}')">Guardar gasto</button>
-      ${id?`<button class="btn gh full" style="color:var(--bad)" onclick="App.gasDel('${id}')">Eliminar</button>`:''}`); },
-  gasOtra(){ const s=$('g_cat'), i=$('g_cat2'); if(!s||!i)return; const otra=s.value==='__otra'; i.style.display=otra?'block':'none'; if(otra)i.focus(); },
-  async gasSave(id){ const s=$('g_cat'); let cat=s.value==='__otra'?($('g_cat2').value||'').trim():s.value;
-    if(!cat){alert('Ponle categoría al gasto');return;}
-    const monto=+$('g_mon').value||0; if(monto<=0){alert('Pon el monto');return;}
-    const b={categoria:cat,concepto:$('g_con').value.trim(),monto,fecha:$('g_fec').value||null,proveedor:$('g_prov').value.trim(),forma_pago:$('g_fp').value,pagado:$('g_pag').value==='true',nota:$('g_not').value.trim()};
-    if(id)await PATCH('kruh_gastos?id=eq.'+id,b); else await POST('kruh_gastos',b);
-    if(b.fecha)this._gasMes=b.fecha.slice(0,7);
-    cerrar(); toast('Gasto guardado'); this.vGastos(); },
-  async gasDel(id){ if(!this._okBorrar())return; await DEL('kruh_gastos?id=eq.'+id); cerrar(); toast('Gasto eliminado'); this.vGastos(); },
+  gasSuma(){ let t=0; document.querySelectorAll('#main input[data-monto]').forEach(i=>t+=+i.value||0); if($('g_total'))$('g_total').textContent=money(t); },
+  async gasCell(id,campo,val){ const g=(this._gastos||[]).find(x=>x.id===id); let v;
+    if(campo==='monto')v=+val||0; else if(campo==='pagado')v=(val==='true'); else if(campo==='fecha')v=val||null; else v=String(val||'').trim();
+    if(g)g[campo]=v; await PATCH('kruh_gastos?id=eq.'+id,{[campo]:v});
+    if(campo==='fecha'&&v&&String(v).slice(0,7)!==this._gasMes){ toast('Se movió a '+this._ymNom(String(v).slice(0,7))); return this.vGastos(); }
+    this.gasSuma(); },
+  async gasNueva(){ const mes=this._gasMes||this._mesActual();
+    await POST('kruh_gastos',{concepto:'',proveedor:'',monto:0,fecha:this._diaDef(mes),forma_pago:'Efectivo',pagado:false});
+    await this.vGastos();
+    const filas=document.querySelectorAll('#main .tb tbody tr'), ult=filas[filas.length-1];
+    if(ult){ const i=ult.querySelector('input'); if(i){i.focus(); i.scrollIntoView({block:'center'});} } },
+  async gasFijos(){ const mes=this._gasMes||this._mesActual(), f=this._diaDef(mes);
+    const ya=(this._gastos||[]).filter(g=>this._gasFecha(g).slice(0,7)===mes).map(g=>(g.concepto||'').toLowerCase());
+    const faltan=this.GASFIJOS.filter(c=>!ya.includes(c.toLowerCase()));
+    if(!faltan.length){ toast('Los fijos ya están'); return; }
+    for(const c of faltan) await POST('kruh_gastos',{concepto:c,proveedor:'',monto:0,fecha:f,forma_pago:'Efectivo',pagado:false});
+    toast(faltan.length+' renglones creados'); this.vGastos(); },
+  async gasDel(id){ const g=(this._gastos||[]).find(x=>x.id===id)||{};
+    if((+g.monto||0)>0 && !this._okBorrar())return;
+    await DEL('kruh_gastos?id=eq.'+id); this._gastos=(this._gastos||[]).filter(x=>x.id!==id); this.vGastos(); },
+  async _dashSet(mesNom,campos){ const ex=(await GET('kruh_dashboard?mes=eq.'+encodeURIComponent(mesNom)+'&select=id'))[0];
+    if(ex) return PATCH('kruh_dashboard?id=eq.'+ex.id,campos);
+    const o=this.MESNOM.indexOf(mesNom); return POST('kruh_dashboard',Object.assign({mes:mesNom,orden:o>0?o:99},campos)); },
+  async gasCerrar(){ if(!this.puedeGestionar){ alert('Solo Admin o Gerencia cierran el mes'); return; }
+    const mes=this._gasMes, nom=this._ymNom(mes); if(!nom){ alert('Mes inválido'); return; }
+    const filas=(this._gastos||[]).filter(g=>this._gasFecha(g).slice(0,7)===mes);
+    const total=filas.reduce((a,g)=>a+(+g.monto||0),0), sin=filas.filter(g=>g.pagado===false).length;
+    if(!confirm('Cerrar '+nom+' con '+money(total)+' en gastos'+(sin?' ('+sin+' sin pagar)':'')+'.\n\nLa tabla queda de solo lectura y el total pasa al Dashboard. ¿Seguro?'))return;
+    await this._dashSet(nom,{gastos:total,cerrado:true}); toast(nom+' cerrado · ya está en el Dashboard'); this.vGastos(); },
+  async gasReabrir(){ if(!this.puedeGestionar)return; const nom=this._ymNom(this._gasMes);
+    if(!confirm('¿Reabrir '+nom+' para volver a editarlo?'))return;
+    await this._dashSet(nom,{cerrado:false}); toast(nom+' reabierto'); this.vGastos(); },
   async gastosExcel(){ toast('Generando Excel…');
     const g=await GET('kruh_gastos?order=fecha.desc&limit=20000');
-    const cols=['Fecha','Categoría','Concepto','Proveedor','Forma de pago','Pagado','Monto','Nota'];
+    const cols=['Mes','Fecha','Gasto','Proveedor','Forma de pago','Pagado','Monto'];
     const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-    const rows=g.map(r=>[this._gasFecha(r),r.categoria||'',r.concepto||'',r.proveedor||'',r.forma_pago||'',(r.pagado===false?'No':'Sí'),(+r.monto||0),r.nota||''].map(q).join(';'));
+    const rows=g.map(r=>[this._gasFecha(r).slice(0,7),this._gasFecha(r),r.concepto||'',r.proveedor||'',r.forma_pago||'',(r.pagado===false?'No':'Sí'),(+r.monto||0)].map(q).join(';'));
     const csv='﻿'+cols.map(q).join(';')+'\r\n'+rows.join('\r\n');
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     a.download='kruh-gastos.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
