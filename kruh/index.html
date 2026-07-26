@@ -284,7 +284,8 @@ const App={
     const prods=this._prods||[], cart=this._cart||{};
     let sub=0, iva=0, nItems=0;
     for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const b=(+p.precio||0)*q; sub+=b; iva+=b*(+p.iva_pct||0)/100; nItems+=q; }
-    const total=sub+iva;
+    const dom=+(this._cartDom||0); this._sub=sub; this._iva=iva;
+    const total=sub+iva+dom;
     this.set(`<h1>Pedidos</h1><div class="sub">Toca − / + para armar el pedido; la cuenta se calcula al lado</div>
       <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div style="flex:1;min-width:250px"><div class="grid" style="grid-template-columns:repeat(2,1fr)">
@@ -299,31 +300,33 @@ const App={
           <input id="pd_cli" placeholder="Cliente" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App._cartCli=this.value">
           <input id="pd_tel" placeholder="Teléfono" value="${esc(this._cartTel||'')}" oninput="App._cartTel=this.value;App.pedTelLookup(this.value)">
           <div style="margin-top:10px;font-size:13px">
-            <div class="row" style="justify-content:space-between"><span class="dim">Productos</span><b>${nItems}</b></div>
-            <div class="row" style="justify-content:space-between"><span class="dim">Subtotal</span><b>${money(sub)}</b></div>
+            ${nItems?Object.keys(cart).map(id=>{const p=prods.find(x=>x.id===id);if(!p)return '';const q=cart[id];return `<div class="row" style="justify-content:space-between"><span class="dim">${esc(p.nombre)} ×${q}</span><span>${money((+p.precio||0)*q)}</span></div>`;}).join(''):'<div class="dim" style="text-align:center;padding:6px 0">Sin productos aún</div>'}
+            <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span class="dim">Subtotal</span><b>${money(sub)}</b></div>
             <div class="row" style="justify-content:space-between"><span class="dim">IVA</span><span>${money(iva)}</span></div>
-            <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total</span><b style="font-size:18px;color:var(--acc)">${money(total)}</b></div>
+            <div class="row" style="justify-content:space-between;align-items:center"><span class="dim">Domicilio</span><input id="pd_dom" type="number" placeholder="0" value="${this._cartDom||''}" oninput="App.domSet(this.value)" style="width:92px;text-align:right;padding:5px 8px"></div>
+            <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total</span><b id="pd_total" style="font-size:18px;color:var(--acc)">${money(total)}</b></div>
           </div>
           <button class="btn acc full" onclick="App.pedGuardar()" ${nItems?'':'disabled style="opacity:.5"'}>Guardar pedido</button>
-          <button class="btn gh full" style="margin-top:6px" onclick="App._cart={};App._pedPaint()">Vaciar</button>
+          <button class="btn gh full" style="margin-top:6px" onclick="App._cart={};App._cartDom=0;App._pedPaint()">Vaciar</button>
         </div>
       </div>
       <h1 style="font-size:18px;margin-top:22px">Pedidos guardados</h1>
       ${(this._peds||[]).length?this._peds.map(p=>{const it=(p.items||[]);const tel=(p.telefono||'').replace(/\D/g,'');return `<div class="item"><div class="top"><div>
         <div class="nm">${esc(p.cliente||'—')} ${tel?`· <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-size:12px">📱</a>`:''}</div>
-        <div class="mt">${it.map(i=>esc(i.nombre)+' ×'+i.qty).join(' · ')||''} · 📅 ${(p.creado_en||'').slice(0,10)}</div></div>
+        <div class="mt">${it.map(i=>esc(i.nombre)+' ×'+i.qty).join(' · ')||''}${p.domicilio?' · domicilio '+money(p.domicilio):''} · 📅 ${(p.creado_en||'').slice(0,10)}</div></div>
         <div class="nm" style="color:var(--acc)">${money(p.total)}</div></div></div>`;}).join(''):'<div class="empty">Aún sin pedidos guardados.</div>'}`);
   },
   pedTelLookup(v){ const t=(v||'').replace(/\D/g,''); if(t.length<7)return; const nom=(this._telMap||{})[t]; if(nom){ this._cartCli=nom; if($('pd_cli'))$('pd_cli').value=nom; } },
-  cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value;
+  cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0;
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
+  domSet(v){ this._cartDom=+v||0; const t=(this._sub||0)+(this._iva||0)+this._cartDom; if($('pd_total'))$('pd_total').textContent=money(t); },
   async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; let total=0;
     for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0}); total+=(+p.precio||0)*q*(1+(+p.iva_pct||0)/100); }
-    if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim();
-    await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,total,estado:'nuevo'});
+    if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0); total+=dom;
+    await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,estado:'nuevo'});
     for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:(+p.existencias||0)-it.qty}); }
     if(cli)await POST('kruh_ventas',{cliente:cli,telefono:tel,producto:items.map(i=>i.nombre).join(', '),monto:total});
-    this._cart={}; this._cartCli=''; this._cartTel=''; toast('Pedido guardado y descontado'); this.vPedidos(); },
+    this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; toast('Pedido guardado y descontado'); this.vPedidos(); },
 
   /* ===================== CRM (cajones: Comunidad / Nuevos → canal) ===================== */
   ETAPAS:['contactado','interesado','pedido','cliente'],
