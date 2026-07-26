@@ -840,9 +840,12 @@ const App={
       if(k===hoyK)cli.dia.add(n); if(k.slice(0,7)===mesK)cli.mes.add(n); if(k.slice(0,4)===anoK)cli.ano.add(n); });
     const B={dia:{},mes:{},ano:{}};
     (peds||[]).forEach(p=>{ const k=this._diaKey(p.creado_en); if(!k)return; const fp=(p.forma_pago||'—').trim()||'—';
-      (p.items||[]).forEach(it=>{ const n=it.nombre||'—', q=+it.qty||0, v=q*(+it.precio||0), key=n+' ||'+fp;
-        const add=b=>{const o=B[b][key]=B[b][key]||{n,fp,q:0,v:0}; o.q+=q; o.v+=v;};
-        if(k===hoyK)add('dia'); if(k.slice(0,7)===mesK)add('mes'); if(k.slice(0,4)===anoK)add('ano'); }); });
+      (p.items||[]).forEach(it=>{ const n=it.nombre||'—', q=+it.qty||0, v=q*(+it.precio||0);
+        // el Día separa por forma de pago; Mes y Año acumulan por producto
+        const add=(b,key,f)=>{const o=B[b][key]=B[b][key]||{n,fp:f,q:0,v:0}; o.q+=q; o.v+=v;};
+        if(k===hoyK)add('dia',n+' ||'+fp,fp);
+        if(k.slice(0,7)===mesK)add('mes',n,'');
+        if(k.slice(0,4)===anoK)add('ano',n,''); }); });
     const tot=b=>Object.values(B[b]).reduce((a,o)=>a+o.v,0);
     const CJ=[['dia','📅 Día','hoy '+f.getDate()+' de '+(this.MESNOM[f.getMonth()+1]||'').toLowerCase(),'👥 '+cli.dia.size+' cliente(s)'],
               ['mes','🗓️ Mes',(this.MESNOM[f.getMonth()+1]||'')+' '+anoK,'👥 '+cli.mes.size+' cliente(s)'],
@@ -851,7 +854,7 @@ const App={
     const sel=caj?B[caj]:{};
     const filas=Object.values(sel).map(o=>({k:o.n,fp:o.fp,q:o.q,v:o.v})).sort((a,b)=>b.v-a.v);
     const tQ=filas.reduce((a,x)=>a+x.q,0), tV=filas.reduce((a,x)=>a+x.v,0);
-    const nomCaj=((CJ.find(c=>c[0]===caj)||[])[2]||'');
+    const nomCaj=((CJ.find(c=>c[0]===caj)||[])[2]||''), conFP=caj==='dia';
     return `<h1 style="font-size:18px;margin-top:24px">Clientes y productos</h1>
       <div class="sub">Día y Mes muestran clientes y productos · Año muestra solo productos</div>
       <div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap">${CJ.map(([k,t,sub,cl])=>`
@@ -862,14 +865,14 @@ const App={
         :(caj==='ano'?'':this._clientesPeriodo(ventas,caj,segSet))+
         `<h1 style="font-size:17px;margin-top:20px">Productos · ${esc(nomCaj)}</h1>`+
         (filas.length?`<div class="tbwrap"><table class="tb" style="min-width:460px">
-        <thead><tr><th style="min-width:190px">Producto</th><th style="min-width:165px">Forma de pago</th><th style="text-align:right">Unidades</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr></thead>
+        <thead><tr><th style="min-width:190px">Producto</th>${conFP?'<th style="min-width:165px">Forma de pago</th>':''}<th style="text-align:right">Unidades</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr></thead>
         <tbody>${filas.map(x=>`<tr>
           <td style="padding-left:10px;font-weight:600">${esc(x.k)}</td>
-          <td style="padding-left:10px;font-size:12px;color:var(--ink2)">${esc(x.fp)}</td>
+          ${conFP?`<td style="padding-left:10px;font-size:12px;color:var(--ink2)">${esc(x.fp)}</td>`:''}
           <td style="text-align:right;padding-right:10px">${num(x.q)}</td>
           <td style="text-align:right;padding-right:10px;font-weight:700;color:var(--acc)">${money(x.v)}</td>
           <td style="text-align:right;padding-right:10px;color:var(--mut)">${tV>0?(x.v/tV*100).toFixed(1):'0'}%</td></tr>`).join('')}</tbody>
-        <tfoot><tr><td style="padding-left:10px">TOTAL ${esc(nomCaj).toUpperCase()}</td><td></td>
+        <tfoot><tr><td style="padding-left:10px">TOTAL ${esc(nomCaj).toUpperCase()}</td>${conFP?'<td></td>':''}
           <td style="text-align:right;padding-right:10px">${num(tQ)}</td>
           <td style="text-align:right;padding-right:10px;color:var(--acc)">${money(tV)}</td>
           <td style="text-align:right;padding-right:10px">100%</td></tr></tfoot>
