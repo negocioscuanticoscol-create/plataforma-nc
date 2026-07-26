@@ -335,7 +335,10 @@ const App={
   /* ===================== PEDIDOS (catálogo con foto + carrito) ===================== */
   async vPedidos(){
     this.loading();
-    const [prods,peds,leads]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_pedidos?order=creado_en.desc&limit=100'),GET('kruh_leads?select=nombre,telefono&limit=3000')]);
+    const [prods,peds,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_pedidos?order=creado_en.desc&limit=100'),GET('kruh_leads?select=nombre,telefono&limit=3000'),GET('kruh_pedidos?select=items&limit=20000')]);
+    // los que más se venden, de primeras
+    const vend={}; hist.forEach(p=>(p.items||[]).forEach(i=>{ if(i.producto_id)vend[i.producto_id]=(vend[i.producto_id]||0)+(+i.qty||0); }));
+    prods.sort((a,b)=>(vend[b.id]||0)-(vend[a.id]||0)||String(a.nombre||'').localeCompare(String(b.nombre||'')));
     this._prods=prods; this._peds=peds; this._cart=this._cart||{};
     this._telMap={}; leads.forEach(l=>{ const t=(l.telefono||'').replace(/\D/g,''); if(t)this._telMap[t]=l.nombre; });
     this._pedPaint();
