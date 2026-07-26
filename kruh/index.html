@@ -299,6 +299,7 @@ const App={
           <div style="font-family:Fraunces,serif;font-size:17px;margin-bottom:8px">La cuenta</div>
           <input id="pd_cli" placeholder="Cliente" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App._cartCli=this.value">
           <input id="pd_tel" placeholder="Teléfono" value="${esc(this._cartTel||'')}" oninput="App._cartTel=this.value;App.pedTelLookup(this.value)">
+          <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value">${['Efectivo','Nequi','Tarjeta crédito','Transferencia'].map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
           <div style="margin-top:10px;font-size:13px">
             ${nItems?Object.keys(cart).map(id=>{const p=prods.find(x=>x.id===id);if(!p)return '';const q=cart[id];return `<div class="row" style="justify-content:space-between"><span class="dim">${esc(p.nombre)} ×${q}</span><span>${money((+p.precio||0)*q)}</span></div>`;}).join(''):'<div class="dim" style="text-align:center;padding:6px 0">Sin productos aún</div>'}
             <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span class="dim">Subtotal</span><b>${money(sub)}</b></div>
@@ -317,15 +318,16 @@ const App={
         <div class="nm" style="color:var(--acc)">${money(p.total)}</div></div></div>`;}).join(''):'<div class="empty">Aún sin pedidos guardados.</div>'}`);
   },
   pedTelLookup(v){ const t=(v||'').replace(/\D/g,''); if(t.length<7)return; const nom=(this._telMap||{})[t]; if(nom){ this._cartCli=nom; if($('pd_cli'))$('pd_cli').value=nom; } },
-  cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0;
+  cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_fp'))this._cartFP=$('pd_fp').value;
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
   domSet(v){ this._cartDom=+v||0; const t=(this._sub||0)+(this._iva||0)+this._cartDom; if($('pd_total'))$('pd_total').textContent=money(t); },
-  async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; let total=0;
-    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0}); total+=(+p.precio||0)*q*(1+(+p.iva_pct||0)/100); }
-    if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0); total+=dom;
-    await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,estado:'nuevo'});
+  async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; let sub=0, iva=0;
+    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const b=(+p.precio||0)*q; sub+=b; iva+=b*(+p.iva_pct||0)/100; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0}); }
+    if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0), fp=this._cartFP||'Efectivo';
+    const total=sub+iva+dom;
+    await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});
     for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:(+p.existencias||0)-it.qty}); }
-    if(cli)await POST('kruh_ventas',{cliente:cli,telefono:tel,producto:items.map(i=>i.nombre).join(', '),monto:total});
+    await POST('kruh_ventas',{cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp});
     this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; toast('Pedido guardado y descontado'); this.vPedidos(); },
 
   /* ===================== CRM (cajones: Comunidad / Nuevos → canal) ===================== */
@@ -334,8 +336,11 @@ const App={
   CANALES:[['todos','Todos'],['local','🏪 Local'],['digital','📱 Digital'],['organico','🌱 Orgánico']],
   async vCrm(){
     this.loading();
-    const leads=await GET('kruh_leads?order=creado_en.desc&limit=2000'); this._leads=leads;
-    const EM={contactado:'👋 Contactado',interesado:'💡 Interesado',pedido:'📋 Pedido',cliente:'🛒 Cliente'};
+    const [leads,ventas]=await Promise.all([GET('kruh_leads?order=creado_en.desc&limit=2000'),GET('kruh_ventas?select=cliente,telefono,creado_en&limit=20000')]);
+    this._leads=leads;
+    const lastTel={}, lastNom={};
+    ventas.forEach(v=>{ const t=(v.telefono||'').replace(/\D/g,''), n=(v.cliente||'').trim().toLowerCase(), d=v.creado_en||'';
+      if(t&&(!lastTel[t]||d>lastTel[t]))lastTel[t]=d; if(n&&(!lastNom[n]||d>lastNom[n]))lastNom[n]=d; });
     const caj=this._crmCajon||'comunidad', can=this._crmCanal||'todos';
     const nuevos=leads.filter(l=>(l.tipo||'nuevo')!=='comunidad');
     const base=caj==='comunidad'?leads:nuevos;   // Comunidad = todo el universo
@@ -347,9 +352,9 @@ const App={
         <div class="cajon ${caj==='nuevos'?'on':''}" onclick="App._crmCajon='nuevos';App.vCrm()"><b>${nuevos.length}</b>✨ Nuevos</div></div>
       <div class="row" style="gap:6px;margin-bottom:12px">${this.CANALES.map(([v,t])=>`<span class="et ${can===v?'on':''}" onclick="App._crmCanal='${v}';App.vCrm()">${t}${v!=='todos'?' ('+base.filter(l=>(l.canal||'local')===v).length+')':''}</span>`).join('')}</div>
       <button class="btn acc" onclick="App.leadModal()">＋ Registro de cliente</button>
-      <div style="margin-top:12px">${lista.length?lista.map(l=>{const tel=(l.telefono||'').replace(/\D/g,'');const cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);return `<div class="item"><div class="top"><div>
+      <div style="margin-top:12px">${lista.length?lista.map(l=>{const tel=(l.telefono||'').replace(/\D/g,'');const cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);const ult=lastTel[tel]||lastNom[(l.nombre||'').trim().toLowerCase()]||'';return `<div class="item"><div class="top"><div>
         <div class="nm">${esc(l.nombre||'—')}${tel?` · <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-weight:600">${esc(l.telefono)}</a>`:''}</div>
-        <div class="mt">${l.tipo==='comunidad'?'👥 comunidad':('✨ '+esc(l.canal||'local'))}${l.ciudad?' · '+esc(l.ciudad):''}${l.interes?' · '+esc(l.interes):''}</div></div>
+        <div class="mt">${l.tipo==='comunidad'?'👥 comunidad':('✨ '+esc(l.canal||'local'))}${l.ciudad?' · '+esc(l.ciudad):''} · ${ult?'🛒 última compra '+ult.slice(0,10):'sin compras aún'}</div></div>
         <a onclick="App.leadDel('${l.id}')" style="color:var(--bad);cursor:pointer">✕</a></div>
         <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><span class="dim" style="font-size:11px;align-self:center">Compra:</span>${this.CATCOMPRA.map(c=>`<span class="et ${cats.includes(c)?'on':''}" onclick="App.leadCat('${l.id}','${c}')">${c}</span>`).join('')}</div></div>`;}).join(''):'<div class="empty">Sin leads en este cajón.</div>'}</div>`);
   },
@@ -587,12 +592,23 @@ const App={
     const arr=Object.values(by).map(o=>{ const semanas=Math.max(1,(Date.now()-new Date(o.primera))/(7*864e5)); o.semanal=o.total/semanas; return o; })
       .sort((a,b)=>b.mesMonto-a.mesMonto);
     const totMes=arr.reduce((a,o)=>a+o.mesMonto,0);
+    const mesV=ventas.filter(v=>new Date(v.creado_en)>=mesIni);
+    const esTar=fp=>String(fp||'').toLowerCase().includes('tarjeta');
+    const sum=(a,f)=>a.reduce((s,v)=>s+(+v[f]||0),0);
+    const tar=mesV.filter(v=>esTar(v.forma_pago)), otr=mesV.filter(v=>!esTar(v.forma_pago));
+    const tarTot=sum(tar,'monto'), tarIva=sum(tar,'iva'), tarBase=tarTot-tarIva-sum(tar,'domicilio'), otrTot=sum(otr,'monto');
     this.set(`<h1>Ventas</h1><div class="sub">🟢 = compró este mes · el 2º círculo lo marcas tú cuando le hagas seguimiento por WhatsApp</div>
       <div class="kpis"><div class="kpi dark"><b>${money(totMes)}</b><span>Ventas del mes</span></div>
         <div class="kpi"><b>${arr.length}</b><span>Clientes registrados</span></div>
         <div class="kpi"><b style="color:var(--acc)">${arr.filter(o=>new Date(o.primera)>=mesIni).length}</b><span>Clientes nuevos (mes)</span></div>
         <div class="kpi"><b>${arr.filter(o=>o.estemes).length}</b><span>Activos (mes)</span></div></div>
-      <button class="btn acc" onclick="App.ventaModal()">＋ Registrar venta</button>
+      <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Formas de pago (mes)</div>
+        <div class="row" style="justify-content:space-between"><span>💳 Tarjeta crédito</span><b>${money(tarTot)}</b></div>
+        <div class="row" style="justify-content:space-between;font-size:11.5px;color:var(--mut)"><span>↳ base ${money(tarBase)} + IVA ${money(tarIva)}</span></div>
+        <div class="row" style="justify-content:space-between;margin-top:4px"><span>💵 Efectivo / Nequi / Transferencia</span><b>${money(otrTot)}</b></div>
+        <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total juntos</span><b style="color:var(--acc)">${money(tarTot+otrTot)}</b></div></div>
+      <div class="row" style="gap:8px"><button class="btn acc" onclick="App.ventaModal()">＋ Registrar venta</button>
+        <button class="btn gh" onclick="App.ventasExcel()">⬇ Excel contabilidad</button></div>
       <div style="margin-top:12px">${arr.length?arr.map(o=>{const tel=(o.tel||'').replace(/\\D/g,'');const on=segSet[o.cliente];return `<div class="item"><div class="top">
         <div class="row" style="gap:9px;align-items:flex-start"><span class="circ ${o.estemes?'on':''}" title="${o.estemes?'compró este mes':'no este mes'}"></span>
           <div><div class="nm">${esc(o.cliente)} <small class="dim">(${o.compras})</small></div>
@@ -608,6 +624,15 @@ const App={
     <button class="btn acc full" onclick="App.ventaSave()">Guardar</button>`); },
   async ventaSave(){ const b={cliente:$('v_cli').value.trim(),telefono:$('v_tel').value.trim(),producto:$('v_pro').value.trim(),monto:+$('v_mon').value||0};
     if(!b.cliente){alert('Cliente');return;} await POST('kruh_ventas',b); cerrar(); toast('Venta registrada'); this.vVentas(); },
+  async ventasExcel(){ toast('Generando Excel…');
+    const v=await GET('kruh_ventas?order=creado_en.desc&limit=20000');
+    const cols=['Fecha','Cliente','Teléfono','Productos','Forma de pago','Subtotal','IVA','Domicilio','Total'];
+    const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+    const rows=v.map(r=>[(r.creado_en||'').slice(0,10),r.cliente||'',r.telefono||'',r.producto||'',r.forma_pago||'',(+r.subtotal||0),(+r.iva||0),(+r.domicilio||0),(+r.monto||0)].map(q).join(';'));
+    const csv='﻿'+cols.map(q).join(';')+'\r\n'+rows.join('\r\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a.download='kruh-ventas-contabilidad.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+    toast('Excel descargado ('+v.length+' ventas)'); },
 
   /* ===================== USUARIOS Y ATRIBUCIONES (solo admin) ===================== */
   async vUsuarios(){
