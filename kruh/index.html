@@ -721,7 +721,7 @@ const App={
   /* ===================== GASTOS (tabla del mes + cierre mensual) ===================== */
   GASFIJOS:['Luz','Agua','Arriendo','Gas','Internet','Teléfono','Nómina','Aseo'],
   FPAGO:['Efectivo','Nequi','Transferencia','Tarjeta crédito','Débito automático'],
-  CATGASTO:['Materia Prima','Empaques','Servicios','Transporte','Aseo','Nómina','Arriendo','Impuestos','Otros'],
+  CATGASTO:['Arriendo','Servicios públicos','Servicios profesionales','Tecnología y software','Nómina y aportes','Materia Prima','Empaques','Etiquetas y publicidad','Aseo y limpieza','Transporte y movilidad','Mantenimiento y locativos','Equipos y menaje','Impuestos y tasas','Papelería','Otros'],
   IVAPCT:19,
   _gasFecha(g){ return (g.fecha||g.creado_en||'').slice(0,10); },
   _ymNom(ym){ return this.MESNOM[+String(ym||'').slice(5,7)]||''; },
@@ -808,7 +808,7 @@ const App={
           <td><input type="number" data-f="iva" value="${g.iva||''}" placeholder="0" ${cel(g,'iva','oninput="App.gasSuma()"')}></td>
           <td><input type="number" data-f="monto" value="${g.monto||''}" placeholder="0" style="color:var(--acc)" ${cel(g,'monto','oninput="App.gasSuma()"')}></td>
           <td><select ${cel(g,'forma_pago')}>${this.FPAGO.map(f=>`<option ${g.forma_pago===f?'selected':''}>${f}</option>`).join('')}</select></td>
-          <td><select ${cel(g,'pagado')}><option value="true" ${g.pagado!==false?'selected':''}>✔ Pagado</option><option value="false" ${g.pagado===false?'selected':''}>⏳ Pendiente</option></select></td>
+          <td><select ${cel(g,'pagado')}><option value="true" ${g.pagado!==false?'selected':''}>✔ Pagado</option><option value="false" ${g.pagado===false?'selected':''}>⏳ Pendiente</option>${cerrado?'':'<option value="borrar">🗑 Eliminar</option>'}</select></td>
           <td><input type="date" value="${esc(g.fecha_pago||'')}" ${cel(g,'fecha_pago')}></td>
           <td><input value="${esc(g.nota||'')}" placeholder="—" ${cel(g,'nota')}></td>
           <td>${cerrado?'':`<a class="del" onclick="App.gasDel('${g.id}')">✕</a>`}</td></tr>`).join('')
@@ -831,6 +831,7 @@ const App={
     if($('g_iva'))$('g_iva').textContent=money(s('iva'));
     if($('g_total'))$('g_total').textContent=money(s('monto')); },
   async gasCell(id,campo,val){ const g=(this._gastos||[]).find(x=>x.id===id); if(!g)return; let v;
+    if(campo==='pagado'&&val==='borrar') return this.gasDel(id);
     if(campo==='monto'||campo==='base'||campo==='iva')v=+val||0;
     else if(campo==='pagado'||campo==='tiene_iva')v=(val==='true');
     else if(campo==='fecha'||campo==='fecha_pago')v=val||null;
@@ -843,11 +844,13 @@ const App={
       const tr=document.querySelector('#main tr[data-id="'+id+'"]');
       if(tr){ const iv=tr.querySelector('[data-f="iva"]'), tt=tr.querySelector('[data-f="monto"]');
         if(iv)iv.value=g.iva||''; if(tt)tt.value=g.monto||''; } }
-    await PATCH('kruh_gastos?id=eq.'+id,patch);
+    const rp=await PATCH('kruh_gastos?id=eq.'+id,patch);
+    if(rp&&!rp.ok){ toast('⚠️ NO se guardó ese dato — avísale a José'); }
     if(campo==='fecha'&&v&&String(v).slice(0,7)!==this._gasMes){ toast('Se movió a '+this._ymNom(String(v).slice(0,7))); return this.vGastos(); }
     this.gasSuma(); },
   async gasNueva(){ const mes=this._gasMes||this._mesActual();
-    await POST('kruh_gastos',{concepto:'',proveedor:'',factura:'',categoria:'',tiene_iva:false,base:0,iva:0,monto:0,fecha:this._diaDef(mes),forma_pago:'Efectivo',pagado:false});
+    const nuevo=await POST('kruh_gastos',{concepto:'',proveedor:'',factura:'',categoria:'',tiene_iva:false,base:0,iva:0,monto:0,fecha:this._diaDef(mes),forma_pago:'Efectivo',pagado:false});
+    if(!nuevo){ toast('⚠️ No se pudo crear el renglón'); return; }
     await this.vGastos();
     const filas=document.querySelectorAll('#main .tb tbody tr'), ult=filas[filas.length-1];
     if(ult){ const i=ult.querySelectorAll('input')[1]; if(i){i.focus(); i.scrollIntoView({block:'center'});} } },
@@ -858,7 +861,7 @@ const App={
     for(const c of faltan) await POST('kruh_gastos',{concepto:c,proveedor:'',factura:'',categoria:'Servicios',tiene_iva:false,base:0,iva:0,monto:0,fecha:f,forma_pago:'Efectivo',pagado:false});
     toast(faltan.length+' renglones creados'); this.vGastos(); },
   async gasDel(id){ const g=(this._gastos||[]).find(x=>x.id===id)||{};
-    if((+g.monto||0)>0 && !this._okBorrar())return;
+    if((+g.monto||0)>0 && !this._okBorrar()) return this.vGastos();
     await DEL('kruh_gastos?id=eq.'+id); this._gastos=(this._gastos||[]).filter(x=>x.id!==id); this.vGastos(); },
   async _dashSet(mesNom,campos){ const ex=(await GET('kruh_dashboard?mes=eq.'+encodeURIComponent(mesNom)+'&select=id'))[0];
     if(ex) return PATCH('kruh_dashboard?id=eq.'+ex.id,campos);
