@@ -771,7 +771,7 @@ const App={
         <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total juntos</span><b style="color:var(--acc)">${money(tarTot+otrTot)}</b></div></div>
       <div class="row" style="gap:8px"><button class="btn acc" onclick="App.ventaModal()">＋ Registrar venta</button>
         <button class="btn gh" onclick="App.ventasExcel()">⬇ Excel contabilidad</button>
-        <button class="btn gh" onclick="App._resProd='dia';App.vVentas()">👥 Clientes en el día de hoy (${cliHoy})</button></div>
+        <button class="btn ${this._resProd==='dia'?'acc':'gh'}" onclick="App._resProd=App._resProd==='dia'?'':'dia';App.vVentas()">👥 Clientes en el día de hoy (${cliHoy})</button></div>
       ${this._resumenProductos(peds,ventas,segSet)}`);
   },
   DOWC:['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],
@@ -839,12 +839,12 @@ const App={
     const tQ=filas.reduce((a,x)=>a+x.q,0), tV=filas.reduce((a,x)=>a+x.v,0);
     const nomCaj=((CJ.find(c=>c[0]===caj)||[])[2]||'');
     return `<h1 style="font-size:18px;margin-top:24px">Clientes y productos</h1>
-      <div class="sub">Toca un cajón para ver quién compró y qué se vendió en ese periodo</div>
+      <div class="sub">Día y Mes muestran clientes y productos · Año muestra solo productos</div>
       <div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap">${CJ.map(([k,t,sub])=>`
         <div class="cajon ${caj===k?'on':''}" onclick="App._resProd=App._resProd==='${k}'?'':'${k}';App.vVentas()">
           <b>${money(tot(k))}</b>${t}<div style="font-size:11px;opacity:.75">${esc(sub)}</div></div>`).join('')}</div>
-      ${!caj?'<div class="empty">👆 Toca Día, Mes o Año para ver los clientes y los productos.</div>'
-        :this._clientesPeriodo(ventas,caj,segSet)+
+      ${!caj?'<div class="empty">👆 Toca Día o Mes para ver clientes y productos · Año muestra solo productos.</div>'
+        :(caj==='ano'?'':this._clientesPeriodo(ventas,caj,segSet))+
         `<h1 style="font-size:17px;margin-top:20px">Productos · ${esc(nomCaj)}</h1>`+
         (filas.length?`<div class="tbwrap"><table class="tb" style="min-width:460px">
         <thead><tr><th style="min-width:190px">Producto</th><th style="text-align:right">Unidades</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr></thead>
