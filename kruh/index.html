@@ -99,7 +99,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['usuarios','👤 Usuarios']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
   view:'dashboard',
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
@@ -177,7 +177,7 @@ const App={
   nav(){ const perm=this._tabsRol(); $('nav').innerHTML=this.TABS.filter(([v])=>perm.includes(v)).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,presupuestos:this.vPresupuestos,ventas:this.vVentas,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,presupuestos:this.vPresupuestos,ventas:this.vVentas,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ $('main').className=''; $('main').innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -668,6 +668,43 @@ const App={
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     a.download='kruh-ventas-contabilidad.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
     toast('Excel descargado ('+v.length+' ventas)'); },
+
+  /* ===================== SEGUIMIENTO DE PRECIOS (competencia) ===================== */
+  _mesActual(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); },
+  async vPrecios(){
+    this.loading();
+    const [prods,comp]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_competencia?order=creado_en.desc&limit=20000')]);
+    this._prods=prods; this._comp=comp;
+    const mes=this._precMes||this._mesActual(); this._precMes=mes;
+    const meses=[...new Set(comp.map(c=>c.mes).filter(Boolean))].sort().reverse(); if(!meses.includes(mes))meses.unshift(mes);
+    const byProd={}; comp.filter(c=>c.mes===mes).forEach(c=>{(byProd[c.producto_id]=byProd[c.producto_id]||[]).push(c);});
+    const lista=prods.filter(p=>(+p.precio||0)>0 || byProd[p.id]);
+    this.set(`<h1>Seguimiento de precios</h1><div class="sub">Compara tu precio con hasta 6 competidores por artículo · se guarda por mes</div>
+      <div class="row" style="gap:8px;margin-bottom:12px;align-items:center"><span class="dim" style="font-size:12px">Mes:</span>
+        <select onchange="App._precMes=this.value;App.vPrecios()" style="width:auto">${meses.map(m=>`<option ${m===mes?'selected':''}>${m}</option>`).join('')}</select></div>
+      ${lista.length?lista.map(p=>{
+        const cs=(byProd[p.id]||[]).slice(0,6); const precios=cs.map(c=>+c.precio||0).filter(x=>x>0);
+        const min=precios.length?Math.min(...precios):0, max=precios.length?Math.max(...precios):0, prom=precios.length?precios.reduce((a,b)=>a+b,0)/precios.length:0;
+        const mio=+p.precio||0; let estado='', col='var(--mut)';
+        if(precios.length){ if(mio<min){estado='el más barato';col='var(--ok)';} else if(mio>max){estado='el más caro';col='var(--bad)';} else {estado='dentro del rango';col='var(--ok)';} }
+        return `<div class="card"><div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div><div style="font-weight:700">${esc(p.nombre)}</div><div class="dim" style="font-size:12px">Tu precio: <b style="color:var(--ink)">${money(mio)}</b>${precios.length?` · <span style="color:${col};font-weight:700">${estado}</span>`:''}</div></div>
+          ${cs.length>=6?'<span class="dim" style="font-size:11px">6/6</span>':`<button class="btn gh sm" onclick="App.compModal('${p.id}','')">＋ competidor</button>`}</div>
+          ${precios.length?`<div class="row" style="gap:12px;font-size:11.5px;color:var(--mut);margin-top:6px"><span>mín ${money(min)}</span><span>prom ${money(prom)}</span><span>máx ${money(max)}</span></div>`:''}
+          <div style="margin-top:8px">${cs.length?cs.map(c=>`<div class="row" style="justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid var(--line2)">
+            <div style="font-size:13px">${esc(c.competidor||'—')}${c.url?` · <a href="${esc(c.url)}" target="_blank" style="color:var(--acc)">🔗 web</a>`:''}</div>
+            <div class="row" style="gap:8px;align-items:center"><b>${money(c.precio)}</b><a onclick="App.compModal('${p.id}','${c.id}')" style="cursor:pointer;color:var(--mut)">✎</a><a onclick="App.compDel('${c.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div>`).join(''):'<div class="dim" style="font-size:12px;padding:4px 0">Sin competidores registrados este mes.</div>'}</div>
+        </div>`;}).join(''):'<div class="empty">No hay productos con precio. Ponles precio en Recetas.</div>'}`);
+  },
+  compModal(prodId,id){ const c=(this._comp||[]).find(x=>x.id===id)||{};
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Agregar'} competidor</h3>
+      <label>Competidor</label><input id="cp_nom" value="${esc(c.competidor||'')}" placeholder="Nombre del competidor">
+      <label>Página web (de donde se saca el precio)</label><input id="cp_url" value="${esc(c.url||'')}" placeholder="https://...">
+      <label>Precio</label><input id="cp_pre" type="number" value="${c.precio||''}">
+      <button class="btn acc full" onclick="App.compSave('${prodId}','${id||''}')">Guardar</button>`); },
+  async compSave(prodId,id){ const b={producto_id:prodId,competidor:$('cp_nom').value.trim(),url:$('cp_url').value.trim(),precio:+$('cp_pre').value||0,mes:this._precMes||this._mesActual()};
+    if(!b.competidor){alert('Nombre del competidor');return;} if(id)await PATCH('kruh_competencia?id=eq.'+id,b); else await POST('kruh_competencia',b); cerrar(); toast('Guardado'); this.vPrecios(); },
+  async compDel(id){ if(!this._okBorrar())return; await DEL('kruh_competencia?id=eq.'+id); this.vPrecios(); },
 
   /* ===================== USUARIOS Y ATRIBUCIONES (solo admin) ===================== */
   async vUsuarios(){
