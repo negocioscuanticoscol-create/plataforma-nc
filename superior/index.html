@@ -304,14 +304,17 @@ const App={
   },
   pedModal(id){ const p=this._ped.find(x=>x.id===id)||{};
     modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Tomar'} pedido</h3>
-      <div class="g2"><div><label>Referencia</label><input id="p_ref" value="${this.esc(p.referencia||'')}"></div>
-      <div><label>Total</label><input id="p_tot" type="number" value="${p.total||0}"></div></div>
+      <label>Referencia</label>
+      <select id="p_ref" onchange="App.pedRefPick()">${p.referencia&&!this._inv.some(it=>((it.referencia||it.nombre||'')+(it.tamano?' · '+it.tamano:''))===p.referencia)?`<option selected>${this.esc(p.referencia)}</option>`:''}<option value="">— seleccionar referencia —</option>${this._inv.map(it=>{const lab=(it.referencia||it.nombre||'')+(it.tamano?' · '+it.tamano:'');return `<option value="${it.id}" data-lab="${this.esc(lab)}" data-pre="${+it.precio||0}" ${p.referencia===lab?'selected':''}>${this.esc(lab)}</option>`;}).join('')}</select>
+      <label>Total</label><input id="p_tot" type="number" value="${p.total||0}">
       <label>Cliente</label><select id="p_cli">${this._cli.length?this._cli.map(c=>`<option value="${c.id}" ${p.cliente_id===c.id?'selected':''}>${this.esc(c.nombre)}${c.local_num?' (Local '+this.esc(c.local_num)+')':''}</option>`).join(''):'<option value="">— crea clientes primero —</option>'}</select>
       <div class="g2"><div><label>Tipo de transporte</label><select id="p_tra">${this.TRANSPORTE.map(t=>`<option ${p.tipo_transporte===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><label>Forma de pago</label><select id="p_pag">${this.PAGO.map(t=>`<option ${p.forma_pago===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
       <button class="btn gold full" onclick="App.pedSave('${id||''}')">Guardar pedido</button>`); },
-  async pedSave(id){ const g=x=>($(x).value||'').trim(); const cliId=$('p_cli').value; const cliNom=(this._cli.find(x=>x.id===cliId)||{}).nombre||'';
-    const row={id:id||('p'+Date.now()),referencia:g('p_ref'),cliente_id:cliId,cliente:cliNom,tipo_transporte:$('p_tra').value,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+  pedRefPick(){ const s=$('p_ref'),o=s.options[s.selectedIndex]; if(o&&o.value&&$('p_tot')&&+(o.dataset.pre)>0)$('p_tot').value=o.dataset.pre; },
+  async pedSave(id){ const cliId=$('p_cli').value; const cliNom=(this._cli.find(x=>x.id===cliId)||{}).nombre||'';
+    const rs=$('p_ref'),ro=rs.options[rs.selectedIndex]; let refLab=''; if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
+    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,tipo_transporte:$('p_tra').value,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     if(!row.referencia){alert('Referencia');return;}
     const i=this._ped.findIndex(x=>x.id===row.id); if(i>=0)this._ped[i]=row; else this._ped.unshift(row);
     await this._put('superior_pedidos',row,this._ped); cerrar(); this.toast('Pedido guardado'); this.vPed(); },
