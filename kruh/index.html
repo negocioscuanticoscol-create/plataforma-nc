@@ -227,7 +227,7 @@ const App={
       <div><label>Unidad</label><input id="p_uni" value="${esc(p.unidad||'g')}"></div>
       <div><label>¿Perecedero?</label><select id="p_per"><option value="true" ${p.perecedero!==false?'selected':''}>Sí</option><option value="false" ${p.perecedero===false?'selected':''}>No</option></select></div></div>
       <label>¿Necesita refrigeración?</label><select id="p_refri"><option value="false" ${!p.refrigeracion?'selected':''}>No</option><option value="true" ${p.refrigeracion?'selected':''}>Sí</option></select>
-      <div class="g2"><div><label>Precio antes de IVA</label><input id="p_pre" type="number" value="${p.precio||0}"></div>
+      <div class="g2"><div><label>Precio de venta (IVA incl.)</label><input id="p_pre" type="number" value="${p.precio||0}"></div>
       <div><label>IVA %</label><input id="p_iva" type="number" value="${p.iva_pct||0}"></div></div>
       <label>Stock mínimo (alerta de inventario)</label><input id="p_min" type="number" value="${p.inv_min||0}">
       <label>Foto del producto</label>
@@ -283,11 +283,11 @@ const App={
   _pedPaint(){
     const prods=this._prods||[], cart=this._cart||{};
     const fp=this._cartFP||'Efectivo', esTar=/tarjeta/i.test(fp);
-    let sub=0, iva=0, nItems=0;
-    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const base=(+p.precio||0)*q; sub+=base; nItems+=q;
-      if(esTar) iva+=base*(+p.iva_pct||0)/100; }
+    let sub=0, iva=0, nItems=0, bruto=0;
+    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line; nItems+=q;
+      if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
     const dom=+(this._cartDom||0); this._sub=sub; this._iva=iva;
-    const total=sub+iva+dom;   // precio = base (antes de IVA); con tarjeta se liquida el IVA encima
+    const total=bruto+dom;   // el precio YA incluye IVA: total igual; con tarjeta se desglosa la base+IVA
     this.set(`<h1>Pedidos</h1><div class="sub">Toca − / + para armar el pedido; la cuenta se calcula al lado</div>
       <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div style="flex:1;min-width:250px"><div class="grid" style="grid-template-columns:repeat(2,1fr)">
@@ -323,11 +323,11 @@ const App={
   cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_fp'))this._cartFP=$('pd_fp').value;
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
   domSet(v){ this._cartDom=+v||0; const t=(this._sub||0)+(this._iva||0)+this._cartDom; if($('pd_total'))$('pd_total').textContent=money(t); },
-  async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; const fp=this._cartFP||'Efectivo', esTar=/tarjeta/i.test(fp); let sub=0, iva=0;
-    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const base=(+p.precio||0)*q; sub+=base; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0});
-      if(esTar) iva+=base*(+p.iva_pct||0)/100; }
+  async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; const fp=this._cartFP||'Efectivo', esTar=/tarjeta/i.test(fp); let sub=0, iva=0, bruto=0;
+    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0});
+      if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
     if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0);
-    const total=sub+iva+dom;
+    const total=bruto+dom;
     await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});
     for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:(+p.existencias||0)-it.qty}); }
     await POST('kruh_ventas',{cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp});
