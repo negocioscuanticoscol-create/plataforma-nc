@@ -99,7 +99,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
   view:'dashboard',
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
@@ -204,7 +204,7 @@ const App={
   nav(){ const perm=this._tabsRol(); $('nav').innerHTML=this.TABS.filter(([v])=>perm.includes(v)).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,presupuestos:this.vPresupuestos,ventas:this.vVentas,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ $('main').className=''; $('main').innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -696,6 +696,79 @@ const App={
     a.download='kruh-ventas-contabilidad.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
     toast('Excel descargado ('+v.length+' ventas)'); },
 
+  /* ===================== GASTOS (luz, agua, arriendo y demás) ===================== */
+  CATGASTO:['Luz','Agua','Arriendo','Gas','Internet','Teléfono','Nómina','Aseo','Mantenimiento','Impuestos','Transporte','Otros'],
+  ICOGASTO:{'Luz':'💡','Agua':'💧','Arriendo':'🏠','Gas':'🔥','Internet':'🌐','Teléfono':'📞','Nómina':'👷','Aseo':'🧼','Mantenimiento':'🔧','Impuestos':'🏛️','Transporte':'🚐','Otros':'🧾'},
+  _gasFecha(g){ return (g.fecha||g.creado_en||'').slice(0,10); },
+  async vGastos(){
+    this.loading();
+    const gastos=await GET('kruh_gastos?order=fecha.desc&limit=5000');
+    this._gastos=gastos;
+    const mes=this._gasMes||this._mesActual(); this._gasMes=mes;
+    const meses=[...new Set(gastos.map(g=>this._gasFecha(g).slice(0,7)).filter(Boolean))].sort().reverse();
+    if(!meses.includes(mes))meses.unshift(mes);
+    const delMes=gastos.filter(g=>this._gasFecha(g).slice(0,7)===mes);
+    const cats=[...new Set(this.CATGASTO.concat(gastos.map(g=>g.categoria).filter(Boolean)))];
+    const cat=this._gasCat||'todos';
+    const totCat={}; delMes.forEach(g=>{ const c=g.categoria||'Otros'; totCat[c]=(totCat[c]||0)+(+g.monto||0); });
+    const total=delMes.reduce((a,g)=>a+(+g.monto||0),0);
+    const pend=delMes.filter(g=>g.pagado===false).reduce((a,g)=>a+(+g.monto||0),0);
+    const lista=(cat==='todos'?delMes:delMes.filter(g=>(g.categoria||'Otros')===cat)).slice().sort((a,b)=>this._gasFecha(b).localeCompare(this._gasFecha(a)));
+    this.set(`<h1>Gastos</h1><div class="sub">Luz, agua, arriendo y lo demás · se guardan por mes y por categoría</div>
+      <div class="kpis">
+        <div class="kpi dark"><b>${money(total)}</b><span>Gastos del mes</span></div>
+        <div class="kpi"><b>${delMes.length}</b><span>Registros del mes</span></div>
+        <div class="kpi"><b style="color:${pend?'var(--bad)':'var(--ok)'}">${money(pend)}</b><span>Pendiente por pagar</span></div>
+      </div>
+      <div class="row" style="gap:8px;margin-bottom:12px;align-items:center"><span class="dim" style="font-size:12px">Mes:</span>
+        <select onchange="App._gasMes=this.value;App.vGastos()" style="width:auto">${meses.map(m=>`<option ${m===mes?'selected':''}>${esc(m)}</option>`).join('')}</select>
+        <button class="btn acc sm" onclick="App.gasModal()">＋ Registrar gasto</button>
+        <button class="btn gh sm" onclick="App.gastosExcel()">⬇ Excel</button></div>
+      <div class="row" style="gap:6px;margin-bottom:12px">
+        <span class="et ${cat==='todos'?'on':''}" onclick="App._gasCat='todos';App.vGastos()">Todos (${money(total)})</span>
+        ${cats.map(c=>`<span class="et ${cat===c?'on':''}" onclick="App._gasCat='${esc(c)}';App.vGastos()">${this.ICOGASTO[c]||'🧾'} ${esc(c)}${totCat[c]?' · '+money(totCat[c]):''}</span>`).join('')}</div>
+      ${lista.length?lista.map(g=>`<div class="item" style="${g.pagado===false?'border-left:3px solid var(--warn)':''}"><div class="top"><div>
+        <div class="nm">${this.ICOGASTO[g.categoria]||'🧾'} ${esc(g.categoria||'Otros')}${g.concepto?' · '+esc(g.concepto):''} ${g.pagado===false?'<span class="tag pe">por pagar</span>':'<span class="tag np">pagado</span>'}</div>
+        <div class="mt">📅 ${esc(this._gasFecha(g))}${g.proveedor?' · '+esc(g.proveedor):''}${g.forma_pago?' · '+esc(g.forma_pago):''}${g.nota?' · '+esc(g.nota):''}</div></div>
+        <div style="text-align:right;white-space:nowrap"><div class="nm" style="color:var(--acc)">${money(g.monto)}</div>
+          <a onclick="App.gasModal('${g.id}')" style="color:var(--acc);cursor:pointer;margin-right:6px">✎</a><a onclick="App.gasDel('${g.id}')" style="color:var(--bad);cursor:pointer">✕</a></div></div></div>`).join('')
+        :'<div class="empty">Sin gastos en este mes/categoría. Registra el primero.</div>'}`);
+  },
+  gasModal(id){ const g=(this._gastos||[]).find(x=>x.id===id)||{};
+    const cats=[...new Set(this.CATGASTO.concat((this._gastos||[]).map(x=>x.categoria).filter(Boolean)))];
+    const hoy=new Date(), fdef=g.fecha||this._gasFecha(g)||(hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0'));
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Registrar'} gasto</h3>
+      <div class="g2"><div><label>Categoría</label>
+        <select id="g_cat" onchange="App.gasOtra()">${cats.map(c=>`<option ${g.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="__otra">＋ Otra…</option></select>
+        <input id="g_cat2" placeholder="Nombre de la categoría nueva" style="display:none;margin-top:6px"></div>
+      <div><label>Monto</label><input id="g_mon" type="number" value="${g.monto||''}" placeholder="0"></div></div>
+      <label>Concepto</label><input id="g_con" value="${esc(g.concepto||'')}" placeholder="Recibo de agosto, factura 1234…">
+      <div class="g2"><div><label>Fecha</label><input id="g_fec" type="date" value="${esc(fdef)}"></div>
+      <div><label>Proveedor / entidad</label><input id="g_prov" value="${esc(g.proveedor||'')}" placeholder="Codensa, EAAB, arrendador…"></div></div>
+      <div class="g2"><div><label>Forma de pago</label><select id="g_fp">${['Efectivo','Nequi','Transferencia','Tarjeta crédito','Débito automático'].map(f=>`<option ${g.forma_pago===f?'selected':''}>${f}</option>`).join('')}</select></div>
+      <div><label>¿Ya está pagado?</label><select id="g_pag"><option value="true" ${g.pagado!==false?'selected':''}>Sí</option><option value="false" ${g.pagado===false?'selected':''}>No, pendiente</option></select></div></div>
+      <label>Nota</label><input id="g_not" value="${esc(g.nota||'')}">
+      <button class="btn acc full" onclick="App.gasSave('${id||''}')">Guardar gasto</button>
+      ${id?`<button class="btn gh full" style="color:var(--bad)" onclick="App.gasDel('${id}')">Eliminar</button>`:''}`); },
+  gasOtra(){ const s=$('g_cat'), i=$('g_cat2'); if(!s||!i)return; const otra=s.value==='__otra'; i.style.display=otra?'block':'none'; if(otra)i.focus(); },
+  async gasSave(id){ const s=$('g_cat'); let cat=s.value==='__otra'?($('g_cat2').value||'').trim():s.value;
+    if(!cat){alert('Ponle categoría al gasto');return;}
+    const monto=+$('g_mon').value||0; if(monto<=0){alert('Pon el monto');return;}
+    const b={categoria:cat,concepto:$('g_con').value.trim(),monto,fecha:$('g_fec').value||null,proveedor:$('g_prov').value.trim(),forma_pago:$('g_fp').value,pagado:$('g_pag').value==='true',nota:$('g_not').value.trim()};
+    if(id)await PATCH('kruh_gastos?id=eq.'+id,b); else await POST('kruh_gastos',b);
+    if(b.fecha)this._gasMes=b.fecha.slice(0,7);
+    cerrar(); toast('Gasto guardado'); this.vGastos(); },
+  async gasDel(id){ if(!this._okBorrar())return; await DEL('kruh_gastos?id=eq.'+id); cerrar(); toast('Gasto eliminado'); this.vGastos(); },
+  async gastosExcel(){ toast('Generando Excel…');
+    const g=await GET('kruh_gastos?order=fecha.desc&limit=20000');
+    const cols=['Fecha','Categoría','Concepto','Proveedor','Forma de pago','Pagado','Monto','Nota'];
+    const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+    const rows=g.map(r=>[this._gasFecha(r),r.categoria||'',r.concepto||'',r.proveedor||'',r.forma_pago||'',(r.pagado===false?'No':'Sí'),(+r.monto||0),r.nota||''].map(q).join(';'));
+    const csv='﻿'+cols.map(q).join(';')+'\r\n'+rows.join('\r\n');
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a.download='kruh-gastos.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+    toast('Excel descargado ('+g.length+' gastos)'); },
+
   /* ===================== SEGUIMIENTO DE PRECIOS (competencia) ===================== */
   _mesActual(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); },
   async vPrecios(){
@@ -739,7 +812,7 @@ const App={
     this.loading();
     const [us,pm]=await Promise.all([GET('kruh_usuarios?order=creado_en&limit=200'),GET('kruh_permisos?limit=50')]);
     this._us=us; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]);
-    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas']];
+    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos']];
     const RMAT=['cajera','panadero','bodeguero','chef'];
     this.set(`<h1>Usuarios y permisos</h1><div class="sub">Cada persona con su clave y rol · y qué pestaña ve cada rol</div>
       <button class="btn acc" onclick="App.usModal()">＋ Nuevo usuario</button>
