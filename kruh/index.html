@@ -340,6 +340,7 @@ const App={
     else { if($('p_foto'))$('p_foto').value=url; const pv=$('p_foto_prev'); if(pv){pv.src=url; pv.style.display='block';} toast('Foto lista'); } },
 
   /* ===================== PEDIDOS (catálogo con foto + carrito) ===================== */
+  FPPEDIDO:['Efectivo','Transferencia','Tarjeta crédito'],
   async vPedidos(){
     this.loading();
     const [prods,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_leads?select=nombre,telefono&limit=3000'),GET('kruh_pedidos?select=items&limit=20000')]);
@@ -371,7 +372,7 @@ const App={
           <div style="font-family:Fraunces,serif;font-size:17px;margin-bottom:8px">La cuenta</div>
           <input id="pd_cli" placeholder="Cliente" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App._cartCli=this.value">
           <input id="pd_tel" placeholder="Teléfono" value="${esc(this._cartTel||'')}" oninput="App._cartTel=this.value;App.pedTelLookup(this.value)">
-          <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value;App._pedPaint()">${['Efectivo','Nequi','Tarjeta crédito','Transferencia'].map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
+          <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value;App._pedPaint()">${this.FPPEDIDO.map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
           <div style="margin-top:10px;font-size:13px">
             ${nItems?Object.keys(cart).map(id=>{const p=prods.find(x=>x.id===id);if(!p)return '';const q=cart[id];return `<div class="row" style="justify-content:space-between"><span class="dim">${esc(p.nombre)} ×${q}</span><span>${money((+p.precio||0)*q)}</span></div>`;}).join(''):'<div class="dim" style="text-align:center;padding:6px 0">Sin productos aún</div>'}
             <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span class="dim">${esTar?'Base (sin IVA)':'Subtotal'}</span><b>${money(sub)}</b></div>
