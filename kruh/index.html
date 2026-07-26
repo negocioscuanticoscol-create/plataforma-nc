@@ -145,6 +145,11 @@ const App={
     this._dash=meses;
     const now=new Date(), cm=now.getMonth()+1, mesIni=new Date(now.getFullYear(),now.getMonth(),1), mesNom=this.MESNOM[cm]||'';
     const costoProd={}; recs.forEach(r=>{costoProd[r.producto_id]=(costoProd[r.producto_id]||0)+(+r.cantidad||0)*(+r.costo_unit||0);});
+    // ventas reales de CADA mes del año en curso: el Dashboard nunca queda desactualizado
+    const ventasPorMes={};
+    ventas.forEach(v=>{ const d=new Date(v.creado_en); if(isNaN(d)||d.getFullYear()!==now.getFullYear())return;
+      ventasPorMes[d.getMonth()+1]=(ventasPorMes[d.getMonth()+1]||0)+(+v.monto||0); });
+    const ventasReales=m=>{ const i=this.MESNOM.findIndex(x=>x&&m&&x.toLowerCase()===String(m).toLowerCase()); return i>0?(ventasPorMes[i]||0):0; };
     const liveVentas=ventas.filter(v=>new Date(v.creado_en)>=mesIni).reduce((a,v)=>a+(+v.monto||0),0);
     let liveCosto=0; peds.forEach(p=>{ if(new Date(p.creado_en)<mesIni)return; (p.items||[]).forEach(it=>{liveCosto+=(+it.qty||0)*(costoProd[it.producto_id]||0);}); });
     const manual=meses.find(m=>m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase())||{ventas:0,costo:0,meta:40000000};
@@ -155,7 +160,8 @@ const App={
     const gastoLive=gastos.filter(g=>(g.fecha||g.creado_en||'').slice(0,7)===ymAct).reduce((a,g)=>a+(+g.monto||0),0);
     const gastosM=manual.cerrado?(+manual.gastos||0):(gastoLive||(+manual.gastos||0));
     const uneta=ubruta-gastosM;
-    const acumMC=meses.reduce((a,m)=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();return a+((es?ventasM:(+m.ventas||0))-(es?costo:(+m.costo||0)));},0);
+    const vMes=m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase(); if(es)return ventasM; const r=ventasReales(m.mes); return r>0?r:(+m.ventas||0);};
+    const acumMC=meses.reduce((a,m)=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();return a+(vMes(m)-(es?costo:(+m.costo||0)));},0);
     const acumGas=meses.reduce((a,m)=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();return a+(es?gastosM:(+m.gastos||0));},0);
     const registrados=leads.length, nuevosMes=leads.filter(l=>new Date(l.creado_en)>=mesIni).length;
     this.set(`<h1>Dashboard</h1><div class="sub">${esc(mesNom)} ${auto?'· <span style="color:var(--ok);font-weight:700">automático con las ventas del mes</span>':'· simulado (al ingresar pedidos se calcula solo)'} · meta ${money(meta)}</div>
@@ -178,7 +184,7 @@ const App={
         <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:8px;padding-top:8px"><span class="dim">Gastos acumulados</span><b style="color:var(--warn)">${money(acumGas)}</b></div>
         <div class="row" style="justify-content:space-between"><span>Utilidad neta acumulada</span><b style="color:${acumMC-acumGas>=0?'var(--ok)':'var(--bad)'}">${money(acumMC-acumGas)}</b></div></div>
       <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
-      ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=es?ventasM:(+m.ventas||0),cc=es?costo:(+m.costo||0),gg=es?gastosM:(+m.gastos||0),nn=v-cc-gg,mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':''}${m.cerrado?'<span class="tag">🔒 gastos cerrados</span>':''}</div>
+      ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=vMes(m),cc=es?costo:(+m.costo||0),gg=es?gastosM:(+m.gastos||0),nn=v-cc-gg,mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':(ventasReales(m.mes)>0?'<span class="tag np">real</span>':'')}${m.cerrado?'<span class="tag">🔒 gastos cerrados</span>':''}</div>
         <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''}${gg?' · gastos '+money(gg):''} · meta ${money(mt)}${es?` · <a onclick="App.dashDetalleMes()" style="color:var(--acc);cursor:pointer;font-weight:700">ver detalle →</a>`:''}</div>
         <div class="mt">Utilidad neta <b style="color:${nn>=0?'var(--ok)':'var(--bad)'}">${money(nn)}</b></div></div>
         ${this.esAdmin?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
@@ -1099,8 +1105,8 @@ const App={
   async gasDel(id){ const g=(this._gastos||[]).find(x=>x.id===id)||{};
     if((+g.monto||0)>0 && !this._okBorrar()) return this._repintar();
     await DEL('kruh_gastos?id=eq.'+id); this._gastos=(this._gastos||[]).filter(x=>x.id!==id); this._repintar(); },
-  async _dashSet(mesNom,campos){ const ex=(await GET('kruh_dashboard?mes=eq.'+encodeURIComponent(mesNom)+'&select=id'))[0];
-    if(ex) return PATCH('kruh_dashboard?id=eq.'+ex.id,campos);
+  async _dashSet(mesNom,campos){ const ex=(await GET('kruh_dashboard?mes=eq.'+encodeURIComponent(mesNom)+'&select=mes'))[0];
+    if(ex) return PATCH('kruh_dashboard?mes=eq.'+encodeURIComponent(mesNom),campos);
     const o=this.MESNOM.indexOf(mesNom); return POST('kruh_dashboard',Object.assign({mes:mesNom,orden:o>0?o:99},campos)); },
   async gasCerrar(){ if(!this.puedeGestionar){ alert('Solo Admin o Gerencia cierran el mes'); return; }
     const mes=this._gasMes, nom=this._ymNom(mes); if(!nom){ alert('Mes inválido'); return; }
