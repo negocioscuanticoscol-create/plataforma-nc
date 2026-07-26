@@ -239,7 +239,7 @@ const App={
     if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
     this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
     ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
-  set(h){ $('main').className=''; $('main').innerHTML=h; },
+  set(h){ const m=$('main'); m.className=''; m.style.cssText=''; m.innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
   /* ===================== RECETAS = HOJA DE COSTOS ===================== */
@@ -1337,7 +1337,7 @@ const App={
         <button class="btn acc" onclick="App.copiarSQLAse()">📋 Copiar el SQL</button>
         <a class="btn" style="background:var(--ok);text-decoration:none" href="https://supabase.com/dashboard/project/fnayedgvamxktxfvywwl/sql/new" target="_blank">Abrir el SQL Editor ↗</a>
         <button class="btn gh" onclick="App.vUsuarios()">Ya lo hice · reintentar</button></div>
-      <pre id="ase_sql" style="background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:11px;margin-top:11px;font-size:11.5px;overflow:auto">${esc(this.SQLASE.join('\n'))}</pre></div>`;
+      <pre id="ase_sql" style="background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:11px;margin-top:11px;font-size:11.5px;overflow:auto;text-align:left;white-space:pre">${esc(this.SQLASE.join('\n'))}</pre></div>`;
     const cerradas=ase.filter(a=>a.fin);
     const hoyK=this._diaKey(new Date()), mesK=hoyK.slice(0,7);
     const minDe=l=>l.reduce((t,a)=>t+this._aseMin(a),0);
