@@ -775,7 +775,7 @@ const App={
           <div class="mt">💰 mes ${money(o.mesMonto)} · ~sem ${money(o.semanal)} · última ${(o.ultima||'').slice(0,10)}</div></div></div>
         <div class="row" style="gap:8px">
           <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div></div>`;}).join(''):'<div class="empty">Sin ventas. Se llenan solas con los Pedidos, o registra una aquí.</div>'}</div>
-      ${this._resumenProductos(peds,mesIni)}`);
+      ${this._resumenProductos(peds)}`);
   },
   DOWC:['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],
   _diaKey(d){ const x=new Date(d); return isNaN(x)?'':x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); },
@@ -806,36 +806,40 @@ const App={
           :'<div class="hint">Todavía no hay ventas este mes.</div>'}
       </div></div>`;
   },
-  _resumenProductos(peds,mesIni){
-    const mesR={}, todoR={};
-    (peds||[]).forEach(p=>{ const delMes=new Date(p.creado_en)>=mesIni;
-      (p.items||[]).forEach(it=>{ const k=it.nombre||'—', q=+it.qty||0, v=q*(+it.precio||0);
-        const a=todoR[k]=todoR[k]||{q:0,v:0}; a.q+=q; a.v+=v;
-        if(delMes){ const b=mesR[k]=mesR[k]||{q:0,v:0}; b.q+=q; b.v+=v; } }); });
-    const filas=Object.entries(todoR).map(([k,t])=>({k,mq:(mesR[k]||{}).q||0,mv:(mesR[k]||{}).v||0,tq:t.q,tv:t.v})).sort((a,b)=>b.mv-a.mv||b.tv-a.tv);
-    const tMq=filas.reduce((a,f)=>a+f.mq,0), tMv=filas.reduce((a,f)=>a+f.mv,0);
-    const tTq=filas.reduce((a,f)=>a+f.tq,0), tTv=filas.reduce((a,f)=>a+f.tv,0);
+  _resumenProductos(peds){
+    const f=new Date(), hoyK=this._diaKey(f), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
+    const B={dia:{},mes:{},ano:{}};
+    (peds||[]).forEach(p=>{ const k=this._diaKey(p.creado_en); if(!k)return;
+      (p.items||[]).forEach(it=>{ const n=it.nombre||'—', q=+it.qty||0, v=q*(+it.precio||0);
+        const add=b=>{const o=B[b][n]=B[b][n]||{q:0,v:0}; o.q+=q; o.v+=v;};
+        if(k===hoyK)add('dia'); if(k.slice(0,7)===mesK)add('mes'); if(k.slice(0,4)===anoK)add('ano'); }); });
+    const tot=b=>Object.values(B[b]).reduce((a,o)=>a+o.v,0);
+    const CJ=[['dia','📅 Día','hoy '+f.getDate()+' de '+(this.MESNOM[f.getMonth()+1]||'').toLowerCase()],
+              ['mes','🗓️ Mes',(this.MESNOM[f.getMonth()+1]||'')+' '+anoK],
+              ['ano','📆 Año',anoK]];
+    const caj=this._resProd||'';
+    const sel=caj?B[caj]:{};
+    const filas=Object.entries(sel).map(([k,o])=>({k,q:o.q,v:o.v})).sort((a,b)=>b.v-a.v);
+    const tQ=filas.reduce((a,x)=>a+x.q,0), tV=filas.reduce((a,x)=>a+x.v,0);
+    const nomCaj=((CJ.find(c=>c[0]===caj)||[])[2]||'');
     return `<h1 style="font-size:18px;margin-top:24px">Resumen por producto</h1>
       <div class="sub">Cuánto se vendió de cada uno · sale de los pedidos generados</div>
-      ${filas.length?`<div class="tbwrap"><table class="tb" style="min-width:560px">
-        <thead><tr><th style="min-width:180px">Producto</th>
-          <th style="text-align:right">Unidades del mes</th><th style="text-align:right">Valor del mes</th>
-          <th style="text-align:right">% del mes</th>
-          <th style="text-align:right">Unidades histórico</th><th style="text-align:right">Valor histórico</th></tr></thead>
-        <tbody>${filas.map(f=>`<tr>
-          <td style="padding-left:10px;font-weight:600">${esc(f.k)}</td>
-          <td style="text-align:right;padding-right:10px">${num(f.mq)}</td>
-          <td style="text-align:right;padding-right:10px;font-weight:700;color:var(--acc)">${money(f.mv)}</td>
-          <td style="text-align:right;padding-right:10px;color:var(--mut)">${tMv>0?(f.mv/tMv*100).toFixed(1):'0'}%</td>
-          <td style="text-align:right;padding-right:10px;color:var(--mut)">${num(f.tq)}</td>
-          <td style="text-align:right;padding-right:10px;color:var(--mut)">${money(f.tv)}</td></tr>`).join('')}</tbody>
-        <tfoot><tr><td style="padding-left:10px">TOTAL</td>
-          <td style="text-align:right;padding-right:10px">${num(tMq)}</td>
-          <td style="text-align:right;padding-right:10px;color:var(--acc)">${money(tMv)}</td>
-          <td style="text-align:right;padding-right:10px">100%</td>
-          <td style="text-align:right;padding-right:10px">${num(tTq)}</td>
-          <td style="text-align:right;padding-right:10px">${money(tTv)}</td></tr></tfoot>
-      </table></div>`:'<div class="empty">Aún no hay pedidos con productos para resumir.</div>'}`;
+      <div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap">${CJ.map(([k,t,sub])=>`
+        <div class="cajon ${caj===k?'on':''}" onclick="App._resProd=App._resProd==='${k}'?'':'${k}';App.vVentas()">
+          <b>${money(tot(k))}</b>${t}<div style="font-size:11px;opacity:.75">${esc(sub)}</div></div>`).join('')}</div>
+      ${!caj?'<div class="empty">👆 Toca Día, Mes o Año para ver el detalle por producto.</div>'
+        :(filas.length?`<div class="tbwrap"><table class="tb" style="min-width:460px">
+        <thead><tr><th style="min-width:190px">Producto</th><th style="text-align:right">Unidades</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr></thead>
+        <tbody>${filas.map(x=>`<tr>
+          <td style="padding-left:10px;font-weight:600">${esc(x.k)}</td>
+          <td style="text-align:right;padding-right:10px">${num(x.q)}</td>
+          <td style="text-align:right;padding-right:10px;font-weight:700;color:var(--acc)">${money(x.v)}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--mut)">${tV>0?(x.v/tV*100).toFixed(1):'0'}%</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td style="padding-left:10px">TOTAL ${esc(nomCaj).toUpperCase()}</td>
+          <td style="text-align:right;padding-right:10px">${num(tQ)}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--acc)">${money(tV)}</td>
+          <td style="text-align:right;padding-right:10px">100%</td></tr></tfoot>
+      </table></div>`:`<div class="empty">Sin pedidos en ${esc(nomCaj)}.</div>`)}`;
   },
   async segToggle(cli,on){ await fetch(SB+'/rest/v1/kruh_seguimiento?on_conflict=cliente',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({cliente:cli,contactado:!on,actualizado:new Date().toISOString()})}); this.vVentas(); },
   ventaModal(){ modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Registrar venta</h3>
