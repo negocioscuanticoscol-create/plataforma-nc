@@ -1,0 +1,339 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>El Nuevo Superior · Colchones</title>
+<style>
+  :root{
+    --navy:#10264f; --navy2:#0b1c3d; --gold:#c6a15b; --gold2:#d8b978; --goldsoft:#f3ead8;
+    --paper:#f4f5f8; --card:#ffffff; --ink:#1c2436; --ink2:#5a6478; --mut:#8b93a5;
+    --line:#e6e9f0; --line2:#f0f2f6; --ok:#2e7d55; --okbg:#e5f2ea; --bad:#b23b34; --badbg:#f7e5e3; --warn:#b5761f;
+    --sh:0 1px 2px rgba(16,38,79,.05),0 12px 30px -18px rgba(16,38,79,.30);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .serif{font-family:Georgia,"Times New Roman",serif}
+  .wrap{max-width:940px;margin:0 auto;padding:0 15px 96px}
+  /* header */
+  header{background:var(--navy);color:#fff;padding:12px 0;border-bottom:3px solid var(--gold)}
+  .hd{max-width:940px;margin:0 auto;padding:0 15px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand .mk{width:38px;height:38px;flex:none}
+  .brand .tx{line-height:1}
+  .brand .t1{font-family:Georgia,serif;font-weight:700;font-size:16px;letter-spacing:.02em}
+  .brand .t1 b{color:var(--gold2);font-weight:700}
+  .brand .t2{font-size:8.5px;letter-spacing:.4em;color:var(--gold);text-transform:uppercase;margin-top:2px}
+  .quien{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#9fb0cf;text-align:right}
+  .quien a{color:#9fb0cf;cursor:pointer;text-decoration:underline}
+  /* nav */
+  nav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;overflow-x:auto}
+  .nv{max-width:940px;margin:0 auto;display:flex;gap:1px;padding:0 8px}
+  nav button{flex:0 0 auto;background:none;border:none;padding:13px 13px;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap;font-family:inherit}
+  nav button.on{color:var(--navy);border-bottom-color:var(--gold)}
+  h1{font-family:Georgia,serif;font-size:24px;font-weight:700;margin:20px 0 2px;color:var(--navy)}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:15px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:15px;margin-bottom:12px;box-shadow:var(--sh)}
+  label{display:block;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:9px 0 4px}
+  input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);font-size:15px;font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)}
+  textarea{min-height:60px;resize:vertical}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+  .btn{padding:12px 17px;border:none;border-radius:9px;background:var(--navy);color:#fff;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
+  .btn.gold{background:var(--gold);color:var(--navy2)}
+  .btn.gh{background:transparent;border:1px solid var(--line);color:var(--ink2)}
+  .btn.full{width:100%;margin-top:10px}
+  .btn.sm{padding:7px 12px;font-size:12px;border-radius:8px}
+  .item{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px;box-shadow:var(--sh)}
+  .item .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+  .nm{font-weight:700;font-size:15px;color:var(--navy)} .mt{font-size:12.5px;color:var(--mut);margin-top:2px}
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+  @media(min-width:640px){.kpis{grid-template-columns:repeat(4,1fr)}}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px;box-shadow:var(--sh)}
+  .kpi b{display:block;font-size:20px;font-family:Georgia,serif;color:var(--navy)}
+  .kpi span{font-size:11px;color:var(--mut)}
+  .kpi.dark{background:var(--navy);color:#fff}.kpi.dark b{color:var(--gold2)}.kpi.dark span{color:#9fb0cf}
+  .chip{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:var(--goldsoft);color:var(--warn)}
+  .chip.tipo{background:#e8edf6;color:var(--navy)}
+  .chip.ok{background:var(--okbg);color:var(--ok)} .chip.bad{background:var(--badbg);color:var(--bad)}
+  .et{font-size:11.5px;font-weight:600;padding:6px 11px;border-radius:20px;border:1px solid var(--line);color:var(--ink2);cursor:pointer;background:#fff;white-space:nowrap}
+  .et.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .row{display:flex;align-items:center}
+  .dim{color:var(--mut)} .empty{text-align:center;color:var(--mut);padding:30px;font-size:14px}
+  .hint{font-size:11.5px;color:var(--mut);margin-top:6px}
+  .hide{display:none!important}
+  /* login */
+  #login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px;background:linear-gradient(165deg,#10264f,#0b1c3d)}
+  #login .card{width:100%;max-width:380px;text-align:center;padding:34px 28px;border:1px solid rgba(198,161,91,.3);background:#0e224a}
+  #login .mk{width:64px;height:64px;margin:0 auto 10px}
+  #login h2{font-family:Georgia,serif;color:#fff;font-size:20px}
+  #login h2 b{color:var(--gold2)}
+  #login .t2{font-size:9px;letter-spacing:.4em;color:var(--gold);text-transform:uppercase;margin:4px 0 18px}
+  #login input{text-align:center;letter-spacing:1px;background:#0b1c3d;border-color:#2a3f6b;color:#fff}
+  #login .err{color:#ff9a90;font-size:13px;margin-top:10px;display:none}
+  /* modal */
+  #modal{position:fixed;inset:0;background:rgba(11,28,61,.55);display:flex;align-items:flex-end;justify-content:center;z-index:50;padding:0}
+  #modal.hide{display:none}
+  #modal .box{background:#fff;width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:20px;max-height:92vh;overflow:auto}
+  @media(min-width:560px){#modal{align-items:center}#modal .box{border-radius:16px}}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;z-index:80;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .bar{height:8px;background:var(--line2);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--gold)}
+</style>
+
+<!-- marca reutilizable (cisne estilizado en dorado) -->
+<svg width="0" height="0" style="position:absolute"><symbol id="swan" viewBox="0 0 100 100">
+  <path fill="#c6a15b" d="M74 30c-3-2-7-3-11-2 2-4 1-8-2-10-2 3-6 4-9 3 1 3 0 6-2 8-8-1-16 2-22 8-7 7-9 16-6 24 1 3 4 5 7 4-1-4 0-8 3-11-1 5 1 10 5 13 6 4 14 4 21 1-9 1-17-3-20-10 5 3 11 3 16 0-6 0-11-3-13-8 12 5 26 2 33-8 3-5 3-11-0-15 2 1 4 1 6 0-2-3-4-5-6-7z"/>
+  <path fill="#d8b978" d="M28 66c8 6 20 6 29-1-9 3-19 2-26-4z"/>
+</symbol></svg>
+
+<div id="login">
+  <div class="card">
+    <svg class="mk"><use href="#swan"/></svg>
+    <h2 class="serif">EL NUEVO <b>SUPERIOR</b></h2>
+    <div class="t2">Colchones</div>
+    <input id="lg" type="password" placeholder="Clave" onkeydown="if(event.key==='Enter')App.login()">
+    <button class="btn gold full" onclick="App.login()">Entrar</button>
+    <div id="lgerr" class="err">Clave incorrecta</div>
+  </div>
+</div>
+
+<div id="app" class="hide">
+  <header><div class="hd">
+    <div class="brand"><svg class="mk"><use href="#swan"/></svg>
+      <div class="tx"><div class="t1">EL NUEVO <b>SUPERIOR</b></div><div class="t2">Colchones</div></div></div>
+    <div class="quien" id="rol"></div>
+  </div></header>
+  <nav><div class="nv" id="nav"></div></nav>
+  <div class="wrap"><div id="main"></div></div>
+</div>
+
+<div id="modal" class="hide"><div class="box" id="modalbox"></div></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function modal(h){ $('modalbox').innerHTML=h; $('modal').classList.remove('hide'); }
+function cerrar(){ $('modal').classList.add('hide'); }
+$('modal').addEventListener('click',e=>{ if(e.target.id==='modal')cerrar(); });
+
+const App={
+  SB:'https://fnayedgvamxktxfvywwl.supabase.co',
+  KEY:'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',
+  PASS:{ 'superioradmin2026':'admin', 'superior2026':'operador' },
+  TIPOS:['Cliente final','Local','Distribuidor'],
+  TRANSPORTE:['Transporte propio','Transportadora','Recoge en fábrica','Domicilio'],
+  PAGO:['Efectivo','Transferencia','Tarjeta crédito','Nequi','Crédito'],
+  TAMANOS:['Sencilla 100x190','Semidoble 120x190','Doble 140x190','Queen 160x190','King 200x200','Especial (a medida)'],
+  TIPOCOL:['Resortado','Espuma','Híbrido','Ortopédico','Pillow top'],
+  FIRMEZA:['Suave','Medio','Firme','Extra firme'],
+  ESTPROG:['pendiente','en proceso','terminado','entregado'],
+  rol:'', view:'dash',
+  _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],
+
+  _H(){ return {apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':'application/json'}; },
+  _loadLocal(k){ try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return [];} },
+  _saveLocal(k,a){ try{localStorage.setItem(k,JSON.stringify(a));}catch(e){} },
+  async _fetch(t){
+    try{ const r=await fetch(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc&limit=8000',{headers:this._H()});
+      if(r.ok){ this._onl[t]=true; return await this._recon(t, await r.json()); } }catch(e){}
+    this._onl[t]=false; return this._loadLocal(t);
+  },
+  async _recon(t,cloud){ const local=this._loadLocal(t); const ids=new Set(cloud.map(x=>x&&x.id)); const miss=local.filter(x=>x&&x.id&&!ids.has(x.id));
+    for(const row of miss){ try{ await fetch(this.SB+'/rest/v1/'+t+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});}catch(e){} }
+    const merged=miss.length?[...miss,...cloud]:cloud; merged.sort((a,b)=>String((b&&b.creado_en)||'').localeCompare(String((a&&a.creado_en)||''))); this._saveLocal(t,merged); return merged; },
+  async _sync(){
+    this._cli=await this._fetch('superior_clientes');
+    this._inv=await this._fetch('superior_inventario');
+    this._ped=await this._fetch('superior_pedidos');
+    this._prog=await this._fetch('superior_programacion');
+    this._leads=await this._fetch('superior_leads');
+    this._online=Object.values(this._onl).some(Boolean);
+  },
+  async _put(t,row,arr){ this._saveLocal(t,arr); if(this._onl[t]){ try{ await fetch(this.SB+'/rest/v1/'+t+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});}catch(e){} } },
+  async _del(t,id,arr){ this._saveLocal(t,arr); if(this._onl[t]){ try{ await fetch(this.SB+'/rest/v1/'+t+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:this._H()});}catch(e){} } },
+
+  login(){ const p=($('lg').value||'').trim(); const rol=this.PASS[p]; if(!rol){$('lgerr').style.display='block';return;} this.rol=rol; sessionStorage.setItem('sup_rol',rol); this._start(); },
+  logout(){ sessionStorage.removeItem('sup_rol'); location.reload(); },
+  async _start(){ $('login').classList.add('hide'); $('app').classList.remove('hide');
+    $('rol').innerHTML=(this.rol==='admin'?'Admin':'Operador')+' · <a onclick="App.logout()">salir</a>';
+    $('main').innerHTML='<div class="empty">Cargando…</div>'; await this._sync(); this.pintarNav(); this.go('dash'); },
+  pintarNav(){ const T=[['dash','Dashboard'],['inv','Inventarios'],['cli','Cliente'],['crm','CRM'],['ped','Pedidos'],['prog','Programación']];
+    $('nav').innerHTML=T.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
+  go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); window.scrollTo(0,0);
+    ({dash:this.vDash,inv:this.vInv,cli:this.vCli,crm:this.vCrm,ped:this.vPed,prog:this.vProg}[v]||this.vDash).call(this); },
+  set(h){ $('main').innerHTML=h; },
+  esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
+  money(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
+  num(n){ return (+n||0).toLocaleString('es-CO'); },
+  toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; document.body.appendChild(t); setTimeout(()=>t.remove(),2500); },
+  _mesIni(){ const d=new Date(); return new Date(d.getFullYear(),d.getMonth(),1); },
+
+  /* ---------- DASHBOARD ---------- */
+  vDash(){ const mi=this._mesIni();
+    const pedMes=this._ped.filter(p=>new Date(p.creado_en)>=mi);
+    const enProg=this._prog.filter(p=>p.estado!=='entregado');
+    const valorInv=this._inv.reduce((a,p)=>a+(+p.existencias||0)*(+p.precio||0),0);
+    const bajo=this._inv.filter(p=>(+p.minimo||0)>0&&(+p.existencias||0)<=(+p.minimo||0));
+    this.set(`<h1>Dashboard</h1><div class="sub">Resumen de ${new Date().toLocaleDateString('es-CO',{month:'long',year:'numeric'})}${this._online?'':' · <span style="color:var(--warn)">modo local</span>'}</div>
+      <div class="kpis">
+        <div class="kpi dark"><b>${pedMes.length}</b><span>Pedidos del mes</span></div>
+        <div class="kpi"><b style="color:var(--warn)">${enProg.length}</b><span>En programación</span></div>
+        <div class="kpi"><b>${this._cli.length}</b><span>Clientes</span></div>
+        <div class="kpi"><b>${this.money(valorInv)}</b><span>Valor inventario</span></div>
+      </div>
+      ${bajo.length?`<div class="card" style="border-left:4px solid var(--bad);background:var(--badbg)"><b style="color:var(--bad)">⚠️ ${bajo.length} referencia(s) en o bajo el mínimo</b><div style="font-size:12.5px;margin-top:4px">${bajo.map(p=>this.esc(p.referencia||p.nombre)+' ('+this.num(p.existencias)+')').join(' · ')}</div></div>`:''}
+      <h1 style="font-size:18px">Pedidos recientes</h1>
+      ${this._ped.length?this._ped.slice(0,10).map(p=>`<div class="item"><div class="top"><div>
+        <div class="nm">${this.esc(p.referencia||'—')} · ${this.esc(p.cliente||'—')}</div>
+        <div class="mt">🚚 ${this.esc(p.tipo_transporte||'—')} · 💳 ${this.esc(p.forma_pago||'—')} · 📅 ${(p.creado_en||'').slice(0,10)}</div></div>
+        <div class="nm">${this.money(p.total)}</div></div></div>`).join(''):'<div class="empty">Aún sin pedidos.</div>'}`);
+  },
+
+  /* ---------- INVENTARIOS ---------- */
+  vInv(){ const arr=this._inv;
+    this.set(`<h1>Inventarios</h1><div class="sub">Referencias de colchón · stock, precio y mínimo</div>
+      <button class="btn gold" onclick="App.invModal()">＋ Nueva referencia</button>
+      <div style="margin-top:12px">${arr.length?arr.map(p=>{const bajo=(+p.minimo||0)>0&&(+p.existencias||0)<=(+p.minimo||0);return `<div class="item"><div class="top"><div>
+        <div class="nm">${this.esc(p.referencia||p.nombre||'—')} ${bajo?'<span class="chip bad">bajo</span>':''}</div>
+        <div class="mt">${this.esc(p.tamano||'')}${p.material?' · '+this.esc(p.material):''} · ${this.money(p.precio)}</div></div>
+        <div style="text-align:right"><b style="font-size:20px;color:var(--navy)">${this.num(p.existencias)}</b><div class="mt">unid.</div></div></div>
+        <div class="row" style="gap:6px;margin-top:8px"><button class="btn gh sm" onclick="App.invMov('${p.id}',1)">＋ entra</button>
+          <button class="btn gh sm" onclick="App.invMov('${p.id}',-1)">− sale</button>
+          <button class="btn gh sm" onclick="App.invModal('${p.id}')">✎</button>
+          <button class="btn gh sm" style="color:var(--bad)" onclick="App.invDel('${p.id}')">✕</button></div></div>`;}).join(''):'<div class="empty">Sin referencias. Crea la primera.</div>'}</div>`);
+  },
+  invModal(id){ const p=this._inv.find(x=>x.id===id)||{};
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Nueva'} referencia</h3>
+      <div class="g2"><div><label>Referencia</label><input id="i_ref" value="${this.esc(p.referencia||'')}"></div>
+      <div><label>Nombre / línea</label><input id="i_nom" value="${this.esc(p.nombre||'')}"></div></div>
+      <div class="g2"><div><label>Tamaño</label><select id="i_tam">${this.TAMANOS.map(t=>`<option ${p.tamano===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label>Material</label><input id="i_mat" value="${this.esc(p.material||'')}" placeholder="Resortes, espuma…"></div></div>
+      <div class="g3"><div><label>Precio</label><input id="i_pre" type="number" value="${p.precio||0}"></div>
+      <div><label>Existencias</label><input id="i_exi" type="number" value="${p.existencias||0}"></div>
+      <div><label>Stock mínimo</label><input id="i_min" type="number" value="${p.minimo||0}"></div></div>
+      <button class="btn gold full" onclick="App.invSave('${id||''}')">Guardar</button>`); },
+  async invSave(id){ const g=x=>($(x).value||'').trim();
+    const row={id:id||('i'+Date.now()),referencia:g('i_ref'),nombre:g('i_nom'),tamano:$('i_tam').value,material:g('i_mat'),precio:+$('i_pre').value||0,existencias:+$('i_exi').value||0,minimo:+$('i_min').value||0,creado_en:(this._inv.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    if(!row.referencia&&!row.nombre){alert('Referencia o nombre');return;}
+    const i=this._inv.findIndex(x=>x.id===row.id); if(i>=0)this._inv[i]=row; else this._inv.unshift(row);
+    await this._put('superior_inventario',row,this._inv); cerrar(); this.toast('Guardado'); this.vInv(); },
+  async invMov(id,delta){ const p=this._inv.find(x=>x.id===id); if(!p)return; const v=prompt((delta>0?'Cuántas ENTRAN':'Cuántas SALEN')+':'); if(v===null)return; const q=+v||0; if(q<=0)return;
+    p.existencias=(+p.existencias||0)+delta*q; await this._put('superior_inventario',p,this._inv); this.toast('Stock actualizado'); this.vInv(); },
+  async invDel(id){ if(!confirm('¿Eliminar referencia?'))return; this._inv=this._inv.filter(x=>x.id!==id); await this._del('superior_inventario',id,this._inv); this.vInv(); },
+
+  /* ---------- CLIENTE (ficha técnica) ---------- */
+  vCli(){ const arr=this._cli;
+    this.set(`<h1>Cliente</h1><div class="sub">Ficha técnica · ${arr.length} cliente(s)</div>
+      <button class="btn gold" onclick="App.cliModal()">＋ Nuevo cliente</button>
+      <div style="margin-top:12px">${arr.length?arr.map(c=>`<div class="item"><div class="top"><div>
+        <div class="nm">${this.esc(c.nombre||'—')} <span class="chip tipo">${this.esc(c.tipo||'—')}</span></div>
+        <div class="mt">${c.local_num?'🏬 Local '+this.esc(c.local_num)+' · ':''}${c.telefono?'📞 '+this.esc(c.telefono):''}${c.ciudad?' · '+this.esc(c.ciudad):''}</div>
+        ${c.nit||c.contacto?`<div class="mt">${c.nit?'NIT '+this.esc(c.nit):''}${c.contacto?' · '+this.esc(c.contacto):''}</div>`:''}</div>
+        <div class="row" style="gap:6px"><a onclick="App.cliModal('${c.id}')" style="cursor:pointer;color:var(--mut)">✎</a><a onclick="App.cliDel('${c.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div></div>`).join(''):'<div class="empty">Sin clientes. Crea la ficha del primero.</div>'}</div>`);
+  },
+  cliModal(id){ const c=this._cli.find(x=>x.id===id)||{};
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Nuevo'} cliente</h3>
+      <div class="g2"><div><label>Nombre / Razón social</label><input id="c_nom" value="${this.esc(c.nombre||'')}"></div>
+      <div><label>Tipo</label><select id="c_tipo">${this.TIPOS.map(t=>`<option ${c.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
+      <div class="g2"><div><label>N° de local</label><input id="c_loc" value="${this.esc(c.local_num||'')}" placeholder="Solo si es local"></div>
+      <div><label>Teléfono</label><input id="c_tel" value="${this.esc(c.telefono||'')}"></div></div>
+      <label>Dirección</label><input id="c_dir" value="${this.esc(c.direccion||'')}">
+      <div class="g2"><div><label>Ciudad</label><input id="c_ciu" value="${this.esc(c.ciudad||'')}"></div>
+      <div><label>NIT / Cédula</label><input id="c_nit" value="${this.esc(c.nit||'')}"></div></div>
+      <div class="g2"><div><label>Contacto</label><input id="c_con" value="${this.esc(c.contacto||'')}"></div>
+      <div><label>Email</label><input id="c_email" value="${this.esc(c.email||'')}"></div></div>
+      <label>Notas</label><textarea id="c_not">${this.esc(c.notas||'')}</textarea>
+      <button class="btn gold full" onclick="App.cliSave('${id||''}')">Guardar</button>`); },
+  async cliSave(id){ const g=x=>($(x).value||'').trim();
+    const row={id:id||('c'+Date.now()),nombre:g('c_nom'),tipo:$('c_tipo').value,local_num:g('c_loc'),telefono:g('c_tel'),direccion:g('c_dir'),ciudad:g('c_ciu'),nit:g('c_nit'),contacto:g('c_con'),email:g('c_email'),notas:g('c_not'),creado_en:(this._cli.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    if(!row.nombre){alert('Nombre');return;}
+    const i=this._cli.findIndex(x=>x.id===row.id); if(i>=0)this._cli[i]=row; else this._cli.unshift(row);
+    await this._put('superior_clientes',row,this._cli); cerrar(); this.toast('Guardado'); this.vCli(); },
+  async cliDel(id){ if(!confirm('¿Eliminar cliente?'))return; this._cli=this._cli.filter(x=>x.id!==id); await this._del('superior_clientes',id,this._cli); this.vCli(); },
+
+  /* ---------- CRM ---------- */
+  ETAPAS:['contactado','interesado','pedido','cliente'],
+  EM:{contactado:'👋 Contactado',interesado:'💡 Interesado',pedido:'📋 Pedido',cliente:'🛒 Cliente'},
+  vCrm(){ const arr=this._leads;
+    this.set(`<h1>CRM</h1><div class="sub">Embudo 👋 → 💡 → 📋 → 🛒</div>
+      <button class="btn gold" onclick="App.leadModal()">＋ Registro</button>
+      <div style="margin-top:12px">${arr.length?arr.map(l=>`<div class="item"><div class="top"><div>
+        <div class="nm">${this.esc(l.nombre||'—')} <span class="chip tipo">${this.esc(l.tipo||'—')}</span></div>
+        <div class="mt">${l.telefono?'📞 '+this.esc(l.telefono):''}${l.local_num?' · 🏬 Local '+this.esc(l.local_num):''}${l.ciudad?' · '+this.esc(l.ciudad):''}${l.interes?' · '+this.esc(l.interes):''}</div></div>
+        <a onclick="App.leadDel('${l.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div>
+        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${this.ETAPAS.map(e=>`<span class="et ${l.etapa===e?'on':''}" onclick="App.leadEtapa('${l.id}','${e}')">${this.EM[e]}</span>`).join('')}</div></div>`).join(''):'<div class="empty">Sin registros.</div>'}</div>`);
+  },
+  leadModal(){ modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">Nuevo registro</h3>
+    <div class="g2"><div><label>Nombre</label><input id="l_nom"></div><div><label>Teléfono</label><input id="l_tel"></div></div>
+    <div class="g2"><div><label>Tipo</label><select id="l_tipo">${this.TIPOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
+    <div><label>N° de local</label><input id="l_loc"></div></div>
+    <div class="g2"><div><label>Ciudad</label><input id="l_ciu"></div><div><label>Interés</label><input id="l_int"></div></div>
+    <button class="btn gold full" onclick="App.leadSave()">Guardar</button>`); },
+  async leadSave(){ const g=x=>($(x).value||'').trim(); const row={id:'l'+Date.now(),nombre:g('l_nom'),telefono:g('l_tel'),tipo:$('l_tipo').value,local_num:g('l_loc'),ciudad:g('l_ciu'),interes:g('l_int'),etapa:'contactado',creado_en:new Date().toISOString()};
+    if(!row.nombre){alert('Nombre');return;} this._leads.unshift(row); await this._put('superior_leads',row,this._leads); cerrar(); this.toast('Registrado'); this.vCrm(); },
+  async leadEtapa(id,e){ const l=this._leads.find(x=>x.id===id); if(!l)return; l.etapa=e; await this._put('superior_leads',l,this._leads); this.vCrm(); },
+  async leadDel(id){ if(!confirm('¿Eliminar?'))return; this._leads=this._leads.filter(x=>x.id!==id); await this._del('superior_leads',id,this._leads); this.vCrm(); },
+
+  /* ---------- PEDIDOS ---------- */
+  vPed(){ const arr=this._ped;
+    this.set(`<h1>Pedidos</h1><div class="sub">Toma de pedido · referencia, cliente, transporte y forma de pago</div>
+      <button class="btn gold" onclick="App.pedModal()">＋ Tomar pedido</button>
+      <div style="margin-top:12px">${arr.length?arr.map(p=>`<div class="item"><div class="top"><div>
+        <div class="nm">${this.esc(p.referencia||'—')} · ${this.esc(p.cliente||'—')}</div>
+        <div class="mt">🚚 ${this.esc(p.tipo_transporte||'—')} · 💳 ${this.esc(p.forma_pago||'—')} · 📅 ${(p.creado_en||'').slice(0,10)}</div></div>
+        <div style="text-align:right"><div class="nm">${this.money(p.total)}</div>
+        <div class="row" style="gap:6px;margin-top:4px"><a onclick="App.pedProgramar('${p.id}')" style="cursor:pointer;color:var(--gold);font-weight:700;font-size:12px">→ programar</a><a onclick="App.pedDel('${p.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div></div></div>`).join(''):'<div class="empty">Sin pedidos.</div>'}</div>`);
+  },
+  pedModal(id){ const p=this._ped.find(x=>x.id===id)||{};
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Tomar'} pedido</h3>
+      <div class="g2"><div><label>Referencia</label><input id="p_ref" value="${this.esc(p.referencia||'')}"></div>
+      <div><label>Total</label><input id="p_tot" type="number" value="${p.total||0}"></div></div>
+      <label>Cliente</label><select id="p_cli">${this._cli.length?this._cli.map(c=>`<option value="${c.id}" ${p.cliente_id===c.id?'selected':''}>${this.esc(c.nombre)}${c.local_num?' (Local '+this.esc(c.local_num)+')':''}</option>`).join(''):'<option value="">— crea clientes primero —</option>'}</select>
+      <div class="g2"><div><label>Tipo de transporte</label><select id="p_tra">${this.TRANSPORTE.map(t=>`<option ${p.tipo_transporte===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label>Forma de pago</label><select id="p_pag">${this.PAGO.map(t=>`<option ${p.forma_pago===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
+      <button class="btn gold full" onclick="App.pedSave('${id||''}')">Guardar pedido</button>`); },
+  async pedSave(id){ const g=x=>($(x).value||'').trim(); const cliId=$('p_cli').value; const cliNom=(this._cli.find(x=>x.id===cliId)||{}).nombre||'';
+    const row={id:id||('p'+Date.now()),referencia:g('p_ref'),cliente_id:cliId,cliente:cliNom,tipo_transporte:$('p_tra').value,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    if(!row.referencia){alert('Referencia');return;}
+    const i=this._ped.findIndex(x=>x.id===row.id); if(i>=0)this._ped[i]=row; else this._ped.unshift(row);
+    await this._put('superior_pedidos',row,this._ped); cerrar(); this.toast('Pedido guardado'); this.vPed(); },
+  async pedDel(id){ if(!confirm('¿Eliminar pedido?'))return; this._ped=this._ped.filter(x=>x.id!==id); await this._del('superior_pedidos',id,this._ped); this.vPed(); },
+  pedProgramar(id){ const p=this._ped.find(x=>x.id===id); if(!p)return; this.progModal('',{pedido_id:id,cliente:p.cliente,local_num:(this._cli.find(x=>x.id===p.cliente_id)||{}).local_num||'',referencia:p.referencia}); },
+
+  /* ---------- PROGRAMACIÓN ---------- */
+  vProg(){ const arr=this._prog;
+    this.set(`<h1>Programación de pedido</h1><div class="sub">Características del colchón a fabricar</div>
+      <button class="btn gold" onclick="App.progModal()">＋ Programar colchón</button>
+      <div style="margin-top:12px">${arr.length?arr.map(p=>`<div class="item"><div class="top"><div>
+        <div class="nm">${this.esc(p.referencia||p.tamano||'Colchón')} <span class="chip ${p.estado==='entregado'?'ok':(p.estado==='terminado'?'ok':'')}">${this.esc(p.estado||'pendiente')}</span></div>
+        <div class="mt">👤 ${this.esc(p.cliente||'—')}${p.local_num?' · 🏬 Local '+this.esc(p.local_num):''}</div>
+        <div class="mt">${this.esc(p.tamano||'')}${p.alto?' · '+this.esc(p.alto)+'cm':''}${p.tipo?' · '+this.esc(p.tipo):''}${p.firmeza?' · '+this.esc(p.firmeza):''}${p.pillow==='Sí'?' · pillow':''}${p.color?' · '+this.esc(p.color):''} · x${this.num(p.cantidad||1)}</div>
+        ${p.observaciones?`<div class="mt">📝 ${this.esc(p.observaciones)}</div>`:''}</div>
+        <div class="row" style="gap:6px"><a onclick="App.progModal('${p.id}')" style="cursor:pointer;color:var(--mut)">✎</a><a onclick="App.progDel('${p.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div>
+        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${this.ESTPROG.map(e=>`<span class="et ${p.estado===e?'on':''}" onclick="App.progEstado('${p.id}','${e}')">${e}</span>`).join('')}</div></div>`).join(''):'<div class="empty">Sin colchones programados.</div>'}</div>`);
+  },
+  progModal(id,pre){ const p=id?(this._prog.find(x=>x.id===id)||{}):(pre||{});
+    const cliOpts=this._cli.map(c=>`<option value="${c.id}" data-loc="${this.esc(c.local_num||'')}" ${p.cliente===c.nombre?'selected':''}>${this.esc(c.nombre)}${c.local_num?' · Local '+this.esc(c.local_num):''}</option>`).join('');
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Programar'} colchón</h3>
+      <label>Cliente (solo nombre y N° de local)</label>
+      <select id="pg_cli" onchange="App.progCliPick()">${p.cliente&&!this._cli.find(c=>c.nombre===p.cliente)?`<option selected>${this.esc(p.cliente)}</option>`:''}<option value="">— seleccionar —</option>${cliOpts}</select>
+      <div class="g2" style="margin-top:4px"><div><label>Cliente</label><input id="pg_nom" value="${this.esc(p.cliente||'')}" readonly style="background:#f4f5f8"></div>
+      <div><label>N° de local</label><input id="pg_loc" value="${this.esc(p.local_num||'')}" readonly style="background:#f4f5f8"></div></div>
+      <div class="g2"><div><label>Referencia</label><input id="pg_ref" value="${this.esc(p.referencia||'')}"></div>
+      <div><label>Cantidad</label><input id="pg_cant" type="number" value="${p.cantidad||1}"></div></div>
+      <div class="g2"><div><label>Tamaño</label><select id="pg_tam">${this.TAMANOS.map(t=>`<option ${p.tamano===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label>Alto (cm)</label><input id="pg_alto" value="${this.esc(p.alto||'')}"></div></div>
+      <div class="g2"><div><label>Tipo</label><select id="pg_tipo">${this.TIPOCOL.map(t=>`<option ${p.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label>Firmeza</label><select id="pg_fir">${this.FIRMEZA.map(t=>`<option ${p.firmeza===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
+      <div class="g3"><div><label>Tela / tapizado</label><input id="pg_tela" value="${this.esc(p.tela||'')}"></div>
+      <div><label>Color</label><input id="pg_color" value="${this.esc(p.color||'')}"></div>
+      <div><label>Pillow top</label><select id="pg_pil"><option ${p.pillow==='No'?'selected':''}>No</option><option ${p.pillow==='Sí'?'selected':''}>Sí</option></select></div></div>
+      <label>Observaciones</label><textarea id="pg_obs">${this.esc(p.observaciones||'')}</textarea>
+      <button class="btn gold full" onclick="App.progSave('${id||''}','${this.esc(p.pedido_id||'')}')">Guardar programación</button>`); },
+  progCliPick(){ const s=$('pg_cli'), o=s.options[s.selectedIndex]; if(!o)return; $('pg_nom').value=o.value?o.textContent.split(' · Local')[0]:''; $('pg_loc').value=o.dataset?(o.dataset.loc||''):''; },
+  async progSave(id,pedId){ const g=x=>($(x).value||'').trim();
+    const row={id:id||('pg'+Date.now()),pedido_id:pedId||'',cliente:g('pg_nom'),local_num:g('pg_loc'),referencia:g('pg_ref'),cantidad:+$('pg_cant').value||1,tamano:$('pg_tam').value,alto:g('pg_alto'),tipo:$('pg_tipo').value,firmeza:$('pg_fir').value,tela:g('pg_tela'),color:g('pg_color'),pillow:$('pg_pil').value,observaciones:g('pg_obs'),estado:(this._prog.find(x=>x.id===id)||{}).estado||'pendiente',creado_en:(this._prog.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    const i=this._prog.findIndex(x=>x.id===row.id); if(i>=0)this._prog[i]=row; else this._prog.unshift(row);
+    await this._put('superior_programacion',row,this._prog); cerrar(); this.toast('Programado'); this.vProg(); },
+  async progEstado(id,e){ const p=this._prog.find(x=>x.id===id); if(!p)return; p.estado=e; await this._put('superior_programacion',p,this._prog); this.vProg(); },
+  async progDel(id){ if(!confirm('¿Eliminar programación?'))return; this._prog=this._prog.filter(x=>x.id!==id); await this._del('superior_programacion',id,this._prog); this.vProg(); },
+};
+(function(){ const r=sessionStorage.getItem('sup_rol'); if(r&&Object.values(App.PASS).includes(r)){ App.rol=r; App._start(); } else { setTimeout(()=>{const e=$('lg');if(e)e.focus();},80); } })();
+</script>
