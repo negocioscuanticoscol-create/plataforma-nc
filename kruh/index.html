@@ -741,7 +741,7 @@ const App={
   /* ===================== VENTAS (clientes, estilo Smart) ===================== */
   async vVentas(){
     this.loading();
-    const [ventas,seg]=await Promise.all([GET('kruh_ventas?order=creado_en.desc&limit=8000'),GET('kruh_seguimiento?limit=3000')]);
+    const [ventas,seg,peds]=await Promise.all([GET('kruh_ventas?order=creado_en.desc&limit=8000'),GET('kruh_seguimiento?limit=3000'),GET('kruh_pedidos?select=items,creado_en&limit=3000')]);
     const segSet={}; seg.forEach(s=>segSet[s.cliente]=s.contactado);
     const mesIni=new Date(); mesIni.setDate(1); mesIni.setHours(0,0,0,0);
     const by={};
@@ -772,8 +772,40 @@ const App={
         <div class="row" style="gap:9px;align-items:flex-start"><span class="circ ${o.estemes?'on':''}" title="${o.estemes?'compró este mes':'no este mes'}"></span>
           <div><div class="nm">${esc(o.cliente)} <small class="dim">(${o.compras})</small></div>
           <div class="mt">💰 mes ${money(o.mesMonto)} · ~sem ${money(o.semanal)} · última ${(o.ultima||'').slice(0,10)}</div></div></div>
-        <div class="row" style="gap:8px">${tel?`<a href="https://wa.me/57${tel}" target="_blank" class="btn sm" style="background:#25a35a;color:#fff">📱</a>`:''}
-          <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div></div>`;}).join(''):'<div class="empty">Sin ventas. Se llenan solas con los Pedidos, o registra una aquí.</div>'}</div>`);
+        <div class="row" style="gap:8px">
+          <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div></div>`;}).join(''):'<div class="empty">Sin ventas. Se llenan solas con los Pedidos, o registra una aquí.</div>'}</div>
+      ${this._resumenProductos(peds,mesIni)}`);
+  },
+  _resumenProductos(peds,mesIni){
+    const mesR={}, todoR={};
+    (peds||[]).forEach(p=>{ const delMes=new Date(p.creado_en)>=mesIni;
+      (p.items||[]).forEach(it=>{ const k=it.nombre||'—', q=+it.qty||0, v=q*(+it.precio||0);
+        const a=todoR[k]=todoR[k]||{q:0,v:0}; a.q+=q; a.v+=v;
+        if(delMes){ const b=mesR[k]=mesR[k]||{q:0,v:0}; b.q+=q; b.v+=v; } }); });
+    const filas=Object.entries(todoR).map(([k,t])=>({k,mq:(mesR[k]||{}).q||0,mv:(mesR[k]||{}).v||0,tq:t.q,tv:t.v})).sort((a,b)=>b.mv-a.mv||b.tv-a.tv);
+    const tMq=filas.reduce((a,f)=>a+f.mq,0), tMv=filas.reduce((a,f)=>a+f.mv,0);
+    const tTq=filas.reduce((a,f)=>a+f.tq,0), tTv=filas.reduce((a,f)=>a+f.tv,0);
+    return `<h1 style="font-size:18px;margin-top:24px">Resumen por producto</h1>
+      <div class="sub">Cuánto se vendió de cada uno · sale de los pedidos generados</div>
+      ${filas.length?`<div class="tbwrap"><table class="tb" style="min-width:560px">
+        <thead><tr><th style="min-width:180px">Producto</th>
+          <th style="text-align:right">Unidades del mes</th><th style="text-align:right">Valor del mes</th>
+          <th style="text-align:right">% del mes</th>
+          <th style="text-align:right">Unidades histórico</th><th style="text-align:right">Valor histórico</th></tr></thead>
+        <tbody>${filas.map(f=>`<tr>
+          <td style="padding-left:10px;font-weight:600">${esc(f.k)}</td>
+          <td style="text-align:right;padding-right:10px">${num(f.mq)}</td>
+          <td style="text-align:right;padding-right:10px;font-weight:700;color:var(--acc)">${money(f.mv)}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--mut)">${tMv>0?(f.mv/tMv*100).toFixed(1):'0'}%</td>
+          <td style="text-align:right;padding-right:10px;color:var(--mut)">${num(f.tq)}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--mut)">${money(f.tv)}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td style="padding-left:10px">TOTAL</td>
+          <td style="text-align:right;padding-right:10px">${num(tMq)}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--acc)">${money(tMv)}</td>
+          <td style="text-align:right;padding-right:10px">100%</td>
+          <td style="text-align:right;padding-right:10px">${num(tTq)}</td>
+          <td style="text-align:right;padding-right:10px">${money(tTv)}</td></tr></tfoot>
+      </table></div>`:'<div class="empty">Aún no hay pedidos con productos para resumir.</div>'}`;
   },
   async segToggle(cli,on){ await fetch(SB+'/rest/v1/kruh_seguimiento?on_conflict=cliente',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({cliente:cli,contactado:!on,actualizado:new Date().toISOString()})}); this.vVentas(); },
   ventaModal(){ modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Registrar venta</h3>
