@@ -769,13 +769,7 @@ const App={
         <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total juntos</span><b style="color:var(--acc)">${money(tarTot+otrTot)}</b></div></div>
       <div class="row" style="gap:8px"><button class="btn acc" onclick="App.ventaModal()">＋ Registrar venta</button>
         <button class="btn gh" onclick="App.ventasExcel()">⬇ Excel contabilidad</button></div>
-      <div style="margin-top:12px">${arr.length?arr.map(o=>{const tel=(o.tel||'').replace(/\\D/g,'');const on=segSet[o.cliente];return `<div class="item"><div class="top">
-        <div class="row" style="gap:9px;align-items:flex-start"><span class="circ ${o.estemes?'on':''}" title="${o.estemes?'compró este mes':'no este mes'}"></span>
-          <div><div class="nm">${esc(o.cliente)} <small class="dim">(${o.compras})</small></div>
-          <div class="mt">💰 mes ${money(o.mesMonto)} · ~sem ${money(o.semanal)} · última ${(o.ultima||'').slice(0,10)}</div></div></div>
-        <div class="row" style="gap:8px">
-          <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div></div>`;}).join(''):'<div class="empty">Sin ventas. Se llenan solas con los Pedidos, o registra una aquí.</div>'}</div>
-      ${this._resumenProductos(peds)}`);
+      ${this._resumenProductos(peds,ventas,segSet)}`);
   },
   DOWC:['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],
   _diaKey(d){ const x=new Date(d); return isNaN(x)?'':x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); },
@@ -806,7 +800,26 @@ const App={
           :'<div class="hint">Todavía no hay ventas este mes.</div>'}
       </div></div>`;
   },
-  _resumenProductos(peds){
+  _clientesPeriodo(ventas,caj,segSet){
+    const hoyK=this._diaKey(new Date()), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
+    const enP=v=>{ const k=this._diaKey(v.creado_en); if(!k)return false;
+      return caj==='dia'?k===hoyK:(caj==='mes'?k.slice(0,7)===mesK:k.slice(0,4)===anoK); };
+    const by={};
+    (ventas||[]).filter(enP).forEach(v=>{ const k=(v.cliente||'—').trim();
+      const o=by[k]=by[k]||{cliente:k,tel:v.telefono||'',compras:0,monto:0,ultima:v.creado_en};
+      o.compras++; o.monto+=(+v.monto||0); if(v.creado_en>o.ultima)o.ultima=v.creado_en; if(v.telefono)o.tel=v.telefono; });
+    const arr=Object.values(by).sort((a,b)=>b.monto-a.monto);
+    const tot=arr.reduce((a,o)=>a+o.monto,0);
+    return `<h1 style="font-size:17px;margin-top:18px">Clientes · ${arr.length} · ${money(tot)}</h1>
+      ${arr.length?arr.map(o=>{const on=(segSet||{})[o.cliente];return `<div class="item"><div class="top">
+        <div class="row" style="gap:9px;align-items:flex-start"><span class="circ on" title="compró en este periodo"></span>
+          <div><div class="nm">${esc(o.cliente)} <small class="dim">(${o.compras})</small></div>
+          <div class="mt">💰 ${money(o.monto)} · ${tot>0?(o.monto/tot*100).toFixed(1):'0'}% · última ${(o.ultima||'').slice(0,10)}</div></div></div>
+        <div class="row" style="gap:8px">
+          <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div></div>`;}).join('')
+        :'<div class="empty">Ningún cliente compró en este periodo.</div>'}`;
+  },
+  _resumenProductos(peds,ventas,segSet){
     const f=new Date(), hoyK=this._diaKey(f), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
     const B={dia:{},mes:{},ano:{}};
     (peds||[]).forEach(p=>{ const k=this._diaKey(p.creado_en); if(!k)return;
@@ -822,13 +835,15 @@ const App={
     const filas=Object.entries(sel).map(([k,o])=>({k,q:o.q,v:o.v})).sort((a,b)=>b.v-a.v);
     const tQ=filas.reduce((a,x)=>a+x.q,0), tV=filas.reduce((a,x)=>a+x.v,0);
     const nomCaj=((CJ.find(c=>c[0]===caj)||[])[2]||'');
-    return `<h1 style="font-size:18px;margin-top:24px">Resumen por producto</h1>
-      <div class="sub">Cuánto se vendió de cada uno · sale de los pedidos generados</div>
+    return `<h1 style="font-size:18px;margin-top:24px">Clientes y productos</h1>
+      <div class="sub">Toca un cajón para ver quién compró y qué se vendió en ese periodo</div>
       <div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap">${CJ.map(([k,t,sub])=>`
         <div class="cajon ${caj===k?'on':''}" onclick="App._resProd=App._resProd==='${k}'?'':'${k}';App.vVentas()">
           <b>${money(tot(k))}</b>${t}<div style="font-size:11px;opacity:.75">${esc(sub)}</div></div>`).join('')}</div>
-      ${!caj?'<div class="empty">👆 Toca Día, Mes o Año para ver el detalle por producto.</div>'
-        :(filas.length?`<div class="tbwrap"><table class="tb" style="min-width:460px">
+      ${!caj?'<div class="empty">👆 Toca Día, Mes o Año para ver los clientes y los productos.</div>'
+        :this._clientesPeriodo(ventas,caj,segSet)+
+        `<h1 style="font-size:17px;margin-top:20px">Productos · ${esc(nomCaj)}</h1>`+
+        (filas.length?`<div class="tbwrap"><table class="tb" style="min-width:460px">
         <thead><tr><th style="min-width:190px">Producto</th><th style="text-align:right">Unidades</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr></thead>
         <tbody>${filas.map(x=>`<tr>
           <td style="padding-left:10px;font-weight:600">${esc(x.k)}</td>
