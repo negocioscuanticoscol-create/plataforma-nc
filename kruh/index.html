@@ -333,15 +333,16 @@ const App={
     this.loading();
     const leads=await GET('kruh_leads?order=creado_en.desc&limit=2000'); this._leads=leads;
     const EM={contactado:'👋 Contactado',interesado:'💡 Interesado',pedido:'📋 Pedido',cliente:'🛒 Cliente'};
-    const caj=this._crmCajon||'nuevos', can=this._crmCanal||'todos';
-    const comun=leads.filter(l=>l.tipo==='comunidad'), nuevos=leads.filter(l=>(l.tipo||'nuevo')!=='comunidad');
-    let lista=caj==='comunidad'?comun:nuevos;
-    if(caj==='nuevos'&&can!=='todos') lista=lista.filter(l=>(l.canal||'local')===can);
+    const caj=this._crmCajon||'comunidad', can=this._crmCanal||'todos';
+    const nuevos=leads.filter(l=>(l.tipo||'nuevo')!=='comunidad');
+    const base=caj==='comunidad'?leads:nuevos;   // Comunidad = todo el universo
+    let lista=base;
+    if(can!=='todos') lista=lista.filter(l=>(l.canal||'local')===can);
     this.set(`<h1>CRM</h1><div class="sub">Comunidad y nuevos por canal · embudo 👋 → 💡 → 📋 → 🛒</div>
       <div class="row" style="gap:10px;margin-bottom:12px">
-        <div class="cajon ${caj==='comunidad'?'on':''}" onclick="App._crmCajon='comunidad';App.vCrm()"><b>${comun.length}</b>👥 Comunidad</div>
+        <div class="cajon ${caj==='comunidad'?'on':''}" onclick="App._crmCajon='comunidad';App.vCrm()"><b>${leads.length}</b>👥 Comunidad</div>
         <div class="cajon ${caj==='nuevos'?'on':''}" onclick="App._crmCajon='nuevos';App.vCrm()"><b>${nuevos.length}</b>✨ Nuevos</div></div>
-      ${caj==='nuevos'?`<div class="row" style="gap:6px;margin-bottom:12px">${this.CANALES.map(([v,t])=>`<span class="et ${can===v?'on':''}" onclick="App._crmCanal='${v}';App.vCrm()">${t}${v!=='todos'?' ('+nuevos.filter(l=>(l.canal||'local')===v).length+')':''}</span>`).join('')}</div>`:''}
+      <div class="row" style="gap:6px;margin-bottom:12px">${this.CANALES.map(([v,t])=>`<span class="et ${can===v?'on':''}" onclick="App._crmCanal='${v}';App.vCrm()">${t}${v!=='todos'?' ('+base.filter(l=>(l.canal||'local')===v).length+')':''}</span>`).join('')}</div>
       <button class="btn acc" onclick="App.leadModal()">＋ Registro de cliente</button>
       <div style="margin-top:12px">${lista.length?lista.map(l=>{const tel=(l.telefono||'').replace(/\D/g,'');const cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);return `<div class="item"><div class="top"><div>
         <div class="nm">${esc(l.nombre||'—')}${tel?` · <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-weight:600">${esc(l.telefono)}</a>`:''}</div>
