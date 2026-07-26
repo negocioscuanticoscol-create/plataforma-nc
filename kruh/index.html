@@ -142,8 +142,11 @@ const App={
   async vDashboard(){
     this.loading();
     const [meses,leads,ventas,peds,recs,gastos]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en&limit=5000'),GET('kruh_ventas?select=monto,creado_en&limit=8000'),GET('kruh_pedidos?select=items,creado_en&limit=3000'),GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000'),GET('kruh_gastos?select=monto,fecha,creado_en&limit=5000')]);
-    this._dash=meses;
     const now=new Date(), cm=now.getMonth()+1, mesIni=new Date(now.getFullYear(),now.getMonth(),1), mesNom=this.MESNOM[cm]||'';
+    // del mes en curso hacia atrás; los meses futuros quedan de últimas
+    const rango=m=>{ const o=+m.orden||99; return o<=cm?o:o-1000; };
+    meses.sort((a,b)=>rango(b)-rango(a));
+    this._dash=meses;
     const costoProd={}; recs.forEach(r=>{costoProd[r.producto_id]=(costoProd[r.producto_id]||0)+(+r.cantidad||0)*(+r.costo_unit||0);});
     // ventas reales de CADA mes del año en curso: el Dashboard nunca queda desactualizado
     const ventasPorMes={};
