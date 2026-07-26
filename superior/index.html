@@ -125,7 +125,7 @@ const App={
   FIRMEZA:['Suave','Medio','Firme','Extra firme'],
   ESTPROG:['pendiente','en proceso','terminado','entregado'],
   rol:'', view:'dash',
-  _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],_lin:[],
+  _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],_lin:[],_loc:[],_vend:[],
 
   _H(){ return {apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':'application/json'}; },
   _loadLocal(k){ try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return [];} },
@@ -145,6 +145,8 @@ const App={
     this._prog=await this._fetch('superior_programacion');
     this._leads=await this._fetch('superior_leads');
     this._lin=await this._fetch('superior_lineas');
+    this._loc=await this._fetch('superior_locales');
+    this._vend=await this._fetch('superior_vendedores');
     this._online=Object.values(this._onl).some(Boolean);
   },
   async _put(t,row,arr){ this._saveLocal(t,arr); if(this._onl[t]){ try{ await fetch(this.SB+'/rest/v1/'+t+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});}catch(e){} } },
@@ -155,10 +157,10 @@ const App={
   async _start(){ $('login').classList.add('hide'); $('app').classList.remove('hide');
     $('rol').innerHTML=(this.rol==='admin'?'Admin':'Operador')+' · <a onclick="App.logout()">salir</a>';
     $('main').innerHTML='<div class="empty">Cargando…</div>'; await this._sync(); this.pintarNav(); this.go('dash'); },
-  pintarNav(){ const T=[['dash','Dashboard'],['inv','Inventarios'],['ref','Referencias'],['cat','Catálogo'],['cli','Cliente'],['crm','CRM'],['ped','Pedidos'],['prog','Programación']];
+  pintarNav(){ const T=[['dash','Dashboard'],['inv','Inventarios'],['ref','Referencias'],['cat','Catálogo'],['cli','Cliente'],['equipo','Equipo'],['crm','CRM'],['ped','Pedidos'],['prog','Programación']];
     $('nav').innerHTML=T.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); window.scrollTo(0,0);
-    ({dash:this.vDash,inv:this.vInv,ref:this.vRef,cat:this.vCat,cli:this.vCli,crm:this.vCrm,ped:this.vPed,prog:this.vProg}[v]||this.vDash).call(this); },
+    ({dash:this.vDash,inv:this.vInv,ref:this.vRef,cat:this.vCat,cli:this.vCli,equipo:this.vEquipo,crm:this.vCrm,ped:this.vPed,prog:this.vProg}[v]||this.vDash).call(this); },
   set(h){ $('main').innerHTML=h; },
   esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
   money(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
@@ -318,6 +320,52 @@ const App={
     await this._put('superior_clientes',row,this._cli); cerrar(); this.toast('Guardado'); this.vCli(); },
   async cliDel(id){ if(!confirm('¿Eliminar cliente?'))return; this._cli=this._cli.filter(x=>x.id!==id); await this._del('superior_clientes',id,this._cli); this.vCli(); },
 
+  /* ---------- EQUIPO (locales + vendedores) ---------- */
+  vEquipo(){ const tab=this._eqTab||'locales'; this._eqTab=tab;
+    const vendBy={}; this._vend.forEach(v=>{(vendBy[v.local_id]=vendBy[v.local_id]||[]).push(v);});
+    this.set(`<h1>Equipo</h1><div class="sub">Locales, administradores y vendedores</div>
+      <div class="row" style="gap:10px;margin-bottom:12px">
+        <div class="et ${tab==='locales'?'on':''}" onclick="App._eqTab='locales';App.vEquipo()">🏬 Locales (${this._loc.length})</div>
+        <div class="et ${tab==='vend'?'on':''}" onclick="App._eqTab='vend';App.vEquipo()">👤 Vendedores (${this._vend.length})</div></div>
+      ${tab==='locales'?`
+        <button class="btn gold" onclick="App.locModal()">＋ Nuevo local</button>
+        <div style="margin-top:12px">${this._loc.length?this._loc.map(l=>{const vs=vendBy[l.id]||[];return `<div class="item"><div class="top"><div>
+          <div class="nm">🏬 ${this.esc(l.nombre||'—')}</div>
+          <div class="mt">${l.direccion?'📍 '+this.esc(l.direccion):''}${l.administrador?' · admin: '+this.esc(l.administrador):''}${l.admin_cel?' 📞 '+this.esc(l.admin_cel):''}</div>
+          <div class="mt">${vs.length?'Vendedores: '+vs.map(v=>this.esc(v.nombre)).join(', '):'sin vendedores'}</div></div>
+          <div class="row" style="gap:6px"><a onclick="App.locModal('${l.id}')" style="cursor:pointer;color:var(--mut)">✎</a><a onclick="App.locDel('${l.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div></div>`;}).join(''):'<div class="empty">Sin locales.</div>'}</div>`
+      :`
+        <button class="btn gold" onclick="App.vendModal()">＋ Nuevo vendedor</button>
+        <div style="margin-top:12px">${this._vend.length?this._vend.map(v=>`<div class="item"><div class="top"><div>
+          <div class="nm">👤 ${this.esc(v.nombre||'—')}</div>
+          <div class="mt">${v.celular?'📞 '+this.esc(v.celular):''}${v.cedula?' · CC '+this.esc(v.cedula):''}${v.local_nombre?' · 🏬 '+this.esc(v.local_nombre):''}</div></div>
+          <div class="row" style="gap:6px"><a onclick="App.vendModal('${v.id}')" style="cursor:pointer;color:var(--mut)">✎</a><a onclick="App.vendDel('${v.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div></div>`).join(''):'<div class="empty">Sin vendedores.</div>'}</div>`}`);
+  },
+  locModal(id){ const l=this._loc.find(x=>x.id===id)||{};
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Nuevo'} local</h3>
+      <label>Nombre del local</label><input id="lo_nom" value="${this.esc(l.nombre||'')}">
+      <label>Dirección</label><input id="lo_dir" value="${this.esc(l.direccion||'')}">
+      <div class="g2"><div><label>Administrador</label><input id="lo_adm" value="${this.esc(l.administrador||'')}"></div>
+      <div><label>Cel. administrador</label><input id="lo_cel" value="${this.esc(l.admin_cel||'')}"></div></div>
+      <button class="btn gold full" onclick="App.locSave('${id||''}')">Guardar</button>`); },
+  async locSave(id){ const g=x=>($(x).value||'').trim();
+    const row={id:id||('lo'+Date.now()),nombre:g('lo_nom'),direccion:g('lo_dir'),administrador:g('lo_adm'),admin_cel:g('lo_cel'),creado_en:(this._loc.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    if(!row.nombre){alert('Nombre');return;} const i=this._loc.findIndex(x=>x.id===row.id); if(i>=0)this._loc[i]=row; else this._loc.unshift(row);
+    await this._put('superior_locales',row,this._loc); cerrar(); this.toast('Local guardado'); this.vEquipo(); },
+  async locDel(id){ if(!confirm('¿Eliminar local?'))return; this._loc=this._loc.filter(x=>x.id!==id); await this._del('superior_locales',id,this._loc); this.vEquipo(); },
+  vendModal(id){ const v=this._vend.find(x=>x.id===id)||{};
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Nuevo'} vendedor</h3>
+      <label>Nombre</label><input id="ve_nom" value="${this.esc(v.nombre||'')}">
+      <div class="g2"><div><label>Celular</label><input id="ve_cel" value="${this.esc(v.celular||'')}"></div>
+      <div><label>Cédula</label><input id="ve_ced" value="${this.esc(v.cedula||'')}"></div></div>
+      <label>Local</label><select id="ve_loc"><option value="">— sin local —</option>${this._loc.map(l=>`<option value="${l.id}" ${v.local_id===l.id?'selected':''}>${this.esc(l.nombre)}</option>`).join('')}</select>
+      <button class="btn gold full" onclick="App.vendSave('${id||''}')">Guardar</button>`); },
+  async vendSave(id){ const g=x=>($(x).value||'').trim(); const locId=$('ve_loc').value; const locNom=(this._loc.find(x=>x.id===locId)||{}).nombre||'';
+    const row={id:id||('ve'+Date.now()),nombre:g('ve_nom'),celular:g('ve_cel'),cedula:g('ve_ced'),local_id:locId,local_nombre:locNom,creado_en:(this._vend.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    if(!row.nombre){alert('Nombre');return;} const i=this._vend.findIndex(x=>x.id===row.id); if(i>=0)this._vend[i]=row; else this._vend.unshift(row);
+    await this._put('superior_vendedores',row,this._vend); cerrar(); this.toast('Vendedor guardado'); this.vEquipo(); },
+  async vendDel(id){ if(!confirm('¿Eliminar vendedor?'))return; this._vend=this._vend.filter(x=>x.id!==id); await this._del('superior_vendedores',id,this._vend); this.vEquipo(); },
+
   /* ---------- CRM ---------- */
   ETAPAS:['contactado','interesado','pedido','cliente'],
   EM:{contactado:'👋 Contactado',interesado:'💡 Interesado',pedido:'📋 Pedido',cliente:'🛒 Cliente'},
@@ -367,6 +415,7 @@ const App={
         <label>Observaciones</label><textarea id="pd_obs"></textarea>
       </div>
       <label>Cliente</label><select id="p_cli">${this._cli.length?this._cli.map(c=>`<option value="${c.id}" ${p.cliente_id===c.id?'selected':''}>${this.esc(c.nombre)}${c.local_num?' (Local '+this.esc(c.local_num)+')':''}</option>`).join(''):'<option value="">— crea clientes primero —</option>'}</select>
+      <label>Vendedor</label><select id="p_vend"><option value="">— sin vendedor —</option>${this._vend.map(v=>`<option value="${v.id}" ${p.vendedor_id===v.id?'selected':''}>${this.esc(v.nombre)}${v.local_nombre?' · '+this.esc(v.local_nombre):''}</option>`).join('')}</select>
       <div class="g2"><div><label>Tipo de transporte</label><select id="p_tra">${this.TRANSPORTE.map(t=>`<option ${p.tipo_transporte===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><label>Forma de pago</label><select id="p_pag">${this.PAGO.map(t=>`<option ${p.forma_pago===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
       <button class="btn gold full" onclick="App.pedSave('${id||''}')">Guardar pedido</button>`); },
@@ -374,19 +423,20 @@ const App={
     if($('pd_medida'))$('pd_medida').style.display=med?'block':'none';
     if(!med && o && o.value && $('p_tot') && +(o.dataset.pre)>0)$('p_tot').value=o.dataset.pre; },
   async pedSave(id){ const cliId=$('p_cli').value; const cliObj=this._cli.find(x=>x.id===cliId)||{}; const cliNom=cliObj.nombre||'';
+    const vId=$('p_vend')?$('p_vend').value:''; const vObj=this._vend.find(x=>x.id===vId)||{};
     const rs=$('p_ref'),ro=rs.options[rs.selectedIndex]; const medida=rs.value==='__medida__';
     let refLab=''; if(medida)refLab='A la medida'; else if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
     if(!refLab){alert('Selecciona una referencia');return;}
-    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,tipo_transporte:$('p_tra').value,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,vendedor_id:vId,vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',tipo_transporte:$('p_tra').value,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     const i=this._ped.findIndex(x=>x.id===row.id); if(i>=0)this._ped[i]=row; else this._ped.unshift(row);
     await this._put('superior_pedidos',row,this._ped);
     // Nuevo pedido -> crear programación automática (a la medida con variables, o desde la referencia)
-    if(!id){ const inv=medida?null:this._inv.find(x=>x.id===rs.value); const g=x=>($(x)?$(x).value:'').trim();
-      const prog={id:'pg'+Date.now(),pedido_id:row.id,cliente:cliNom,local_num:cliObj.local_num||'',referencia:refLab,cantidad:1,
+    if(!id){ const inv=medida?null:this._inv.find(x=>x.id===rs.value); const g=x=>($(x)?$(x).value:'').trim(); const ahora=new Date().toISOString();
+      const prog={id:'pg'+Date.now(),pedido_id:row.id,cliente:cliNom,local_num:cliObj.local_num||'',vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',referencia:refLab,cantidad:1,
         tamano:medida?$('pd_tam').value:(inv?inv.tamano:''), alto:medida?g('pd_alto'):'',
         tipo:medida?$('pd_tipo').value:(inv?(inv.material||''):''), firmeza:medida?$('pd_fir').value:'',
         tela:medida?g('pd_tela'):'', color:medida?g('pd_color'):'', pillow:medida?$('pd_pil').value:'No',
-        observaciones:medida?g('pd_obs'):'', estado:'pendiente', creado_en:new Date().toISOString()};
+        observaciones:medida?g('pd_obs'):'', estado:'pendiente', historial:[{estado:'pendiente',ts:ahora}], creado_en:ahora};
       this._prog.unshift(prog); await this._put('superior_programacion',prog,this._prog);
     }
     cerrar(); this.toast(id?'Pedido actualizado':'Pedido guardado y enviado a programación'); this.go(id?'ped':'prog'); },
@@ -394,16 +444,38 @@ const App={
   pedProgramar(id){ const p=this._ped.find(x=>x.id===id); if(!p)return; this.progModal('',{pedido_id:id,cliente:p.cliente,local_num:(this._cli.find(x=>x.id===p.cliente_id)||{}).local_num||'',referencia:p.referencia}); },
 
   /* ---------- PROGRAMACIÓN ---------- */
-  vProg(){ const arr=this._prog;
-    this.set(`<h1>Programación de pedido</h1><div class="sub">Características del colchón a fabricar</div>
+  _fmtDT(iso){ if(!iso)return '—'; try{ return new Date(iso).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return String(iso).slice(0,16).replace('T',' '); } },
+  _dur(ms){ if(!(ms>0))return '0 min'; const h=ms/3.6e6; if(h<1)return Math.max(1,Math.round(ms/60000))+' min'; if(h<48)return h.toFixed(1)+' h'; return (h/24).toFixed(1)+' d'; },
+  _durProd(p){ if(!p.creado_en)return ''; const fin=p.entregado_en?new Date(p.entregado_en):new Date(); const ms=fin-new Date(p.creado_en); return (p.entregado_en?'⏱️ producción '+this._dur(ms):'⏳ en curso '+this._dur(ms)); },
+  vProg(){ const arr=this._prog; const tab=this._progTab||'lista'; this._progTab=tab;
+    if(tab==='traza') return this._progTraza();
+    this.set(`<h1>Programación de pedido</h1><div class="sub">Con hora de llegada y tiempos por estado</div>
+      <div class="row" style="gap:10px;margin-bottom:12px">
+        <div class="et ${tab==='lista'?'on':''}" onclick="App._progTab='lista';App.vProg()">📋 Órdenes (${arr.length})</div>
+        <div class="et ${tab==='traza'?'on':''}" onclick="App._progTab='traza';App.vProg()">📊 Trazabilidad</div></div>
       <button class="btn gold" onclick="App.progModal()">＋ Programar colchón</button>
       <div style="margin-top:12px">${arr.length?arr.map(p=>`<div class="item"><div class="top"><div>
         <div class="nm">${this.esc(p.referencia||p.tamano||'Colchón')} <span class="chip ${p.estado==='entregado'?'ok':(p.estado==='terminado'?'ok':'')}">${this.esc(p.estado||'pendiente')}</span></div>
-        <div class="mt">👤 ${this.esc(p.cliente||'—')}${p.local_num?' · 🏬 Local '+this.esc(p.local_num):''}</div>
+        <div class="mt">👤 ${this.esc(p.cliente||'—')}${p.local_num?' · 🏬 Local '+this.esc(p.local_num):''}${p.vendedor?' · 🧑‍💼 '+this.esc(p.vendedor):''}</div>
+        <div class="mt">🕐 Llegó ${this._fmtDT(p.creado_en)} · ${this._durProd(p)}</div>
         <div class="mt">${this.esc(p.tamano||'')}${p.alto?' · '+this.esc(p.alto)+'cm':''}${p.tipo?' · '+this.esc(p.tipo):''}${p.firmeza?' · '+this.esc(p.firmeza):''}${p.pillow==='Sí'?' · pillow':''}${p.color?' · '+this.esc(p.color):''} · x${this.num(p.cantidad||1)}</div>
         ${p.observaciones?`<div class="mt">📝 ${this.esc(p.observaciones)}</div>`:''}</div>
         <div class="row" style="gap:6px"><a onclick="App.progModal('${p.id}')" style="cursor:pointer;color:var(--mut)">✎</a><a onclick="App.progDel('${p.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div>
-        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${this.ESTPROG.map(e=>`<span class="et ${p.estado===e?'on':''}" onclick="App.progEstado('${p.id}','${e}')">${e}</span>`).join('')}</div></div>`).join(''):'<div class="empty">Sin colchones programados.</div>'}</div>`);
+        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${this.ESTPROG.map(e=>`<span class="et ${p.estado===e?'on':''}" onclick="App.progEstado('${p.id}','${e}')">${e}</span>`).join('')}</div>
+        ${(Array.isArray(p.historial)&&p.historial.length>1)?`<div style="font-size:10px;color:var(--mut);margin-top:6px">${p.historial.map(h=>this.esc(h.estado)+' '+this._fmtDT(h.ts)).join(' → ')}</div>`:''}
+        </div>`).join(''):'<div class="empty">Sin colchones programados.</div>'}</div>`);
+  },
+  _progTraza(){ const arr=this._prog; const done=arr.filter(p=>p.entregado_en&&p.creado_en);
+    const by={}; done.forEach(p=>{const k=p.referencia||'—'; const ms=new Date(p.entregado_en)-new Date(p.creado_en); (by[k]=by[k]||[]).push(ms);});
+    const rows=Object.entries(by).map(([ref,l])=>{const n=l.length,prom=l.reduce((a,b)=>a+b,0)/n;return {ref,n,prom,mn:Math.min(...l),mx:Math.max(...l)};}).sort((a,b)=>b.n-a.n);
+    const enCurso=arr.filter(p=>!p.entregado_en).length;
+    this.set(`<h1>Trazabilidad</h1><div class="sub">Tiempos de producción acumulados por referencia</div>
+      <div class="row" style="gap:10px;margin-bottom:12px">
+        <div class="et" onclick="App._progTab='lista';App.vProg()">📋 Órdenes</div>
+        <div class="et on">📊 Trazabilidad</div></div>
+      <div class="kpis" style="grid-template-columns:1fr 1fr"><div class="kpi"><b>${done.length}</b><span>Entregados</span></div><div class="kpi"><b style="color:var(--warn)">${enCurso}</b><span>En producción</span></div></div>
+      ${rows.length?rows.map(r=>`<div class="card"><div class="nm">${this.esc(r.ref)}</div>
+        <div class="row" style="gap:14px;font-size:12.5px;color:var(--mut);margin-top:6px;flex-wrap:wrap"><span><b style="color:var(--navy)">${r.n}</b> entregados</span><span>prom <b style="color:var(--navy)">${this._dur(r.prom)}</b></span><span>mín ${this._dur(r.mn)}</span><span>máx ${this._dur(r.mx)}</span></div></div>`).join(''):'<div class="empty">Aún no hay colchones entregados para medir tiempos. Marca uno como "entregado" y aquí verás el acumulado.</div>'}`);
   },
   progModal(id,pre){ const p=id?(this._prog.find(x=>x.id===id)||{}):(pre||{});
     const cliOpts=this._cli.map(c=>`<option value="${c.id}" data-loc="${this.esc(c.local_num||'')}" ${p.cliente===c.nombre?'selected':''}>${this.esc(c.nombre)}${c.local_num?' · Local '+this.esc(c.local_num):''}</option>`).join('');
@@ -441,7 +513,18 @@ const App={
     const row={id:id||('pg'+Date.now()),pedido_id:pedId||'',cliente:g('pg_nom'),local_num:g('pg_loc'),referencia:refLab,cantidad:+$('pg_cant').value||1,tamano:$('pg_tam').value,alto:g('pg_alto'),tipo:$('pg_tipo').value,firmeza:$('pg_fir').value,estructura:g('pg_est'),tela:g('pg_tela'),color:g('pg_color'),pillow:$('pg_pil').value,observaciones:g('pg_obs'),estado:(this._prog.find(x=>x.id===id)||{}).estado||'pendiente',creado_en:(this._prog.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     const i=this._prog.findIndex(x=>x.id===row.id); if(i>=0)this._prog[i]=row; else this._prog.unshift(row);
     await this._put('superior_programacion',row,this._prog); cerrar(); this.toast('Programado'); this.vProg(); },
-  async progEstado(id,e){ const p=this._prog.find(x=>x.id===id); if(!p)return; p.estado=e; await this._put('superior_programacion',p,this._prog); this.vProg(); },
+  async progEstado(id,e){ const p=this._prog.find(x=>x.id===id); if(!p)return; const ahora=new Date().toISOString();
+    p.estado=e; p.historial=Array.isArray(p.historial)?p.historial:[]; p.historial.push({estado:e,ts:ahora});
+    if(e==='entregado')p.entregado_en=ahora;
+    await this._put('superior_programacion',p,this._prog);
+    if(e==='entregado')this._avisoVendedor(p); this.vProg(); },
+  _avisoVendedor(p){ const cel=(p.vendedor_cel||'').replace(/\D/g,'');
+    const msg=`Hola ${p.vendedor||''}, el pedido de ${p.cliente||'cliente'} (${p.referencia||''}) ya está DISPONIBLE ✅🛏️`;
+    if(cel){ modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:6px">✅ Colchón disponible</h3>
+      <p style="font-size:13.5px;margin-bottom:12px">Avísale al vendedor <b>${this.esc(p.vendedor||'—')}</b> que su pedido ya está listo:</p>
+      <a class="btn gold full" href="https://wa.me/57${cel}?text=${encodeURIComponent(msg)}" target="_blank">📱 Avisar por WhatsApp</a>
+      <button class="btn gh full" onclick="cerrar()">Cerrar</button>`); }
+    else this.toast('Entregado ✅ (sin celular de vendedor para avisar)'); },
   async progDel(id){ if(!confirm('¿Eliminar programación?'))return; this._prog=this._prog.filter(x=>x.id!==id); await this._del('superior_programacion',id,this._prog); this.vProg(); },
 };
 (function(){ const q=new URLSearchParams(location.search);
