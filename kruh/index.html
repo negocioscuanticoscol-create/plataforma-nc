@@ -111,7 +111,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
   view:'dashboard',
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
@@ -505,18 +505,26 @@ const App={
     const [provs,pp]=await Promise.all([GET('kruh_proveedores?order=categoria,nombre&limit=2000'),GET('kruh_prov_productos?order=nombre&limit=5000')]);
     this._provs=provs; this._pp=pp;
     const ppBy={}; pp.forEach(x=>{(ppBy[x.proveedor_id]=ppBy[x.proveedor_id]||[]).push(x);});
-    const caj=this._provTab||'dir';
-    this.set(`<h1>Proveedores</h1><div class="sub">Directorio y registro de compras de materia prima</div>
-      <div class="row" style="gap:10px;margin-bottom:12px">
-        <div class="cajon ${caj==='dir'?'on':''}" onclick="App._provTab='dir';App.vProveedores()"><b>${provs.length}</b>🚚 Proveedores</div>
-        <div class="cajon ${caj==='compra'?'on':''}" onclick="App._provTab='compra';App.vProveedores()">🛒 Registrar materia prima</div></div>
-      ${caj==='compra'?this._provCompraHTML(provs):this._provDirHTML(provs,ppBy)}`);
+    const caj=this._provTab||'';
+    this.set(`<h1>Proveedores</h1><div class="sub">Directorio por cajón · toca uno para ver sus proveedores</div>
+      <div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        ${this.CATCOMPRAS.map(c=>{const n=provs.filter(p=>this._catProv(p)===c).length;
+          return `<div class="cajon ${caj===c?'on':''}" onclick="App._provTab=App._provTab==='${esc(c)}'?'':'${esc(c)}';App.vProveedores()"><b>${n}</b>${esc(c)}</div>`;}).join('')}
+        <div class="cajon ${caj==='compra'?'on':''}" onclick="App._provTab='compra';App.vProveedores()">🛒 Registrar compra</div></div>
+      ${caj==='compra'?this._provCompraHTML(provs):this._provDirHTML(provs,ppBy,caj)}`);
   },
-  _provDirHTML(provs,ppBy){
-    const cats=[...new Set(provs.map(p=>p.categoria||'Sin categoría'))];
+  _catProv(p){ const c=String(p.categoria||'').toLowerCase();
+    if(/empaq|envase|frasco|desechab|bandeja/.test(c))return 'Empaques';
+    if(/aseo|limpiez|consumib/.test(c))return 'Consumibles aseo';
+    if(/etiqueta|sticker|rotul|publicid/.test(c))return 'Etiquetas';
+    return 'Materia prima'; },
+  _provDirHTML(provs,ppBy,caj){
+    if(!caj) return `<button class="btn acc" onclick="App.provModal()">＋ Registrar proveedor</button>
+      <div class="empty">👆 Toca un cajón para ver sus proveedores.</div>`;
+    const lista=provs.filter(p=>this._catProv(p)===caj);
     return `<button class="btn acc" onclick="App.provModal()">＋ Registrar proveedor</button>
-      ${provs.length?cats.map(cat=>`<div style="margin-top:14px"><div class="tag" style="margin-bottom:8px">${esc(cat)}</div>
-        ${provs.filter(p=>(p.categoria||'Sin categoría')===cat).map(p=>{const prods=ppBy[p.id]||[];return `<div class="item" style="cursor:pointer" onclick="App._provOpen=App._provOpen==='${p.id}'?'':'${p.id}';App.vProveedores()">
+      ${lista.length?[caj].map(cat=>`<div style="margin-top:14px"><div class="tag" style="margin-bottom:8px">${esc(cat)} · ${lista.length}</div>
+        ${lista.map(p=>{const prods=ppBy[p.id]||[];return `<div class="item" style="cursor:pointer" onclick="App._provOpen=App._provOpen==='${p.id}'?'':'${p.id}';App.vProveedores()">
         <div class="top"><div><div class="nm">${esc(p.nombre)}</div><div class="mt">${prods.length} producto(s)${p.telefono?' · 📱 '+esc(p.telefono):''}</div></div>
         <span class="tag">${esc(p.condicion_pago||'')}</span></div>
         ${this._provOpen===p.id?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px;font-size:13px;line-height:1.6" onclick="event.stopPropagation()">
@@ -525,7 +533,7 @@ const App={
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--mut);margin:8px 0 4px">Productos que provee</div>
           ${prods.length?prods.map(x=>`<div class="row" style="justify-content:space-between;padding:2px 0"><span>• ${esc(x.nombre)} <small class="dim">${money(x.valor)}/${esc(x.unidad||'kg')}</small></span><span style="white-space:nowrap"><a onclick="App.provProdModal('${p.id}','${x.id}')" style="color:var(--acc);cursor:pointer;margin-right:6px">✎</a><a onclick="App.provProdDel('${x.id}')" style="color:var(--bad);cursor:pointer">✕</a></span></div>`).join(''):'<div class="hint">Sin productos aún.</div>'}
           <button class="btn gh sm full" onclick="App.provProdModal('${p.id}')">＋ Agregar producto</button>
-          <button class="btn gh sm" style="margin-top:8px" onclick="App.provModal('${p.id}')">✎ Editar proveedor</button></div>`:''}</div>`;}).join('')}</div>`).join(''):'<div class="empty">Sin proveedores aún.</div>'}`;
+          <button class="btn gh sm" style="margin-top:8px" onclick="App.provModal('${p.id}')">✎ Editar proveedor</button></div>`:''}</div>`;}).join('')}</div>`).join(''):`<div class="empty">Ningún proveedor en ${esc(caj)} todavía.</div>`}`;
   },
   _provCompraHTML(provs){
     return `<div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:8px">Registrar compra de materia prima</div>
@@ -587,27 +595,33 @@ const App={
     this._mp=mp; this._provs=provs;
     const bajos=mp.filter(m=>(+m.existencias||0)<=(+m.stock_min||0)&&(+m.stock_min||0)>0);
     const valor=mp.reduce((a,m)=>a+(+m.existencias||0)*(+m.costo_unit||0),0);
-    const caj=this._mpTab||'lista';
-    this.set(`<h1>Materia prima</h1><div class="sub">Insumos que compras a proveedores · stock, costo y mínimo</div>
+    const caj=this._mpTab||'';
+    const cat=m=>{const c=String(m.categoria||'').toLowerCase();
+      if(/empaq|envase|frasco|desechab|bandeja/.test(c))return 'Empaques';
+      if(/aseo|limpiez|consumib/.test(c))return 'Consumibles aseo';
+      if(/etiqueta|sticker|rotul/.test(c))return 'Etiquetas';
+      return 'Materia prima';};
+    this.set(`<h1>Compras</h1><div class="sub">Lo que le compras a proveedores · stock, costo y mínimo · toca un cajón para abrirlo</div>
       <div class="kpis"><div class="kpi"><b>${mp.length}</b><span>Insumos</span></div>
         <div class="kpi"><b style="color:${bajos.length?'var(--bad)':'var(--ok)'}">${bajos.length}</b><span>Bajo mínimo</span></div>
-        <div class="kpi dark"><b>${money(valor)}</b><span>Valor en materia prima</span></div></div>
-      <div class="row" style="gap:10px;margin-bottom:12px">
-        <div class="cajon ${caj==='lista'?'on':''}" onclick="App._mpTab='lista';App.vMateriaPrima()">📦 Insumos</div>
+        <div class="kpi dark"><b>${money(valor)}</b><span>Valor en existencias</span></div></div>
+      <div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        ${this.CATCOMPRAS.map(c=>{const l=mp.filter(m=>cat(m)===c), v=l.reduce((a,m)=>a+(+m.existencias||0)*(+m.costo_unit||0),0);
+          return `<div class="cajon ${caj===c?'on':''}" onclick="App._mpTab=App._mpTab==='${esc(c)}'?'':'${esc(c)}';App.vMateriaPrima()"><b>${money(v)}</b>${esc(c)}<div style="font-size:11px;opacity:.75">${l.length} insumo(s)</div></div>`;}).join('')}
         <div class="cajon ${caj==='nuevo'?'on':''}" onclick="App._mpTab='nuevo';App.vMateriaPrima()">＋ Nuevo insumo</div></div>
-      ${caj==='nuevo'?this._mpNuevoHTML(provs):this._mpListaHTML(mp)}`);
+      ${caj==='nuevo'?this._mpNuevoHTML(provs):(caj?this._mpListaHTML(mp.filter(m=>cat(m)===caj),caj):'<div class="empty">👆 Toca un cajón para ver sus insumos.</div>')}`);
   },
   _mpNuevoHTML(provs){ return `<div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:8px">Nuevo insumo</div>
     <div class="g2"><div><label>Nombre</label><input id="mp_nom"></div><div><label>Categoría</label><input id="mp_cat" placeholder="Harinas, Lácteos…"></div></div>
     <div class="g3"><div><label>Unidad</label><input id="mp_uni" value="kg"></div><div><label>Costo x unidad</label><input id="mp_cu" type="number" value="0"></div><div><label>Stock mínimo</label><input id="mp_min" type="number" value="0"></div></div>
     <label>Proveedor</label><select id="mp_prov"><option value="">—</option>${provs.map(pv=>`<option value="${pv.id}" data-n="${esc(pv.nombre)}">${esc(pv.nombre)}</option>`).join('')}</select>
     <button class="btn acc full" onclick="App.mpSave('')">Guardar insumo</button></div>`; },
-  _mpListaHTML(mp){ return `${mp.length?mp.map(m=>{const bajo=(+m.existencias||0)<=(+m.stock_min||0)&&(+m.stock_min||0)>0;return `<div class="item" style="${bajo?'border-left:3px solid var(--bad)':''}"><div class="top"><div>
+  _mpListaHTML(mp,caj){ return `${mp.length?mp.map(m=>{const bajo=(+m.existencias||0)<=(+m.stock_min||0)&&(+m.stock_min||0)>0;return `<div class="item" style="${bajo?'border-left:3px solid var(--bad)':''}"><div class="top"><div>
         <div class="nm">${esc(m.nombre)}</div><div class="mt">${esc(m.categoria||'')}${m.proveedor?' · 🚚 '+esc(m.proveedor):''} · ${money(m.costo_unit)}/${esc(m.unidad||'kg')}</div></div>
         <div style="text-align:right"><div class="nm" style="color:${bajo?'var(--bad)':'var(--ink)'}">${num(m.existencias)} ${esc(m.unidad||'kg')}</div>${bajo?'<span class="tag pe">bajo</span>':''}</div></div>
         <div class="row" style="margin-top:9px"><button class="btn acc sm" onclick="App.mpMov('${m.id}','entrada')">＋ Compra</button>
           <button class="btn gh sm" onclick="App.mpMov('${m.id}','salida')">− Consumo</button>
-          <button class="btn gh sm" onclick="App.mpModal('${m.id}')">✎ Editar</button></div></div>`;}).join(''):'<div class="empty">Sin materia prima. Crea el primer insumo o regístralo desde una compra en Proveedores.</div>'}`; },
+          <button class="btn gh sm" onclick="App.mpModal('${m.id}')">✎ Editar</button></div></div>`;}).join(''):`<div class="empty">Nada en ${esc(caj||'este cajón')} todavía. Créalo con ＋ Nuevo insumo o regístralo desde una compra en Proveedores.</div>`}`; },
   mpModal(id){ const m=(this._mp||[]).find(x=>x.id===id)||{}, provs=this._provs||[];
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Nuevo'} insumo</h3>
       <div class="g2"><div><label>Nombre</label><input id="mp_nom" value="${esc(m.nombre||'')}"></div>
@@ -721,13 +735,15 @@ const App={
   /* ===================== GASTOS (tabla del mes + cierre mensual) ===================== */
   GASFIJOS:['Luz','Agua','Arriendo','Gas','Internet','Teléfono','Nómina','Aseo'],
   FPAGO:['Efectivo','Nequi','Transferencia','Tarjeta crédito','Débito automático'],
-  CATGASTO:['Materia Prima','Empaques','Aseo','Transporte','Arriendo','Servicios públicos','Servicios profesionales','Tecnología y software','Nómina y aportes','Impuestos y tasas','Etiquetas y publicidad','Mantenimiento y locativos','Equipos y menaje','Papelería','Otros'],
+  CATGASTO:['Arriendo','Servicios públicos','Servicios profesionales','Tecnología y software','Nómina y aportes','Transporte','Mantenimiento y locativos','Equipos y menaje','Impuestos y tasas','Papelería','Otros'],
+  CATCOMPRAS:['Materia prima','Empaques','Consumibles aseo','Etiquetas'],
+  RUBROS_COMPRAS:['materia prima','empaques','empaque','aseo','consumibles aseo','consumibles','etiquetas','etiquetas y publicidad'],
+  _esCompra(g){ return this.RUBROS_COMPRAS.includes(String(g.rubro||'').toLowerCase()); },
   IVAPCT:19,
   CAJONES:[['todos','📋 Todos'],['fijos','🏠 Gastos fijos'],['variables','🔄 Gastos variables'],['nomina','👷 Nómina'],['otros','🧾 Otros']],
   RUBRO_CAJON:{'Arriendo':'fijos','Servicios públicos':'fijos','Servicios profesionales':'fijos','Tecnología y software':'fijos',
     'Nómina y aportes':'nomina',
-    'Materia Prima':'variables','Empaques':'variables','Aseo':'variables','Transporte':'variables','Etiquetas y publicidad':'variables',
-    'Mantenimiento y locativos':'variables','Equipos y menaje':'variables','Papelería':'variables'},
+    'Transporte':'variables','Mantenimiento y locativos':'variables','Equipos y menaje':'variables','Papelería':'variables'},
   _cajonDe(g){ return this.RUBRO_CAJON[g.rubro]||'otros'; },
   _gasFecha(g){ return (g.fecha||g.creado_en||'').slice(0,10); },
   _ymNom(ym){ return this.MESNOM[+String(ym||'').slice(5,7)]||''; },
@@ -779,7 +795,9 @@ const App={
     this._gastos=gastos;
     const mes=this._gasMes||this._mesActual(); this._gasMes=mes;
     const meses=[...new Set(gastos.map(g=>this._gasFecha(g).slice(0,7)).filter(Boolean).concat([mes,this._mesActual()]))].sort().reverse();
-    const todas=gastos.filter(g=>this._gasFecha(g).slice(0,7)===mes).sort((a,b)=>(this._gasFecha(a)+(a.creado_en||'')).localeCompare(this._gasFecha(b)+(b.creado_en||'')));
+    const delMes=gastos.filter(g=>this._gasFecha(g).slice(0,7)===mes);
+    const enCompras=delMes.filter(g=>this._esCompra(g));
+    const todas=delMes.filter(g=>!this._esCompra(g)).sort((a,b)=>(this._gasFecha(a)+(a.creado_en||'')).localeCompare(this._gasFecha(b)+(b.creado_en||'')));
     const totMes=todas.reduce((a,g)=>a+(+g.monto||0),0);
     const caj=this._gasCajon||'';
     const tc={}; this.CAJONES.forEach(([k])=>tc[k]={n:0,t:0});
@@ -804,11 +822,12 @@ const App={
       <div class="row" style="gap:10px;margin-bottom:14px;flex-wrap:wrap">${this.CAJONES.map(([k,t])=>`
         <div class="cajon ${caj===k?'on':''}" onclick="App._gasCajon=App._gasCajon==='${k}'?'':'${k}';App.vGastos()">
           <b>${money(tc[k].t)}</b>${t}<div style="font-size:11px;opacity:.75">${tc[k].n} registro(s)</div></div>`).join('')}</div>
+      ${enCompras.length?`<div class="card" style="border-left:4px solid var(--acc2);font-size:13px">🛒 <b>${enCompras.length} registro(s)</b> de ${esc(nom)} por ${money(enCompras.reduce((a,g)=>a+(+g.monto||0),0))} quedaron fuera de Gastos: son materia prima, empaques, consumibles de aseo o etiquetas y esos van en <b>Compras</b>.</div>`:''}
       ${!caj?`<div class="empty">👆 Toca un cajón para abrirlo y ver sus gastos.</div>`:`
       <div class="tbwrap"><table class="tb">
         <thead><tr>
           <th style="min-width:130px">Fecha</th><th style="min-width:165px">Proveedor</th><th style="min-width:110px">N° factura</th>
-          <th style="min-width:185px">Rubro</th><th style="min-width:170px">Descripción</th><th style="min-width:190px">Descripción adicional</th>
+          <th style="min-width:185px">Rubro</th><th style="min-width:200px">Descripción</th>
           <th style="min-width:85px">¿IVA?</th><th style="min-width:115px;text-align:right">Valor sin IVA</th>
           <th style="min-width:105px;text-align:right">IVA</th><th style="min-width:120px;text-align:right">Total</th>
           <th style="min-width:135px">Método de pago</th><th style="min-width:120px">Estado</th>
@@ -818,8 +837,7 @@ const App={
           <td><input value="${esc(g.proveedor||'')}" placeholder="Nombre del proveedor" ${cel(g,'proveedor')}></td>
           <td><input value="${esc(g.factura||'')}" placeholder="N°" ${cel(g,'factura')}></td>
           <td><select ${cel(g,'rubro')}><option value="" ${g.rubro?'':'selected'}>— sin rubro —</option>${this.CATGASTO.map(c=>`<option ${g.rubro===c?'selected':''}>${esc(c)}</option>`).join('')}${g.rubro&&!this.CATGASTO.includes(g.rubro)?`<option selected>${esc(g.rubro)}</option>`:''}</select></td>
-          <td><input value="${esc(g.concepto||'')}" placeholder="Qué se compró" ${cel(g,'concepto')}></td>
-          <td><input value="${esc(g.detalle||'')}" placeholder="Detalle, periodo, observación…" ${cel(g,'detalle')}></td>
+          <td><input value="${esc(g.concepto||'')}" placeholder="Qué se pagó" ${cel(g,'concepto')}></td>
           <td><select ${cel(g,'tiene_iva')}><option value="false" ${g.tiene_iva?'':'selected'}>No</option><option value="true" ${g.tiene_iva?'selected':''}>Sí</option></select></td>
           <td><input type="number" data-f="base" value="${g.base||''}" placeholder="0" ${cel(g,'base','oninput="App.gasSuma()"')}></td>
           <td><input type="number" data-f="iva" value="${g.iva||''}" placeholder="0" ${cel(g,'iva','oninput="App.gasSuma()"')}></td>
@@ -829,14 +847,14 @@ const App={
           <td><input type="date" value="${esc(g.fecha_pago||'')}" ${cel(g,'fecha_pago')}></td>
           <td><input value="${esc(g.nota||'')}" placeholder="—" ${cel(g,'nota')}></td>
           <td>${cerrado?'':`<a class="del" onclick="App.gasDel('${g.id}')">✕</a>`}</td></tr>`).join('')
-          :`<tr><td colspan="15" style="text-align:center;color:var(--mut);padding:26px 10px">Este cajón no tiene gastos en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> y escoge su rubro.</td></tr>`}</tbody>
+          :`<tr><td colspan="14" style="text-align:center;color:var(--mut);padding:26px 10px">Este cajón no tiene gastos en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> y escoge su rubro.</td></tr>`}</tbody>
         <tfoot>
-          <tr><td colspan="7" style="text-align:right">${caj==='todos'?'TOTALES DEL MES':'TOTALES DE '+esc(nomCaj).toUpperCase()}</td>
+          <tr><td colspan="6" style="text-align:right">${caj==='todos'?'TOTALES DEL MES':'TOTALES DE '+esc(nomCaj).toUpperCase()}</td>
             <td id="g_base" style="text-align:right">${money(tBase)}</td>
             <td id="g_iva" style="text-align:right">${money(tIva)}</td>
             <td id="g_total" style="text-align:right;font-size:17px;color:var(--acc)">${money(total)}</td>
             <td colspan="5"></td></tr>
-          <tr><td colspan="7" style="text-align:right;font-weight:400;color:var(--mut)">Pagado / Pendiente</td>
+          <tr><td colspan="6" style="text-align:right;font-weight:400;color:var(--mut)">Pagado / Pendiente</td>
             <td colspan="3" style="text-align:right;font-weight:400"><span style="color:var(--ok)">${money(pagado)}</span> / <span style="color:${pend?'var(--bad)':'var(--mut)'}">${money(pend)}</span></td>
             <td colspan="5"></td></tr>
         </tfoot></table></div>
@@ -906,9 +924,9 @@ const App={
     await this._dashSet(nom,{cerrado:false}); toast(nom+' reabierto'); this.vGastos(); },
   async gastosExcel(){ toast('Generando Excel…');
     const g=await GET('kruh_gastos?order=fecha.desc&limit=20000');
-    const cols=['Mes','Fecha','Proveedor','N° factura','Rubro','Descripción','Descripción adicional','¿Tiene IVA?','Valor sin IVA','IVA','Valor total','Método de pago','Estado','Fecha de pago','Notas'];
+    const cols=['Mes','Fecha','Proveedor','N° factura','Rubro','Descripción','¿Tiene IVA?','Valor sin IVA','IVA','Valor total','Método de pago','Estado','Fecha de pago','Notas'];
     const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-    const rows=g.map(r=>[this._gasFecha(r).slice(0,7),this._gasFecha(r),r.proveedor||'',r.factura||'',r.rubro||'',r.concepto||'',r.detalle||'',(r.tiene_iva?'Sí':'No'),(+r.base||0),(+r.iva||0),(+r.monto||0),r.forma_pago||'',(r.pagado===false?'Pendiente':'Pagado'),r.fecha_pago||'',r.nota||''].map(q).join(';'));
+    const rows=g.map(r=>[this._gasFecha(r).slice(0,7),this._gasFecha(r),r.proveedor||'',r.factura||'',r.rubro||'',r.concepto||'',(r.tiene_iva?'Sí':'No'),(+r.base||0),(+r.iva||0),(+r.monto||0),r.forma_pago||'',(r.pagado===false?'Pendiente':'Pagado'),r.fecha_pago||'',r.nota||''].map(q).join(';'));
     const csv='﻿'+cols.map(q).join(';')+'\r\n'+rows.join('\r\n');
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     a.download='kruh-gastos.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
@@ -957,7 +975,7 @@ const App={
     this.loading();
     const [us,pm]=await Promise.all([GET('kruh_usuarios?order=creado_en&limit=200'),GET('kruh_permisos?limit=50')]);
     this._us=us; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]);
-    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🌾 Materia prima'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos']];
+    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos']];
     const RMAT=['cajera','panadero','bodeguero','chef'];
     this.set(`<h1>Usuarios y permisos</h1><div class="sub">Cada persona con su clave y rol · y qué pestaña ve cada rol</div>
       <button class="btn acc" onclick="App.usModal()">＋ Nuevo usuario</button>
