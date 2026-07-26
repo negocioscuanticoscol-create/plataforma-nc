@@ -357,8 +357,11 @@ const App={
     let sub=0, iva=0, nItems=0, bruto=0;
     for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line; nItems+=q;
       if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
-    const dom=+(this._cartDom||0); this._sub=sub; this._iva=iva;
-    const total=bruto+dom;   // el precio YA incluye IVA: total igual; con tarjeta se desglosa la base+IVA
+    const dom=+(this._cartDom||0);
+    const desc=Math.min(Math.max(0,+(this._cartDesc||0)),bruto);   // el descuento no puede pasarse del bruto
+    const fac=bruto>0?(bruto-desc)/bruto:1; sub*=fac; iva*=fac;    // el descuento baja base e IVA a prorrata
+    this._sub=sub; this._iva=iva; this._desc=desc;
+    const total=bruto-desc+dom;   // el precio YA incluye IVA: total igual; con tarjeta se desglosa la base+IVA
     this.set(`<h1>Pedidos</h1><div class="sub">Toca − / + para armar el pedido; la cuenta se calcula al lado</div>
       <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
         <div style="flex:1;min-width:250px"><div class="grid" style="grid-template-columns:repeat(2,1fr)">
@@ -375,8 +378,10 @@ const App={
           <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value;App._pedPaint()">${this.FPPEDIDO.map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
           <div style="margin-top:10px;font-size:13px">
             ${nItems?Object.keys(cart).map(id=>{const p=prods.find(x=>x.id===id);if(!p)return '';const q=cart[id];return `<div class="row" style="justify-content:space-between"><span class="dim">${esc(p.nombre)} ×${q}</span><span>${money((+p.precio||0)*q)}</span></div>`;}).join(''):'<div class="dim" style="text-align:center;padding:6px 0">Sin productos aún</div>'}
-            <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span class="dim">${esTar?'Base (sin IVA)':'Subtotal'}</span><b>${money(sub)}</b></div>
-            ${esTar?`<div class="row" style="justify-content:space-between"><span class="dim">IVA</span><span>${money(iva)}</span></div>`:''}
+            <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span class="dim">${esTar?'Base (sin IVA)':'Subtotal'}</span><b id="pd_sub">${money(sub)}</b></div>
+            <div class="row" style="justify-content:space-between;align-items:center"><span class="dim">Descuento</span><input id="pd_desc" type="number" placeholder="0" value="${this._cartDesc||''}" oninput="App.descSet(this.value)" style="width:92px;text-align:right;padding:5px 8px;color:var(--bad)"></div>
+            <div class="row" id="pd_dline" style="justify-content:space-between;font-size:11.5px;color:var(--bad);${desc>0?'':'display:none'}"><span>− descuento</span><span id="pd_dval">−${money(desc)}</span></div>
+            ${esTar?`<div class="row" style="justify-content:space-between"><span class="dim">IVA</span><span id="pd_iva">${money(iva)}</span></div>`:''}
             <div class="row" style="justify-content:space-between;align-items:center"><span class="dim">Domicilio</span><input id="pd_dom" type="number" placeholder="0" value="${this._cartDom||''}" oninput="App.domSet(this.value)" style="width:92px;text-align:right;padding:5px 8px"></div>
             <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total</span><b id="pd_total" style="font-size:18px;color:var(--acc)">${money(total)}</b></div>
           </div>
@@ -387,20 +392,40 @@ const App={
       `);
   },
   pedTelLookup(v){ const t=(v||'').replace(/\D/g,''); if(t.length<7)return; const nom=(this._telMap||{})[t]; if(nom){ this._cartCli=nom; if($('pd_cli'))$('pd_cli').value=nom; } },
-  cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_fp'))this._cartFP=$('pd_fp').value;
+  cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_desc'))this._cartDesc=+$('pd_desc').value||0; if($('pd_fp'))this._cartFP=$('pd_fp').value;
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
-  domSet(v){ this._cartDom=+v||0; const t=(this._sub||0)+(this._iva||0)+this._cartDom; if($('pd_total'))$('pd_total').textContent=money(t); },
+  domSet(v){ this._cartDom=+v||0; this._recalc(); },
+  descSet(v){ this._cartDesc=+v||0; this._recalc(); },
+  /* recalcula la cuenta sin repintar, para no perder el cursor */
+  _recalc(){ const prods=this._prods||[], cart=this._cart||{};
+    const esTar=/tarjeta/i.test(this._cartFP||'Efectivo');
+    let sub=0, iva=0, bruto=0;
+    for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line;
+      if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
+    const dom=+(this._cartDom||0), desc=Math.min(Math.max(0,+(this._cartDesc||0)),bruto);
+    const fac=bruto>0?(bruto-desc)/bruto:1; sub*=fac; iva*=fac;
+    this._sub=sub; this._iva=iva; this._desc=desc;
+    if($('pd_sub'))$('pd_sub').textContent=money(sub);
+    if($('pd_iva'))$('pd_iva').textContent=money(iva);
+    if($('pd_dval'))$('pd_dval').textContent='−'+money(desc);
+    if($('pd_dline'))$('pd_dline').style.display=desc>0?'flex':'none';
+    if($('pd_total'))$('pd_total').textContent=money(bruto-desc+dom); },
   async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; const fp=this._cartFP||'Efectivo', esTar=/tarjeta/i.test(fp); let sub=0, iva=0, bruto=0;
     for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0});
       if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
     if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0);
-    const total=bruto+dom;
-    await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});
+    const desc=Math.min(Math.max(0,+(this._cartDesc||0)),bruto);
+    const fac=bruto>0?(bruto-desc)/bruto:1; sub*=fac; iva*=fac;
+    const total=bruto-desc+dom;
+    let ped=await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,descuento:desc,total,forma_pago:fp,estado:'nuevo'});
+    if(!ped) ped=await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});   // sin la columna descuento
+    if(!ped){ toast('⚠️ No se pudo guardar el pedido'); return; }
     const saldos=[];
     for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); const nuevo=(+((p&&p.existencias)||0))-it.qty; if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:nuevo}); saldos.push({nombre:it.nombre,qty:it.qty,saldo:nuevo}); }
-    await POST('kruh_ventas',{cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp});
+    const bv={cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp};
+    if(!await POST('kruh_ventas',{...bv,descuento:desc})) await POST('kruh_ventas',bv);   // sin la columna descuento
     if(dom>0) await this._sumarDomicilio(dom,fp);
-    this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; toast('Pedido generado'); await this.vPedidos();
+    this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; this._cartDesc=0; toast('Pedido generado'); await this.vPedidos();
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3><div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)')}">quedan ${s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`); },
 
   /* el domicilio cobrado en la cuenta cae solo en Gastos, acumulado por día */
@@ -417,7 +442,7 @@ const App={
   /* ===================== CRM (cajones: Comunidad / Nuevos → canal) ===================== */
   ETAPAS:['contactado','interesado','pedido','cliente'],
   CATCOMPRA:['Panadería','Conservas','Repostería'],
-  CANALES:[['todos','Todos'],['local','🏪 Local'],['digital','📱 Digital'],['organico','🌱 Orgánico']],
+  CANALES:[['todos','Todos'],['local','🏪 Local'],['digital','📱 Digital'],['organico','🌱 Orgánico'],['empleados','👷 Empleados']],
   async vCrm(){
     this.loading();
     const [leads,ventas]=await Promise.all([GET('kruh_leads?order=creado_en.desc&limit=2000'),GET('kruh_ventas?select=cliente,telefono,creado_en&limit=20000')]);
@@ -444,7 +469,7 @@ const App={
           <a onclick="App.leadDel('${l.id}')" style="color:var(--bad);cursor:pointer">✕</a></div></div>
         <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><span class="dim" style="font-size:11px;align-self:center">Compra:</span>${this.CATCOMPRA.map(c=>`<span class="et ${cats.includes(c)?'on':''}" onclick="App.leadCat('${l.id}','${c}')">${c}</span>`).join('')}</div></div>`;}).join(''):'<div class="empty">Sin leads en este cajón.</div>'}</div>`);
   },
-  ORIGEN:[['registrado','Cliente registrado (comunidad)','comunidad','local'],['nuevo','Cliente nuevo (local)','nuevo','local'],['digital','Digital','nuevo','digital'],['organico','Orgánico','nuevo','organico']],
+  ORIGEN:[['registrado','Cliente registrado (comunidad)','comunidad','local'],['nuevo','Cliente nuevo (local)','nuevo','local'],['digital','Digital','nuevo','digital'],['organico','Orgánico','nuevo','organico'],['empleados','Empleados','comunidad','empleados']],
   leadModal(id){ const l=id?((this._leads||[]).find(x=>x.id===id)||{}):{};
     const caj=this._crmCajon||'nuevos';
     const actual=this.ORIGEN.find(o=>o[2]===l.tipo&&o[3]===(l.canal||'local'));
