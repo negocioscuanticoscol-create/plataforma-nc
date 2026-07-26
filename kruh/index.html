@@ -327,6 +327,7 @@ const App={
 
   /* ===================== CRM (cajones: Comunidad / Nuevos → canal) ===================== */
   ETAPAS:['contactado','interesado','pedido','cliente'],
+  CATCOMPRA:['Panadería','Conservas','Repostería'],
   CANALES:[['todos','Todos'],['local','🏪 Local'],['digital','📱 Digital'],['organico','🌱 Orgánico']],
   async vCrm(){
     this.loading();
@@ -342,11 +343,11 @@ const App={
         <div class="cajon ${caj==='nuevos'?'on':''}" onclick="App._crmCajon='nuevos';App.vCrm()"><b>${nuevos.length}</b>✨ Nuevos</div></div>
       ${caj==='nuevos'?`<div class="row" style="gap:6px;margin-bottom:12px">${this.CANALES.map(([v,t])=>`<span class="et ${can===v?'on':''}" onclick="App._crmCanal='${v}';App.vCrm()">${t}${v!=='todos'?' ('+nuevos.filter(l=>(l.canal||'local')===v).length+')':''}</span>`).join('')}</div>`:''}
       <button class="btn acc" onclick="App.leadModal()">＋ Registro de cliente</button>
-      <div style="margin-top:12px">${lista.length?lista.map(l=>`<div class="item"><div class="top"><div>
-        <div class="nm">${esc(l.nombre||'—')} ${l.telefono?`· <a href="https://wa.me/57${esc((l.telefono||'').replace(/\D/g,''))}" target="_blank" style="color:#16734a;font-size:12px">📱</a>`:''}</div>
+      <div style="margin-top:12px">${lista.length?lista.map(l=>{const tel=(l.telefono||'').replace(/\D/g,'');const cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);return `<div class="item"><div class="top"><div>
+        <div class="nm">${esc(l.nombre||'—')}${tel?` · <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-weight:600">${esc(l.telefono)}</a>`:''}</div>
         <div class="mt">${l.tipo==='comunidad'?'👥 comunidad':('✨ '+esc(l.canal||'local'))}${l.ciudad?' · '+esc(l.ciudad):''}${l.interes?' · '+esc(l.interes):''}</div></div>
         <a onclick="App.leadDel('${l.id}')" style="color:var(--bad);cursor:pointer">✕</a></div>
-        <div class="row" style="margin-top:8px">${this.ETAPAS.map(e=>`<span class="et ${l.etapa===e?'on':''}" onclick="App.leadEtapa('${l.id}','${e}')">${EM[e]}</span>`).join('')}</div></div>`).join(''):'<div class="empty">Sin leads en este cajón.</div>'}</div>`);
+        <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><span class="dim" style="font-size:11px;align-self:center">Compra:</span>${this.CATCOMPRA.map(c=>`<span class="et ${cats.includes(c)?'on':''}" onclick="App.leadCat('${l.id}','${c}')">${c}</span>`).join('')}</div></div>`;}).join(''):'<div class="empty">Sin leads en este cajón.</div>'}</div>`);
   },
   ORIGEN:[['registrado','Cliente registrado (comunidad)','comunidad','local'],['nuevo','Cliente nuevo (local)','nuevo','local'],['digital','Digital','nuevo','digital'],['organico','Orgánico','nuevo','organico']],
   leadModal(){ const caj=this._crmCajon||'nuevos', defO=caj==='comunidad'?'registrado':'nuevo';
@@ -362,6 +363,9 @@ const App={
     const b={nombre:$('l_nom').value.trim(),telefono:$('l_tel').value.trim(),direccion:$('l_dir').value.trim(),ciudad:$('l_ciu').value.trim(),instagram:$('l_ig').value.trim(),cedula:$('l_ced').value.trim(),interes:$('l_int').value.trim(),etapa:'contactado',tipo:org[2],canal:org[3]};
     if(!b.nombre){alert('Nombre');return;} await POST('kruh_leads',b); cerrar(); toast('Cliente registrado'); this.vCrm(); },
   async leadEtapa(id,e){ await PATCH('kruh_leads?id=eq.'+id,{etapa:e}); this.vCrm(); },
+  async leadCat(id,cat){ const l=(this._leads||[]).find(x=>x.id===id)||{}; let cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if(cats.includes(cat))cats=cats.filter(c=>c!==cat); else cats.push(cat); const val=cats.join(', ');
+    await PATCH('kruh_leads?id=eq.'+id,{categorias:val}); l.categorias=val; this.vCrm(); },
   async leadDel(id){ if(!this._okBorrar())return; await DEL('kruh_leads?id=eq.'+id); this.vCrm(); },
 
   /* ===================== INVENTARIO + índice de cobertura ===================== */
