@@ -392,8 +392,20 @@ const App={
     const saldos=[];
     for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); const nuevo=(+((p&&p.existencias)||0))-it.qty; if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:nuevo}); saldos.push({nombre:it.nombre,qty:it.qty,saldo:nuevo}); }
     await POST('kruh_ventas',{cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp});
+    if(dom>0) await this._sumarDomicilio(dom,fp);
     this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; toast('Pedido generado'); await this.vPedidos();
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3><div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)')}">quedan ${s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`); },
+
+  /* el domicilio cobrado en la cuenta cae solo en Gastos, acumulado por día */
+  async _sumarDomicilio(valor,fp){
+    const h=new Date(), f=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');
+    const ex=(await GET('kruh_gastos?rubro=eq.Domicilios&fecha=eq.'+f+'&select=id,monto,nota&limit=1'))[0];
+    if(ex){ const n=(+ex.monto||0)+valor, c=(+((String(ex.nota||'').match(/^(\d+)/)||[])[1])||0)+1;
+      const r=await PATCH('kruh_gastos?id=eq.'+ex.id,{monto:n,base:n,nota:c+' domicilio(s) del día'});
+      if(r&&!r.ok) toast('⚠️ El domicilio no se sumó a Gastos'); }
+    else { const r=await POST('kruh_gastos',{fecha:f,rubro:'Domicilios',concepto:'Domicilios del día',proveedor:'',factura:'',
+        tiene_iva:false,base:valor,iva:0,monto:valor,forma_pago:fp||'Efectivo',pagado:true,nota:'1 domicilio(s) del día'});
+      if(!r) toast('⚠️ El domicilio no se registró en Gastos'); } },
 
   /* ===================== CRM (cajones: Comunidad / Nuevos → canal) ===================== */
   ETAPAS:['contactado','interesado','pedido','cliente'],
@@ -932,7 +944,7 @@ const App={
   /* ===================== GASTOS (tabla del mes + cierre mensual) ===================== */
   GASFIJOS:['Luz','Agua','Arriendo','Gas','Internet','Teléfono','Nómina','Aseo'],
   FPAGO:['Efectivo','Nequi','Transferencia','Tarjeta crédito','Débito automático'],
-  CATGASTO:['Arriendo','Servicios públicos','Servicios profesionales','Tecnología y software','Nómina y aportes','Transporte','Mantenimiento y locativos','Equipos y menaje','Impuestos y tasas','Papelería','Otros'],
+  CATGASTO:['Arriendo','Servicios públicos','Servicios profesionales','Tecnología y software','Nómina y aportes','Domicilios','Transporte','Mantenimiento y locativos','Equipos y menaje','Impuestos y tasas','Papelería','Otros'],
   CATCOMPRAS:['Materia prima','Empaques','Consumibles aseo','Etiquetas'],
   RUBROS_COMPRAS:['materia prima','empaques','empaque','aseo','consumibles aseo','consumibles','etiquetas','etiquetas y publicidad'],
   _esCompra(g){ return this.RUBROS_COMPRAS.includes(String(g.rubro||'').toLowerCase()); },
@@ -940,7 +952,7 @@ const App={
   CAJONES:[['todos','📋 Todos'],['fijos','🏠 Gastos fijos'],['variables','🔄 Gastos variables'],['nomina','👷 Nómina'],['otros','🧾 Otros']],
   RUBRO_CAJON:{'Arriendo':'fijos','Servicios públicos':'fijos','Servicios profesionales':'fijos','Tecnología y software':'fijos',
     'Nómina y aportes':'nomina',
-    'Transporte':'variables','Mantenimiento y locativos':'variables','Equipos y menaje':'variables','Papelería':'variables'},
+    'Domicilios':'variables','Transporte':'variables','Mantenimiento y locativos':'variables','Equipos y menaje':'variables','Papelería':'variables'},
   _cajonDe(g){ return this.RUBRO_CAJON[g.rubro]||'otros'; },
   _gasFecha(g){ return (g.fecha||g.creado_en||'').slice(0,10); },
   _ymNom(ym){ return this.MESNOM[+String(ym||'').slice(5,7)]||''; },
