@@ -385,7 +385,7 @@ const App={
   /* ===================== INVENTARIO + índice de cobertura ===================== */
   async vInventario(){
     this.loading();
-    const [prods,movs]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_movimientos?order=creado_en.desc&limit=1000')]);
+    const [prods,movs,ventas]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_movimientos?order=creado_en.desc&limit=1000'),GET('kruh_ventas?select=monto,creado_en&limit=20000')]);
     this._prods=prods;
     // consumo diario prom (salidas ult 30 dias)
     const hoy=new Date(), d30=new Date(hoy-30*864e5);
@@ -394,6 +394,32 @@ const App={
     const cobRows=prods.map(p=>{ const cons=(salBy[p.id]||0)/30; const dias=cons>0?(+p.existencias||0)/cons:null; return {p,cons,dias}; });
     const bajoMin=prods.filter(p=>(+p.inv_min||0)>0 && (+p.existencias||0)<=(+p.inv_min||0));
     const negativos=prods.filter(p=>(+p.existencias||0)<0);
+    // ---- Tendencias: por día del mes, día de semana, efecto quincena ----
+    const pagoDays=[1,2,15,16];
+    const byDom=Array.from({length:31},()=>0), byDow=Array.from({length:7},()=>0);
+    const pago={tot:0,n:0}, normal={tot:0,n:0};
+    ventas.forEach(v=>{ const d=new Date(v.creado_en); if(isNaN(d))return; const m=+v.monto||0; byDom[d.getDate()-1]+=m; byDow[d.getDay()]+=m;
+      if(pagoDays.includes(d.getDate())){pago.tot+=m;pago.n++;}else{normal.tot+=m;normal.n++;} });
+    const promPago=pago.n?pago.tot/pago.n:0, promNormal=normal.n?normal.tot/normal.n:0;
+    const dif=promNormal?((promPago-promNormal)/promNormal*100):0;
+    const maxDom=Math.max(1,...byDom), maxDow=Math.max(1,...byDow);
+    const qtyBy={}; movs.forEach(m=>{ if(m.tipo==='salida')qtyBy[m.producto_id]=(qtyBy[m.producto_id]||0)+(+m.cantidad||0); });
+    const topProd=Object.entries(qtyBy).map(([id,q])=>({p:prods.find(x=>x.id===id),q})).filter(x=>x.p).sort((a,b)=>b.q-a.q).slice(0,6);
+    const DOW=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const tendHTML = ventas.length? `
+      <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:8px">Ventas por día del mes</div>
+        <div style="display:flex;align-items:flex-end;gap:2px;height:110px">${byDom.map((t,i)=>{const day=i+1;const pd=pagoDays.includes(day);const h=Math.round(t/maxDom*100);return `<div title="día ${day}: ${money(t)}" style="flex:1;height:${Math.max(h,t?3:0)}%;background:${pd?'var(--acc)':'var(--line)'};border-radius:2px 2px 0 0"></div>`;}).join('')}</div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--mut);margin-top:3px"><span>1</span><span>15</span><span>31</span></div>
+        <div class="hint" style="margin-top:4px">🟧 = días de pago (1, 2, 15, 16).</div></div>
+      <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Efecto quincena de pago</div>
+        <div class="row" style="justify-content:space-between"><span class="dim">Promedio días de pago</span><b>${money(promPago)}</b></div>
+        <div class="row" style="justify-content:space-between"><span class="dim">Promedio otros días</span><b>${money(promNormal)}</b></div>
+        <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Diferencia</span><b style="color:${dif>=0?'var(--ok)':'var(--bad)'}">${dif>0?'+':''}${dif.toFixed(0)}%</b></div>
+        <div class="hint" style="margin-top:6px">${(pago.n+normal.n)<20?'⏳ Aún con pocos datos — la tendencia se afina a medida que se registran pedidos.':(dif>15?'📈 Sí se ve efecto: los días de pago venden más.':(dif<-15?'📉 Los días de pago venden menos que el resto.':'➖ No se ve un efecto claro de la quincena todavía.'))}</div></div>
+      <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Por día de la semana</div>
+        ${DOW.map((nm,i)=>`<div class="row" style="align-items:center;gap:8px;margin-bottom:3px"><span style="width:74px;font-size:12px" class="dim">${nm}</span><div class="bar" style="flex:1"><i style="width:${Math.round(byDow[i]/maxDow*100)}%;background:var(--acc2)"></i></div><b style="font-size:11px;width:72px;text-align:right">${money(byDow[i])}</b></div>`).join('')}</div>
+      ${topProd.length?`<div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Más pedidos</div>${topProd.map(t=>`<div class="row" style="justify-content:space-between;padding:3px 0"><span>${esc(t.p.nombre)}</span><b>${num(t.q)}</b></div>`).join('')}</div>`:''}`
+      : '<div class="empty">Aún sin ventas para analizar. Genera pedidos y aquí verás el patrón por día y el efecto de la quincena.</div>';
     this.set(`<h1>Inventario</h1><div class="sub">Sube producción; los pedidos descuentan solo. Se puede vender en negativo, pero acá te avisa.</div>
       ${negativos.length?`<div class="card" style="border-left:4px solid var(--bad);background:var(--badbg)"><b style="color:var(--bad)">🔴 ${negativos.length} producto(s) en NEGATIVO — se vendió más de lo que había</b><div style="font-size:12.5px;margin-top:4px">${negativos.map(p=>esc(p.nombre)+' ('+num(p.existencias)+')').join(' · ')}</div></div>`:''}
       ${bajoMin.length?`<div class="card" style="border-left:4px solid var(--warn);background:var(--badbg)"><b style="color:var(--warn)">⚠️ ${bajoMin.length} producto(s) en o bajo el mínimo</b><div style="font-size:12.5px;margin-top:4px">${bajoMin.map(p=>esc(p.nombre)+' ('+num(p.existencias)+'/'+num(p.inv_min)+')').join(' · ')}</div></div>`:''}
@@ -401,7 +427,8 @@ const App={
         <div class="kpi"><b style="color:${bajoMin.length?'var(--bad)':'var(--ok)'}">${bajoMin.length}</b><span>Bajo mínimo</span></div>
         <div class="kpi dark"><b>${money(prods.reduce((a,p)=>a+(+p.existencias||0)*(+p.precio||0),0))}</b><span>Valor en existencias</span></div></div>
       <div class="row" style="gap:6px;margin-bottom:10px"><button class="et ${tab==='exist'?'on':''}" onclick="App._invTab='exist';App.vInventario()">Existencias</button>
-        <button class="et ${tab==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button></div>
+        <button class="et ${tab==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button>
+        <button class="et ${tab==='tend'?'on':''}" onclick="App._invTab='tend';App.vInventario()">Tendencias</button></div>
       ${tab==='exist'?
         (prods.length?`<div class="grid" style="grid-template-columns:repeat(2,1fr)">${cobRows.map(({p,cons,dias})=>{ const bm=(+p.inv_min||0)>0&&(+p.existencias||0)<=(+p.inv_min||0); const pct=dias===null?0:Math.min(100,dias/7*100); const col=bm?'var(--bad)':(dias===null?'var(--mut)':(dias<3?'var(--bad)':(dias<7?'var(--warn)':'var(--ok)')));
           return `<div class="card" style="padding:11px 12px;margin:0;${bm?'border:1px solid var(--bad)':''}"><div style="font-weight:700;font-size:13px;line-height:1.2">${esc(p.nombre)}</div>
@@ -410,7 +437,8 @@ const App={
             <div class="bar" style="margin-top:4px"><i style="width:${pct}%;background:${col}"></i></div>
             <div class="row" style="gap:5px;margin-top:8px"><button class="btn acc sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','entrada')">＋</button>
               <button class="btn gh sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','salida')">−</button></div></div>`;}).join('')}</div>`:'<div class="empty">Sin productos.</div>')
-        : (movs.length?movs.slice(0,300).map(m=>{const p=prods.find(x=>x.id===m.producto_id);return `<div class="item"><div class="top"><div><div class="nm">${m.tipo==='entrada'?'⬆️':'⬇️'} ${esc(p?p.nombre:'—')}</div><div class="mt">${esc(m.motivo||'')} · 📅 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div><div class="nm" style="color:${m.tipo==='entrada'?'var(--ok)':'var(--bad)'}">${m.tipo==='entrada'?'+':'−'}${num(m.cantidad)}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')}`);
+        : tab==='mov'?(movs.length?movs.slice(0,300).map(m=>{const p=prods.find(x=>x.id===m.producto_id);return `<div class="item"><div class="top"><div><div class="nm">${m.tipo==='entrada'?'⬆️':'⬇️'} ${esc(p?p.nombre:'—')}</div><div class="mt">${esc(m.motivo||'')} · 📅 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div><div class="nm" style="color:${m.tipo==='entrada'?'var(--ok)':'var(--bad)'}">${m.tipo==='entrada'?'+':'−'}${num(m.cantidad)}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')
+        : tendHTML}`);
   },
   movModal(id,tipo){ const p=(this._prods||[]).find(x=>x.id===id)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${tipo==='entrada'?'Subir producción':'Registrar salida/merma'} · ${esc(p.nombre||'')}</h3>
