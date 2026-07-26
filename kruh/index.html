@@ -249,7 +249,7 @@ const App={
     this._recsAll=recs;
     const rBy={}; recs.forEach(r=>{(rBy[r.producto_id]=rBy[r.producto_id]||[]).push(r);});
     const pBy={}; pasos.forEach(s=>{(pBy[s.producto_id]=pBy[s.producto_id]||[]).push(s);});
-    const cats=[...new Set(prods.map(p=>p.categoria||'Sin categoría'))];
+    const cats=[...new Set(prods.map(p=>p.categoria||'Sin categoría'))].sort((a,b)=>this._ordenCat(a,b));
     this.set(`<h1>Recetas y costos</h1><div class="sub">Producto → peso/presentación → ingredientes con costo → proceso → costo, precio, IVA y margen</div>
       <button class="btn acc" onclick="App.prodModal()">＋ Nuevo producto</button>
       ${prods.length?cats.map(cat=>`<div style="margin-top:16px"><div class="tag" style="margin-bottom:8px">${esc(cat)}</div>
@@ -281,7 +281,9 @@ const App={
   prodModal(id){ const p=(this._prods||[]).find(x=>x.id===id)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Nuevo'} producto</h3>
       <label>Nombre</label><input id="p_nom" value="${esc(p.nombre||'')}">
-      <div class="g2"><div><label>Categoría</label><input id="p_cat" value="${esc(p.categoria||'')}" placeholder="Pan, Pastelería, Salsas…"></div>
+      <div class="g2"><div><label>Categoría</label>
+        <select id="p_cat" onchange="App.prodOtraCat()">${[...new Set(this.CATPROD.concat((this._prods||[]).map(x=>x.categoria).filter(Boolean)))].sort((a,b)=>this._ordenCat(a,b)).map(c=>`<option ${p.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}<option value="__otra">＋ Otra…</option></select>
+        <input id="p_cat2" placeholder="Nombre de la categoría nueva" style="display:none;margin-top:6px"></div>
       <div><label>Presentación</label><input id="p_pres" value="${esc(p.presentacion||'')}" placeholder="Barra, bolsa x6…"></div></div>
       <div class="g3"><div><label>Peso</label><input id="p_peso" type="number" value="${p.peso||0}"></div>
       <div><label>Unidad</label><input id="p_uni" value="${esc(p.unidad||'g')}"></div>
@@ -298,7 +300,12 @@ const App={
       <div class="hint">Los ingredientes y los pasos se agregan en el cajón del producto.</div>
       ${id?`<button class="btn gh full" onclick="App.prodDel('${id}')" style="color:var(--bad)">Eliminar producto</button>`:''}`);
   },
-  async prodSave(id){ const b={nombre:$('p_nom').value.trim(),categoria:$('p_cat').value.trim(),presentacion:$('p_pres').value.trim(),peso:+$('p_peso').value||0,unidad:$('p_uni').value.trim()||'g',precio:+$('p_pre').value||0,iva_pct:+$('p_iva').value||0,inv_min:+$('p_min').value||0,perecedero:$('p_per').value==='true',refrigeracion:$('p_refri').value==='true',foto_url:$('p_foto').value.trim()};
+  CATPROD:['Panadería','Conservas','Repostería','Productos Eventos','Servicio'],
+  _ordenCat(a,b){ const i=x=>{const n=this.CATPROD.indexOf(x); return n<0?99:n;}; return i(a)-i(b)||String(a).localeCompare(String(b)); },
+  prodOtraCat(){ const s=$('p_cat'), i=$('p_cat2'); if(!s||!i)return; const otra=s.value==='__otra';
+    i.style.display=otra?'block':'none'; if(otra)i.focus(); },
+  async prodSave(id){ const sc=$('p_cat'); const cat=sc.value==='__otra'?($('p_cat2').value||'').trim():sc.value;
+    const b={nombre:$('p_nom').value.trim(),categoria:cat,presentacion:$('p_pres').value.trim(),peso:+$('p_peso').value||0,unidad:$('p_uni').value.trim()||'g',precio:+$('p_pre').value||0,iva_pct:+$('p_iva').value||0,inv_min:+$('p_min').value||0,perecedero:$('p_per').value==='true',refrigeracion:$('p_refri').value==='true',foto_url:$('p_foto').value.trim()};
     if(!b.nombre){alert('Ponle nombre');return;} if(id) await PATCH('kruh_productos?id=eq.'+id,b); else await POST('kruh_productos',b);
     cerrar(); toast('Guardado · ya está en el catálogo'); this.vRecetas(); },
   async prodDel(id){ if(!this._okBorrar())return; await DEL('kruh_recetas?producto_id=eq.'+id); await DEL('kruh_productos?id=eq.'+id); cerrar(); toast('Eliminado'); this.vRecetas(); },
