@@ -158,7 +158,7 @@ const App={
         <div class="hint">Suma de (ventas − costo) de todos los meses. Al cambiar precios de items, este acumulado se mueve.</div></div>
       <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
       ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=es?ventasM:(+m.ventas||0),cc=es?costo:(+m.costo||0),mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':''}</div>
-        <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''} · meta ${money(mt)}</div></div>
+        <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''} · meta ${money(mt)}${es?` · <a onclick="App.dashDetalleMes()" style="color:var(--acc);cursor:pointer;font-weight:700">ver detalle →</a>`:''}</div></div>
         ${this.esAdmin?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
         <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div></div>`;}).join('')}
       ${this.esAdmin?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
@@ -174,6 +174,33 @@ const App={
     const b={mes:nombre,ventas:+$('d_ven').value||0,costo:+$('d_cos').value||0,meta:+$('d_meta').value||40000000,orden:(this.MESNOM.indexOf(nombre)>0?this.MESNOM.indexOf(nombre):99)};
     await fetch(SB+'/rest/v1/kruh_dashboard?on_conflict=mes',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(b)});
     cerrar(); toast('Guardado'); this.vDashboard(); },
+  async dashDetalleMes(){
+    const now=new Date(), mesIni=new Date(now.getFullYear(),now.getMonth(),1);
+    const [movs,prods,recs,ventas,peds]=await Promise.all([
+      GET('kruh_movimientos?select=producto_id,tipo,cantidad,creado_en&limit=10000'),
+      GET('kruh_productos?select=id,nombre&limit=1000'),
+      GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000'),
+      GET('kruh_ventas?select=monto,creado_en&limit=8000'),
+      GET('kruh_pedidos?select=creado_en&limit=3000')]);
+    const nombre={}; prods.forEach(p=>nombre[p.id]=p.nombre);
+    const costoU={}; recs.forEach(r=>costoU[r.producto_id]=(costoU[r.producto_id]||0)+(+r.cantidad||0)*(+r.costo_unit||0));
+    const prodBy={}; movs.forEach(m=>{ if(m.tipo==='entrada' && new Date(m.creado_en)>=mesIni) prodBy[m.producto_id]=(prodBy[m.producto_id]||0)+(+m.cantidad||0); });
+    const filas=Object.entries(prodBy).map(([id,q])=>({nombre:nombre[id]||'—',q,costo:q*(costoU[id]||0),sinCosto:!(costoU[id]>0)})).sort((a,b)=>b.q-a.q);
+    const totCosto=filas.reduce((a,f)=>a+f.costo,0), sinCosto=filas.filter(f=>f.sinCosto).length;
+    const ventaMes=ventas.filter(v=>new Date(v.creado_en)>=mesIni).reduce((a,v)=>a+(+v.monto||0),0);
+    const nPed=peds.filter(p=>new Date(p.creado_en)>=mesIni).length;
+    const util=ventaMes-totCosto;
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:2px">Detalle del mes</h3><div class="dim" style="font-size:12px;margin-bottom:10px">${esc(this.MESNOM[now.getMonth()+1]||'')}</div>
+      <div style="font-weight:700;margin-bottom:4px">🏭 Producido (entró a inventario)</div>
+      ${filas.length?filas.map(f=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--line2)"><span>${esc(f.nombre)} <small class="dim">×${num(f.q)}</small></span><span>${f.sinCosto?'<span class="dim">sin costo</span>':money(f.costo)}</span></div>`).join(''):'<div class="dim" style="font-size:12px;padding:4px 0">Nada producido este mes.</div>'}
+      <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><b>Costo de producción</b><b>${money(totCosto)}</b></div>
+      ${sinCosto?`<div class="hint" style="color:var(--warn)">${sinCosto} producto(s) sin costo de receta — el costo mostrado es parcial.</div>`:''}
+      <div style="font-weight:700;margin:12px 0 4px">💰 Vendido (pedidos generados)</div>
+      <div class="row" style="justify-content:space-between"><span class="dim">Pedidos del mes</span><b>${nPed}</b></div>
+      <div class="row" style="justify-content:space-between"><span>Venta del mes</span><b style="color:var(--acc)">${money(ventaMes)}</b></div>
+      <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:6px;padding-top:6px"><b>Utilidad (venta − costo)</b><b style="color:${util>=0?'var(--ok)':'var(--bad)'}">${money(util)}</b></div>
+      <button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Cerrar</button>`);
+  },
   nav(){ const perm=this._tabsRol(); $('nav').innerHTML=this.TABS.filter(([v])=>perm.includes(v)).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
