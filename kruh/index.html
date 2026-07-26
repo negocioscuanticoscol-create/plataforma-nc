@@ -348,7 +348,7 @@ const App={
     const vend={}; hist.forEach(p=>(p.items||[]).forEach(i=>{ if(i.producto_id)vend[i.producto_id]=(vend[i.producto_id]||0)+(+i.qty||0); }));
     prods.sort((a,b)=>(vend[b.id]||0)-(vend[a.id]||0)||String(a.nombre||'').localeCompare(String(b.nombre||'')));
     this._prods=prods; this._cart=this._cart||{};
-    this._telMap={}; leads.forEach(l=>{ const t=(l.telefono||'').replace(/\D/g,''); if(t)this._telMap[t]=l.nombre; });
+    this._telMap={}; leads.forEach(l=>{ const t=this._telKey(l.telefono); if(t.length>=7)this._telMap[t]=l.nombre; });
     this._pedPaint();
   },
   _pedPaint(){
@@ -396,7 +396,7 @@ const App={
       </div>
       `);
   },
-  pedTelLookup(v){ const t=(v||'').replace(/\D/g,''); if(t.length<7)return; const nom=(this._telMap||{})[t]; if(nom){ this._cartCli=nom; if($('pd_cli'))$('pd_cli').value=nom; } },
+  pedTelLookup(v){ const t=this._telKey(v); if(t.length<7)return; const nom=(this._telMap||{})[t]; if(nom){ this._cartCli=nom; if($('pd_cli'))$('pd_cli').value=nom; } },
   cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_desc'))this._cartDesc=+$('pd_desc').value||0; if($('pd_fp'))this._cartFP=$('pd_fp').value;
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
   /* cantidad escrita a mano en la cuenta */
@@ -435,8 +435,22 @@ const App={
     const bv={cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp};
     if(!await POST('kruh_ventas',{...bv,descuento:desc})) await POST('kruh_ventas',bv);   // sin la columna descuento
     if(dom>0) await this._sumarDomicilio(dom,fp);
+    const nuevoCli=await this._guardarClientePedido(cli,tel);
     this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; this._cartDesc=0; toast('Pedido generado'); await this.vPedidos();
-    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3><div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)')}">quedan ${s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`); },
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3>
+      ${nuevoCli?`<div style="border:1.5px solid var(--ok);background:var(--okbg);border-radius:9px;padding:8px 11px;margin-bottom:9px;font-size:13px">👤 <b style="color:var(--ok)">${esc(nuevoCli)}</b> quedó registrado en el CRM</div>`:''}
+      <div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)')}">quedan ${s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`); },
+
+  /* si el cliente del pedido no está en el CRM, se registra solo */
+  async _guardarClientePedido(cli,tel){
+    const nom=String(cli||'').trim(), k=this._telKey(tel);
+    if(!nom || k.length<7) return '';                       // sin teléfono no se puede evitar duplicados
+    if((this._telMap||{})[k]) return '';                    // ya está en el CRM
+    const b={nombre:nom,telefono:String(tel||'').trim(),etapa:'contactado',tipo:'nuevo',canal:'local',interes:'Registrado desde un pedido'};
+    const r=await POST('kruh_leads',b);
+    if(!r) return '';
+    this._telMap=this._telMap||{}; this._telMap[k]=nom;
+    return nom; },
 
   /* el domicilio cobrado en la cuenta cae solo en Gastos, acumulado por día */
   async _sumarDomicilio(valor,fp){
