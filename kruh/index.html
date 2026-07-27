@@ -557,7 +557,7 @@ const App={
       if(!cerrado){ try{ r.start(); return; }catch(e){} }      // Chrome cortó solo: se reabre y sigue
       clearInterval(iv); this._rec=null;
       const t=texto();
-      this._vozUltimo=t||'(silencio)';                        // queda a la vista para diagnosticar
+      this._vozUltimo=t?("último que oyó: "+t):"último turno: no captó nada";                        // queda a la vista para diagnosticar
       if(!t){ this._vozRepetir(cb,paso); return; }
       this._vozLog.push(t); cb(t); };
     try{ r.start(); }catch(e){ this._vozOye=false; this.vozFin('No se pudo abrir el micrófono'); } },
@@ -570,9 +570,24 @@ const App={
          prod:'Productos',dom:'Domicilio',fin:'Listo'},
   vozIniciar(){ if(!this._SR()){ alert('Este navegador no permite dictado. Se necesita Chrome en Android o computador.'); return; }
     if(this._vozGuiado){ this.vozFin('Cancelado'); return; }
-    this._vozGuiado=true; this._vozPaso='tel'; this._vozLog=[]; this._vozFallos=0;
-    this._vozLineas=[]; this._vozDice=''; this._vozParcial=''; this._vozUltimo='';
-    this._hablar('Teléfono.',()=>this._oir(t=>this._pasoTel(t),'tel')); },
+    if(!window.isSecureContext){ alert('El micrófono solo funciona con https. Abre la página publicada, no el archivo local.'); return; }
+    /* El permiso HAY que pedirlo aqui, dentro del clic. Si se pide despues —cuando
+       termina de hablar y recien ahi se abre el microfono— el gesto del usuario ya
+       vencio y Chrome no muestra el cuadro de permiso: falla callado. */
+    this._vozUltimo=''; this._vozDice='Preparando el micrófono…'; this._pedPaint();
+    try{ const C=window.AudioContext||window.webkitAudioContext;      // desbloquea el pitido
+      if(C){ this._ac=this._ac||new C(); if(this._ac.state==='suspended')this._ac.resume(); } }catch(e){}
+    const arranca=()=>{ this._vozGuiado=true; this._vozPaso='tel'; this._vozLog=[]; this._vozFallos=0;
+      this._vozLineas=[]; this._vozParcial='';
+      this._hablar('Teléfono.',()=>this._oir(t=>this._pasoTel(t),'tel')); };
+    const nav=navigator.mediaDevices;
+    if(!nav||!nav.getUserMedia){ arranca(); return; }
+    nav.getUserMedia({audio:true}).then(s=>{ s.getTracks().forEach(t=>t.stop()); arranca(); })
+      .catch(err=>{ this._vozGuiado=false; this._vozDice='';
+        this._vozUltimo=(err&&err.name==='NotAllowedError')
+          ? 'permiso de micrófono DENEGADO — ábrelo en el candado 🔒 de la barra de direcciones'
+          : 'no se pudo abrir el micrófono ('+((err&&err.name)||'?')+')';
+        this._pedPaint(); toast('🎤 Sin micrófono'); }); },
   vozFin(msg){ this._vozGuiado=false; this._vozOye=false; this._vozPaso='fin'; this._vozDice='';
     try{ if(this._rec)this._rec.stop(); }catch(e){}
     try{ if(window.speechSynthesis)window.speechSynthesis.cancel(); }catch(e){}
@@ -659,8 +674,10 @@ const App={
         ${this._vozAbriendo?`<div class="hint" style="margin-top:3px">abriendo el micrófono…</div>`:''}
         ${this._vozOye?`<div class="hint" style="margin-top:3px">🎤 escuchando… <i id="voz_oye">${esc(this._vozParcial||'…')}</i></div>
         <div class="hint" style="font-size:10px;margin-top:2px">Puedes dictar por partes, con pausas — espera sin afán.</div>`:''}
-        ${this._vozUltimo?`<div class="hint" style="font-size:10px;margin-top:3px;border-top:1px solid var(--line);padding-top:3px">último que oyó: <b>${esc(this._vozUltimo)}</b></div>`:''}
       </div>`; }
+    // el diagnostico va FUERA del recuadro: si falla el permiso, _vozGuiado queda en
+    // falso y adentro no se veria nunca, que es justo cuando mas falta hace
+    if(this._vozUltimo) h+=`<div class="hint" style="font-size:10.5px;margin-bottom:8px;border-left:3px solid var(--warn);padding:4px 7px;background:var(--badbg);border-radius:6px">🎤 ${esc(this._vozUltimo)}</div>`;
     const L=this._vozLineas||[], prods=this._prods||[];
     if(L.length) h+=`<div class="card" style="margin:0 0 8px;padding:8px 9px;border:1.5px solid var(--acc)">
       <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:4px">
