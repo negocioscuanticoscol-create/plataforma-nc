@@ -740,10 +740,10 @@ const App={
        ['baja','⬇️ Bajas','var(--warn)','Merma / daño','salió del inventario'],
        ['perdida','❌ V. perdidas','var(--bad)','Venta perdida','NO toca el inventario'],
        ['conv','🔄 Conversión','var(--gold)','Porcionado','se parte en otro producto']],
-  /* Pares que se convierten y en cuantas partes. Si el par no esta aqui, el factor
-     se escribe a mano; asi sirve para cualquier producto sin tocar el codigo. */
-  CONV:{'Apfelstrudel':{a:'Apfelstrudel Porción',f:6},
-        'Crumble de ciruelas':{a:'Crumble Ciruelas porcion',f:6}},
+  /* Que producto se parte en cual, y en cuantas partes. El boton 🔄 Conversión SOLO
+     aparece para los productos que esten aqui: en los demas no tiene sentido y solo
+     estorbaria. Para habilitar otro par basta agregar un renglon a esta lista. */
+  CONV:{'Apfelstrudel':{a:'Apfelstrudel Porción',f:6}},
   /* cuanto mueve el inventario cada tipo: +1 suma, -1 resta, 0 no lo toca.
      conv_mas/conv_menos son los dos lados de una conversion: uno resta el entero
      y el otro suma las porciones. NO son 'entrada', a proposito: el Dashboard
@@ -752,17 +752,21 @@ const App={
   invProd(id){ this._invProd=id; this.vInventario(); },
   invAcc(k){ this._invAcc=k; this.vInventario(); },
   _panelMov(prods,movs){
-    const pid=this._invProd||'', acc=this._invAcc||'entrada';
+    const pid=this._invProd||'';
     const p=(prods||[]).find(x=>x.id===pid);
-    const A=this.ACC.find(a=>a[0]===acc)||this.ACC[0];
+    const cv=p?(this.CONV[p.nombre]||null):null;
+    // el botón de conversión solo existe para los productos que se parten
+    const ACC=this.ACC.filter(a=>a[0]!=='conv'||cv);
+    let acc=this._invAcc||'entrada';
+    if(acc==='conv'&&!cv){ acc='entrada'; this._invAcc='entrada'; }   // si cambia a otro producto
+    const A=ACC.find(a=>a[0]===acc)||ACC[0];
     const hoyK=this._diaKey(new Date());
     const tipoBusca=acc==='conv'?'conv_menos':acc;   // la conversión se lista por el lado que sale
     const delDia=p?(movs||[]).filter(m=>m.producto_id===pid&&m.tipo===tipoBusca&&this._diaKey(m.creado_en)===hoyK):[];
     const totDia=delDia.reduce((a,m)=>a+(+m.cantidad||0),0);
-    const cv=p?(this.CONV[p.nombre]||null):null;
     const dest=this._convDest||(cv?((prods||[]).find(x=>x.nombre===cv.a)||{}).id||'':'');
     const fac=this._convFac||(cv?cv.f:6);
-    const botones=this.ACC.map(([k,t,col])=>`<button class="btn sm" style="flex:1;min-width:118px;padding:7px 4px;background:${acc===k?col:'transparent'};color:${acc===k?'#fff':col};border:1.5px solid ${col};font-weight:700" onclick="App.invAcc('${k}')">${t}</button>`).join('');
+    const botones=ACC.map(([k,t,col])=>`<button class="btn sm" style="flex:1;min-width:118px;padding:7px 4px;background:${acc===k?col:'transparent'};color:${acc===k?'#fff':col};border:1.5px solid ${col};font-weight:700" onclick="App.invAcc('${k}')">${t}</button>`).join('');
     return `<div class="card">
       <label>Producto</label>
       <select id="inv_sel" onchange="App.invProd(this.value)">
