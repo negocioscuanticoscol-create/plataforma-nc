@@ -1181,7 +1181,7 @@ const App={
         <div class="kpi"><b>${arr.filter(o=>o.estemes).length}</b><span>Compraron este mes</span></div>
         <div class="kpi"><b>${arr.length}</b><span>Han comprado alguna vez</span></div></div>
       ${this._ventaDia(mesV)}
-      ${this._mmCard(movsV,prodsV)}
+      ${this._mmCard(movsV,prodsV,peds)}
       ${this._formasPago(mesV,tarBase,tarIva)}
       <div class="row" style="gap:8px"><button class="btn acc" onclick="App.ventaModal()">＋ Registrar venta</button>
         <button class="btn gh" onclick="App.ventasExcel()">⬇ Excel contabilidad</button></div>
@@ -1256,9 +1256,16 @@ const App={
       if(c==='mus'){ o.mus+=q; o.musV+=val; } else { o.per+=q; o.perV+=val; } });
     return R;
   },
-  _mmCard(movs,prods){
+  /* descuentos dados en los pedidos del periodo: n = cuantos pedidos, v = cuanta plata */
+  _descAgrupa(peds,filtro){ const R={n:0,v:0};
+    (peds||[]).forEach(p=>{ const k=this._diaKey(p.creado_en); if(!k||!filtro(k))return;
+      const dd=+p.descuento||0; if(dd>0){ R.n++; R.v+=dd; } });
+    return R; },
+  _mmCard(movs,prods,peds){
     const hoyK=this._diaKey(new Date()), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
-    const d=this._mmAgrupa(movs,prods,k=>k===hoyK), m=this._mmAgrupa(movs,prods,k=>k.slice(0,7)===mesK), a=this._mmAgrupa(movs,prods,k=>k.slice(0,4)===anoK);
+    const F={dia:k=>k===hoyK, mes:k=>k.slice(0,7)===mesK, ano:k=>k.slice(0,4)===anoK};
+    const d=this._mmAgrupa(movs,prods,F.dia), m=this._mmAgrupa(movs,prods,F.mes), a=this._mmAgrupa(movs,prods,F.ano);
+    d.desc=this._descAgrupa(peds,F.dia); m.desc=this._descAgrupa(peds,F.mes); a.desc=this._descAgrupa(peds,F.ano);
     const cel=(t,o,col)=>`<div style="flex:1;text-align:center;padding:5px 3px">
       <b style="display:block;font-family:Fraunces,serif;font-size:23px;color:${col};line-height:1.1">${num(o.n)}</b>
       <span style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em">${t}</span>
@@ -1269,8 +1276,9 @@ const App={
     return `<div class="card">
       <div class="row" style="gap:9px;flex-wrap:wrap;align-items:stretch">
         ${bloque('🎁 Muestras regaladas','mus','var(--ok)','var(--okbg)','var(--ok)')}
-        ${bloque('❌ Ventas perdidas','per','var(--bad)','var(--badbg)','var(--bad)')}</div>
-      <div class="hint" style="margin-top:7px">Valor estimado con el precio de lista. Las muestras sí salieron del inventario; las ventas perdidas no movieron nada, son las que no se alcanzaron a atender. El conteo del mes arranca solo en cada mes nuevo, pero el histórico completo queda guardado.</div></div>`;
+        ${bloque('❌ Ventas perdidas','per','var(--bad)','var(--badbg)','var(--bad)')}
+        ${bloque('💸 Descuentos dados','desc','var(--warn)','var(--badbg)','var(--warn)')}</div>
+      <div class="hint" style="margin-top:7px">El número grande es la cantidad (muestras, ventas perdidas o <b>pedidos con descuento</b>) y debajo va la plata. Muestras y perdidas se valoran al precio de lista; el descuento es la plata que de verdad se dejó de cobrar. Las muestras sí salieron del inventario; las ventas perdidas no movieron nada. El conteo del mes arranca solo en cada mes nuevo, pero el histórico queda guardado.</div></div>`;
   },
   /* detalle por producto del periodo que este seleccionado en los cajones Dia/Mes/Año */
   _mmPeriodo(movs,prods,caj){
@@ -1299,19 +1307,38 @@ const App={
       return caj==='dia'?k===hoyK:(caj==='mes'?k.slice(0,7)===mesK:k.slice(0,4)===anoK); };
     const by={};
     (ventas||[]).filter(enP).forEach(v=>{ const k=(v.cliente||'—').trim();
-      const o=by[k]=by[k]||{cliente:k,tel:v.telefono||'',compras:0,monto:0,ultima:v.creado_en};
-      o.compras++; o.monto+=(+v.monto||0); if(v.creado_en>o.ultima)o.ultima=v.creado_en; if(v.telefono)o.tel=v.telefono; });
+      const o=by[k]=by[k]||{cliente:k,tel:v.telefono||'',compras:0,monto:0,ultima:v.creado_en,vts:[]};
+      o.compras++; o.monto+=(+v.monto||0); o.vts.push(v);
+      if(v.creado_en>o.ultima)o.ultima=v.creado_en; if(v.telefono)o.tel=v.telefono; });
     const arr=Object.values(by).sort((a,b)=>b.monto-a.monto);
     const tot=arr.reduce((a,o)=>a+o.monto,0);
+    const FP={'Efectivo':'💵','Transferencia':'🏦','Nequi':'📱','Tarjeta crédito':'💳'};
     return `<h1 style="font-size:17px;margin-top:18px">Clientes · ${arr.length} · ${money(tot)}</h1>
-      ${arr.length?arr.map(o=>{const on=(segSet||{})[o.cliente];return `<div class="item"><div class="top">
-        <div class="row" style="gap:9px;align-items:flex-start"><span class="circ on" title="compró en este periodo"></span>
-          <div><div class="nm">${esc(o.cliente)} <small class="dim">(${o.compras})</small></div>
-          <div class="mt">💰 ${money(o.monto)} · ${tot>0?(o.monto/tot*100).toFixed(1):'0'}% · última ${(o.ultima||'').slice(0,10)}</div></div></div>
+      <div class="sub" style="margin-bottom:8px">Toca un cliente para ver qué llevó y cómo pagó.</div>
+      ${arr.length?arr.map((o,i)=>{ const on=(segSet||{})[o.cliente], t=(o.tel||'').replace(/\D/g,''), id='cd'+i;
+        const det=o.vts.slice().sort((a,b)=>String(b.creado_en).localeCompare(String(a.creado_en)))
+          .map(v=>{ const fp=(v.forma_pago||'—').trim()||'—', ds=+v.descuento||0, dm=+v.domicilio||0;
+            return `<div style="padding:6px 0;border-top:1px solid var(--line2)">
+              <div class="row" style="justify-content:space-between;gap:8px;align-items:flex-start">
+                <span style="flex:1;font-size:12.5px">${esc(v.producto||'—')}</span>
+                <b style="font-size:12.5px;white-space:nowrap">${money(v.monto)}</b></div>
+              <div class="mt">${FP[fp]||'•'} ${esc(fp)} · 🕐 ${new Date(v.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${ds>0?` · <span style="color:var(--bad)">−${money(ds)} dcto</span>`:''}${dm>0?` · 🛵 ${money(dm)}`:''}</div></div>`;}).join('');
+        return `<div class="item"><div class="top">
+        <div class="row" style="gap:9px;align-items:flex-start;flex:1;cursor:pointer" onclick="App.cliDet('${id}')">
+          <span class="circ on" title="compró en este periodo"></span>
+          <div style="flex:1"><div class="nm"><span id="${id}_f" style="color:var(--acc)">▸</span> ${esc(o.cliente)} <small class="dim">(${o.compras})</small></div>
+          <div class="mt">💰 ${money(o.monto)} · ${tot>0?(o.monto/tot*100).toFixed(1):'0'}% · última ${(o.ultima||'').slice(0,10)}</div>
+          ${t?`<div class="mt">📲 <a href="https://wa.me/57${t}" target="_blank" onclick="event.stopPropagation()" style="color:#16734a;font-weight:700">${esc(o.tel)}</a></div>`:'<div class="mt" style="color:var(--mut)">sin teléfono</div>'}</div></div>
         <div class="row" style="gap:8px">
-          <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div></div>`;}).join('')
+          <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div>
+        <div id="${id}" style="display:none;margin-top:4px">${det}</div></div>`;}).join('')
         :'<div class="empty">Ningún cliente compró en este periodo.</div>'}`;
   },
+  /* despliega el detalle de un cliente sin repintar la vista entera */
+  cliDet(id){ const e=$(id); if(!e)return;
+    const abierto=e.style.display!=='none';
+    e.style.display=abierto?'none':'block';
+    const f=$(id+'_f'); if(f)f.textContent=abierto?'▸':'▾'; },
   _resumenProductos(peds,ventas,segSet,movsV,prodsV){
     const f=new Date(), hoyK=this._diaKey(f), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
     const cli={dia:new Set(),mes:new Set(),ano:new Set()};
@@ -1328,9 +1355,13 @@ const App={
       if(k===hoyK){ COBRADO.dia+=tt; DESC.dia+=dd; }
       if(k.slice(0,7)===mesK){ COBRADO.mes+=tt; DESC.mes+=dd; }
       if(k.slice(0,4)===anoK){ COBRADO.ano+=tt; DESC.ano+=dd; }
-      (p.items||[]).forEach(it=>{ const n=it.nombre||'—', q=+it.qty||0, v=q*(+it.precio||0);
+      // el descuento del pedido se reparte entre sus productos, a prorrata del valor de
+      // cada uno. Así la columna "cobrado" de la tabla cuadra con la plata que entró.
+      const bru=(p.items||[]).reduce((s,i)=>s+(+i.qty||0)*(+i.precio||0),0);
+      const fac=bru>0?Math.min(1,dd/bru):0;
+      (p.items||[]).forEach(it=>{ const n=it.nombre||'—', q=+it.qty||0, v=q*(+it.precio||0), ds=v*fac;
         // el Día separa por forma de pago; Mes y Año acumulan por producto
-        const add=(b,key,f)=>{const o=B[b][key]=B[b][key]||{n,fp:f,q:0,v:0}; o.q+=q; o.v+=v;};
+        const add=(b,key,f)=>{const o=B[b][key]=B[b][key]||{n,fp:f,q:0,v:0,d:0}; o.q+=q; o.v+=v; o.d+=ds;};
         if(k===hoyK)add('dia',n+' ||'+fp,fp);
         if(k.slice(0,7)===mesK)add('mes',n,'');
         if(k.slice(0,4)===anoK)add('ano',n,''); }); });
@@ -1340,8 +1371,13 @@ const App={
               ['ano','📆 Año',anoK,'']];
     const caj=this._resProd||'';
     const sel=caj?B[caj]:{};
-    const filas=Object.values(sel).map(o=>({k:o.n,fp:o.fp,q:o.q,v:o.v})).sort((a,b)=>b.v-a.v);
+    const filas=Object.values(sel).map(o=>({k:o.n,fp:o.fp,q:o.q,v:o.v,d:o.d||0})).sort((a,b)=>b.v-a.v);
     const tQ=filas.reduce((a,x)=>a+x.q,0), tV=filas.reduce((a,x)=>a+x.v,0);
+    const tD=filas.reduce((a,x)=>a+x.d,0), tC=tV-tD;          // lista, descuento, cobrado
+    const hayDesc=tD>0.5;                                     // la columna solo sale si hubo
+    const dom=(peds||[]).reduce((a,p)=>{ const k=this._diaKey(p.creado_en);
+      const en=caj==='dia'?k===hoyK:(caj==='mes'?k.slice(0,7)===mesK:k.slice(0,4)===anoK);
+      return a+(en?(+p.domicilio||0):0); },0);
     const nomCaj=((CJ.find(c=>c[0]===caj)||[])[2]||''), conFP=caj==='dia';
     return `<h1 style="font-size:18px;margin-top:24px">Clientes y productos</h1>
       <div class="sub">Día y Mes muestran clientes y productos · Año muestra solo productos</div>
@@ -1353,19 +1389,23 @@ const App={
         :(caj==='ano'?'':this._clientesPeriodo(ventas,caj,segSet))+
         `<h1 style="font-size:17px;margin-top:20px">Productos · ${esc(nomCaj)}</h1>`+
         (filas.length?`<div class="tbwrap"><table class="tb" style="min-width:460px">
-        <thead><tr><th style="min-width:190px">Producto</th>${conFP?'<th style="min-width:165px">Forma de pago</th>':''}<th style="text-align:right">Unidades</th><th style="text-align:right">Valor</th><th style="text-align:right">%</th></tr></thead>
-        <tbody>${filas.map(x=>`<tr>
+        <thead><tr><th style="min-width:190px">Producto</th>${conFP?'<th style="min-width:165px">Forma de pago</th>':''}<th style="text-align:right">Unidades</th><th style="text-align:right">Lista</th>${hayDesc?'<th style="text-align:right">Descuento</th>':''}<th style="text-align:right">Cobrado</th><th style="text-align:right">%</th></tr></thead>
+        <tbody>${filas.map(x=>{const cob=x.v-x.d; return `<tr>
           <td style="padding-left:10px;font-weight:600">${esc(x.k)}</td>
           ${conFP?`<td style="padding-left:10px;font-size:12px;color:var(--ink2)">${esc(x.fp)}</td>`:''}
           <td style="text-align:right;padding-right:10px">${num(x.q)}</td>
-          <td style="text-align:right;padding-right:10px;font-weight:700;color:var(--acc)">${money(x.v)}</td>
-          <td style="text-align:right;padding-right:10px;color:var(--mut)">${tV>0?(x.v/tV*100).toFixed(1):'0'}%</td></tr>`).join('')}</tbody>
+          <td style="text-align:right;padding-right:10px;color:var(--mut)">${money(x.v)}</td>
+          ${hayDesc?`<td style="text-align:right;padding-right:10px;color:${x.d>0?'var(--bad)':'var(--mut)'}">${x.d>0?'−'+money(x.d):'—'}</td>`:''}
+          <td style="text-align:right;padding-right:10px;font-weight:700;color:var(--acc)">${money(cob)}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--mut)">${tC>0?(cob/tC*100).toFixed(1):'0'}%</td></tr>`;}).join('')}</tbody>
         <tfoot><tr><td style="padding-left:10px">TOTAL ${esc(nomCaj).toUpperCase()}</td>${conFP?'<td></td>':''}
           <td style="text-align:right;padding-right:10px">${num(tQ)}</td>
-          <td style="text-align:right;padding-right:10px;color:var(--acc)">${money(tV)}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--mut)">${money(tV)}</td>
+          ${hayDesc?`<td style="text-align:right;padding-right:10px;color:var(--bad)">−${money(tD)}</td>`:''}
+          <td style="text-align:right;padding-right:10px;color:var(--acc)">${money(tC)}</td>
           <td style="text-align:right;padding-right:10px">100%</td></tr></tfoot>
-      </table></div>`+((DESC[caj]||0)>0?`<div class="hint" style="margin-top:5px;border-left:3px solid var(--warn);padding:4px 8px;background:var(--badbg);border-radius:6px">
-          La tabla suma el <b>precio de lista</b> (${money(tV)}). En ${esc(nomCaj)} se dieron <b style="color:var(--bad)">${money(DESC[caj])}</b> en descuentos, así que lo <b>cobrado</b> fue ${money(tot(caj))} — que es lo que muestra el cajón y la venta día por día.</div>`:'')
+      </table></div>`+(dom>0?`<div class="hint" style="margin-top:5px">Cobrado en productos ${money(tC)} + domicilios ${money(dom)} = <b>${money(tot(caj))}</b>, que es lo que muestra el cajón y la venta día por día.</div>`
+        :`<div class="hint" style="margin-top:5px">Cobrado ${money(tC)} — cuadra con el cajón y con la venta día por día.</div>`)
         :`<div class="empty">Sin pedidos en ${esc(nomCaj)}.</div>`)
         +this._mmPeriodo(movsV,prodsV,caj)}`;
   },

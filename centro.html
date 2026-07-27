@@ -159,18 +159,27 @@ async vResumen(){
   const cuentas=await api('nc_mkt_cuentas?select=cliente,seguidores&limit=500');
   const inf=(await api('nc_infra?select=*&limit=1'))[0]||null;
   const segBy={}; cuentas.forEach(c=>segBy[c.cliente]=(segBy[c.cliente]||0)+(+c.seguidores||0));
+  // g:'cli' = clientes de NC · g:'ace' = aceleradores de prospección · g:'her' = aplicaciones
+  const BASE='https://negocioscuanticoscol-create.github.io/plataforma-nc/';
   const emp=[
-   {n:'Feroz',g:'app',bot:'feroz',d:'Botas de dotación · distribuidores',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=feroz'},
-   {n:'Smart',g:'app',bot:'smart',d:'Envases herméticos · B2B',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/?empresa=smart'},
-   {n:'Fresco a tu Casa',g:'app',bot:null,d:'Mercado fresco a domicilio (1er cliente: CODABAS)',u:'https://negocioscuanticoscol-create.github.io/DeCodabasATuCasa/'},
-   {n:'ZARRAT',g:'cli',bot:null,d:'Atelier de moda a la medida',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/zarrat/'},
-   {n:'FES Fueling',g:'cli',bot:null,d:'ERP repuestos cisternas',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/fesfueling/'},
-   {n:'KRUH',g:'cli',bot:null,d:'Panadería → restaurante',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/kruh/'},
-   {n:'Calzado Alpaca',g:'cli',bot:null,d:'Comercializadora de calzado · Los Indestructibles',u:'https://negocioscuanticoscol-create.github.io/plataforma-nc/alpaca/'},
+   {n:'Feroz',g:'cli',bot:'feroz',d:'Botas de dotación · distribuidores',u:BASE+'?empresa=feroz'},
+   {n:'Smart',g:'cli',bot:'smart',d:'Envases herméticos · B2B',u:BASE+'?empresa=smart'},
+   {n:'ZARRAT',g:'cli',bot:null,d:'Atelier de moda a la medida',u:BASE+'zarrat/'},
+   {n:'FES Fueling',g:'cli',bot:null,d:'ERP repuestos cisternas',u:BASE+'fesfueling/'},
+   {n:'KRUH',g:'cli',bot:null,d:'Panadería → restaurante · Club del Pan',u:BASE+'kruh/'},
+   {n:'Calzado Alpaca',g:'cli',bot:null,d:'Comercializadora de calzado · Los Indestructibles',u:BASE+'alpaca/'},
+   {n:'El Nuevo Superior',g:'cli',bot:null,d:'Fábrica de colchones',u:BASE+'superior/'},
+   {n:'Sole Paris',g:'cli',bot:null,d:'Skincare · diagnóstico de piel',u:BASE+'soleparis/'},
+   {n:'CallProspector',g:'ace',bot:null,d:'Marcación en frío por telemercaderistas · en desarrollo',u:null},
+   {n:'Marcador de empresas',g:'ace',bot:null,d:'Marcación de empresas · Feroz',u:BASE+'marcador_empresas.html'},
+   {n:'Barrido presencial',g:'ace',bot:null,d:'Prospección en calle · mapa y lista',u:BASE+'barrido.html'},
+   {n:'Fresco a tu Casa',g:'her',bot:null,d:'Mercado fresco a domicilio (1er cliente: CODABAS)',u:'https://negocioscuanticoscol-create.github.io/DeCodabasATuCasa/'},
   ];
+  // Fuera del Resumen a propósito (herramientas internas de un cliente, no apps aparte):
+  // cotizador-smart, catalogo, pauta y autopedido. Siguen publicadas y funcionando.
   const totLeads=(leadsBy.smart||0)+(leadsBy.feroz||0);
   const totSeg=cuentas.reduce((a,c)=>a+(+c.seguidores||0),0);
-  const nApp=emp.filter(e=>e.g==='app').length, nCli=emp.filter(e=>e.g==='cli').length;
+  const nCli=emp.filter(e=>e.g==='cli').length, nAce=emp.filter(e=>e.g==='ace').length, nHer=emp.filter(e=>e.g==='her').length;
   const card=e=>{ const lm=e.bot?(leadsBy[e.bot]||0):null; const seg=segBy[e.n]||0;
     return `<div class="empc" ${e.u?`onclick="window.open('${e.u}','_blank')" style="cursor:pointer"`:''}>
       <div class="en">${esc(e.n)}</div><div class="ed">${esc(e.d)}</div>
@@ -180,17 +189,20 @@ async vResumen(){
       ${e.u?'<span class="go">Abrir →</span>':''}</div>`; };
   const grupo=g=>`<div class="emp">${emp.filter(e=>e.g===g).map(card).join('')}</div>`;
   const sech='font-size:14px;font-weight:800;margin:22px 0 8px;letter-spacing:.3px';
+  // una sección por grupo; las vacías no se pintan, para no dejar títulos colgando
+  const SEC=[['cli','👥 Clientes','Motor Cuántico'],
+             ['ace','🚀 Aceleradores de prospección','captan clientes nuevos'],
+             ['her','📱 Aplicaciones','herramientas de trabajo']];
+  const secciones=SEC.filter(([g])=>emp.some(e=>e.g===g))
+    .map(([g,t,s])=>`<h2 style="${sech}">${t} <span style="color:var(--faint);font-weight:600">· ${s}</span></h2>${grupo(g)}`).join('');
   $('main').innerHTML=`<h1>📊 Resumen · Negocios Cuánticos</h1>
     <div class="sub">La foto de NC en un vistazo.</div>
     <div class="kpis">
       <div class="kpi ok"><b>${nm(totLeads)}</b><span>Leads de bots este mes</span></div>
       <div class="kpi acc"><b>${nm(totSeg)}</b><span>Seguidores (total)</span></div>
-      <div class="kpi azul"><b>${nApp} · ${nCli}</b><span>Apps propias · Clientes</span></div>
+      <div class="kpi azul"><b>${nCli} · ${nAce} · ${nHer}</b><span>Clientes · Aceleradores · Apps</span></div>
     </div>
-    <h2 style="${sech}">👥 Clientes <span style="color:var(--faint);font-weight:600">· Motor Cuántico</span></h2>
-    ${grupo('cli')}
-    <h2 style="${sech}">📱 Aplicaciones <span style="color:var(--faint);font-weight:600">· plataformas propias NC</span></h2>
-    ${grupo('app')}
+    ${secciones}
     ${inf?(()=>{ const bar=(pct,warn80)=>`<div style="height:9px;background:#ece8e0;border-radius:6px;overflow:hidden;margin-top:5px"><i style="display:block;height:100%;width:${Math.min(100,pct)}%;background:${pct>=80?'#d22':(pct>=60?'#e8a30c':'#2e9e4f')}"></i></div>`;
       const cli=Object.entries(inf.por_cliente||{}).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${esc(k)} <b>${v}MB</b>`).join(' · ');
       const alerta=inf.db_pct>=80||inf.storage_pct>=80;
