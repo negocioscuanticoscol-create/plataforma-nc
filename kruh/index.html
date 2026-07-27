@@ -837,7 +837,9 @@ const App={
     const mot='Conversión: '+q+' '+p.nombre+' → '+sale+' '+d.nombre;
     const a=await POST('kruh_movimientos',{producto_id:p.id,tipo:'conv_menos',cantidad:q,motivo:mot});
     if(!a){ toast('⚠️ NO se guardó la conversión'); return; }
-    const b=await POST('kruh_movimientos',{producto_id:d.id,tipo:'conv_mas',cantidad:sale,motivo:mot});
+    // el id del primero se guarda en el motivo del segundo: asi se sabe cual va con cual
+    // y al borrar uno se puede borrar el otro, sin dejar media conversion suelta
+    const b=await POST('kruh_movimientos',{producto_id:d.id,tipo:'conv_mas',cantidad:sale,motivo:mot+' [par:'+a.id+']'});
     if(!b){ await DEL('kruh_movimientos?id=eq.'+a.id);   // se deshace, si no queda a medias
       toast('⚠️ NO se guardó la conversión — nada quedó a medias'); return; }
     const u1=await PATCH('kruh_productos?id=eq.'+p.id,{existencias:quedan});
@@ -858,8 +860,10 @@ const App={
       toast(up&&!up.ok?'⚠️ Guardado, pero el inventario NO se movió — revisa':'Guardado · quedan '+num(nueva)); }
     else toast('❌ '+num(q)+' venta(s) perdida(s) · el inventario NO se movió');
     this.vInventario(); },
-  movEditar(id){ const m=(this._movs||[]).find(x=>x.id===id); if(!m)return;
-    if(!this._okGerencia('editar este movimiento'))return;
+  movEditar(id){ const m=(this._movs||[]).find(x=>x.id===id);
+    if(!m){ toast('No encontré ese movimiento — recarga'); return; }
+    if(/^conv_/.test(m.tipo)){ alert('Una conversión no se edita a medias, porque las dos partes tienen que cuadrar. Bórrala y vuélvela a hacer.'); return; }
+    if(!this._okGerencia('editar este movimiento')){ toast('Cancelado — no se cambió nada'); return; }
     const p=(this._prods||[]).find(x=>x.id===m.producto_id)||{}, sg=this._sgn(m.tipo), q0=+m.cantidad||0;
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:6px">Editar movimiento</h3>
       <div class="hint" style="margin-bottom:6px">${esc(p.nombre||'')} · ${esc(m.tipo)} · 🕐 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
@@ -878,15 +882,36 @@ const App={
       const up=await PATCH('kruh_productos?id=eq.'+p.id,{existencias:nueva});
       if(up&&!up.ok) toast('⚠️ Movimiento editado, pero el inventario NO — revisa'); }
     cerrar(); toast('Movimiento editado'); this.vInventario(); },
-  async movBorrar(id){ const m=(this._movs||[]).find(x=>x.id===id); if(!m)return;
-    if(!this._okGerencia('BORRAR este movimiento'))return;
-    const p=(this._prods||[]).find(x=>x.id===m.producto_id), sg=this._sgn(m.tipo), q=+m.cantidad||0;
-    const r=await DEL('kruh_movimientos?id=eq.'+id);
-    if(r&&!r.ok){ toast('⚠️ No se pudo borrar'); return; }
-    if(sg&&p){ const nueva=(+p.existencias||0)-sg*q;   // se deshace el efecto que tuvo
-      const up=await PATCH('kruh_productos?id=eq.'+p.id,{existencias:nueva});
-      toast(up&&!up.ok?'⚠️ Borrado, pero el inventario NO se devolvió — revisa':'Borrado · quedan '+num(nueva)); }
-    else toast('Borrado');
+  /* Borrar = como si la operación nunca hubiera pasado: se va la fila y se deshace
+     su efecto. Si es una conversión se borran LAS DOS filas, porque borrar una sola
+     dejaba la mitad suelta sumando o restando por su cuenta. */
+  _paresDe(m){ const todos=this._movs||[], out=[m];
+    if(m.tipo==='conv_menos'){ const o=todos.find(x=>x.tipo==='conv_mas'&&String(x.motivo||'').includes('[par:'+m.id+']')); if(o)out.push(o); }
+    else if(m.tipo==='conv_mas'){ const g=String(m.motivo||'').match(/\[par:([^\]]+)\]/);
+      if(g){ const o=todos.find(x=>x.id===g[1]); if(o)out.push(o); } }
+    return out; },
+  async movBorrar(id){ const m=(this._movs||[]).find(x=>x.id===id);
+    if(!m){ toast('No encontré ese movimiento — recarga'); return; }
+    const filas=this._paresDe(m), prods=this._prods||[];
+    const detalle=filas.map(x=>{ const p=prods.find(y=>y.id===x.producto_id)||{};
+      const s=this._sgn(x.tipo), n=+x.cantidad||0;
+      return '· '+(s>0?'+':(s<0?'−':''))+num(n)+' '+(p.nombre||'—')+(s?' → quedaría en '+num((+p.existencias||0)-s*n):' (no toca inventario)');
+    }).join('\n');
+    const esPedido=/^Pedido /.test(String(m.motivo||''));
+    if(!confirm('Se borra de la base y se deshace su efecto:\n\n'+detalle
+      +(filas.length>1?'\n\n(es una conversión: se borran las dos partes)':'')
+      +(esPedido?'\n\n⚠️ OJO: este movimiento viene de un pedido. Se devuelve el inventario, pero el PEDIDO y la VENTA siguen registrados. Bórralos desde Pedidos si el pedido fue un error.':'')
+      +'\n\n¿Continuo?')) return;
+    if(!this._okGerencia('BORRAR este movimiento')){ toast('Cancelado — no se borró nada'); return; }
+    for(const x of filas){
+      const r=await DEL('kruh_movimientos?id=eq.'+x.id);
+      if(r&&!r.ok){ toast('⚠️ No se pudo borrar — revisa'); this.vInventario(); return; }
+      const p=prods.find(y=>y.id===x.producto_id), s=this._sgn(x.tipo), n=+x.cantidad||0;
+      if(s&&p){ const nueva=(+p.existencias||0)-s*n;      // se deshace el efecto que tuvo
+        const up=await PATCH('kruh_productos?id=eq.'+p.id,{existencias:nueva});
+        if(up&&!up.ok){ toast('⚠️ Borrado, pero el inventario NO se devolvió — revisa'); this.vInventario(); return; }
+        p.existencias=nueva; } }
+    toast(filas.length>1?'Conversión borrada completa':'Borrado · inventario devuelto');
     this.vInventario(); },
 
   /* ✏️ corregir el TOTAL de muestras del mes de una vez (atajo del panel).
