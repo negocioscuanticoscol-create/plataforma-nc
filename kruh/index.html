@@ -520,41 +520,47 @@ const App={
     // todavia estaba abriendo y se perdian las primeras palabras.
     const r=new SR(); this._rec=r; this._vozAbriendo=true; this._vozOye=false; this._vozParcial=''; this._pedPaint();
     r.lang='es-CO'; r.continuous=true; r.interimResults=true; r.maxAlternatives=1;
-    let dicho='', cerrado=false, tmr=null, sono=false;
-    const cerrar=()=>{ if(cerrado)return; cerrado=true; clearTimeout(tmr); try{ r.stop(); }catch(e){} };
+    let dicho='', suelto='', cerrado=false, iv=null, sono=false, ultimaVoz=0;
+    const texto=()=>((dicho+' '+suelto).trim()||(this._vozParcial||'').trim());
+    const cerrar=()=>{ if(cerrado)return; cerrado=true; clearInterval(iv); try{ r.stop(); }catch(e){} };
     /* Paciente mientras la respuesta esta incompleta, rapido apenas ya esta:
        el telefono se puede dictar de a dos o de a tres con pausas largas, pero
        en cuanto suman 10 digitos cierra casi de una. Igual con un si/no. */
-    const espera=()=>{ const t=this._vozParcial||'';
+    const espera=()=>{ const t=texto();
       if(paso==='tel' && this._norm(t).replace(/\D/g,'').length>=10) return 1300;
       if((paso==='promo'||paso==='mas'||paso==='dom') && this._siNo(t)!==null) return 1000;
       if(paso==='tipo' && this._tipoCli(t)) return 1000;
       return ESP; };
-    const reloj=()=>{ clearTimeout(tmr); tmr=setTimeout(cerrar,espera()); };
+    /* el silencio se mide con reloj de pared, no con un temporizador que se reinicie:
+       antes, cada vez que Chrome reabria el microfono la cuenta volvia a cero y no cerraba nunca */
+    const vigilar=()=>{ clearInterval(iv); iv=setInterval(()=>{ if(cerrado)return;
+      if(Date.now()-ultimaVoz>=espera())cerrar(); },250); };
     r.onstart=()=>{ this._vozAbriendo=false; this._vozOye=true;
-      if(!sono){ sono=true; this._beep(); }                   // un solo pitido aunque se reabra
-      this._pedPaint(); reloj(); };
+      if(!sono){ sono=true; this._beep(); this._pedPaint(); }  // un solo pitido y un solo repintado
+      if(!ultimaVoz)ultimaVoz=Date.now();
+      vigilar(); };
     r.onresult=e=>{ let fin='',par='';
       for(let i=e.resultIndex;i<e.results.length;i++){ const s=e.results[i][0].transcript;
         if(e.results[i].isFinal)fin+=' '+s; else par+=' '+s; }
-      if(fin)dicho+=fin;
+      if(fin){ dicho+=fin; suelto=''; } else if(par.trim()) suelto=par;
+      // OJO: lo provisional tambien se guarda. Chrome de Android a veces cierra sin
+      // marcar nada como final, y antes se perdia todo lo dictado.
       this._vozParcial=(dicho+' '+par).trim();
-      const d=$('voz_oye'); if(d)d.textContent=this._vozParcial||'…';
-      reloj(); };                                             // cada palabra reinicia la cuenta
-    r.onerror=ev=>{ if(ev.error==='no-speech')return;          // lo resuelve el reloj de silencio
-      clearTimeout(tmr); cerrado=true; this._vozOye=false; this._rec=null;
-      if(ev.error==='aborted')return;
+      ultimaVoz=Date.now();
+      const d=$('voz_oye'); if(d)d.textContent=this._vozParcial||'…'; };
+    r.onerror=ev=>{ if(ev.error==='no-speech'||ev.error==='aborted')return;   // lo resuelve el reloj
+      clearInterval(iv); cerrado=true; this._vozOye=false; this._rec=null;
       if(ev.error==='not-allowed'){ this.vozFin('Falta dar permiso al micrófono'); return; }
       this.vozFin('Error de dictado: '+ev.error); };
     r.onend=()=>{ this._vozOye=false;
       if(!this._vozGuiado){ this._rec=null; return; }
       if(!cerrado){ try{ r.start(); return; }catch(e){} }      // Chrome cortó solo: se reabre y sigue
-      clearTimeout(tmr); this._rec=null;
-      const t=(dicho||'').trim();
+      clearInterval(iv); this._rec=null;
+      const t=texto();
+      this._vozUltimo=t||'(silencio)';                        // queda a la vista para diagnosticar
       if(!t){ this._vozRepetir(cb,paso); return; }
       this._vozLog.push(t); cb(t); };
     try{ r.start(); }catch(e){ this._vozOye=false; this.vozFin('No se pudo abrir el micrófono'); } },
-  /* boton para no esperar el silencio */
   _vozRepetir(cb,paso){ this._vozFallos=(this._vozFallos||0)+1;
     if(this._vozFallos>=3){ this.vozFin('No se oyó nada — sigue a mano'); return; }
     this._hablar('No te oí. Repite.',()=>this._oir(cb,paso)); },
@@ -565,7 +571,7 @@ const App={
   vozIniciar(){ if(!this._SR()){ alert('Este navegador no permite dictado. Se necesita Chrome en Android o computador.'); return; }
     if(this._vozGuiado){ this.vozFin('Cancelado'); return; }
     this._vozGuiado=true; this._vozPaso='tel'; this._vozLog=[]; this._vozFallos=0;
-    this._vozLineas=[]; this._vozDice=''; this._vozParcial='';
+    this._vozLineas=[]; this._vozDice=''; this._vozParcial=''; this._vozUltimo='';
     this._hablar('Teléfono.',()=>this._oir(t=>this._pasoTel(t),'tel')); },
   vozFin(msg){ this._vozGuiado=false; this._vozOye=false; this._vozPaso='fin'; this._vozDice='';
     try{ if(this._rec)this._rec.stop(); }catch(e){}
@@ -653,6 +659,7 @@ const App={
         ${this._vozAbriendo?`<div class="hint" style="margin-top:3px">abriendo el micrófono…</div>`:''}
         ${this._vozOye?`<div class="hint" style="margin-top:3px">🎤 escuchando… <i id="voz_oye">${esc(this._vozParcial||'…')}</i></div>
         <div class="hint" style="font-size:10px;margin-top:2px">Puedes dictar por partes, con pausas — espera sin afán.</div>`:''}
+        ${this._vozUltimo?`<div class="hint" style="font-size:10px;margin-top:3px;border-top:1px solid var(--line);padding-top:3px">último que oyó: <b>${esc(this._vozUltimo)}</b></div>`:''}
       </div>`; }
     const L=this._vozLineas||[], prods=this._prods||[];
     if(L.length) h+=`<div class="card" style="margin:0 0 8px;padding:8px 9px;border:1.5px solid var(--acc)">
