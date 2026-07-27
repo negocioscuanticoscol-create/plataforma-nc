@@ -501,21 +501,30 @@ const App={
       g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+0.09);
       o.stop(a.currentTime+0.1);
     }catch(e){} },
+  /* Cuanto tarda en decir una frase. OJO: cada digito se lee como palabra entera
+     ("3" dura lo que "tres"), asi que contar letras se queda MUY corto: para
+     "3 5 0 2 2 4 1 8 5 2. ¿Está bien?" daba 2s cuando de verdad son 4.5s, y el
+     respaldo cortaba la pregunta a la mitad y abria el microfono antes de tiempo. */
+  _durTxt(t){ const s=String(t||'').replace(/\d/g,'0000');
+    return Math.min(600+s.length*62,9000); },
   _hablar(txt,luego){ this._vozDice=txt; this._pedPaint();
     const S=window.speechSynthesis;
     if(!S){ if(luego)luego(); return; }
-    let ya=false; const seguir=()=>{ if(ya)return; ya=true; if(luego)luego(); };
+    let ya=false;
+    // pausa corta al terminar de hablar: si el microfono abre pegado a la voz,
+    // Android todavia tiene tomado el audio y se pierde la primera palabra
+    const seguir=()=>{ if(ya)return; ya=true; if(luego)setTimeout(luego,280); };
     try{ S.cancel();
       const u=new SpeechSynthesisUtterance(txt); u.lang='es-CO'; u.rate=1.25;
       u.onend=seguir; u.onerror=seguir;
       S.speak(u);
-      // respaldo por si onend no dispara (pasa en Chrome de Android). Estimacion corta y con tope
-      setTimeout(()=>{ if(this._vozGuiado&&!ya){ S.cancel(); seguir(); } }, Math.min(300+txt.length*55,4200));
+      // respaldo solo por si onend no dispara (pasa en Chrome de Android)
+      setTimeout(()=>{ if(this._vozGuiado&&!ya){ S.cancel(); seguir(); } }, this._durTxt(txt)+600);
     }catch(e){ seguir(); } },
   /* Cuanto silencio se aguanta antes de dar por terminada la respuesta.
      El telefono y la direccion se dictan por grupos ("350... 224... 18... 52"),
      asi que ahi hay que esperar mas. Un si/no se contesta de una. */
-  ESPERA:{tel:6500,nom:4000,dir:6500,promo:2500,tipo:2500,prod:4000,cant:2500,mas:2500,dom:3000,domv:3500,pago:3000,telok:2500},
+  ESPERA:{tel:6500,nom:4000,dir:6500,promo:3500,tipo:3500,prod:4000,cant:2500,mas:3500,dom:3000,domv:3500,pago:3000,telok:4000},
   _oir(cb,paso){ const SR=this._SR(); if(!SR){ this.vozFin('Este navegador no permite dictado'); return; }
     const ESP=this.ESPERA[paso||'']||2800;
     // El microfono queda ABIERTO y se cierra solo tras ESP de silencio, no en la primera pausa.
