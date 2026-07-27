@@ -466,9 +466,12 @@ const App={
     return items; },
   _titulo(s){ return String(s||'').split(' ').filter(Boolean)
     .map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '); },
+  /* OJO con el orden: el NO se revisa primero. Si no, "no está bien" cae en el
+     "bien" del sí. Y "está bien" tiene que valer, porque es lo que contesta la
+     gente cuando le preguntan "¿está bien?" — repite la pregunta. */
   _siNo(t){ t=this._norm(t);
-    if(/\b(si|sii|claro|correcto|afirmativo|dale|listo|obvio|exacto|por supuesto)\b/.test(t))return true;
-    if(/\b(no|nel|negativo|ninguno|nada|tampoco)\b/.test(t))return false;
+    if(/\b(no|nel|nop|negativo|ninguno|nada|tampoco|mal|malo|incorrect\w*|falso|equivocad\w*|error|cambi\w*|corrig\w*|corregir|repit\w*|repetir|otra vez|nunca)\b/.test(t))return false;
+    if(/\b(si|sii|sip|sisas|claro|correcto|correcta|afirmativo|dale|listo|lista|obvio|exacto|exactamente|asi es|ok|oka|okey|okay|vale|bien|bueno|perfecto|seguro|positivo|confirmo|confirmado|cierto|verdad|aja|eso|de una|hagale|hagalé|sigue|siga|continua|adelante)\b/.test(t))return true;
     return null; },
   _tipoCli(t){ t=this._norm(t);
     if(/\b(nuevo|nueva|primera vez|primerizo)\b/.test(t))return 'nuevo';
@@ -600,7 +603,11 @@ const App={
     this._telPend=tel; this._vozPaso='tel'; this._pedPaint();
     this._hablar(tel.split('').join(' ')+'.'+(tel.length<7?' Son solo '+tel.length+' números.':'')+' ¿Está bien?',
       ()=>this._oir(x=>this._pasoTelOk(x),'telok')); },
-  _pasoTelOk(t){ const r=this._siNo(t);
+  _pasoTelOk(t){
+    // si en vez de contestar vuelve a dictar el número, se toma como corrección
+    const otro=this._norm(t).replace(/\D/g,'');
+    if(otro.length>=7 && otro!==this._telPend){ this._pasoTel(t); return; }
+    const r=this._siNo(t);
     if(r===null){ this._hablar('¿Está bien? Sí o no.',()=>this._oir(x=>this._pasoTelOk(x),'telok')); return; }
     this._vozFallos=0;
     if(!r){ this._telPend=''; this._hablar('Dime el teléfono otra vez.',()=>this._oir(x=>this._pasoTel(x),'tel')); return; }
