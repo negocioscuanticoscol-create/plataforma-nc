@@ -61,7 +61,7 @@
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:22px;z-index:80;font-size:13px}
   small.dim{color:var(--mut)}
   .pcard{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--sh)}
-  .pimg{aspect-ratio:1/1;background:#efe6d5 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:34px}
+  .pimg{aspect-ratio:4/3;background:#efe6d5 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:28px}
   .pin{padding:8px 10px}
   .pn{font-weight:700;font-size:13px;line-height:1.2;min-height:31px}
   .pp{color:var(--acc);font-weight:800;font-size:14px;margin:2px 0 6px}
@@ -347,12 +347,15 @@ const App={
   FPPEDIDO:['Efectivo','Transferencia','Tarjeta crédito'],
   async vPedidos(){
     this.loading();
-    const [prods,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_leads?select=nombre,telefono&limit=3000'),GET('kruh_pedidos?select=items&limit=20000')]);
+    const [prods,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_leads?select=id,nombre,telefono,direccion,tipo,infopromos&limit=3000'),GET('kruh_pedidos?select=items&limit=20000')]);
     // los que más se venden, de primeras
     const vend={}; hist.forEach(p=>(p.items||[]).forEach(i=>{ if(i.producto_id)vend[i.producto_id]=(vend[i.producto_id]||0)+(+i.qty||0); }));
     prods.sort((a,b)=>(vend[b.id]||0)-(vend[a.id]||0)||String(a.nombre||'').localeCompare(String(b.nombre||'')));
     this._prods=prods; this._cart=this._cart||{};
-    this._telMap={}; leads.forEach(l=>{ const t=this._telKey(l.telefono); if(t.length>=7)this._telMap[t]=l.nombre; });
+    // mapa por telefono con TODO el contacto. Si hay repetidos se guarda el primero y se cuenta
+    this._telMap={}; leads.forEach(l=>{ const t=this._telKey(l.telefono); if(t.length<7)return;
+      if(this._telMap[t]) this._telMap[t]._dup=(this._telMap[t]._dup||1)+1;
+      else this._telMap[t]={id:l.id,nombre:l.nombre||'',direccion:l.direccion||'',tipo:l.tipo||'comunidad',infopromos:!!l.infopromos}; });
     this._pedPaint();
   },
   _pedPaint(){
@@ -377,8 +380,16 @@ const App={
         </div></div>
         <div style="flex:0 0 228px;position:sticky;top:58px" class="card">
           <div style="font-family:Fraunces,serif;font-size:17px;margin-bottom:8px">La cuenta</div>
+          <input id="pd_tel" placeholder="Teléfono — se busca solo" value="${esc(this._cartTel||'')}" oninput="App.pedTelLookup(this.value)">
+          <div id="pd_found" style="font-size:11px;font-weight:700;margin:4px 0 2px;${this._cartHallado?'':'display:none'}">${this._cartHallado||''}</div>
           <input id="pd_cli" placeholder="Cliente" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App._cartCli=this.value">
-          <input id="pd_tel" placeholder="Teléfono" value="${esc(this._cartTel||'')}" oninput="App._cartTel=this.value;App.pedTelLookup(this.value)">
+          <input id="pd_dir" placeholder="Dirección" style="margin-bottom:6px" value="${esc(this._cartDir||'')}" oninput="App._cartDir=this.value">
+          <label class="row" style="gap:6px;align-items:center;font-size:12.5px;margin-bottom:6px;cursor:pointer">
+            <input id="pd_promo" type="checkbox" style="width:auto;margin:0" ${this._cartPromo?'checked':''} onchange="App._cartPromo=this.checked"> Quiero promo
+          </label>
+          <select id="pd_tipo" onchange="App._cartTipo=this.value">
+            <option value="comunidad" ${(this._cartTipo||'comunidad')==='comunidad'?'selected':''}>Cliente comunidad</option>
+            <option value="nuevo" ${this._cartTipo==='nuevo'?'selected':''}>Cliente nuevo</option></select>
           <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value;App._pedPaint()">${this.FPPEDIDO.map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
           <div style="margin-top:10px;font-size:13px">
             ${nItems?Object.keys(cart).map(id=>{const p=prods.find(x=>x.id===id);if(!p)return '';const q=cart[id];
@@ -395,18 +406,41 @@ const App={
             <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total</span><b id="pd_total" style="font-size:18px;color:var(--acc)">${money(total)}</b></div>
           </div>
           <button class="btn acc full" onclick="App.pedGuardar()" ${nItems?'':'disabled style="opacity:.5"'}>Generar pedido</button>
-          <button class="btn gh full" style="margin-top:6px" onclick="App._cart={};App._cartDom=0;App._pedPaint()">Vaciar</button>
+          <button class="btn gh full" style="margin-top:6px" onclick="App.vaciarCuenta()">Vaciar</button>
         </div>
       </div>
       `);
   },
-  pedTelLookup(v){ const t=this._telKey(v); if(t.length<7)return; const nom=(this._telMap||{})[t]; if(nom){ this._cartCli=nom; if($('pd_cli'))$('pd_cli').value=nom; } },
-  cartSet(id,delta){ this._cart=this._cart||{}; if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value; if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_desc'))this._cartDesc=+$('pd_desc').value||0; if($('pd_fp'))this._cartFP=$('pd_fp').value;
+  /* Vaciar deja la cuenta como recien abierta: productos, totales y datos del cliente */
+  vaciarCuenta(){ this._cart={}; this._cartDom=0; this._cartDesc=0;
+    this._cartCli=''; this._cartTel=''; this._cartDir=''; this._cartPromo=false;
+    this._cartTipo='comunidad'; this._cartHallado='';
+    this._pedPaint(); toast('Cuenta vaciada'); },
+  /* al escribir el telefono se busca en el CRM y se rellena TODO lo que exista */
+  pedTelLookup(v){ this._cartTel=v;
+    const t=this._telKey(v), l=t.length>=7?(this._telMap||{})[t]:null;
+    if(!l){ this._cartHallado=''; this._pintaHallado(); return; }
+    this._cartCli=l.nombre||''; this._cartDir=l.direccion||'';
+    this._cartPromo=!!l.infopromos; this._cartTipo=l.tipo||'comunidad';
+    if($('pd_cli'))$('pd_cli').value=this._cartCli;
+    if($('pd_dir'))$('pd_dir').value=this._cartDir;
+    if($('pd_promo'))$('pd_promo').checked=this._cartPromo;
+    if($('pd_tipo'))$('pd_tipo').value=this._cartTipo;
+    this._cartHallado=(l._dup>1?'⚠️ '+l._dup+' contactos tienen este mismo teléfono · se cargó '+l.nombre
+                              :'✓ '+l.nombre+' — ya está en el CRM');
+    this._pintaHallado(); },
+  _pintaHallado(){ const e=$('pd_found'); if(!e)return;
+    e.textContent=this._cartHallado||''; e.style.display=this._cartHallado?'block':'none';
+    e.style.color=/^⚠️/.test(this._cartHallado||'')?'var(--warn)':'var(--ok)'; },
+  /* guarda en memoria lo que este escrito, para que no se pierda al repintar la cuenta */
+  _leerCart(){ if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value;
+    if($('pd_dir'))this._cartDir=$('pd_dir').value; if($('pd_promo'))this._cartPromo=$('pd_promo').checked;
+    if($('pd_tipo'))this._cartTipo=$('pd_tipo').value; if($('pd_fp'))this._cartFP=$('pd_fp').value;
+    if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_desc'))this._cartDesc=+$('pd_desc').value||0; },
+  cartSet(id,delta){ this._cart=this._cart||{}; this._leerCart();
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
   /* cantidad escrita a mano en la cuenta */
-  cartQty(id,v){ const q=Math.max(0,Math.round(+v||0)); this._cart=this._cart||{};
-    if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value;
-    if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_desc'))this._cartDesc=+$('pd_desc').value||0;
+  cartQty(id,v){ const q=Math.max(0,Math.round(+v||0)); this._cart=this._cart||{}; this._leerCart();
     if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
   domSet(v){ this._cartDom=+v||0; this._recalc(); },
   descSet(v){ this._cartDesc=+v||0; this._recalc(); },
@@ -440,7 +474,9 @@ const App={
     if(!await POST('kruh_ventas',{...bv,descuento:desc})) await POST('kruh_ventas',bv);   // sin la columna descuento
     if(dom>0) await this._sumarDomicilio(dom,fp);
     const nuevoCli=await this._guardarClientePedido(cli,tel);
-    this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; this._cartDesc=0; toast('Pedido generado'); await this.vPedidos();
+    this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; this._cartDesc=0;
+    this._cartDir=''; this._cartPromo=false; this._cartTipo='comunidad'; this._cartHallado='';
+    toast('Pedido generado'); await this.vPedidos();
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3>
       ${nuevoCli?`<div style="border:1.5px solid var(--ok);background:var(--okbg);border-radius:9px;padding:8px 11px;margin-bottom:9px;font-size:13px">👤 <b style="color:var(--ok)">${esc(nuevoCli)}</b> quedó registrado en el CRM</div>`:''}
       <div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)')}">quedan ${s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`); },
@@ -449,11 +485,20 @@ const App={
   async _guardarClientePedido(cli,tel){
     const nom=String(cli||'').trim(), k=this._telKey(tel);
     if(!nom || k.length<7) return '';                       // sin teléfono no se puede evitar duplicados
-    if((this._telMap||{})[k]) return '';                    // ya está en el CRM
-    const b={nombre:nom,telefono:String(tel||'').trim(),etapa:'contactado',tipo:'nuevo',canal:'local',interes:'Registrado desde un pedido'};
+    const dir=(this._cartDir||'').trim(), promo=!!this._cartPromo, tipo=this._cartTipo||'comunidad';
+    const ex=(this._telMap||{})[k];
+    if(ex){ // ya está en el CRM: solo se actualiza lo que cambió
+      const b={}; if(dir&&dir!==ex.direccion)b.direccion=dir;
+      if(promo!==!!ex.infopromos)b.infopromos=promo;
+      if(tipo!==ex.tipo)b.tipo=tipo;
+      if(Object.keys(b).length){ const r=await PATCH('kruh_leads?id=eq.'+ex.id,b);
+        if(r&&!r.ok) toast('⚠️ El pedido quedó, pero el CRM no se actualizó'); else Object.assign(ex,b); }
+      return ''; }
+    const b={nombre:nom,telefono:String(tel||'').trim(),direccion:dir,infopromos:promo,
+      etapa:'contactado',tipo:tipo,canal:'local',interes:'Registrado desde un pedido'};
     const r=await POST('kruh_leads',b);
     if(!r) return '';
-    this._telMap=this._telMap||{}; this._telMap[k]=nom;
+    this._telMap=this._telMap||{}; this._telMap[k]={id:r.id,nombre:nom,direccion:dir,tipo:tipo,infopromos:promo};
     return nom; },
 
   /* el domicilio cobrado en la cuenta cae solo en Gastos, acumulado por día */
@@ -561,7 +606,7 @@ const App={
   async vInventario(){
     this.loading();
     const [prods,movs,ventas]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_movimientos?order=creado_en.desc&limit=1000'),GET('kruh_ventas?select=monto,creado_en&limit=20000')]);
-    this._prods=prods;
+    this._prods=prods; this._movs=movs;
     // consumo diario prom (salidas ult 30 dias) — las perdidas NO cuentan, no salio nada del estante
     const hoy=new Date(), d30=new Date(hoy-30*864e5);
     const salBy={}; movs.forEach(m=>{ if((m.tipo==='salida'||m.tipo==='muestra') && new Date(m.creado_en)>=d30){ salBy[m.producto_id]=(salBy[m.producto_id]||0)+(+m.cantidad||0);} });
@@ -620,6 +665,7 @@ const App={
         <button class="et ${tab==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button>
         <button class="et ${tab==='tend'?'on':''}" onclick="App._invTab='tend';App.vInventario()">Tendencias</button></div>
       ${tab==='exist'?
+        this._panelMov(prods,movs)+
         (prods.length?`<div class="grid" style="grid-template-columns:repeat(2,1fr)">${cobRows.map(({p,cons,dias})=>{ const bm=(+p.inv_min||0)>0&&(+p.existencias||0)<=(+p.inv_min||0); const pct=dias===null?0:Math.min(100,dias/7*100); const col=bm?'var(--bad)':(dias===null?'var(--mut)':(dias<3?'var(--bad)':(dias<7?'var(--warn)':'var(--ok)')));
           return `<div class="card" style="padding:11px 12px;margin:0;${bm?'border:1px solid var(--bad)':''}"><div style="font-weight:700;font-size:13px;line-height:1.2">${esc(p.nombre)}</div>
             <div class="row" style="justify-content:space-between;margin-top:3px"><b style="font-size:18px;color:${bm?'var(--bad)':'var(--ink)'}"><span id="ex_${p.id}">${num(p.existencias)}</span> <small class="dim" style="font-size:11px;font-weight:400">${esc(p.unidad||'')}</small></b><span style="font-size:11px;color:${col};font-weight:700">${dias===null?'':dias.toFixed(0)+'d'}</span></div>
@@ -627,47 +673,120 @@ const App={
             <div class="bar" style="margin-top:4px"><i style="width:${pct}%;background:${col}"></i></div>
             <div id="mu_${p.id}" style="font-size:10.5px;color:var(--ok);font-weight:700;margin-top:4px;${musBy[p.id]?'':'display:none'}">${this._txtMus(p.id)}</div>
             <div id="pe_${p.id}" style="font-size:10.5px;color:var(--bad);font-weight:700;margin-top:2px;${perBy[p.id]?'':'display:none'}">${this._txtPer(p.id)}</div>
-            <div class="row" style="gap:5px;margin-top:8px"><button class="btn acc sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','entrada')">＋ Adicionar stock</button></div>
-            <div class="row" style="gap:5px;margin-top:5px;align-items:stretch">
-              <button class="btn sm" style="flex:1;padding:6px 0;background:var(--okbg);border:1.5px solid var(--ok);color:var(--ok);font-weight:700" onclick="App.muestraMenos('${p.id}')">🎁 Muestra −</button>
-              <button class="btn sm" style="padding:6px 9px;background:var(--okbg);border:1.5px solid var(--ok);color:var(--ok);font-weight:700" title="Corregir las muestras del mes" onclick="App.musEditar('${p.id}')">✏️</button>
-              <button class="btn sm" style="flex:1;padding:6px 0;background:var(--badbg);border:1.5px solid var(--bad);color:var(--bad);font-weight:700" onclick="App.perdidaMas('${p.id}')">❌ V. perdida +</button></div></div>`;}).join('')}</div>`:'<div class="empty">Sin productos.</div>')
+            </div>`;}).join('')}</div>`:'<div class="empty">Sin productos.</div>')
         : tab==='mov'?(movs.length?movs.slice(0,300).map(m=>{const p=prods.find(x=>x.id===m.producto_id);
             const q=+m.cantidad||0, corr=(m.tipo==='muestra'&&q<0);   // muestras devueltas por el ✏️
             const ic=corr?'↩️':(m.tipo==='entrada'?'⬆️':(m.tipo==='muestra'?'🎁':(m.tipo==='perdida'?'❌':'⬇️')));
             const cl=(corr||m.tipo==='entrada'||m.tipo==='muestra')?'var(--ok)':'var(--bad)';
             const sg=corr?'+':(m.tipo==='entrada'?'+':(m.tipo==='perdida'?'':'−'));   // la perdida no suma ni resta inventario
-            const tg=corr?' <span class="tag pe">corrección de muestras · vuelve al inventario</span>':(m.tipo==='muestra'?' <span class="tag pe">muestra gratis</span>':(m.tipo==='perdida'?' <span class="tag pe">venta perdida · no toca inventario</span>':''));
+            const tg=corr?' <span class="tag pe">corrección de muestras · vuelve al inventario</span>':(m.tipo==='muestra'?' <span class="tag pe">muestra gratis</span>':(m.tipo==='perdida'?' <span class="tag pe">venta perdida · no toca inventario</span>':(m.tipo==='baja'?' <span class="tag pe">baja · merma o daño</span>':'')));
             return `<div class="item"><div class="top"><div><div class="nm">${ic} ${esc(p?p.nombre:'—')}${tg}</div><div class="mt">${esc(m.motivo||'')} · 📅 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div><div class="nm" style="color:${cl}">${sg}${num(Math.abs(q))}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')
         : tendHTML}`);
   },
   /* textos de los contadores: siempre "hoy (mes)". El mes se recalcula desde el dia 1, no se borra nada */
   _txtMus(id){ return '🎁 Muestras — hoy '+num((this._musDia||{})[id]||0)+' ('+num((this._musBy||{})[id]||0)+' en el mes)'; },
   _txtPer(id){ return '❌ V. perdidas — hoy '+num((this._perDia||{})[id]||0)+' ('+num((this._perBy||{})[id]||0)+' en el mes)'; },
-  _pintaMus(id){ const e=$('mu_'+id); if(e){ e.textContent=this._txtMus(id); e.style.display=(this._musBy||{})[id]?'block':'none'; }
-    const a=$('kpi_musd'); if(a)a.textContent=num(this._musTotD||0); const b=$('kpi_mus'); if(b)b.textContent=num(this._musTot||0); },
-  _pintaPer(id){ const e=$('pe_'+id); if(e){ e.textContent=this._txtPer(id); e.style.display=(this._perBy||{})[id]?'block':'none'; }
-    const a=$('kpi_perd'); if(a)a.textContent=num(this._perTotD||0); const b=$('kpi_per'); if(b)b.textContent=num(this._perTot||0); },
+  /* ===== Panel unico de movimientos: se escoge el producto y luego la accion ===== */
+  ACC:[['entrada','＋ Adicionar stock','var(--acc)','Producción del día','entró al inventario'],
+       ['muestra','🎁 Muestras','var(--ok)','Muestra gratis','salió del inventario'],
+       ['baja','⬇️ Bajas','var(--warn)','Merma / daño','salió del inventario'],
+       ['perdida','❌ V. perdidas','var(--bad)','Venta perdida','NO toca el inventario']],
+  /* cuanto mueve el inventario cada tipo: +1 suma, -1 resta, 0 no lo toca */
+  _sgn(t){ return t==='entrada'?1:(t==='perdida'?0:-1); },
+  invProd(id){ this._invProd=id; this.vInventario(); },
+  invAcc(k){ this._invAcc=k; this.vInventario(); },
+  _panelMov(prods,movs){
+    const pid=this._invProd||'', acc=this._invAcc||'entrada';
+    const p=(prods||[]).find(x=>x.id===pid);
+    const A=this.ACC.find(a=>a[0]===acc)||this.ACC[0];
+    const hoyK=this._diaKey(new Date());
+    const delDia=p?(movs||[]).filter(m=>m.producto_id===pid&&m.tipo===acc&&this._diaKey(m.creado_en)===hoyK):[];
+    const totDia=delDia.reduce((a,m)=>a+(+m.cantidad||0),0);
+    const botones=this.ACC.map(([k,t,col])=>`<button class="btn sm" style="flex:1;min-width:118px;padding:7px 4px;background:${acc===k?col:'transparent'};color:${acc===k?'#fff':col};border:1.5px solid ${col};font-weight:700" onclick="App.invAcc('${k}')">${t}</button>`).join('');
+    return `<div class="card">
+      <label>Producto</label>
+      <select id="inv_sel" onchange="App.invProd(this.value)">
+        <option value="">— Escoge un producto —</option>
+        ${(prods||[]).map(x=>`<option value="${x.id}" ${x.id===pid?'selected':''}>${esc(x.nombre)}${(+x.existencias||0)<0?' (en negativo)':''}</option>`).join('')}
+      </select>
+      ${!p?'<div class="hint" style="margin-top:6px">Escoge un producto y aparecen los botones para registrar entradas, muestras, bajas o ventas perdidas.</div>':`
+      <div class="row" style="justify-content:space-between;margin-top:8px;padding-bottom:7px;border-bottom:1px solid var(--line)">
+        <span class="dim">Existencias ahora</span>
+        <b style="font-size:19px;color:${(+p.existencias||0)<0?'var(--bad)':'var(--ink)'}">${num(p.existencias)} <small class="dim" style="font-size:11px;font-weight:400">${esc(p.unidad||'')}</small></b></div>
+      <div class="row" style="gap:5px;margin-top:9px;flex-wrap:wrap">${botones}</div>
+      <div class="row" style="gap:6px;margin-top:10px;align-items:flex-end;flex-wrap:wrap">
+        <div style="width:92px"><label>Cantidad</label><input id="qa_n" type="number" min="1" value="1"></div>
+        <div style="flex:1;min-width:150px"><label>Motivo</label><input id="qa_m" value="${esc(A[3])}"></div>
+        <button class="btn acc" style="padding:9px 16px" onclick="App.movRapido()">Guardar</button>
+        <button class="btn sm" style="padding:9px 13px;background:transparent;border:1.5px solid ${A[2]};color:${A[2]};font-weight:700" title="Registra 1 de una vez, sin escribir nada" onclick="App.movRapido(1)">1 clic = 1</button></div>
+      <div class="hint" style="margin-top:5px">${esc(A[1])}: lo que registres <b>${esc(A[4])}</b>.${acc==='muestra'?` · <a onclick="App.musEditar('${p.id}')" style="color:var(--acc);cursor:pointer;font-weight:700">✏️ corregir el total del mes</a>`:''}</div>
+      <div style="border-top:1px solid var(--line);margin-top:11px;padding-top:9px">
+        <div class="row" style="justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)">Registrado hoy · ${esc(A[1])}</span>
+          <b style="font-size:12px">${num(totDia)}</b></div>
+        ${delDia.length?delDia.map(m=>{const f=new Date(m.creado_en);
+          return `<div class="row" style="justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line2)">
+            <div><b style="font-size:14px">${this._sgn(m.tipo)>0?'+':(this._sgn(m.tipo)<0?'−':'')}${num(Math.abs(+m.cantidad||0))}</b>
+              <span style="font-size:12px;color:var(--ink2)"> ${esc(m.motivo||'')}</span>
+              <div class="mt">🕐 ${f.toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div>
+            <div class="row" style="gap:5px">
+              <button class="btn gh sm" style="padding:4px 8px" title="Editar (pide clave)" onclick="App.movEditar('${m.id}')">✏️</button>
+              <button class="btn gh sm" style="padding:4px 8px;color:var(--bad)" title="Borrar (pide clave)" onclick="App.movBorrar('${m.id}')">🗑</button></div></div>`;}).join('')
+          :'<div class="hint">Nada registrado hoy en '+esc(A[1])+'.</div>'}
+        <div class="hint" style="margin-top:6px">Editar o borrar pide clave de admin o gerencia. Si el movimiento tocaba inventario, al borrarlo se devuelve.</div>
+      </div>`}</div>`;
+  },
+  /* uno=1 -> registra 1 de una vez sin leer los campos (el clic rapido) */
+  async movRapido(uno){ const pid=this._invProd, acc=this._invAcc||'entrada';
+    const p=(this._prods||[]).find(x=>x.id===pid); if(!p){alert('Escoge un producto');return;}
+    const A=this.ACC.find(a=>a[0]===acc)||this.ACC[0];
+    const q=uno?1:Math.round(+$('qa_n').value||0); if(q<=0){alert('La cantidad debe ser mayor que cero');return;}
+    const mv=await POST('kruh_movimientos',{producto_id:pid,tipo:acc,cantidad:q,motivo:uno?A[3]:$('qa_m').value.trim()});
+    if(!mv){ toast('⚠️ NO se guardó — vuelve a intentar'); return; }
+    const sg=this._sgn(acc);
+    if(sg){ const nueva=(+p.existencias||0)+sg*q;
+      const up=await PATCH('kruh_productos?id=eq.'+pid,{existencias:nueva});
+      toast(up&&!up.ok?'⚠️ Guardado, pero el inventario NO se movió — revisa':'Guardado · quedan '+num(nueva)); }
+    else toast('❌ '+num(q)+' venta(s) perdida(s) · el inventario NO se movió');
+    this.vInventario(); },
+  movEditar(id){ const m=(this._movs||[]).find(x=>x.id===id); if(!m)return;
+    if(!this._okGerencia('editar este movimiento'))return;
+    const p=(this._prods||[]).find(x=>x.id===m.producto_id)||{}, sg=this._sgn(m.tipo), q0=+m.cantidad||0;
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:6px">Editar movimiento</h3>
+      <div class="hint" style="margin-bottom:6px">${esc(p.nombre||'')} · ${esc(m.tipo)} · 🕐 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div>
+      <label>Cantidad</label><input id="me_n" type="number" min="0" value="${q0}" autofocus>
+      <label>Motivo</label><input id="me_m" value="${esc(m.motivo||'')}">
+      ${sg?`<div class="hint">Existencias hoy: <b>${num(p.existencias)}</b> → quedarían <b id="me_q">${num(p.existencias)}</b></div>`:'<div class="hint">Este movimiento no toca el inventario.</div>'}
+      <button class="btn acc full" onclick="App.movEditarSave('${id}')">Guardar</button>`);
+    const inp=$('me_n'); if(inp&&sg)inp.oninput=()=>{ const n=Math.max(0,+inp.value||0), qq=(+p.existencias||0)+sg*(n-q0);
+      const e=$('me_q'); if(e){ e.textContent=num(qq); e.style.color=qq<0?'var(--bad)':''; } }; },
+  async movEditarSave(id){ const m=(this._movs||[]).find(x=>x.id===id); if(!m)return;
+    const p=(this._prods||[]).find(x=>x.id===m.producto_id), sg=this._sgn(m.tipo), q0=+m.cantidad||0;
+    const n=Math.max(0,Math.round(+$('me_n').value||0)), mot=$('me_m').value.trim();
+    const r=await PATCH('kruh_movimientos?id=eq.'+id,{cantidad:n,motivo:mot});
+    if(r&&!r.ok){ toast('⚠️ No se pudo editar'); return; }
+    if(sg&&p&&n!==q0){ const nueva=(+p.existencias||0)+sg*(n-q0);
+      const up=await PATCH('kruh_productos?id=eq.'+p.id,{existencias:nueva});
+      if(up&&!up.ok) toast('⚠️ Movimiento editado, pero el inventario NO — revisa'); }
+    cerrar(); toast('Movimiento editado'); this.vInventario(); },
+  async movBorrar(id){ const m=(this._movs||[]).find(x=>x.id===id); if(!m)return;
+    if(!this._okGerencia('BORRAR este movimiento'))return;
+    const p=(this._prods||[]).find(x=>x.id===m.producto_id), sg=this._sgn(m.tipo), q=+m.cantidad||0;
+    const r=await DEL('kruh_movimientos?id=eq.'+id);
+    if(r&&!r.ok){ toast('⚠️ No se pudo borrar'); return; }
+    if(sg&&p){ const nueva=(+p.existencias||0)-sg*q;   // se deshace el efecto que tuvo
+      const up=await PATCH('kruh_productos?id=eq.'+p.id,{existencias:nueva});
+      toast(up&&!up.ok?'⚠️ Borrado, pero el inventario NO se devolvió — revisa':'Borrado · quedan '+num(nueva)); }
+    else toast('Borrado');
+    this.vInventario(); },
 
-  /* muestra gratis de a una, sin ventana: solo el − */
-  async muestraMenos(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return;
-    const nueva=(+p.existencias||0)-1; p.existencias=nueva;
-    this._musBy[id]=(this._musBy[id]||0)+1; this._musDia[id]=(this._musDia[id]||0)+1;
-    this._musTot=(this._musTot||0)+1; this._musTotD=(this._musTotD||0)+1;
-    const ex=$('ex_'+id); if(ex){ ex.textContent=num(nueva); if(ex.parentElement)ex.parentElement.style.color=nueva<0?'var(--bad)':''; }
-    this._pintaMus(id);
-    toast('🎁 1 muestra · quedan '+num(nueva));
-    const mv=await POST('kruh_movimientos',{producto_id:id,tipo:'muestra',cantidad:1,motivo:'Muestra gratis'});
-    const up=await PATCH('kruh_productos?id=eq.'+id,{existencias:nueva});
-    if(!mv||(up&&!up.ok)) toast('⚠️ NO se guardó la muestra — recarga y revisa'); },
-
-  /* ✏️ corregir el total de muestras del mes. Ojo: la muestra SI mueve inventario,
-     asi que si el numero baja hay que devolver el stock, y si sube hay que descontarlo */
+  /* ✏️ corregir el TOTAL de muestras del mes de una vez (atajo del panel).
+     La muestra si mueve inventario: si el numero baja se devuelve el stock, si sube se descuenta */
   musEditar(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return;
-    if(!this._okGerencia('corregir las muestras'))return;   // solo admin o gerencia
+    if(!this._okGerencia('corregir el total de muestras del mes'))return;
     const act=+((this._musBy||{})[id]||0), dia=+((this._musDia||{})[id]||0);
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:6px">🎁 Muestras · ${esc(p.nombre)}</h3>
-      <div class="hint" style="margin-bottom:6px">Hoy van <b>${num(dia)}</b> · este mes <b>${num(act)}</b>. Corrige el total del mes si te pasaste de clics o si repartiste varias de una.</div>
+      <div class="hint" style="margin-bottom:6px">Hoy van <b>${num(dia)}</b> · este mes <b>${num(act)}</b>. Esto corrige el total del mes de un solo golpe; para arreglar un registro puntual usa el ✏️ de la lista de hoy.</div>
       <label>Muestras de este mes</label><input id="ms_n" type="number" min="0" value="${act}" autofocus>
       <div class="hint">Existencias hoy: <b>${num(p.existencias)}</b> → quedarían <b id="ms_q">${num(p.existencias)}</b></div>
       <button class="btn acc full" onclick="App.musGuardar('${id}')">Guardar</button>`);
@@ -683,34 +802,6 @@ const App={
     const up=await PATCH('kruh_productos?id=eq.'+id,{existencias:nueva});
     cerrar(); toast(up&&!up.ok?'⚠️ Muestras corregidas, pero el inventario NO — revisa':'🎁 Muestras del mes: '+num(n));
     this.vInventario(); },
-
-  /* venta perdida: solo se cuenta. NO toca existencias ni descuenta nada */
-  async perdidaMas(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return;
-    this._perBy=this._perBy||{}; this._perDia=this._perDia||{};
-    this._perBy[id]=(this._perBy[id]||0)+1; this._perDia[id]=(this._perDia[id]||0)+1;
-    this._perTot=(this._perTot||0)+1; this._perTotD=(this._perTotD||0)+1;
-    this._pintaPer(id);
-    toast('❌ 1 venta perdida · el inventario NO se movió');
-    const mv=await POST('kruh_movimientos',{producto_id:id,tipo:'perdida',cantidad:1,motivo:'Venta perdida'});
-    if(!mv){ // se devuelve el contador para no dejar un dato falso en pantalla
-      this._perBy[id]--; this._perDia[id]--; this._perTot--; this._perTotD--;
-      this._pintaPer(id);
-      toast('⚠️ NO se guardó la venta perdida — vuelve a intentar'); } },
-  movModal(id,tipo){ const p=(this._prods||[]).find(x=>x.id===id)||{};
-    const T={entrada:['Adicionar stock','Producción del día'],muestra:['🎁 Muestras gratis','Muestra gratis'],salida:['Descontar (salida/merma)','Merma/ajuste']}[tipo]||['Movimiento',''];
-    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${T[0]} · ${esc(p.nombre||'')}</h3>
-      ${tipo==='muestra'?'<div class="hint" style="margin-bottom:6px">Las muestras se regalan: descuentan del inventario y quedan contadas aparte para saber cuánto estás entregando.</div>':''}
-      <label>Cantidad (${esc(p.unidad||'und')})</label><input id="mv_cant" type="number" autofocus>
-      <label>${tipo==='muestra'?'¿A quién / para qué?':'Motivo'}</label><input id="mv_mot" value="${esc(T[1])}" ${tipo==='muestra'?'placeholder="Degustación, cliente nuevo, feria…"':''}>
-      <div class="hint">Existencias hoy: <b>${num(p.existencias)}</b> → quedarían <b id="mv_queda">${num(p.existencias)}</b></div>
-      <button class="btn acc full" onclick="App.movSave('${id}','${tipo}')">Guardar</button>`);
-    const inp=$('mv_cant'); if(inp)inp.oninput=()=>{ const q=+inp.value||0; const n=(+p.existencias||0)+(tipo==='entrada'?q:-q);
-      const e=$('mv_queda'); if(e){e.textContent=num(n); e.style.color=n<0?'var(--bad)':'';} }; },
-  async movSave(id,tipo){ const q=+$('mv_cant').value||0; if(q<=0){alert('Cantidad');return;}
-    await POST('kruh_movimientos',{producto_id:id,tipo,cantidad:q,motivo:$('mv_mot').value.trim()});
-    const p=(this._prods||[]).find(x=>x.id===id); const nueva=(+((p&&p.existencias)||0))+(tipo==='entrada'?q:-q);
-    await PATCH('kruh_productos?id=eq.'+id,{existencias:nueva}); cerrar();
-    toast(tipo==='muestra'?'🎁 '+num(q)+' en muestras · inventario descontado':'Inventario actualizado'); this.vInventario(); },
 
   /* ===================== PROVEEDORES ===================== */
   async vProveedores(){
