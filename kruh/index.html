@@ -344,7 +344,7 @@ const App={
     else { if($('p_foto'))$('p_foto').value=url; const pv=$('p_foto_prev'); if(pv){pv.src=url; pv.style.display='block';} toast('Foto lista'); } },
 
   /* ===================== PEDIDOS (catálogo con foto + carrito) ===================== */
-  FPPEDIDO:['Efectivo','Transferencia','Tarjeta crédito'],
+  FPPEDIDO:['Efectivo','Nequi','Transferencia','Tarjeta crédito'],
   async vPedidos(){
     this.loading();
     const [prods,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_leads?select=id,nombre,telefono,direccion,tipo,infopromos&limit=3000'),GET('kruh_pedidos?select=items&limit=20000')]);
@@ -1039,7 +1039,7 @@ const App={
     const esTar=fp=>String(fp||'').toLowerCase().includes('tarjeta');
     const sum=(a,f)=>a.reduce((s,v)=>s+(+v[f]||0),0);
     const tar=mesV.filter(v=>esTar(v.forma_pago)), otr=mesV.filter(v=>!esTar(v.forma_pago));
-    const tarTot=sum(tar,'monto'), tarIva=sum(tar,'iva'), tarBase=tarTot-tarIva-sum(tar,'domicilio'), otrTot=sum(otr,'monto');
+    const tarTot=sum(tar,'monto'), tarIva=sum(tar,'iva'), tarBase=tarTot-tarIva-sum(tar,'domicilio');
     const hoyK=this._diaKey(new Date());
     const cliHoy=new Set(ventas.filter(v=>this._diaKey(v.creado_en)===hoyK).map(v=>(v.cliente||'—').trim())).size;
     this.set(`<h1>Ventas</h1><div class="sub">🟢 = compró este mes · el 2º círculo lo marcas tú cuando le hagas seguimiento por WhatsApp</div>
@@ -1050,14 +1050,38 @@ const App={
         <div class="kpi"><b>${arr.length}</b><span>Han comprado alguna vez</span></div></div>
       ${this._ventaDia(mesV)}
       ${this._mmCard(movsV,prodsV)}
-      <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Formas de pago (mes)</div>
-        <div class="row" style="justify-content:space-between"><span>💳 Tarjeta crédito</span><b>${money(tarTot)}</b></div>
-        <div class="row" style="justify-content:space-between;font-size:11.5px;color:var(--mut)"><span>↳ base ${money(tarBase)} + IVA ${money(tarIva)}</span></div>
-        <div class="row" style="justify-content:space-between;margin-top:4px"><span>💵 Efectivo / Nequi / Transferencia</span><b>${money(otrTot)}</b></div>
-        <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total juntos</span><b style="color:var(--acc)">${money(tarTot+otrTot)}</b></div></div>
+      ${this._formasPago(mesV,tarBase,tarIva)}
       <div class="row" style="gap:8px"><button class="btn acc" onclick="App.ventaModal()">＋ Registrar venta</button>
         <button class="btn gh" onclick="App.ventasExcel()">⬇ Excel contabilidad</button></div>
       ${this._resumenProductos(peds,ventas,segSet,movsV,prodsV)}`);
+  },
+  /* Cada forma de pago por separado. OJO: la base trae los nombres de la importación,
+     no los del formulario: "Aplicación" es Nequi/Daviplata y "Transferencia débito"
+     también es transferencia. Por eso se agrupa por lo que dice el texto, no por
+     igualdad exacta, y lo que no cuadre con nada cae en "Otros" a la vista. */
+  FPGRUPOS:[['tar','💳 Tarjeta crédito',/tarjeta|credito|débito credito/],
+            ['efe','💵 Efectivo',/efectivo|contado/],
+            ['neq','📱 Nequi / Aplicación',/nequi|aplicaci|daviplata|app/],
+            ['tra','🏦 Transferencia',/transferencia|transfer|consignaci/],
+            ['nde','❔ No especificado',/no especificado|sin especificar|^$/]],
+  _grupoFP(fp){ const t=this._norm(fp||'');
+    for(const [k,,re] of this.FPGRUPOS) if(re.test(t))return k;
+    return 'otr'; },
+  _norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); },
+  _formasPago(mesV,tarBase,tarIva){
+    const t={}, n={}; let tot=0;
+    (mesV||[]).forEach(v=>{ const k=this._grupoFP(v.forma_pago), m=+v.monto||0;
+      t[k]=(t[k]||0)+m; n[k]=(n[k]||0)+1; tot+=m; });
+    const filas=this.FPGRUPOS.concat([['otr','❔ Otros',null]])
+      .filter(([k])=>t[k])
+      .map(([k,nom])=>`<div class="row" style="justify-content:space-between;margin-top:4px">
+        <span>${nom} <small class="dim" style="font-size:11px">${n[k]} venta(s)</small></span>
+        <b>${money(t[k])} <small class="dim" style="font-size:11px;font-weight:400">${tot>0?Math.round(t[k]/tot*100):0}%</small></b></div>`
+        +(k==='tar'&&tarBase?`<div class="row" style="justify-content:space-between;font-size:11.5px;color:var(--mut)"><span>↳ base ${money(tarBase)} + IVA ${money(tarIva)}</span></div>`:''))
+      .join('');
+    return `<div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:2px">Formas de pago (mes)</div>
+      ${filas||'<div class="hint">Sin ventas este mes.</div>'}
+      <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:6px;padding-top:6px"><span>Total juntos</span><b style="color:var(--acc)">${money(tot)}</b></div></div>`;
   },
   DOWC:['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],
   _diaKey(d){ const x=new Date(d); return isNaN(x)?'':x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); },
