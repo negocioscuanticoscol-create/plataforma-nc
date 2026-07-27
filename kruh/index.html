@@ -512,7 +512,7 @@ const App={
   /* Cuanto silencio se aguanta antes de dar por terminada la respuesta.
      El telefono y la direccion se dictan por grupos ("350... 224... 18... 52"),
      asi que ahi hay que esperar mas. Un si/no se contesta de una. */
-  ESPERA:{tel:6500,nom:4000,dir:6500,promo:2500,tipo:2500,prod:4000,cant:2500,mas:2500,dom:3000,domv:3500,pago:3000,gen:2500},
+  ESPERA:{tel:6500,nom:4000,dir:6500,promo:2500,tipo:2500,prod:4000,cant:2500,mas:2500,dom:3000,domv:3500,pago:3000,gen:2500,telok:2500},
   _oir(cb,paso){ const SR=this._SR(); if(!SR){ this.vozFin('Este navegador no permite dictado'); return; }
     const ESP=this.ESPERA[paso||'']||2800;
     // El microfono queda ABIERTO y se cierra solo tras ESP de silencio, no en la primera pausa.
@@ -592,10 +592,22 @@ const App={
     try{ if(this._rec)this._rec.stop(); }catch(e){}
     try{ if(window.speechSynthesis)window.speechSynthesis.cancel(); }catch(e){}
     this._rec=null; if(msg)toast('🎤 '+msg); this._pedPaint(); },
+  /* El telefono siempre se repite en voz, digito por digito, y se confirma.
+     Es el dato del que cuelga todo lo demas: si sale mal, busca al cliente equivocado. */
   _pasoTel(t){ this._vozFallos=0;
     const tel=this._norm(t).replace(/\D/g,'');
-    if(tel.length<7){ this._hablar('No entendí. Teléfono.',()=>this._oir(x=>this._pasoTel(x),'tel')); return; }
-    this._cartTel=tel; this.pedTelLookup(tel);
+    if(!tel){ this._hablar('No oí ningún número. Dime el teléfono.',()=>this._oir(x=>this._pasoTel(x),'tel')); return; }
+    this._telPend=tel; this._vozPaso='tel'; this._pedPaint();
+    this._hablar(tel.split('').join(' ')+'.'+(tel.length<7?' Son solo '+tel.length+' números.':'')+' ¿Está bien?',
+      ()=>this._oir(x=>this._pasoTelOk(x),'telok')); },
+  _pasoTelOk(t){ const r=this._siNo(t);
+    if(r===null){ this._hablar('¿Está bien? Sí o no.',()=>this._oir(x=>this._pasoTelOk(x),'telok')); return; }
+    this._vozFallos=0;
+    if(!r){ this._telPend=''; this._hablar('Dime el teléfono otra vez.',()=>this._oir(x=>this._pasoTel(x),'tel')); return; }
+    const tel=this._telPend||'';
+    if(tel.length<7){ this._telPend='';   // confirmo uno incompleto: no sirve para buscar
+      this._hablar('Faltan números, deben ser mínimo 7. Dímelo otra vez.',()=>this._oir(x=>this._pasoTel(x),'tel')); return; }
+    this._telPend=''; this._cartTel=tel; this.pedTelLookup(tel);
     if(/^✓/.test(this._cartHallado||'')){          // ya está en el CRM: se salta nombre, dirección y tipo
       if(!this._cartPromo){ this._vozPaso='promo';  // pero si aún no está en el grupo, se le pregunta
         this._hablar('Es '+this._cartCli+'. ¿Lo anexo al grupo de info promo?',
