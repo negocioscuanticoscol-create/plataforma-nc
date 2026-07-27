@@ -529,24 +529,65 @@ const App={
     const lastTel={}, lastNom={};
     ventas.forEach(v=>{ const t=(v.telefono||'').replace(/\D/g,''), n=(v.cliente||'').trim().toLowerCase(), d=v.creado_en||'';
       if(t&&(!lastTel[t]||d>lastTel[t]))lastTel[t]=d; if(n&&(!lastNom[n]||d>lastNom[n]))lastNom[n]=d; });
+    this._crmUlt={tel:lastTel,nom:lastNom};
+    this._crmPaint();
+  },
+  /* Buscar ignora los cajones y los canales a proposito: si escribes un nombre
+     lo quieres encontrar este donde este, no solo dentro de la pestaña abierta. */
+  _crmFiltra(){
+    const leads=this._leads||[], q=this._norm(this._crmQ||''), qd=q.replace(/\D/g,'');
+    if(q){ return leads.filter(l=>{
+      if(this._norm(l.nombre||'').includes(q))return true;
+      if(qd && (l.telefono||'').replace(/\D/g,'').includes(qd))return true;
+      return false; }); }
     const caj=this._crmCajon||'comunidad', can=this._crmCanal||'todos';
-    const nuevos=leads.filter(l=>(l.tipo||'nuevo')!=='comunidad');
-    const base=caj==='comunidad'?leads:nuevos;   // Comunidad = todo el universo
-    let lista=base;
-    if(can!=='todos') lista=lista.filter(l=>(l.canal||'local')===can);
-    this.set(`<h1>CRM</h1><div class="sub">Comunidad y nuevos por canal · embudo 👋 → 💡 → 📋 → 🛒</div>
-      <div class="row" style="gap:10px;margin-bottom:12px">
-        <div class="cajon ${caj==='comunidad'?'on':''}" onclick="App._crmCajon='comunidad';App.vCrm()"><b>${leads.length}</b>👥 Comunidad</div>
-        <div class="cajon ${caj==='nuevos'?'on':''}" onclick="App._crmCajon='nuevos';App.vCrm()"><b>${nuevos.length}</b>✨ Nuevos</div></div>
-      <div class="row" style="gap:6px;margin-bottom:12px">${this.CANALES.map(([v,t])=>`<span class="et ${can===v?'on':''}" onclick="App._crmCanal='${v}';App.vCrm()">${t}${v!=='todos'?' ('+base.filter(l=>(l.canal||'local')===v).length+')':''}</span>`).join('')}</div>
-      <button class="btn acc" onclick="App.leadModal()">＋ Registro de cliente</button>
-      <div style="margin-top:12px">${lista.length?lista.map(l=>{const tel=(l.telefono||'').replace(/\D/g,'');const cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);const ult=lastTel[tel]||lastNom[(l.nombre||'').trim().toLowerCase()]||'';return `<div class="item"><div class="top"><div>
+    const base=caj==='comunidad'?leads:leads.filter(l=>(l.tipo||'nuevo')!=='comunidad');
+    return can==='todos'?base:base.filter(l=>(l.canal||'local')===can);
+  },
+  _crmItems(lista){
+    const U=this._crmUlt||{tel:{},nom:{}};
+    if(!lista.length) return this._crmQ
+      ? `<div class="empty">Ningún cliente con "${esc(this._crmQ)}" — ni por nombre ni por teléfono.</div>`
+      : '<div class="empty">Sin leads en este cajón.</div>';
+    return lista.map(l=>{ const tel=(l.telefono||'').replace(/\D/g,'');
+      const cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);
+      const ult=U.tel[tel]||U.nom[(l.nombre||'').trim().toLowerCase()]||'';
+      return `<div class="item"><div class="top"><div>
         <div class="nm">${esc(l.nombre||'—')}${tel?` · <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-weight:600">${esc(l.telefono)}</a>`:''}</div>
         <div class="mt">${l.tipo==='comunidad'?'👥 comunidad':('✨ '+esc(l.canal||'local'))}${l.ciudad?' · '+esc(l.ciudad):''} · ${ult?'🛒 última compra '+ult.slice(0,10):'sin compras aún'}
           ${this._listaNueva(l)?'<span class="tag pe">🏷️ precios nuevos</span>':''}${l.infopromos?'<span class="tag">📣 promos</span>':''}</div></div>
         <div class="row" style="gap:10px;flex:none"><a onclick="App.leadModal('${l.id}')" style="color:var(--acc);cursor:pointer;font-weight:700">✎</a>
           <a onclick="App.leadDel('${l.id}')" style="color:var(--bad);cursor:pointer">✕</a></div></div>
-        <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><span class="dim" style="font-size:11px;align-self:center">Compra:</span>${this.CATCOMPRA.map(c=>`<span class="et ${cats.includes(c)?'on':''}" onclick="App.leadCat('${l.id}','${c}')">${c}</span>`).join('')}</div></div>`;}).join(''):'<div class="empty">Sin leads en este cajón.</div>'}</div>`);
+        <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><span class="dim" style="font-size:11px;align-self:center">Compra:</span>${this.CATCOMPRA.map(c=>`<span class="et ${cats.includes(c)?'on':''}" onclick="App.leadCat('${l.id}','${c}')">${c}</span>`).join('')}</div></div>`;}).join('');
+  },
+  _crmCabeza(n){ const q=this._crmQ||'';
+    return q ? `<b style="color:var(--acc)">${n}</b> resultado(s) para "${esc(q)}" · se busca en todo el CRM, sin importar el cajón`
+             : `${n} cliente(s)`; },
+  /* solo repinta la lista, para no perder el cursor del buscador en cada tecla */
+  crmBuscar(v){ this._crmQ=v;
+    const lista=this._crmFiltra();
+    const c=$('crm_lista'); if(c)c.innerHTML=this._crmItems(lista);
+    const h=$('crm_cab'); if(h)h.innerHTML=this._crmCabeza(lista.length);
+    const x=$('crm_x'); if(x)x.style.display=v?'block':'none'; },
+  crmLimpiar(){ this._crmQ=''; const i=$('crm_q'); if(i){ i.value=''; i.focus(); } this.crmBuscar(''); },
+  _crmPaint(){
+    const leads=this._leads||[];
+    const caj=this._crmCajon||'comunidad', can=this._crmCanal||'todos';
+    const nuevos=leads.filter(l=>(l.tipo||'nuevo')!=='comunidad');
+    const base=caj==='comunidad'?leads:nuevos;
+    const lista=this._crmFiltra(), q=this._crmQ||'';
+    this.set(`<h1>CRM</h1><div class="sub">Comunidad y nuevos por canal · embudo 👋 → 💡 → 📋 → 🛒</div>
+      <div class="row" style="gap:6px;margin-bottom:12px;align-items:center">
+        <input id="crm_q" placeholder="🔍 Buscar por nombre o teléfono" value="${esc(q)}" oninput="App.crmBuscar(this.value)" style="flex:1;margin:0">
+        <button id="crm_x" class="btn gh sm" style="padding:8px 12px;${q?'':'display:none'}" onclick="App.crmLimpiar()">✕</button></div>
+      <div class="row" style="gap:10px;margin-bottom:12px">
+        <div class="cajon ${caj==='comunidad'?'on':''}" onclick="App._crmCajon='comunidad';App._crmQ='';App._crmPaint()"><b>${leads.length}</b>👥 Comunidad</div>
+        <div class="cajon ${caj==='nuevos'?'on':''}" onclick="App._crmCajon='nuevos';App._crmQ='';App._crmPaint()"><b>${nuevos.length}</b>✨ Nuevos</div></div>
+      <div class="row" style="gap:6px;margin-bottom:12px">${this.CANALES.map(([v,t])=>`<span class="et ${can===v?'on':''}" onclick="App._crmCanal='${v}';App._crmQ='';App._crmPaint()">${t}${v!=='todos'?' ('+base.filter(l=>(l.canal||'local')===v).length+')':''}</span>`).join('')}</div>
+      <button class="btn acc" onclick="App.leadModal()">＋ Registro de cliente</button>
+      <div class="hint" id="crm_cab" style="margin-top:10px">${this._crmCabeza(lista.length)}</div>
+      <div id="crm_lista" style="margin-top:6px">${this._crmItems(lista)}</div>`);
+    const i=$('crm_q'); if(i&&q){ i.focus(); i.setSelectionRange(q.length,q.length); }
   },
   ORIGEN:[['registrado','Cliente registrado (comunidad)','comunidad','local'],['nuevo','Cliente nuevo (local)','nuevo','local'],['digital','Digital','nuevo','digital'],['organico','Orgánico','nuevo','organico'],['empleados','Empleados','comunidad','empleados']],
   leadModal(id){ const l=id?((this._leads||[]).find(x=>x.id===id)||{}):{};
