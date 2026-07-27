@@ -488,39 +488,70 @@ const App={
     return vio?tot+acum:0; },
 
   /* ---- voz: hablar y escuchar por turnos (nunca a la vez, se oiria a si misma) ---- */
+  /* pitido corto en el momento exacto en que el microfono queda abierto */
+  _beep(){ try{ const C=window.AudioContext||window.webkitAudioContext; if(!C)return;
+      this._ac=this._ac||new C(); const a=this._ac;
+      if(a.state==='suspended')a.resume();
+      const o=a.createOscillator(), g=a.createGain();
+      o.type='sine'; o.frequency.value=880; g.gain.value=0.09;
+      o.connect(g); g.connect(a.destination); o.start();
+      g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+0.09);
+      o.stop(a.currentTime+0.1);
+    }catch(e){} },
   _hablar(txt,luego){ this._vozDice=txt; this._pedPaint();
     const S=window.speechSynthesis;
     if(!S){ if(luego)luego(); return; }
+    let ya=false; const seguir=()=>{ if(ya)return; ya=true; if(luego)luego(); };
     try{ S.cancel();
-      const u=new SpeechSynthesisUtterance(txt); u.lang='es-CO'; u.rate=1.05;
-      u.onend=()=>{ if(luego)luego(); };
-      u.onerror=()=>{ if(luego)luego(); };
+      const u=new SpeechSynthesisUtterance(txt); u.lang='es-CO'; u.rate=1.25;
+      u.onend=seguir; u.onerror=seguir;
       S.speak(u);
-      setTimeout(()=>{ if(this._vozGuiado&&!this._vozOye&&luego){ S.cancel(); luego(); } }, 700+txt.length*95);
-    }catch(e){ if(luego)luego(); } },
-  _oir(cb){ const SR=this._SR(); if(!SR){ this.vozFin('Este navegador no permite dictado'); return; }
-    const r=new SR(); this._rec=r; this._vozOye=true; this._vozParcial=''; this._pedPaint();
-    r.lang='es-CO'; r.continuous=false; r.interimResults=true; r.maxAlternatives=1;
-    let dicho='';
+      // respaldo por si onend no dispara (pasa en Chrome de Android). Estimacion corta y con tope
+      setTimeout(()=>{ if(this._vozGuiado&&!ya){ S.cancel(); seguir(); } }, Math.min(300+txt.length*55,4200));
+    }catch(e){ seguir(); } },
+  /* Cuanto silencio se aguanta antes de dar por terminada la respuesta.
+     El telefono y la direccion se dictan por grupos ("350... 224... 18... 52"),
+     asi que ahi hay que esperar mas. Un si/no se contesta de una. */
+  ESPERA:{tel:4000,nom:2800,dir:4000,promo:1800,tipo:1800,prod:3200,mas:1800,dom:2000,domv:2200},
+  _oir(cb,paso){ const SR=this._SR(); if(!SR){ this.vozFin('Este navegador no permite dictado'); return; }
+    const ESP=this.ESPERA[paso||'']||2800;
+    // El microfono queda ABIERTO y se cierra solo tras ESP de silencio, no en la primera pausa.
+    // _vozOye se prende en onstart, no antes: si no, la pantalla decia "escuchando" mientras
+    // todavia estaba abriendo y se perdian las primeras palabras.
+    const r=new SR(); this._rec=r; this._vozAbriendo=true; this._vozOye=false; this._vozParcial=''; this._pedPaint();
+    r.lang='es-CO'; r.continuous=true; r.interimResults=true; r.maxAlternatives=1;
+    let dicho='', cerrado=false, tmr=null, sono=false;
+    const cerrar=()=>{ if(cerrado)return; cerrado=true; clearTimeout(tmr); try{ r.stop(); }catch(e){} };
+    const reloj=()=>{ clearTimeout(tmr); tmr=setTimeout(cerrar,ESP); };
+    this._vozCerrar=cerrar;                                   // para el boton "Ya terminé"
+    r.onstart=()=>{ this._vozAbriendo=false; this._vozOye=true;
+      if(!sono){ sono=true; this._beep(); }                   // un solo pitido aunque se reabra
+      this._pedPaint(); reloj(); };
     r.onresult=e=>{ let fin='',par='';
       for(let i=e.resultIndex;i<e.results.length;i++){ const s=e.results[i][0].transcript;
         if(e.results[i].isFinal)fin+=' '+s; else par+=' '+s; }
       if(fin)dicho+=fin;
       this._vozParcial=(dicho+' '+par).trim();
-      const d=$('voz_oye'); if(d)d.textContent=this._vozParcial||'…'; };
-    r.onerror=ev=>{ this._vozOye=false; this._rec=null;
+      const d=$('voz_oye'); if(d)d.textContent=this._vozParcial||'…';
+      reloj(); };                                             // cada palabra reinicia la cuenta
+    r.onerror=ev=>{ if(ev.error==='no-speech')return;          // lo resuelve el reloj de silencio
+      clearTimeout(tmr); cerrado=true; this._vozOye=false; this._rec=null;
+      if(ev.error==='aborted')return;
       if(ev.error==='not-allowed'){ this.vozFin('Falta dar permiso al micrófono'); return; }
-      if(ev.error==='no-speech'){ this._vozRepetir(cb); return; }
       this.vozFin('Error de dictado: '+ev.error); };
-    r.onend=()=>{ this._vozOye=false; this._rec=null;
-      if(!this._vozGuiado)return;
+    r.onend=()=>{ this._vozOye=false;
+      if(!this._vozGuiado){ this._rec=null; return; }
+      if(!cerrado){ try{ r.start(); return; }catch(e){} }      // Chrome cortó solo: se reabre y sigue
+      clearTimeout(tmr); this._rec=null; this._vozCerrar=null;
       const t=(dicho||'').trim();
-      if(!t){ this._vozRepetir(cb); return; }
+      if(!t){ this._vozRepetir(cb,paso); return; }
       this._vozLog.push(t); cb(t); };
     try{ r.start(); }catch(e){ this._vozOye=false; this.vozFin('No se pudo abrir el micrófono'); } },
-  _vozRepetir(cb){ this._vozFallos=(this._vozFallos||0)+1;
+  /* boton para no esperar el silencio */
+  vozYa(){ if(this._vozCerrar)this._vozCerrar(); },
+  _vozRepetir(cb,paso){ this._vozFallos=(this._vozFallos||0)+1;
     if(this._vozFallos>=3){ this.vozFin('No se oyó nada — sigue a mano'); return; }
-    this._hablar('No te oí. Repite por favor.',()=>this._oir(cb)); },
+    this._hablar('No te oí. Repite.',()=>this._oir(cb,paso)); },
 
   /* ---- el hilo de la conversación ---- */
   PASOS:{tel:'Teléfono',nom:'Nombre',dir:'Dirección',promo:'Promociones',tipo:'Tipo de cliente',
@@ -529,40 +560,40 @@ const App={
     if(this._vozGuiado){ this.vozFin('Cancelado'); return; }
     this._vozGuiado=true; this._vozPaso='tel'; this._vozLog=[]; this._vozFallos=0;
     this._vozLineas=[]; this._vozDice=''; this._vozParcial='';
-    this._hablar('Dicta el teléfono del cliente.',()=>this._oir(t=>this._pasoTel(t))); },
+    this._hablar('Teléfono.',()=>this._oir(t=>this._pasoTel(t),'tel')); },
   vozFin(msg){ this._vozGuiado=false; this._vozOye=false; this._vozPaso='fin'; this._vozDice='';
     try{ if(this._rec)this._rec.stop(); }catch(e){}
     try{ if(window.speechSynthesis)window.speechSynthesis.cancel(); }catch(e){}
     this._rec=null; if(msg)toast('🎤 '+msg); this._pedPaint(); },
   _pasoTel(t){ this._vozFallos=0;
     const tel=this._norm(t).replace(/\D/g,'');
-    if(tel.length<7){ this._hablar('No entendí el número. Dícta el teléfono otra vez.',()=>this._oir(x=>this._pasoTel(x))); return; }
+    if(tel.length<7){ this._hablar('No entendí. Teléfono.',()=>this._oir(x=>this._pasoTel(x),'tel')); return; }
     this._cartTel=tel; this.pedTelLookup(tel);
     this._vozPaso='nom';
     if(/^✓/.test(this._cartHallado||'')){          // ya está en el CRM: se salta todo el bloque del cliente
       this._vozPaso='prod';
-      this._hablar('Es '+this._cartCli+'. Ya está grabado. Empecemos por el pedido: dicta producto y cantidad.',
-        ()=>this._oir(x=>this._pasoProd(x))); return; }
-    this._hablar('No está grabado. Dicta el nombre del cliente.',()=>this._oir(x=>this._pasoNom(x))); },
+      this._hablar('Es '+this._cartCli+'. Ahora el pedido.',
+        ()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
+    this._hablar('No está grabado. Nombre.',()=>this._oir(x=>this._pasoNom(x),'nom')); },
   _pasoNom(t){ this._vozFallos=0; this._cartCli=this._titulo(this._norm(t)); this._vozPaso='dir';
-    this._hablar('Dicta la dirección.',()=>this._oir(x=>this._pasoDir(x))); },
+    this._hablar('Dirección.',()=>this._oir(x=>this._pasoDir(x),'dir')); },
   _pasoDir(t){ this._vozFallos=0; this._cartDir=this._titulo(this._norm(t)); this._vozPaso='promo';
-    this._hablar('¿Quiere recibir promociones? Sí o no.',()=>this._oir(x=>this._pasoPromo(x))); },
+    this._hablar('¿Quiere promociones?',()=>this._oir(x=>this._pasoPromo(x),'promo')); },
   _pasoPromo(t){ const r=this._siNo(t);
-    if(r===null){ this._hablar('Responde sí o no.',()=>this._oir(x=>this._pasoPromo(x))); return; }
+    if(r===null){ this._hablar('Responde sí o no.',()=>this._oir(x=>this._pasoPromo(x),'promo')); return; }
     this._vozFallos=0; this._cartPromo=r; this._vozPaso='tipo';
-    this._hablar('¿Es cliente comunidad o cliente nuevo?',()=>this._oir(x=>this._pasoTipo(x))); },
+    this._hablar('¿Comunidad o nuevo?',()=>this._oir(x=>this._pasoTipo(x),'tipo')); },
   _pasoTipo(t){ const r=this._tipoCli(t);
-    if(!r){ this._hablar('Di comunidad o nuevo.',()=>this._oir(x=>this._pasoTipo(x))); return; }
+    if(!r){ this._hablar('Comunidad o nuevo.',()=>this._oir(x=>this._pasoTipo(x),'tipo')); return; }
     this._vozFallos=0; this._cartTipo=r; this._vozPaso='prod';
-    this._hablar('Listo. Empecemos por el pedido: dicta producto y cantidad.',()=>this._oir(x=>this._pasoProd(x))); },
+    this._hablar('Ahora el pedido.',()=>this._oir(x=>this._pasoProd(x),'prod')); },
   _pasoProd(t){
     if(/\b(listo|ya|nada mas|no mas|eso es todo|terminado|fin)\b/.test(this._norm(t))){ this._irADomicilio(); return; }
     const items=this._vozItems(t);
     const nuevas=items.map(it=>{ const m=this._matchProd(it.txt);
       return {qty:it.qty,txt:it.txt,prod:m.prod,ambiguo:m.ambiguo,alt:m.alt}; });
     const buenas=nuevas.filter(l=>l.prod);
-    if(!buenas.length){ this._hablar('No reconocí ese producto. Repítelo.',()=>this._oir(x=>this._pasoProd(x))); return; }
+    if(!buenas.length){ this._hablar('No lo reconocí. Repite.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
     this._vozFallos=0;
     this._cart=this._cart||{};
     buenas.forEach(l=>{ this._cart[l.prod.id]=(this._cart[l.prod.id]||0)+l.qty; });
@@ -571,26 +602,26 @@ const App={
     const dudosas=nuevas.filter(l=>!l.prod||l.ambiguo).length;
     this._pedPaint();
     this._hablar(leido+'. Van '+this._plataTxt(this._totalCart())+'.'+(dudosas?' Ojo, revisa la pantalla.':'')+' ¿Algo más?',
-      ()=>this._oir(x=>this._pasoMas(x))); },
+      ()=>this._oir(x=>this._pasoMas(x),'mas')); },
   _pasoMas(t){ const r=this._siNo(t);
     if(r===false){ this._irADomicilio(); return; }
     this._vozFallos=0;
-    if(r===true){ this._hablar('Dicta el producto.',()=>this._oir(x=>this._pasoProd(x))); return; }
+    if(r===true){ this._hablar('Producto.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
     this._pasoProd(t); },                                  // si ya dictó el producto, se aprovecha
   _irADomicilio(){ this._vozFallos=0; this._vozPaso='dom';
-    this._hablar('El pedido va en '+this._plataTxt(this._totalCart())+'. ¿Tendría domicilio?',
-      ()=>this._oir(x=>this._pasoDom(x))); },
+    this._hablar('Van '+this._plataTxt(this._totalCart())+'. ¿Tendría domicilio?',
+      ()=>this._oir(x=>this._pasoDom(x),'dom')); },
   _pasoDom(t){ const r=this._siNo(t), v=this._plata(t);
     if(r===false){ this._cartDom=0; this._cerrarVoz(); return; }
     if(v>0){ this._cartDom=v; this._cerrarVoz(); return; }   // dijo "sí, seis mil quinientos"
-    if(r===true){ this._hablar('¿De cuánto es el domicilio?',()=>this._oir(x=>this._pasoDomValor(x))); return; }
-    this._hablar('Responde sí o no.',()=>this._oir(x=>this._pasoDom(x))); },
+    if(r===true){ this._hablar('¿De cuánto?',()=>this._oir(x=>this._pasoDomValor(x),'domv')); return; }
+    this._hablar('Responde sí o no.',()=>this._oir(x=>this._pasoDom(x),'dom')); },
   _pasoDomValor(t){ const v=this._plata(t);
-    if(!v){ this._hablar('No entendí el valor. Dilo otra vez.',()=>this._oir(x=>this._pasoDomValor(x))); return; }
+    if(!v){ this._hablar('No entendí. Repite.',()=>this._oir(x=>this._pasoDomValor(x),'domv')); return; }
     this._cartDom=v; this._cerrarVoz(); },
   _cerrarVoz(){ this._vozPaso='fin';
     const dudosas=(this._vozLineas||[]).filter(l=>!l.prod||l.ambiguo).length;
-    this._hablar('Total '+this._plataTxt(this._totalCart())+'. '+(dudosas?'Revisa lo marcado en naranja y genera el pedido.':'Revisa y genera el pedido.'),
+    this._hablar('Total '+this._plataTxt(this._totalCart())+'. '+(dudosas?'Revisa lo naranja y genera.':'Revisa y genera.'),
       ()=>{ this._vozGuiado=false; this._vozDice=''; this._pedPaint(); }); },
   _totalCart(){ const prods=this._prods||[], c=this._cart||{}; let b=0;
     for(const id in c){ const p=prods.find(x=>x.id===id); if(p)b+=(+p.precio||0)*c[id]; }
@@ -613,7 +644,9 @@ const App={
       h+=`<div class="card" style="margin:0 0 8px;padding:7px 9px;border:1.5px solid var(--acc);background:var(--okbg)">
         <div style="font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin-bottom:3px">${P.map(k=>`<span style="${this._vozPaso===k?'color:var(--acc);font-weight:700':''}">${esc(this.PASOS[k])}</span>`).join(' › ')}</div>
         ${this._vozDice?`<div style="font-size:12.5px;font-weight:700;color:var(--acc)">🔊 ${esc(this._vozDice)}</div>`:''}
-        ${this._vozOye?`<div class="hint" style="margin-top:3px">🎤 escuchando… <i id="voz_oye">${esc(this._vozParcial||'…')}</i></div>`:''}
+        ${this._vozAbriendo?`<div class="hint" style="margin-top:3px">abriendo el micrófono…</div>`:''}
+        ${this._vozOye?`<div class="hint" style="margin-top:3px">🎤 escuchando… <i id="voz_oye">${esc(this._vozParcial||'…')}</i></div>
+        <button class="btn acc sm full" style="margin-top:5px;padding:4px 0" onclick="App.vozYa()">Ya terminé ▸</button>`:''}
       </div>`; }
     const L=this._vozLineas||[], prods=this._prods||[];
     if(L.length) h+=`<div class="card" style="margin:0 0 8px;padding:8px 9px;border:1.5px solid var(--acc)">
