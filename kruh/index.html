@@ -723,10 +723,11 @@ const App={
             </div>`;}).join('')}</div>`:'<div class="empty">Sin productos.</div>')
         : tab==='mov'?(movs.length?movs.slice(0,300).map(m=>{const p=prods.find(x=>x.id===m.producto_id);
             const q=+m.cantidad||0, corr=(m.tipo==='muestra'&&q<0);   // muestras devueltas por el ✏️
-            const ic=corr?'↩️':(m.tipo==='entrada'?'⬆️':(m.tipo==='muestra'?'🎁':(m.tipo==='perdida'?'❌':'⬇️')));
-            const cl=(corr||m.tipo==='entrada'||m.tipo==='muestra')?'var(--ok)':'var(--bad)';
-            const sg=corr?'+':(m.tipo==='entrada'?'+':(m.tipo==='perdida'?'':'−'));   // la perdida no suma ni resta inventario
-            const tg=corr?' <span class="tag pe">corrección de muestras · vuelve al inventario</span>':(m.tipo==='muestra'?' <span class="tag pe">muestra gratis</span>':(m.tipo==='perdida'?' <span class="tag pe">venta perdida · no toca inventario</span>':(m.tipo==='baja'?' <span class="tag pe">baja · merma o daño</span>':'')));
+            const cvn=m.tipo==='conv_menos', cvp=m.tipo==='conv_mas';
+            const ic=corr?'↩️':(cvn||cvp?'🔄':(m.tipo==='entrada'?'⬆️':(m.tipo==='muestra'?'🎁':(m.tipo==='perdida'?'❌':'⬇️'))));
+            const cl=(corr||cvp||m.tipo==='entrada'||m.tipo==='muestra')?'var(--ok)':(cvn?'var(--gold)':'var(--bad)');
+            const sg=(corr||cvp||m.tipo==='entrada')?'+':(m.tipo==='perdida'?'':'−');   // la perdida no suma ni resta inventario
+            const tg=corr?' <span class="tag pe">corrección de muestras · vuelve al inventario</span>':(cvn?' <span class="tag pe">conversión · se partió</span>':(cvp?' <span class="tag pe">conversión · salió de otro producto</span>':(m.tipo==='muestra'?' <span class="tag pe">muestra gratis</span>':(m.tipo==='perdida'?' <span class="tag pe">venta perdida · no toca inventario</span>':(m.tipo==='baja'?' <span class="tag pe">baja · merma o daño</span>':'')))));
             return `<div class="item"><div class="top"><div><div class="nm">${ic} ${esc(p?p.nombre:'—')}${tg}</div><div class="mt">${esc(m.motivo||'')} · 📅 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div><div class="nm" style="color:${cl}">${sg}${num(Math.abs(q))}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')
         : tendHTML}`);
   },
@@ -737,9 +738,17 @@ const App={
   ACC:[['entrada','＋ Adicionar stock','var(--acc)','Producción del día','entró al inventario'],
        ['muestra','🎁 Muestras','var(--ok)','Muestra gratis','salió del inventario'],
        ['baja','⬇️ Bajas','var(--warn)','Merma / daño','salió del inventario'],
-       ['perdida','❌ V. perdidas','var(--bad)','Venta perdida','NO toca el inventario']],
-  /* cuanto mueve el inventario cada tipo: +1 suma, -1 resta, 0 no lo toca */
-  _sgn(t){ return t==='entrada'?1:(t==='perdida'?0:-1); },
+       ['perdida','❌ V. perdidas','var(--bad)','Venta perdida','NO toca el inventario'],
+       ['conv','🔄 Conversión','var(--gold)','Porcionado','se parte en otro producto']],
+  /* Pares que se convierten y en cuantas partes. Si el par no esta aqui, el factor
+     se escribe a mano; asi sirve para cualquier producto sin tocar el codigo. */
+  CONV:{'Apfelstrudel':{a:'Apfelstrudel Porción',f:6},
+        'Crumble de ciruelas':{a:'Crumble Ciruelas porcion',f:6}},
+  /* cuanto mueve el inventario cada tipo: +1 suma, -1 resta, 0 no lo toca.
+     conv_mas/conv_menos son los dos lados de una conversion: uno resta el entero
+     y el otro suma las porciones. NO son 'entrada', a proposito: el Dashboard
+     cuenta las entradas como produccion y contaria dos veces el mismo costo. */
+  _sgn(t){ return (t==='entrada'||t==='conv_mas')?1:(t==='perdida'?0:-1); },
   invProd(id){ this._invProd=id; this.vInventario(); },
   invAcc(k){ this._invAcc=k; this.vInventario(); },
   _panelMov(prods,movs){
@@ -747,8 +756,12 @@ const App={
     const p=(prods||[]).find(x=>x.id===pid);
     const A=this.ACC.find(a=>a[0]===acc)||this.ACC[0];
     const hoyK=this._diaKey(new Date());
-    const delDia=p?(movs||[]).filter(m=>m.producto_id===pid&&m.tipo===acc&&this._diaKey(m.creado_en)===hoyK):[];
+    const tipoBusca=acc==='conv'?'conv_menos':acc;   // la conversión se lista por el lado que sale
+    const delDia=p?(movs||[]).filter(m=>m.producto_id===pid&&m.tipo===tipoBusca&&this._diaKey(m.creado_en)===hoyK):[];
     const totDia=delDia.reduce((a,m)=>a+(+m.cantidad||0),0);
+    const cv=p?(this.CONV[p.nombre]||null):null;
+    const dest=this._convDest||(cv?((prods||[]).find(x=>x.nombre===cv.a)||{}).id||'':'');
+    const fac=this._convFac||(cv?cv.f:6);
     const botones=this.ACC.map(([k,t,col])=>`<button class="btn sm" style="flex:1;min-width:118px;padding:7px 4px;background:${acc===k?col:'transparent'};color:${acc===k?'#fff':col};border:1.5px solid ${col};font-weight:700" onclick="App.invAcc('${k}')">${t}</button>`).join('');
     return `<div class="card">
       <label>Producto</label>
@@ -761,12 +774,24 @@ const App={
         <span class="dim">Existencias ahora</span>
         <b style="font-size:19px;color:${(+p.existencias||0)<0?'var(--bad)':'var(--ink)'}">${num(p.existencias)} <small class="dim" style="font-size:11px;font-weight:400">${esc(p.unidad||'')}</small></b></div>
       <div class="row" style="gap:5px;margin-top:9px;flex-wrap:wrap">${botones}</div>
+      ${acc==='conv'?`
+      <div class="row" style="gap:6px;margin-top:10px;align-items:flex-end;flex-wrap:wrap">
+        <div style="width:92px"><label>Convertir</label><input id="cv_n" type="number" min="1" value="1" oninput="App.convPrevia()"></div>
+        <div style="flex:1;min-width:170px"><label>En</label>
+          <select id="cv_d" onchange="App._convDest=this.value;App.convPrevia()">
+            <option value="">— escoge el producto —</option>
+            ${(prods||[]).filter(x=>x.id!==pid).map(x=>`<option value="${x.id}" ${x.id===dest?'selected':''}>${esc(x.nombre)}</option>`).join('')}
+          </select></div>
+        <div style="width:82px"><label>Rinde</label><input id="cv_f" type="number" min="1" value="${fac}" oninput="App._convFac=+this.value||1;App.convPrevia()"></div>
+        <button class="btn acc" style="padding:9px 16px" onclick="App.convGuardar()">Convertir</button></div>
+      <div class="hint" id="cv_prev" style="margin-top:5px;border-left:3px solid var(--gold);padding:4px 8px;background:#fdf8ec;border-radius:6px">${this._convTxt(p,prods,dest,fac,1)}</div>`
+      :`
       <div class="row" style="gap:6px;margin-top:10px;align-items:flex-end;flex-wrap:wrap">
         <div style="width:92px"><label>Cantidad</label><input id="qa_n" type="number" min="1" value="1"></div>
         <div style="flex:1;min-width:150px"><label>Motivo</label><input id="qa_m" value="${esc(A[3])}"></div>
         <button class="btn acc" style="padding:9px 16px" onclick="App.movRapido()">Guardar</button>
         <button class="btn sm" style="padding:9px 13px;background:transparent;border:1.5px solid ${A[2]};color:${A[2]};font-weight:700" title="Registra 1 de una vez, sin escribir nada" onclick="App.movRapido(1)">1 clic = 1</button></div>
-      <div class="hint" style="margin-top:5px">${esc(A[1])}: lo que registres <b>${esc(A[4])}</b>.${acc==='muestra'?` · <a onclick="App.musEditar('${p.id}')" style="color:var(--acc);cursor:pointer;font-weight:700">✏️ corregir el total del mes</a>`:''}</div>
+      <div class="hint" style="margin-top:5px">${esc(A[1])}: lo que registres <b>${esc(A[4])}</b>.${acc==='muestra'?` · <a onclick="App.musEditar('${p.id}')" style="color:var(--acc);cursor:pointer;font-weight:700">✏️ corregir el total del mes</a>`:''}</div>`}
       <div style="border-top:1px solid var(--line);margin-top:11px;padding-top:9px">
         <div class="row" style="justify-content:space-between;margin-bottom:6px">
           <span style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)">Registrado hoy · ${esc(A[1])}</span>
@@ -783,6 +808,43 @@ const App={
         <div class="hint" style="margin-top:6px">Editar o borrar pide clave de admin o gerencia. Si el movimiento tocaba inventario, al borrarlo se devuelve.</div>
       </div>`}</div>`;
   },
+  /* ---- Conversión: un entero se parte en varias porciones ----
+     Son DOS movimientos: conv_menos resta el entero y conv_mas suma las porciones.
+     Se usan tipos propios y no 'entrada' porque el Dashboard cuenta las entradas
+     como producción del mes: si las porciones entraran así, el costo se contaría
+     dos veces (una al hornear el entero y otra al partirlo). */
+  _convTxt(p,prods,dest,fac,n){
+    const d=(prods||[]).find(x=>x.id===dest);
+    if(!p||!d) return 'Escoge en qué producto se convierte.';
+    const q=Math.max(1,Math.round(+n||1)), f=Math.max(1,Math.round(+fac||1)), sale=q*f;
+    const vIn=q*(+p.precio||0), vOut=sale*(+d.precio||0), dif=vOut-vIn;
+    return `<b>${num(q)} ${esc(p.nombre)}</b> → <b>${num(sale)} ${esc(d.nombre)}</b>`
+      +` · quedan ${num((+p.existencias||0)-q)} y ${num((+d.existencias||0)+sale)}`
+      +(dif?` · <span style="color:${dif<0?'var(--bad)':'var(--ok)'}">${dif<0?'pierde':'gana'} ${money(Math.abs(dif))} de valor de lista</span>`:'');
+  },
+  convPrevia(){ const e=$('cv_prev'); if(!e)return;
+    const p=(this._prods||[]).find(x=>x.id===this._invProd);
+    e.innerHTML=this._convTxt(p,this._prods,($('cv_d')||{}).value,($('cv_f')||{}).value,($('cv_n')||{}).value); },
+  async convGuardar(){
+    const p=(this._prods||[]).find(x=>x.id===this._invProd); if(!p){alert('Escoge un producto');return;}
+    const dest=($('cv_d')||{}).value||'', d=(this._prods||[]).find(x=>x.id===dest);
+    if(!d){alert('Escoge en qué producto se convierte');return;}
+    const q=Math.round(+($('cv_n')||{}).value||0), f=Math.round(+($('cv_f')||{}).value||0);
+    if(q<=0){alert('¿Cuántos vas a convertir?');return;}
+    if(f<=0){alert('¿En cuántas partes rinde cada uno?');return;}
+    const sale=q*f, quedan=(+p.existencias||0)-q;
+    if(quedan<0 && !confirm('Solo hay '+num(p.existencias)+' de '+p.nombre+'. Quedaría en '+num(quedan)+'. ¿Sigo?'))return;
+    const mot='Conversión: '+q+' '+p.nombre+' → '+sale+' '+d.nombre;
+    const a=await POST('kruh_movimientos',{producto_id:p.id,tipo:'conv_menos',cantidad:q,motivo:mot});
+    if(!a){ toast('⚠️ NO se guardó la conversión'); return; }
+    const b=await POST('kruh_movimientos',{producto_id:d.id,tipo:'conv_mas',cantidad:sale,motivo:mot});
+    if(!b){ await DEL('kruh_movimientos?id=eq.'+a.id);   // se deshace, si no queda a medias
+      toast('⚠️ NO se guardó la conversión — nada quedó a medias'); return; }
+    const u1=await PATCH('kruh_productos?id=eq.'+p.id,{existencias:quedan});
+    const u2=await PATCH('kruh_productos?id=eq.'+d.id,{existencias:(+d.existencias||0)+sale});
+    toast((u1&&!u1.ok)||(u2&&!u2.ok)?'⚠️ Conversión guardada, pero el inventario NO — revisa'
+      :'🔄 '+num(q)+' '+p.nombre+' → '+num(sale)+' '+d.nombre);
+    this._convDest=''; this._convFac=0; this.vInventario(); },
   /* uno=1 -> registra 1 de una vez sin leer los campos (el clic rapido) */
   async movRapido(uno){ const pid=this._invProd, acc=this._invAcc||'entrada';
     const p=(this._prods||[]).find(x=>x.id===pid); if(!p){alert('Escoge un producto');return;}
