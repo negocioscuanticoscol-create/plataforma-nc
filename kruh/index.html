@@ -512,7 +512,7 @@ const App={
   /* Cuanto silencio se aguanta antes de dar por terminada la respuesta.
      El telefono y la direccion se dictan por grupos ("350... 224... 18... 52"),
      asi que ahi hay que esperar mas. Un si/no se contesta de una. */
-  ESPERA:{tel:6500,nom:4000,dir:6500,promo:2500,tipo:2500,prod:4000,cant:2500,mas:2500,dom:3000,domv:3500,pago:3000,gen:2500,telok:2500},
+  ESPERA:{tel:6500,nom:4000,dir:6500,promo:2500,tipo:2500,prod:4000,cant:2500,mas:2500,dom:3000,domv:3500,pago:3000,telok:2500},
   _oir(cb,paso){ const SR=this._SR(); if(!SR){ this.vozFin('Este navegador no permite dictado'); return; }
     const ESP=this.ESPERA[paso||'']||2800;
     // El microfono queda ABIERTO y se cierra solo tras ESP de silencio, no en la primera pausa.
@@ -567,7 +567,7 @@ const App={
 
   /* ---- el hilo de la conversación ---- */
   PASOS:{tel:'Teléfono',nom:'Nombre',dir:'Dirección',promo:'Promo',tipo:'Tipo',
-         prod:'Producto',cant:'Cantidad',mas:'¿Más?',dom:'Domicilio',pago:'Pago',gen:'Generar',fin:'Listo'},
+         prod:'Producto',cant:'Cantidad',mas:'¿Más?',dom:'Domicilio',pago:'Pago',fin:'Listo'},
   vozIniciar(){ if(!this._SR()){ alert('Este navegador no permite dictado. Se necesita Chrome en Android o computador.'); return; }
     if(this._vozGuiado){ this.vozFin('Cancelado'); return; }
     if(!window.isSecureContext){ alert('El micrófono solo funciona con https. Abre la página publicada, no el archivo local.'); return; }
@@ -684,18 +684,15 @@ const App={
   _irAPago(){ this._vozFallos=0; this._vozPaso='pago'; this._pedPaint();
     this._hablar('¿Forma de pago? Efectivo, transferencia o tarjeta.',
       ()=>this._oir(x=>this._pasoPago(x),'pago')); },
+  /* Ultimo paso. El dictado NO genera el pedido: eso siempre se aprieta a mano,
+     por voz o escrito da igual, pero la confirmacion final es de la persona. */
   _pasoPago(t){ const f=this._formaPago(t);
     if(!f){ this._hablar('Efectivo, transferencia o tarjeta.',()=>this._oir(x=>this._pasoPago(x),'pago')); return; }
-    this._vozFallos=0; this._cartFP=f; this._vozPaso='gen'; this._pedPaint();
+    this._vozFallos=0; this._cartFP=f; this._vozPaso='fin'; this._pedPaint();
     const dudosas=(this._vozLineas||[]).filter(l=>!l.prod||l.ambiguo).length;
-    this._hablar(f+'. Total '+this._plataTxt(this._totalCart())+'.'+
-      (dudosas?' Ojo, hay líneas por revisar.':'')+' ¿Genero el pedido?',
-      ()=>this._oir(x=>this._pasoGenerar(x),'gen')); },
-  _pasoGenerar(t){ const r=this._siNo(t);
-    if(r===null){ this._hablar('¿Genero el pedido? Sí o no.',()=>this._oir(x=>this._pasoGenerar(x),'gen')); return; }
-    this._vozGuiado=false; this._vozPaso='fin'; this._vozDice=''; this._pedPaint();
-    if(!r){ toast('Pedido armado — revísalo y genéralo tú'); return; }
-    this._hablar('Generando.',()=>{ this.pedGuardar(); }); },
+    this._hablar(f+'. Total '+this._plataTxt(this._totalCart())+'. '+
+      (dudosas?'Revisa lo naranja y genera el pedido.':'Revisa y genera el pedido.'),
+      ()=>{ this._vozGuiado=false; this._vozDice=''; this._pedPaint(); }); },
   _totalCart(){ const prods=this._prods||[], c=this._cart||{}; let b=0;
     for(const id in c){ const p=prods.find(x=>x.id===id); if(p)b+=(+p.precio||0)*c[id]; }
     const desc=Math.min(Math.max(0,+(this._cartDesc||0)),b);
