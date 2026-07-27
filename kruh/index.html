@@ -629,7 +629,7 @@ const App={
         this._hablar('Es '+this._cartCli+'. ¿Lo anexo al grupo de info promo?',
           ()=>this._oir(x=>this._pasoPromo(x),'promo')); return; }
       this._vozPaso='prod';
-      this._hablar('Es '+this._cartCli+'. Ahora el pedido: dicta un producto.',
+      this._hablar('Es '+this._cartCli+'. Ahora el pedido. Dicta un producto, y di finalizado cuando termines.',
         ()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
     this._vozPaso='nom';
     this._hablar('No está en la base. Dime el nombre.',()=>this._oir(x=>this._pasoNom(x),'nom')); },
@@ -642,17 +642,21 @@ const App={
     this._vozFallos=0; this._cartPromo=r; this._pedPaint();
     if(this._cartTipo && /^✓/.test(this._cartHallado||'')){    // los que ya están en el CRM no repiten el tipo
       this._vozPaso='prod';
-      this._hablar('Ahora el pedido: dicta un producto.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
+      this._hablar('Ahora el pedido. Dicta un producto, y di finalizado cuando termines.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
     this._vozPaso='tipo';
     this._hablar('¿Comunidad o nuevo?',()=>this._oir(x=>this._pasoTipo(x),'tipo')); },
   _pasoTipo(t){ const r=this._tipoCli(t);
     if(!r){ this._hablar('Comunidad o nuevo.',()=>this._oir(x=>this._pasoTipo(x),'tipo')); return; }
     this._vozFallos=0; this._cartTipo=r; this._vozPaso='prod'; this._pedPaint();
-    this._hablar('Ahora el pedido: dicta un producto.',()=>this._oir(x=>this._pasoProd(x),'prod')); },
+    this._hablar('Ahora el pedido. Dicta un producto, y di finalizado cuando termines.',()=>this._oir(x=>this._pasoProd(x),'prod')); },
   /* Primero SOLO el producto. La cantidad se pregunta aparte, despues de repetir
      el nombre que entendio, para que se pueda corregir antes de sumar nada. */
+  /* Palabras para cerrar la lista de productos. Se revisan ANTES que el si/no:
+     "listo" tambien esta en las de si, y al preguntar "¿algo mas?" pedia otro
+     producto justo cuando le estaban diciendo que ya no habia mas. */
+  _esFin(t){ return /\b(finalizado|finalizar|finaliza|finalizamos|terminado|terminar|termina|terminamos|listo|lista|ya|ya esta|nada mas|no mas|eso es todo|eso seria|hasta ahi|cerrar|fin)\b/.test(this._norm(t)); },
   _pasoProd(t){
-    if(/\b(listo|ya|nada mas|no mas|eso es todo|terminado|fin)\b/.test(this._norm(t))){ this._irADomicilio(); return; }
+    if(this._esFin(t)){ this._irADomicilio(); return; }
     const items=this._vozItems(t);
     const txt=items.length?items[0].txt:this._norm(t);
     const m=this._matchProd(txt);
@@ -666,6 +670,7 @@ const App={
     return 0; },
   _pasoCant(t){ const p=this._vozPend;
     if(!p){ this._pasoProd(t); return; }
+    if(this._esFin(t)){ this._vozPend=null; this._irADomicilio(); return; }   // se arrepintió del producto
     const n=this._cantidad(t);
     if(!n){ this._hablar('¿Cuántos?',()=>this._oir(x=>this._pasoCant(x),'cant')); return; }
     this._vozFallos=0; this._cart=this._cart||{};
@@ -675,7 +680,9 @@ const App={
     this._hablar(n+' '+p.prod.nombre+'. Van '+this._plataTxt(this._totalCart())+
       (p.ambiguo?'. Ojo, revisa la pantalla':'')+'. ¿Algo más?',
       ()=>this._oir(x=>this._pasoMas(x),'mas')); },
-  _pasoMas(t){ const r=this._siNo(t);
+  _pasoMas(t){
+    if(this._esFin(t)){ this._irADomicilio(); return; }     // va primero: "listo" también es un sí
+    const r=this._siNo(t);
     if(r===false){ this._irADomicilio(); return; }
     this._vozFallos=0;
     if(r===true){ this._vozPaso='prod'; this._hablar('Producto.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
