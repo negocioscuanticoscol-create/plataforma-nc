@@ -61,7 +61,7 @@
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:11px 18px;border-radius:22px;z-index:80;font-size:13px}
   small.dim{color:var(--mut)}
   .pcard{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--sh)}
-  .pimg{aspect-ratio:4/3;background:#efe6d5 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:28px}
+  .pimg{aspect-ratio:16/9;background:#efe6d5 center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:22px}
   .pin{padding:8px 10px}
   .pn{font-weight:700;font-size:13px;line-height:1.2;min-height:31px}
   .pp{color:var(--acc);font-weight:800;font-size:14px;margin:2px 0 6px}
@@ -419,7 +419,11 @@ const App={
   /* al escribir el telefono se busca en el CRM y se rellena TODO lo que exista */
   pedTelLookup(v){ this._cartTel=v;
     const t=this._telKey(v), l=t.length>=7?(this._telMap||{})[t]:null;
-    if(!l){ this._cartHallado=''; this._pintaHallado(); return; }
+    if(!l){ // no está en el CRM: con el teléfono ya completo se marca solo como cliente nuevo
+      if(t.length>=7){ this._cartTipo='nuevo'; if($('pd_tipo'))$('pd_tipo').value='nuevo';
+        this._cartHallado='＋ No está en el CRM — se registra como cliente nuevo'; }
+      else this._cartHallado='';
+      this._pintaHallado(); return; }
     this._cartCli=l.nombre||''; this._cartDir=l.direccion||'';
     this._cartPromo=!!l.infopromos; this._cartTipo=l.tipo||'comunidad';
     if($('pd_cli'))$('pd_cli').value=this._cartCli;
@@ -431,7 +435,8 @@ const App={
     this._pintaHallado(); },
   _pintaHallado(){ const e=$('pd_found'); if(!e)return;
     e.textContent=this._cartHallado||''; e.style.display=this._cartHallado?'block':'none';
-    e.style.color=/^⚠️/.test(this._cartHallado||'')?'var(--warn)':'var(--ok)'; },
+    const h=this._cartHallado||'';
+    e.style.color=/^⚠️/.test(h)?'var(--warn)':(/^✓/.test(h)?'var(--ok)':'var(--acc)'); },
   /* guarda en memoria lo que este escrito, para que no se pierda al repintar la cuenta */
   _leerCart(){ if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value;
     if($('pd_dir'))this._cartDir=$('pd_dir').value; if($('pd_promo'))this._cartPromo=$('pd_promo').checked;
