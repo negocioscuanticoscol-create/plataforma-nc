@@ -512,7 +512,7 @@ const App={
   /* Cuanto silencio se aguanta antes de dar por terminada la respuesta.
      El telefono y la direccion se dictan por grupos ("350... 224... 18... 52"),
      asi que ahi hay que esperar mas. Un si/no se contesta de una. */
-  ESPERA:{tel:6500,nom:4000,dir:6500,promo:2500,tipo:2500,prod:5000,mas:2500,dom:3000,domv:3500},
+  ESPERA:{tel:6500,nom:4000,dir:6500,promo:2500,tipo:2500,prod:4000,cant:2500,mas:2500,dom:3000,domv:3500,pago:3000,gen:2500},
   _oir(cb,paso){ const SR=this._SR(); if(!SR){ this.vozFin('Este navegador no permite dictado'); return; }
     const ESP=this.ESPERA[paso||'']||2800;
     // El microfono queda ABIERTO y se cierra solo tras ESP de silencio, no en la primera pausa.
@@ -566,8 +566,8 @@ const App={
     this._hablar('No te oí. Repite.',()=>this._oir(cb,paso)); },
 
   /* ---- el hilo de la conversación ---- */
-  PASOS:{tel:'Teléfono',nom:'Nombre',dir:'Dirección',promo:'Promociones',tipo:'Tipo de cliente',
-         prod:'Productos',dom:'Domicilio',fin:'Listo'},
+  PASOS:{tel:'Teléfono',nom:'Nombre',dir:'Dirección',promo:'Promo',tipo:'Tipo',
+         prod:'Producto',cant:'Cantidad',mas:'¿Más?',dom:'Domicilio',pago:'Pago',gen:'Generar',fin:'Listo'},
   vozIniciar(){ if(!this._SR()){ alert('Este navegador no permite dictado. Se necesita Chrome en Android o computador.'); return; }
     if(this._vozGuiado){ this.vozFin('Cancelado'); return; }
     if(!window.isSecureContext){ alert('El micrófono solo funciona con https. Abre la página publicada, no el archivo local.'); return; }
@@ -596,60 +596,94 @@ const App={
     const tel=this._norm(t).replace(/\D/g,'');
     if(tel.length<7){ this._hablar('No entendí. Teléfono.',()=>this._oir(x=>this._pasoTel(x),'tel')); return; }
     this._cartTel=tel; this.pedTelLookup(tel);
-    this._vozPaso='nom';
-    if(/^✓/.test(this._cartHallado||'')){          // ya está en el CRM: se salta todo el bloque del cliente
+    if(/^✓/.test(this._cartHallado||'')){          // ya está en el CRM: se salta nombre, dirección y tipo
+      if(!this._cartPromo){ this._vozPaso='promo';  // pero si aún no está en el grupo, se le pregunta
+        this._hablar('Es '+this._cartCli+'. ¿Lo anexo al grupo de info promo?',
+          ()=>this._oir(x=>this._pasoPromo(x),'promo')); return; }
       this._vozPaso='prod';
-      this._hablar('Es '+this._cartCli+'. Ahora el pedido.',
+      this._hablar('Es '+this._cartCli+'. Ahora el pedido: dicta un producto.',
         ()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
-    this._hablar('No está grabado. Nombre.',()=>this._oir(x=>this._pasoNom(x),'nom')); },
+    this._vozPaso='nom';
+    this._hablar('No está en la base. Dime el nombre.',()=>this._oir(x=>this._pasoNom(x),'nom')); },
   _pasoNom(t){ this._vozFallos=0; this._cartCli=this._titulo(this._norm(t)); this._vozPaso='dir';
     this._hablar('Dirección.',()=>this._oir(x=>this._pasoDir(x),'dir')); },
   _pasoDir(t){ this._vozFallos=0; this._cartDir=this._titulo(this._norm(t)); this._vozPaso='promo';
-    this._hablar('¿Quiere promociones?',()=>this._oir(x=>this._pasoPromo(x),'promo')); },
+    this._hablar('¿Lo anexo al grupo de info promo?',()=>this._oir(x=>this._pasoPromo(x),'promo')); },
   _pasoPromo(t){ const r=this._siNo(t);
-    if(r===null){ this._hablar('Responde sí o no.',()=>this._oir(x=>this._pasoPromo(x),'promo')); return; }
-    this._vozFallos=0; this._cartPromo=r; this._vozPaso='tipo';
+    if(r===null){ this._hablar('Sí o no.',()=>this._oir(x=>this._pasoPromo(x),'promo')); return; }
+    this._vozFallos=0; this._cartPromo=r; this._pedPaint();
+    if(this._cartTipo && /^✓/.test(this._cartHallado||'')){    // los que ya están en el CRM no repiten el tipo
+      this._vozPaso='prod';
+      this._hablar('Ahora el pedido: dicta un producto.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
+    this._vozPaso='tipo';
     this._hablar('¿Comunidad o nuevo?',()=>this._oir(x=>this._pasoTipo(x),'tipo')); },
   _pasoTipo(t){ const r=this._tipoCli(t);
     if(!r){ this._hablar('Comunidad o nuevo.',()=>this._oir(x=>this._pasoTipo(x),'tipo')); return; }
-    this._vozFallos=0; this._cartTipo=r; this._vozPaso='prod';
-    this._hablar('Ahora el pedido.',()=>this._oir(x=>this._pasoProd(x),'prod')); },
+    this._vozFallos=0; this._cartTipo=r; this._vozPaso='prod'; this._pedPaint();
+    this._hablar('Ahora el pedido: dicta un producto.',()=>this._oir(x=>this._pasoProd(x),'prod')); },
+  /* Primero SOLO el producto. La cantidad se pregunta aparte, despues de repetir
+     el nombre que entendio, para que se pueda corregir antes de sumar nada. */
   _pasoProd(t){
     if(/\b(listo|ya|nada mas|no mas|eso es todo|terminado|fin)\b/.test(this._norm(t))){ this._irADomicilio(); return; }
     const items=this._vozItems(t);
-    const nuevas=items.map(it=>{ const m=this._matchProd(it.txt);
-      return {qty:it.qty,txt:it.txt,prod:m.prod,ambiguo:m.ambiguo,alt:m.alt}; });
-    const buenas=nuevas.filter(l=>l.prod);
-    if(!buenas.length){ this._hablar('No lo reconocí. Repite.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
-    this._vozFallos=0;
-    this._cart=this._cart||{};
-    buenas.forEach(l=>{ this._cart[l.prod.id]=(this._cart[l.prod.id]||0)+l.qty; });
-    this._vozLineas=(this._vozLineas||[]).concat(nuevas);
-    const leido=buenas.map(l=>l.qty+' '+l.prod.nombre).join(', ');
-    const dudosas=nuevas.filter(l=>!l.prod||l.ambiguo).length;
-    this._pedPaint();
-    this._hablar(leido+'. Van '+this._plataTxt(this._totalCart())+'.'+(dudosas?' Ojo, revisa la pantalla.':'')+' ¿Algo más?',
+    const txt=items.length?items[0].txt:this._norm(t);
+    const m=this._matchProd(txt);
+    if(!m.prod){ this._hablar('No lo reconocí. Repite el producto.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
+    this._vozFallos=0; this._vozPaso='cant';
+    this._vozPend={prod:m.prod,txt:txt,ambiguo:m.ambiguo,alt:m.alt};
+    this._hablar(m.prod.nombre+'. ¿Cuántos?',()=>this._oir(x=>this._pasoCant(x),'cant')); },
+  _cantidad(t){ const w=this._norm(t).split(' ');
+    for(const x of w){ if(/^\d+$/.test(x))return +x;
+      if(this.NUMPAL[x]!==undefined)return this.NUMPAL[x]; }
+    return 0; },
+  _pasoCant(t){ const p=this._vozPend;
+    if(!p){ this._pasoProd(t); return; }
+    const n=this._cantidad(t);
+    if(!n){ this._hablar('¿Cuántos?',()=>this._oir(x=>this._pasoCant(x),'cant')); return; }
+    this._vozFallos=0; this._cart=this._cart||{};
+    this._cart[p.prod.id]=(this._cart[p.prod.id]||0)+n;
+    this._vozLineas=(this._vozLineas||[]).concat([{qty:n,txt:p.txt,prod:p.prod,ambiguo:p.ambiguo,alt:p.alt}]);
+    this._vozPend=null; this._vozPaso='mas'; this._pedPaint();
+    this._hablar(n+' '+p.prod.nombre+'. Van '+this._plataTxt(this._totalCart())+
+      (p.ambiguo?'. Ojo, revisa la pantalla':'')+'. ¿Algo más?',
       ()=>this._oir(x=>this._pasoMas(x),'mas')); },
   _pasoMas(t){ const r=this._siNo(t);
     if(r===false){ this._irADomicilio(); return; }
     this._vozFallos=0;
-    if(r===true){ this._hablar('Producto.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
+    if(r===true){ this._vozPaso='prod'; this._hablar('Producto.',()=>this._oir(x=>this._pasoProd(x),'prod')); return; }
     this._pasoProd(t); },                                  // si ya dictó el producto, se aprovecha
-  _irADomicilio(){ this._vozFallos=0; this._vozPaso='dom';
+  _irADomicilio(){ this._vozFallos=0; this._vozPaso='dom'; this._vozPend=null;
     this._hablar('Van '+this._plataTxt(this._totalCart())+'. ¿Tendría domicilio?',
       ()=>this._oir(x=>this._pasoDom(x),'dom')); },
   _pasoDom(t){ const r=this._siNo(t), v=this._plata(t);
-    if(r===false){ this._cartDom=0; this._cerrarVoz(); return; }
-    if(v>0){ this._cartDom=v; this._cerrarVoz(); return; }   // dijo "sí, seis mil quinientos"
+    if(r===false){ this._cartDom=0; this._irAPago(); return; }
+    if(v>0){ this._cartDom=v; this._irAPago(); return; }     // dijo "sí, seis mil quinientos"
     if(r===true){ this._hablar('¿De cuánto?',()=>this._oir(x=>this._pasoDomValor(x),'domv')); return; }
-    this._hablar('Responde sí o no.',()=>this._oir(x=>this._pasoDom(x),'dom')); },
+    this._hablar('Sí o no.',()=>this._oir(x=>this._pasoDom(x),'dom')); },
   _pasoDomValor(t){ const v=this._plata(t);
     if(!v){ this._hablar('No entendí. Repite.',()=>this._oir(x=>this._pasoDomValor(x),'domv')); return; }
-    this._cartDom=v; this._cerrarVoz(); },
-  _cerrarVoz(){ this._vozPaso='fin';
+    this._cartDom=v; this._irAPago(); },
+  _formaPago(t){ const n=this._norm(t);
+    if(/\b(tarjeta|credito|débito|debito|datafono|visa|master)\b/.test(n))return 'Tarjeta crédito';
+    if(/\b(transferencia|transfe|nequi|daviplata|bancolombia|llave|qr)\b/.test(n))return 'Transferencia';
+    if(/\b(efectivo|plata|billete|contado|cash|monedas)\b/.test(n))return 'Efectivo';
+    let mej=null,s=0; this.FPPEDIDO.forEach(f=>{ const x=this._sim(t,f); if(x>s){s=x;mej=f;} });
+    return s>=0.45?mej:null; },
+  _irAPago(){ this._vozFallos=0; this._vozPaso='pago'; this._pedPaint();
+    this._hablar('¿Forma de pago? Efectivo, transferencia o tarjeta.',
+      ()=>this._oir(x=>this._pasoPago(x),'pago')); },
+  _pasoPago(t){ const f=this._formaPago(t);
+    if(!f){ this._hablar('Efectivo, transferencia o tarjeta.',()=>this._oir(x=>this._pasoPago(x),'pago')); return; }
+    this._vozFallos=0; this._cartFP=f; this._vozPaso='gen'; this._pedPaint();
     const dudosas=(this._vozLineas||[]).filter(l=>!l.prod||l.ambiguo).length;
-    this._hablar('Total '+this._plataTxt(this._totalCart())+'. '+(dudosas?'Revisa lo naranja y genera.':'Revisa y genera.'),
-      ()=>{ this._vozGuiado=false; this._vozDice=''; this._pedPaint(); }); },
+    this._hablar(f+'. Total '+this._plataTxt(this._totalCart())+'.'+
+      (dudosas?' Ojo, hay líneas por revisar.':'')+' ¿Genero el pedido?',
+      ()=>this._oir(x=>this._pasoGenerar(x),'gen')); },
+  _pasoGenerar(t){ const r=this._siNo(t);
+    if(r===null){ this._hablar('¿Genero el pedido? Sí o no.',()=>this._oir(x=>this._pasoGenerar(x),'gen')); return; }
+    this._vozGuiado=false; this._vozPaso='fin'; this._vozDice=''; this._pedPaint();
+    if(!r){ toast('Pedido armado — revísalo y genéralo tú'); return; }
+    this._hablar('Generando.',()=>{ this.pedGuardar(); }); },
   _totalCart(){ const prods=this._prods||[], c=this._cart||{}; let b=0;
     for(const id in c){ const p=prods.find(x=>x.id===id); if(p)b+=(+p.precio||0)*c[id]; }
     const desc=Math.min(Math.max(0,+(this._cartDesc||0)),b);
