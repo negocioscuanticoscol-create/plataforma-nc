@@ -138,6 +138,9 @@ const App={
     if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; sessionStorage.setItem('kruh_rol',rol); this.init(); },
   logout(){ sessionStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
   _okBorrar(){ const p=prompt('🔒 Clave para BORRAR:'); if(p===null)return false; if(p===this.PASS.admin||p===this.PASS.gerencia)return true; alert('Clave incorrecta'); return false; },
+  /* pide clave de admin o gerencia para acciones que corrigen datos ya guardados */
+  _okGerencia(que){ const p=prompt('🔒 Clave de admin o gerencia para '+que+':'); if(p===null)return false;
+    if(p===this.PASS.admin||p===this.PASS.gerencia)return true; alert('Clave incorrecta'); return false; },
   paintHeader(){ const q=document.querySelector('.quien'); if(q){ const r=(this.rol||'').charAt(0).toUpperCase()+(this.rol||'').slice(1); q.innerHTML=`${r} · <a onclick="App.logout()" style="cursor:pointer;text-decoration:underline">salir</a>`; } },
 
   /* ===================== DASHBOARD ===================== */
@@ -558,19 +561,23 @@ const App={
   async vInventario(){
     this.loading();
     const [prods,movs,ventas]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_movimientos?order=creado_en.desc&limit=1000'),GET('kruh_ventas?select=monto,creado_en&limit=20000')]);
-    this._prods=prods; this._musBy={}; this._musTot=0; this._perBy={}; this._perTot=0;
+    this._prods=prods;
     // consumo diario prom (salidas ult 30 dias) — las perdidas NO cuentan, no salio nada del estante
     const hoy=new Date(), d30=new Date(hoy-30*864e5);
     const salBy={}; movs.forEach(m=>{ if((m.tipo==='salida'||m.tipo==='muestra') && new Date(m.creado_en)>=d30){ salBy[m.producto_id]=(salBy[m.producto_id]||0)+(+m.cantidad||0);} });
-    // muestras gratis del mes (descuentan inventario y se miden aparte)
-    const mesIni0=new Date(hoy.getFullYear(),hoy.getMonth(),1);
-    const musBy=this._musBy; let musTot=0;
-    movs.forEach(m=>{ if(m.tipo==='muestra' && new Date(m.creado_en)>=mesIni0){ musBy[m.producto_id]=(musBy[m.producto_id]||0)+(+m.cantidad||0); musTot+=(+m.cantidad||0); } });
-    this._musTot=musTot;
-    // ventas perdidas del mes: solo se cuentan, NO tocan existencias
-    const perBy=this._perBy; let perTot=0;
-    movs.forEach(m=>{ if(m.tipo==='perdida' && new Date(m.creado_en)>=mesIni0){ perBy[m.producto_id]=(perBy[m.producto_id]||0)+(+m.cantidad||0); perTot+=(+m.cantidad||0); } });
-    this._perTot=perTot;
+    // Muestras y ventas perdidas: se cuentan del dia y del mes. El mes arranca en cero solo,
+    // porque siempre se recalcula desde el dia 1; nada se borra, el historico queda en la tabla.
+    const mesIni0=new Date(hoy.getFullYear(),hoy.getMonth(),1), hoyK0=this._diaKey(hoy);
+    const musBy={},musDia={},perBy={},perDia={}; let musTot=0,musTotD=0,perTot=0,perTotD=0;
+    movs.forEach(m=>{ const t=m.tipo; if(t!=='muestra'&&t!=='perdida')return;
+      const f=new Date(m.creado_en); if(isNaN(f)||f<mesIni0)return;
+      const q=+m.cantidad||0, esHoy=this._diaKey(m.creado_en)===hoyK0;
+      if(t==='muestra'){ musBy[m.producto_id]=(musBy[m.producto_id]||0)+q; musTot+=q;
+        if(esHoy){ musDia[m.producto_id]=(musDia[m.producto_id]||0)+q; musTotD+=q; } }
+      else { perBy[m.producto_id]=(perBy[m.producto_id]||0)+q; perTot+=q;
+        if(esHoy){ perDia[m.producto_id]=(perDia[m.producto_id]||0)+q; perTotD+=q; } } });
+    this._musBy=musBy; this._musDia=musDia; this._musTot=musTot; this._musTotD=musTotD;
+    this._perBy=perBy; this._perDia=perDia; this._perTot=perTot; this._perTotD=perTotD;
     const tab=this._invTab||'exist'; this._invTab=tab;
     const cobRows=prods.map(p=>{ const cons=(salBy[p.id]||0)/30; const dias=cons>0?(+p.existencias||0)/cons:null; return {p,cons,dias}; });
     const bajoMin=prods.filter(p=>(+p.inv_min||0)>0 && (+p.existencias||0)<=(+p.inv_min||0));
@@ -606,8 +613,8 @@ const App={
       ${bajoMin.length?`<div class="card" style="border-left:4px solid var(--warn);background:var(--badbg)"><b style="color:var(--warn)">⚠️ ${bajoMin.length} producto(s) en o bajo el mínimo</b><div style="font-size:12.5px;margin-top:4px">${bajoMin.map(p=>esc(p.nombre)+' ('+num(p.existencias)+'/'+num(p.inv_min)+')').join(' · ')}</div></div>`:''}
       <div class="kpis"><div class="kpi"><b style="color:${negativos.length?'var(--bad)':'var(--ink)'}">${prods.length}</b><span>Productos</span></div>
         <div class="kpi"><b style="color:${bajoMin.length?'var(--bad)':'var(--ok)'}">${bajoMin.length}</b><span>Bajo mínimo</span></div>
-        <div class="kpi" style="border:1.5px solid var(--ok)"><b style="color:var(--ok)" id="kpi_mus">${num(musTot)}</b><span>🎁 Muestras del mes</span></div>
-        <div class="kpi" style="border:1.5px solid var(--bad)"><b style="color:var(--bad)" id="kpi_per">${num(perTot)}</b><span>❌ V. perdidas del mes</span></div>
+        <div class="kpi" style="border:1.5px solid var(--ok)"><b style="color:var(--ok)"><span id="kpi_musd">${num(musTotD)}</span> <small style="font-size:15px;font-weight:400">(<span id="kpi_mus">${num(musTot)}</span>)</small></b><span>🎁 Muestras · hoy (mes)</span></div>
+        <div class="kpi" style="border:1.5px solid var(--bad)"><b style="color:var(--bad)"><span id="kpi_perd">${num(perTotD)}</span> <small style="font-size:15px;font-weight:400">(<span id="kpi_per">${num(perTot)}</span>)</small></b><span>❌ V. perdidas · hoy (mes)</span></div>
         <div class="kpi dark"><b>${money(prods.reduce((a,p)=>a+(+p.existencias||0)*(+p.precio||0),0))}</b><span>Valor en existencias</span></div></div>
       <div class="row" style="gap:6px;margin-bottom:10px"><button class="et ${tab==='exist'?'on':''}" onclick="App._invTab='exist';App.vInventario()">Existencias</button>
         <button class="et ${tab==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button>
@@ -618,43 +625,76 @@ const App={
             <div class="row" style="justify-content:space-between;margin-top:3px"><b style="font-size:18px;color:${bm?'var(--bad)':'var(--ink)'}"><span id="ex_${p.id}">${num(p.existencias)}</span> <small class="dim" style="font-size:11px;font-weight:400">${esc(p.unidad||'')}</small></b><span style="font-size:11px;color:${col};font-weight:700">${dias===null?'':dias.toFixed(0)+'d'}</span></div>
             <div style="font-size:10.5px;color:var(--ink);font-weight:600">Stock mínimo: ${num(p.inv_min)}${bm?' · <b style="color:var(--bad)">BAJO</b>':''}</div>
             <div class="bar" style="margin-top:4px"><i style="width:${pct}%;background:${col}"></i></div>
-            <div id="mu_${p.id}" style="font-size:10.5px;color:var(--ok);font-weight:700;margin-top:4px;${musBy[p.id]?'':'display:none'}">🎁 ${num(musBy[p.id]||0)} en muestras este mes</div>
-            <div id="pe_${p.id}" style="font-size:10.5px;color:var(--bad);font-weight:700;margin-top:2px;${perBy[p.id]?'':'display:none'}">❌ ${num(perBy[p.id]||0)} venta(s) perdida(s) este mes</div>
+            <div id="mu_${p.id}" style="font-size:10.5px;color:var(--ok);font-weight:700;margin-top:4px;${musBy[p.id]?'':'display:none'}">${this._txtMus(p.id)}</div>
+            <div id="pe_${p.id}" style="font-size:10.5px;color:var(--bad);font-weight:700;margin-top:2px;${perBy[p.id]?'':'display:none'}">${this._txtPer(p.id)}</div>
             <div class="row" style="gap:5px;margin-top:8px"><button class="btn acc sm" style="flex:1;padding:5px 0" onclick="App.movModal('${p.id}','entrada')">＋ Adicionar stock</button></div>
             <div class="row" style="gap:5px;margin-top:5px;align-items:stretch">
               <button class="btn sm" style="flex:1;padding:6px 0;background:var(--okbg);border:1.5px solid var(--ok);color:var(--ok);font-weight:700" onclick="App.muestraMenos('${p.id}')">🎁 Muestra −</button>
+              <button class="btn sm" style="padding:6px 9px;background:var(--okbg);border:1.5px solid var(--ok);color:var(--ok);font-weight:700" title="Corregir las muestras del mes" onclick="App.musEditar('${p.id}')">✏️</button>
               <button class="btn sm" style="flex:1;padding:6px 0;background:var(--badbg);border:1.5px solid var(--bad);color:var(--bad);font-weight:700" onclick="App.perdidaMas('${p.id}')">❌ V. perdida +</button></div></div>`;}).join('')}</div>`:'<div class="empty">Sin productos.</div>')
         : tab==='mov'?(movs.length?movs.slice(0,300).map(m=>{const p=prods.find(x=>x.id===m.producto_id);
-            const ic=m.tipo==='entrada'?'⬆️':(m.tipo==='muestra'?'🎁':(m.tipo==='perdida'?'❌':'⬇️'));
-            const cl=m.tipo==='entrada'?'var(--ok)':(m.tipo==='muestra'?'var(--ok)':'var(--bad)');
-            const sg=m.tipo==='entrada'?'+':(m.tipo==='perdida'?'':'−');   // la perdida no suma ni resta inventario
-            const tg=m.tipo==='muestra'?' <span class="tag pe">muestra gratis</span>':(m.tipo==='perdida'?' <span class="tag pe">venta perdida · no toca inventario</span>':'');
-            return `<div class="item"><div class="top"><div><div class="nm">${ic} ${esc(p?p.nombre:'—')}${tg}</div><div class="mt">${esc(m.motivo||'')} · 📅 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div><div class="nm" style="color:${cl}">${sg}${num(m.cantidad)}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')
+            const q=+m.cantidad||0, corr=(m.tipo==='muestra'&&q<0);   // muestras devueltas por el ✏️
+            const ic=corr?'↩️':(m.tipo==='entrada'?'⬆️':(m.tipo==='muestra'?'🎁':(m.tipo==='perdida'?'❌':'⬇️')));
+            const cl=(corr||m.tipo==='entrada'||m.tipo==='muestra')?'var(--ok)':'var(--bad)';
+            const sg=corr?'+':(m.tipo==='entrada'?'+':(m.tipo==='perdida'?'':'−'));   // la perdida no suma ni resta inventario
+            const tg=corr?' <span class="tag pe">corrección de muestras · vuelve al inventario</span>':(m.tipo==='muestra'?' <span class="tag pe">muestra gratis</span>':(m.tipo==='perdida'?' <span class="tag pe">venta perdida · no toca inventario</span>':''));
+            return `<div class="item"><div class="top"><div><div class="nm">${ic} ${esc(p?p.nombre:'—')}${tg}</div><div class="mt">${esc(m.motivo||'')} · 📅 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div><div class="nm" style="color:${cl}">${sg}${num(Math.abs(q))}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')
         : tendHTML}`);
   },
+  /* textos de los contadores: siempre "hoy (mes)". El mes se recalcula desde el dia 1, no se borra nada */
+  _txtMus(id){ return '🎁 Muestras — hoy '+num((this._musDia||{})[id]||0)+' ('+num((this._musBy||{})[id]||0)+' en el mes)'; },
+  _txtPer(id){ return '❌ V. perdidas — hoy '+num((this._perDia||{})[id]||0)+' ('+num((this._perBy||{})[id]||0)+' en el mes)'; },
+  _pintaMus(id){ const e=$('mu_'+id); if(e){ e.textContent=this._txtMus(id); e.style.display=(this._musBy||{})[id]?'block':'none'; }
+    const a=$('kpi_musd'); if(a)a.textContent=num(this._musTotD||0); const b=$('kpi_mus'); if(b)b.textContent=num(this._musTot||0); },
+  _pintaPer(id){ const e=$('pe_'+id); if(e){ e.textContent=this._txtPer(id); e.style.display=(this._perBy||{})[id]?'block':'none'; }
+    const a=$('kpi_perd'); if(a)a.textContent=num(this._perTotD||0); const b=$('kpi_per'); if(b)b.textContent=num(this._perTot||0); },
+
   /* muestra gratis de a una, sin ventana: solo el − */
   async muestraMenos(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return;
     const nueva=(+p.existencias||0)-1; p.existencias=nueva;
-    this._musBy[id]=(this._musBy[id]||0)+1; this._musTot=(this._musTot||0)+1;
+    this._musBy[id]=(this._musBy[id]||0)+1; this._musDia[id]=(this._musDia[id]||0)+1;
+    this._musTot=(this._musTot||0)+1; this._musTotD=(this._musTotD||0)+1;
     const ex=$('ex_'+id); if(ex){ ex.textContent=num(nueva); if(ex.parentElement)ex.parentElement.style.color=nueva<0?'var(--bad)':''; }
-    const mu=$('mu_'+id); if(mu){ mu.style.display='block'; mu.textContent='🎁 '+num(this._musBy[id])+' en muestras este mes'; }
-    const k=$('kpi_mus'); if(k)k.textContent=num(this._musTot);
+    this._pintaMus(id);
     toast('🎁 1 muestra · quedan '+num(nueva));
     const mv=await POST('kruh_movimientos',{producto_id:id,tipo:'muestra',cantidad:1,motivo:'Muestra gratis'});
     const up=await PATCH('kruh_productos?id=eq.'+id,{existencias:nueva});
     if(!mv||(up&&!up.ok)) toast('⚠️ NO se guardó la muestra — recarga y revisa'); },
 
+  /* ✏️ corregir el total de muestras del mes. Ojo: la muestra SI mueve inventario,
+     asi que si el numero baja hay que devolver el stock, y si sube hay que descontarlo */
+  musEditar(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return;
+    if(!this._okGerencia('corregir las muestras'))return;   // solo admin o gerencia
+    const act=+((this._musBy||{})[id]||0), dia=+((this._musDia||{})[id]||0);
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:6px">🎁 Muestras · ${esc(p.nombre)}</h3>
+      <div class="hint" style="margin-bottom:6px">Hoy van <b>${num(dia)}</b> · este mes <b>${num(act)}</b>. Corrige el total del mes si te pasaste de clics o si repartiste varias de una.</div>
+      <label>Muestras de este mes</label><input id="ms_n" type="number" min="0" value="${act}" autofocus>
+      <div class="hint">Existencias hoy: <b>${num(p.existencias)}</b> → quedarían <b id="ms_q">${num(p.existencias)}</b></div>
+      <button class="btn acc full" onclick="App.musGuardar('${id}')">Guardar</button>`);
+    const inp=$('ms_n'); if(inp)inp.oninput=()=>{ const n=Math.max(0,+inp.value||0), q=(+p.existencias||0)+(act-n);
+      const e=$('ms_q'); if(e){ e.textContent=num(q); e.style.color=q<0?'var(--bad)':''; } }; },
+  async musGuardar(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return;
+    const act=+((this._musBy||{})[id]||0), n=Math.max(0,Math.round(+$('ms_n').value||0)), d=n-act;
+    if(!d){ cerrar(); return; }
+    const nueva=(+p.existencias||0)-d;
+    const mv=await POST('kruh_movimientos',{producto_id:id,tipo:'muestra',cantidad:d,
+      motivo:d>0?('Ajuste de muestras +'+d):('Corrección de muestras '+d)});
+    if(!mv){ toast('⚠️ No se pudo guardar el ajuste'); return; }
+    const up=await PATCH('kruh_productos?id=eq.'+id,{existencias:nueva});
+    cerrar(); toast(up&&!up.ok?'⚠️ Muestras corregidas, pero el inventario NO — revisa':'🎁 Muestras del mes: '+num(n));
+    this.vInventario(); },
+
   /* venta perdida: solo se cuenta. NO toca existencias ni descuenta nada */
   async perdidaMas(id){ const p=(this._prods||[]).find(x=>x.id===id); if(!p)return;
-    this._perBy=this._perBy||{}; this._perBy[id]=(this._perBy[id]||0)+1; this._perTot=(this._perTot||0)+1;
-    const pe=$('pe_'+id); if(pe){ pe.style.display='block'; pe.textContent='❌ '+num(this._perBy[id])+' venta(s) perdida(s) este mes'; }
-    const k=$('kpi_per'); if(k)k.textContent=num(this._perTot);
+    this._perBy=this._perBy||{}; this._perDia=this._perDia||{};
+    this._perBy[id]=(this._perBy[id]||0)+1; this._perDia[id]=(this._perDia[id]||0)+1;
+    this._perTot=(this._perTot||0)+1; this._perTotD=(this._perTotD||0)+1;
+    this._pintaPer(id);
     toast('❌ 1 venta perdida · el inventario NO se movió');
     const mv=await POST('kruh_movimientos',{producto_id:id,tipo:'perdida',cantidad:1,motivo:'Venta perdida'});
     if(!mv){ // se devuelve el contador para no dejar un dato falso en pantalla
-      this._perBy[id]--; this._perTot--;
-      if(pe){ pe.textContent='❌ '+num(this._perBy[id])+' venta(s) perdida(s) este mes'; if(!this._perBy[id])pe.style.display='none'; }
-      if(k)k.textContent=num(this._perTot);
+      this._perBy[id]--; this._perDia[id]--; this._perTot--; this._perTotD--;
+      this._pintaPer(id);
       toast('⚠️ NO se guardó la venta perdida — vuelve a intentar'); } },
   movModal(id,tipo){ const p=(this._prods||[]).find(x=>x.id===id)||{};
     const T={entrada:['Adicionar stock','Producción del día'],muestra:['🎁 Muestras gratis','Muestra gratis'],salida:['Descontar (salida/merma)','Merma/ajuste']}[tipo]||['Movimiento',''];
@@ -888,7 +928,7 @@ const App={
   /* ===================== VENTAS (clientes, estilo Smart) ===================== */
   async vVentas(){
     this.loading();
-    const [ventas,seg,peds,leads,perds,prodsV]=await Promise.all([GET('kruh_ventas?order=creado_en.desc&limit=8000'),GET('kruh_seguimiento?limit=3000'),GET('kruh_pedidos?select=items,creado_en,forma_pago&limit=3000'),GET('kruh_leads?select=creado_en&limit=5000'),GET('kruh_movimientos?tipo=eq.perdida&select=producto_id,cantidad,creado_en&limit=8000'),GET('kruh_productos?select=id,nombre,precio&limit=1000')]);
+    const [ventas,seg,peds,leads,movsV,prodsV]=await Promise.all([GET('kruh_ventas?order=creado_en.desc&limit=8000'),GET('kruh_seguimiento?limit=3000'),GET('kruh_pedidos?select=items,creado_en,forma_pago&limit=3000'),GET('kruh_leads?select=creado_en&limit=5000'),GET('kruh_movimientos?tipo=in.(muestra,perdida)&select=producto_id,tipo,cantidad,creado_en&limit=20000'),GET('kruh_productos?select=id,nombre,precio&limit=1000')]);
     const segSet={}; seg.forEach(s=>segSet[s.cliente]=s.contactado);
     const mesIni=new Date(); mesIni.setDate(1); mesIni.setHours(0,0,0,0);
     const by={};
@@ -912,7 +952,7 @@ const App={
         <div class="kpi"><b>${arr.filter(o=>o.estemes).length}</b><span>Compraron este mes</span></div>
         <div class="kpi"><b>${arr.length}</b><span>Han comprado alguna vez</span></div></div>
       ${this._ventaDia(mesV)}
-      ${this._perdidasCard(perds,prodsV)}
+      ${this._mmCard(movsV,prodsV)}
       <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Formas de pago (mes)</div>
         <div class="row" style="justify-content:space-between"><span>💳 Tarjeta crédito</span><b>${money(tarTot)}</b></div>
         <div class="row" style="justify-content:space-between;font-size:11.5px;color:var(--mut)"><span>↳ base ${money(tarBase)} + IVA ${money(tarIva)}</span></div>
@@ -920,7 +960,7 @@ const App={
         <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total juntos</span><b style="color:var(--acc)">${money(tarTot+otrTot)}</b></div></div>
       <div class="row" style="gap:8px"><button class="btn acc" onclick="App.ventaModal()">＋ Registrar venta</button>
         <button class="btn gh" onclick="App.ventasExcel()">⬇ Excel contabilidad</button></div>
-      ${this._resumenProductos(peds,ventas,segSet)}`);
+      ${this._resumenProductos(peds,ventas,segSet,movsV,prodsV)}`);
   },
   DOWC:['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],
   _diaKey(d){ const x=new Date(d); return isNaN(x)?'':x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); },
@@ -951,30 +991,54 @@ const App={
           :'<div class="hint">Todavía no hay ventas este mes.</div>'}
       </div></div>`;
   },
-  /* ventas perdidas: se cuentan desde kruh_movimientos (tipo=perdida). No salen del inventario */
-  _perdidasCard(perds,prods){
-    const hoyK=this._diaKey(new Date()), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
+  /* Muestras y ventas perdidas salen de kruh_movimientos. La muestra SI descuenta inventario;
+     la venta perdida NO. El corte del mes es solo de lectura: el historico nunca se borra */
+  _mmAgrupa(movs,prods,filtro){
     const pre={}; (prods||[]).forEach(p=>pre[p.id]={nom:p.nombre,precio:+p.precio||0});
-    const dia={n:0,v:0}, mes={n:0,v:0}, ano={n:0,v:0}, porProd={};
-    (perds||[]).forEach(m=>{ const k=this._diaKey(m.creado_en); if(!k)return;
+    const R={mus:{n:0,v:0},per:{n:0,v:0},prod:{}};
+    (movs||[]).forEach(m=>{ const k=this._diaKey(m.creado_en); if(!k||!filtro(k))return;
       const q=+m.cantidad||0, inf=pre[m.producto_id]||{nom:'—',precio:0}, val=q*inf.precio;
-      if(k.slice(0,4)===anoK){ ano.n+=q; ano.v+=val; }
-      if(k.slice(0,7)===mesK){ mes.n+=q; mes.v+=val;
-        const o=porProd[m.producto_id]=porProd[m.producto_id]||{nom:inf.nom,n:0,v:0}; o.n+=q; o.v+=val; }
-      if(k===hoyK){ dia.n+=q; dia.v+=val; } });
-    const top=Object.values(porProd).sort((a,b)=>b.n-a.n);
-    const cel=(t,o)=>`<div style="flex:1;text-align:center;padding:6px 4px">
-      <b style="display:block;font-family:Fraunces,serif;font-size:24px;color:var(--bad);line-height:1.1">${num(o.n)}</b>
-      <span style="font-size:10.5px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em">${t}</span>
-      <div style="font-size:11px;color:var(--bad);font-weight:700;margin-top:2px">${money(o.v)}</div></div>`;
-    return `<div class="card" style="border:1.5px solid var(--bad);background:var(--badbg)">
-      <div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:2px;color:var(--bad)">❌ Ventas perdidas</div>
-      <div class="hint" style="margin-bottom:6px">Clientes que pidieron algo y no se les pudo vender. No descuentan inventario; el valor es estimado con el precio de lista.</div>
-      <div class="row" style="gap:4px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:2px 0">
-        ${cel('Hoy',dia)}${cel('Este mes',mes)}${cel('Este año',ano)}</div>
-      ${top.length?`<div style="margin-top:8px"><div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:5px">Qué se perdió este mes</div>
-        ${top.map(o=>`<div class="row" style="justify-content:space-between;padding:3px 0"><span>${esc(o.nom)}</span><b style="color:var(--bad)">${num(o.n)} <small style="font-weight:400;color:var(--mut)">· ${money(o.v)}</small></b></div>`).join('')}</div>`
-        :'<div class="hint" style="margin-top:8px">Sin ventas perdidas registradas este mes. Se marcan desde Inventario, con el botón rojo de cada producto.</div>'}</div>`;
+      const c=m.tipo==='muestra'?'mus':'per'; R[c].n+=q; R[c].v+=val;
+      const o=R.prod[m.producto_id]=R.prod[m.producto_id]||{nom:inf.nom,mus:0,musV:0,per:0,perV:0};
+      if(c==='mus'){ o.mus+=q; o.musV+=val; } else { o.per+=q; o.perV+=val; } });
+    return R;
+  },
+  _mmCard(movs,prods){
+    const hoyK=this._diaKey(new Date()), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
+    const d=this._mmAgrupa(movs,prods,k=>k===hoyK), m=this._mmAgrupa(movs,prods,k=>k.slice(0,7)===mesK), a=this._mmAgrupa(movs,prods,k=>k.slice(0,4)===anoK);
+    const cel=(t,o,col)=>`<div style="flex:1;text-align:center;padding:5px 3px">
+      <b style="display:block;font-family:Fraunces,serif;font-size:23px;color:${col};line-height:1.1">${num(o.n)}</b>
+      <span style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em">${t}</span>
+      <div style="font-size:11px;color:${col};font-weight:700;margin-top:2px">${money(o.v)}</div></div>`;
+    const bloque=(tit,cla,col,bg,brd)=>`<div style="flex:1;min-width:225px;border:1.5px solid ${brd};background:${bg};border-radius:11px;padding:8px 9px">
+      <div style="font-family:Fraunces,serif;font-size:15px;color:${col};margin-bottom:3px">${tit}</div>
+      <div class="row" style="gap:3px">${cel('Hoy',d[cla],col)}${cel('Mes',m[cla],col)}${cel('Año',a[cla],col)}</div></div>`;
+    return `<div class="card">
+      <div class="row" style="gap:9px;flex-wrap:wrap;align-items:stretch">
+        ${bloque('🎁 Muestras regaladas','mus','var(--ok)','var(--okbg)','var(--ok)')}
+        ${bloque('❌ Ventas perdidas','per','var(--bad)','var(--badbg)','var(--bad)')}</div>
+      <div class="hint" style="margin-top:7px">Valor estimado con el precio de lista. Las muestras sí salieron del inventario; las ventas perdidas no movieron nada, son las que no se alcanzaron a atender. El conteo del mes arranca solo en cada mes nuevo, pero el histórico completo queda guardado.</div></div>`;
+  },
+  /* detalle por producto del periodo que este seleccionado en los cajones Dia/Mes/Año */
+  _mmPeriodo(movs,prods,caj){
+    const hoyK=this._diaKey(new Date()), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
+    const R=this._mmAgrupa(movs,prods,k=>caj==='dia'?k===hoyK:(caj==='mes'?k.slice(0,7)===mesK:k.slice(0,4)===anoK));
+    const filas=Object.values(R.prod).filter(o=>o.mus||o.per).sort((a,b)=>(b.mus+b.per)-(a.mus+a.per));
+    if(!filas.length) return `<h1 style="font-size:17px;margin-top:20px">🎁 Muestras y ❌ ventas perdidas</h1>
+      <div class="empty">Nada registrado en este periodo.</div>`;
+    return `<h1 style="font-size:17px;margin-top:20px">🎁 Muestras y ❌ ventas perdidas</h1>
+      <div class="tbwrap"><table class="tb" style="min-width:460px">
+        <thead><tr><th style="min-width:190px">Producto</th><th style="text-align:right">🎁 Muestras</th><th style="text-align:right">Valor</th><th style="text-align:right">❌ Perdidas</th><th style="text-align:right">Valor</th></tr></thead>
+        <tbody>${filas.map(o=>`<tr>
+          <td style="padding-left:10px;font-weight:600">${esc(o.nom)}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--ok);font-weight:700">${o.mus?num(o.mus):'—'}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--ok)">${o.mus?money(o.musV):'—'}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--bad);font-weight:700">${o.per?num(o.per):'—'}</td>
+          <td style="text-align:right;padding-right:10px;color:var(--bad)">${o.per?money(o.perV):'—'}</td></tr>`).join('')}</tbody>
+        <tfoot><tr><td style="padding-left:10px">TOTAL</td>
+          <td style="text-align:right;padding-right:10px">${num(R.mus.n)}</td><td style="text-align:right;padding-right:10px">${money(R.mus.v)}</td>
+          <td style="text-align:right;padding-right:10px">${num(R.per.n)}</td><td style="text-align:right;padding-right:10px">${money(R.per.v)}</td></tr></tfoot>
+      </table></div>`;
   },
   _clientesPeriodo(ventas,caj,segSet){
     const hoyK=this._diaKey(new Date()), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
@@ -995,7 +1059,7 @@ const App={
           <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div></div>`;}).join('')
         :'<div class="empty">Ningún cliente compró en este periodo.</div>'}`;
   },
-  _resumenProductos(peds,ventas,segSet){
+  _resumenProductos(peds,ventas,segSet,movsV,prodsV){
     const f=new Date(), hoyK=this._diaKey(f), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
     const cli={dia:new Set(),mes:new Set(),ano:new Set()};
     (ventas||[]).forEach(v=>{ const k=this._diaKey(v.creado_en); if(!k)return; const n=(v.cliente||'—').trim();
@@ -1038,7 +1102,8 @@ const App={
           <td style="text-align:right;padding-right:10px">${num(tQ)}</td>
           <td style="text-align:right;padding-right:10px;color:var(--acc)">${money(tV)}</td>
           <td style="text-align:right;padding-right:10px">100%</td></tr></tfoot>
-      </table></div>`:`<div class="empty">Sin pedidos en ${esc(nomCaj)}.</div>`)}`;
+      </table></div>`:`<div class="empty">Sin pedidos en ${esc(nomCaj)}.</div>`)
+        +this._mmPeriodo(movsV,prodsV,caj)}`;
   },
   async segToggle(cli,on){ await fetch(SB+'/rest/v1/kruh_seguimiento?on_conflict=cliente',{method:'POST',headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({cliente:cli,contactado:!on,actualizado:new Date().toISOString()})}); this.vVentas(); },
   ventaModal(){ modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Registrar venta</h3>
