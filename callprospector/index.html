@@ -56,6 +56,20 @@ header{background:linear-gradient(160deg,var(--azul),var(--azul2));padding:12px 
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.28}}
 @media(prefers-reduced-motion:reduce){.live i{animation:none}}
 .yo{font-size:11.5px;color:#9DB7DA;background:rgba(255,255,255,.1);padding:3px 9px;border-radius:20px}
+.mando{font-size:11.5px;font-weight:700;color:#fff;background:var(--naranja);padding:5px 11px;
+  border-radius:20px;text-decoration:none;white-space:nowrap}
+.mando:active{filter:brightness(.88)}
+#panel{margin-top:11px}
+.pan{background:var(--card2);border:1.5px solid var(--naranja);border-radius:13px;padding:14px;text-align:left}
+.pan h5{font-size:12px;color:var(--naranja2);margin-bottom:3px;font-weight:700}
+.pan .ps{font-size:11.5px;color:var(--dim);margin-bottom:10px;line-height:1.4}
+.pan input{width:100%;background:var(--card);border:1px solid var(--line);color:var(--tx);
+  border-radius:9px;padding:11px;font-size:14px;font-family:inherit;margin-bottom:7px}
+.pan input:focus{outline:none;border-color:var(--naranja)}
+.pan .pb{display:flex;gap:7px;margin-top:4px}
+.pan .pb button{flex:1;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit}
+.pan .pb .g{background:var(--ok);color:#03291D} .pan .pb .s{background:var(--card);color:var(--faint);border:1px solid var(--line)}
 
 /* contador de plata */
 .plata{text-align:center}
@@ -178,6 +192,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
   <div class="hrow">
     <div class="brand"><span>Call</span><span class="p">Prospector</span></div>
     <span class="yo" id="yo">—</span>
+    <a class="mando" href="mando.html">📊 C. Mando</a>
     <div class="live" id="live"><i></i><span id="liveTx">en vivo</span></div>
   </div>
   <div class="plata">
@@ -241,10 +256,14 @@ const cop=n=>'$'+Math.round(n).toLocaleString('es-CO');
 /* ---------- entrada ---------- */
 if(AGENTE){ $('gate').style.display='none'; arrancar(); }
 $('nom').addEventListener('keydown',e=>{ if(e.key==='Enter') entrar(); });
+/* nombres que ya tienen historial → se reconocen escritos como sea (JOSE, jose, José) */
+const norm=s=>String(s||'').trim().toLowerCase().normalize('NFD').replace(SINTILDE,'');
+const SINTILDE=new RegExp('[\\u0300-\\u036f]','g');
+const ALIAS={'jose':'José','jose calderon':'José'};
 function entrar(){
   const v=$('nom').value.trim();
   if(v.length<2){ $('nom').focus(); return; }
-  AGENTE=v; localStorage.setItem('cp_agente',v);
+  AGENTE=ALIAS[norm(v)]||v; localStorage.setItem('cp_agente',AGENTE);
   $('gate').style.display='none'; arrancar();
 }
 
@@ -292,12 +311,13 @@ function render(){
     <a class="call" href="tel:+57${cel}">📞 LLAMAR</a>
     <div class="res">
       <button class="r1" onclick="marcar('Interesado')">🔥 Interesado<small>$2.500</small></button>
-      <button class="r2" onclick="marcar('Competencia')">🏭 Competencia<small>$600</small></button>
       <button class="r3" onclick="marcar('No interesado')">❌ No interesado<small>$350</small></button>
-      <button class="r4" onclick="marcar('No contesta')">☎️ No contesta<small>$150</small></button>
       <button class="r5" onclick="marcar('Equivocado')">⛔ Equivocado<small>$150</small></button>
+      <button class="r4" onclick="marcar('No contesta')">☎️ No contesta<small>$150</small></button>
+      <button class="r2" onclick="marcar('Competencia')">🏭 Competencia<small>$600</small></button>
       <button class="r6" onclick="marcar('No contactar')">🚫 No contactar<small>$250</small></button>
     </div>
+    <div id="panel"></div>
     <div class="nav"><button onclick="mover(-1)">⏮ Anterior</button><button onclick="mover(1)">Siguiente ⏭</button></div>
     <div class="prog">${idx+1} de ${lista.length.toLocaleString('es-CO')} · marca un resultado y pasa solo</div>
   </div>`;
@@ -310,11 +330,45 @@ function marcar(resultado){
   const valor=PAGO[resultado]||0;
   marcados[l.fila]=resultado;
   miPlata+=valor; pintarPlata(true);
-  fetch(SB+'/rest/v1/mkr_llamadas',{method:'POST',
-    headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
+  const p=fetch(SB+'/rest/v1/mkr_llamadas',{method:'POST',
+    headers:{...H,'Content-Type':'application/json','Prefer':'return=representation'},
     body:JSON.stringify({sala:SALA,agente:AGENTE,lead_fila:String(l.fila),lead_nombre:l.nombre||null,
-      lead_ciudad:l.ciudad||null,resultado,valor})}).catch(()=>{});
+      lead_ciudad:l.ciudad||null,resultado,valor,datos:false})})
+    .then(r=>r.json()).then(a=>Array.isArray(a)&&a[0]?a[0].id:null).catch(()=>null);
+
+  // Interesado sin datos no vale: se abre el panel para capturar el contacto
+  if(resultado==='Interesado'){ p.then(id=>abrirPanel(id,l)); return; }
   if($('fSeg').value==='pend'){ lista.splice(idx,1); render(); } else mover(1);
+}
+
+/* ---------- panel de información (solo Interesado) ---------- */
+function abrirPanel(id,l){
+  const c=$('panel'); if(!c) return;
+  c.innerHTML=`<div class="pan">
+    <h5>📋 Datos del interesado</h5>
+    <div class="ps">Un "Interesado" sin contacto no se puede trabajar. Captura los datos ahora.</div>
+    <input id="pC" placeholder="Nombre de quien contestó" value="${(l.contacto||'').replace(/"/g,'')}">
+    <input id="pW" inputmode="tel" placeholder="WhatsApp de compras">
+    <input id="pM" inputmode="email" placeholder="Correo">
+    <div class="pb">
+      <button class="g" onclick="guardarPanel('${id||''}')">Guardar datos</button>
+      <button class="s" onclick="cerrarPanel()">Ahora no</button>
+    </div></div>`;
+  setTimeout(()=>{ const w=$('pW'); if(w) w.focus(); },60);
+}
+function cerrarPanel(){
+  const c=$('panel'); if(c) c.innerHTML='';
+  if($('fSeg').value==='pend'){ const l=lista[idx]; if(l&&marcados[l.fila]){ lista.splice(idx,1); render(); return; } }
+  mover(1);
+}
+function guardarPanel(id){
+  const w=($('pW')||{}).value||'', m=($('pM')||{}).value||'', c=($('pC')||{}).value||'';
+  if(!w.trim() && !m.trim()){ avisar('Falta el WhatsApp o el correo'); return; }
+  if(id) fetch(SB+'/rest/v1/mkr_llamadas?id=eq.'+id,{method:'PATCH',
+    headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify({datos:true})}).catch(()=>{});
+  avisar('✅ Datos guardados · '+(c||'contacto')+' queda listo para ventas');
+  cerrarPanel();
 }
 
 function pintarPlata(bump){
@@ -349,7 +403,7 @@ async function sincronizar(){
   let filas=[];
   try{
     const r=await fetch(SB+'/rest/v1/mkr_llamadas?sala=eq.'+SALA+'&select=id,agente,resultado,valor,lead_nombre,creado_en'+
-      '&order=creado_en.desc&limit=400',{headers:H});
+      '&order=creado_en.desc&limit=3000',{headers:H});
     filas=await r.json();
     if(!Array.isArray(filas)) filas=[];
     $('live').classList.remove('off'); $('liveTx').textContent='en vivo';

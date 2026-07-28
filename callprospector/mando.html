@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1B3A6B">
+<title>Centro de Mando · CallProspector</title>
+<style>
+:root{
+  --azul:#1B3A6B; --azul2:#142C52;
+  --naranja:#E8621A; --naranja2:#FF7A33;
+  --bg:#0B1830; --card:#14294A; --card2:#1B3559; --line:#2A4676;
+  --tx:#EAF1FB; --dim:#93AAC9; --faint:#6A83A6;
+  --ok:#25C08A; --warn:#F0A73C; --bad:#F0604D;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);
+  max-width:560px;margin:0 auto;min-height:100vh;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+header{background:linear-gradient(160deg,var(--azul),var(--azul2));padding:12px 15px 15px;
+  position:sticky;top:0;z-index:20;border-bottom:2px solid var(--naranja);
+  padding-top:calc(12px + env(safe-area-inset-top))}
+.hrow{display:flex;align-items:center;gap:10px}
+.back{background:rgba(255,255,255,.12);color:#fff;text-decoration:none;font-size:12.5px;font-weight:700;
+  padding:6px 12px;border-radius:20px;white-space:nowrap}
+.tit{font-size:15.5px;font-weight:800;letter-spacing:-.02em}
+.tit small{display:block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 1.7s infinite}
+.live.off i{background:var(--bad);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.28}}
+@media(prefers-reduced-motion:reduce){.live i{animation:none}}
+
+.res3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:13px}
+.res3 div{background:rgba(0,0,0,.24);border-radius:11px;padding:9px 7px;text-align:center}
+.res3 b{display:block;font-size:19px;font-weight:800;letter-spacing:-.03em;line-height:1.15}
+.res3 span{font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.res3 .v b{color:var(--ok)} .res3 .d b{color:var(--bad)}
+
+section{padding:16px 15px 0}
+h2{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:9px}
+
+/* notificaciones */
+.nf{background:var(--card);border:1px solid var(--line);border-left-width:4px;border-radius:14px;
+  padding:14px 15px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start}
+.nf.rojo{border-left-color:var(--bad)} .nf.ambar{border-left-color:var(--warn)} .nf.speedy{border-left-color:var(--naranja)}
+.nf .ico{font-size:25px;line-height:1.1;flex:none}
+.nf h3{font-size:14px;font-weight:800;margin-bottom:4px;letter-spacing:-.01em}
+.nf.rojo h3{color:#FF9A8B} .nf.ambar h3{color:#FFD08A} .nf.speedy h3{color:var(--naranja2)}
+.nf p{font-size:12.5px;color:var(--dim);line-height:1.5}
+.nf p b{color:var(--tx);font-weight:700}
+.nf .quien{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px}
+.nf .quien span{font-size:11px;background:var(--card2);border:1px solid var(--line);color:var(--tx);
+  padding:3px 9px;border-radius:20px;font-weight:600}
+.nf.limpio{border-left-color:var(--ok)} .nf.limpio h3{color:#7FE3BE}
+
+/* agentes */
+.ag{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px 15px;margin-bottom:10px}
+.agh{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.agh .n{font-size:15px;font-weight:800;letter-spacing:-.01em}
+.agh .est{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:4px 10px;border-radius:20px;white-space:nowrap}
+.est.ok{background:rgba(37,192,138,.18);color:#7FE3BE;border:1px solid rgba(37,192,138,.45)}
+.est.rev{background:rgba(240,167,60,.16);color:#FFD08A;border:1px solid rgba(240,167,60,.42)}
+.est.no{background:rgba(240,96,77,.16);color:#FF9A8B;border:1px solid rgba(240,96,77,.42)}
+.plt{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
+.plt .val{font-size:27px;font-weight:800;letter-spacing:-.035em;color:var(--ok)}
+.plt .val.cero{color:var(--faint)}
+.plt .tach{font-size:13.5px;color:var(--faint);text-decoration:line-through}
+.plt .lbl{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-left:auto;text-align:right;line-height:1.4}
+.mets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mets div{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center}
+.mets b{display:block;font-size:15px;font-weight:800;letter-spacing:-.02em}
+.mets span{font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.mets .mal b{color:var(--bad)} .mets .bien b{color:var(--ok)} .mets .med b{color:var(--warn)}
+.flags{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.flags i{font-style:normal;font-size:11.5px;color:var(--dim);line-height:1.45;display:flex;gap:6px}
+.flags i b{color:#FF9A8B;font-weight:700}
+
+.vacio{text-align:center;color:var(--faint);font-size:13.5px;padding:44px 20px;line-height:1.6}
+footer{padding:20px 15px calc(24px + env(safe-area-inset-bottom));text-align:center;font-size:11px;
+  color:var(--faint);line-height:1.65}
+footer b{color:var(--dim)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <a class="back" href="index.html">‹ Volver</a>
+    <div class="tit">Centro de Mando<small>Control de calidad</small></div>
+    <div class="live" id="live"><i></i><span id="liveTx">en vivo</span></div>
+  </div>
+  <div class="res3">
+    <div><b id="tLl" class="mono">0</b><span>Llamadas</span></div>
+    <div class="v"><b id="tVal" class="mono">$0</b><span>Validado</span></div>
+    <div class="d"><b id="tDud" class="mono">$0</b><span>En duda</span></div>
+  </div>
+</header>
+
+<section>
+  <h2>Notificaciones</h2>
+  <div id="notis"></div>
+</section>
+
+<section>
+  <h2>Rendimiento por persona</h2>
+  <div id="agentes"><div class="vacio">Cargando…</div></div>
+</section>
+
+<footer>
+  <b>Regla:</b> una llamada de prospección real no baja de <b>25 segundos</b> (marcar, timbrar, hablar, colgar).<br>
+  Un <b>Interesado</b> sin WhatsApp ni correo no se puede trabajar → no se paga.<br>
+  Meta mínima de conversión: <b>8% de interesados</b>.<br><br>
+  CallProspector · Negocios Cuánticos
+</footer>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co';
+const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K};
+const SALA='demo';
+
+const MIN_SEG=25;      // menos de esto: no alcanzó a hacer la llamada
+const META_INT=8;      // % mínimo de interesados que le sirve a Speedy
+const PAGO_INT=2500;
+
+const $=s=>document.getElementById(s);
+const cop=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
+
+async function cargar(){
+  let filas=[];
+  try{
+    const r=await fetch(SB+'/rest/v1/mkr_llamadas?sala=eq.'+SALA+
+      '&select=id,agente,resultado,valor,datos,creado_en&order=creado_en.asc&limit=3000',{headers:H});
+    filas=await r.json(); if(!Array.isArray(filas)) filas=[];
+    $('live').classList.remove('off'); $('liveTx').textContent='en vivo';
+  }catch(e){ $('live').classList.add('off'); $('liveTx').textContent='sin señal'; return; }
+
+  if(!filas.length){
+    $('agentes').innerHTML='<div class="vacio">Todavía nadie ha marcado.<br>Abre CallProspector en los celulares y empieza.</div>';
+    $('notis').innerHTML=''; return;
+  }
+
+  /* ---- agrupar por persona ---- */
+  const por={};
+  filas.forEach(f=>{
+    const a=por[f.agente]=por[f.agente]||{n:f.agente,ll:[],};
+    a.ll.push({t:new Date(f.creado_en).getTime(),r:f.resultado,v:+f.valor||0,d:!!f.datos});
+  });
+
+  const ag=Object.values(por).map(a=>{
+    a.ll.sort((x,y)=>x.t-y.t);
+    let rapidas=0, gaps=[];
+    for(let i=1;i<a.ll.length;i++){
+      const g=(a.ll[i].t-a.ll[i-1].t)/1000;
+      if(g<600) gaps.push(g);            // pausas largas = descanso, no cuentan al ritmo
+      if(g<MIN_SEG) rapidas++;
+    }
+    const total=a.ll.length;
+    const ritmo=gaps.length?Math.round(gaps.reduce((s,g)=>s+g,0)/gaps.length):null;
+    const ints=a.ll.filter(x=>x.r==='Interesado');
+    const sinDatos=ints.filter(x=>!x.d).length;
+    const pctInt=total?+(ints.length/total*100).toFixed(1):0;
+    const cruda=a.ll.reduce((s,x)=>s+x.v,0);
+    // validado: se cae lo marcado demasiado rápido y el interesado sin datos
+    let validado=0;
+    for(let i=0;i<a.ll.length;i++){
+      const x=a.ll[i];
+      const g=i?(x.t-a.ll[i-1].t)/1000:9999;
+      if(g<MIN_SEG) continue;
+      if(x.r==='Interesado' && !x.d) continue;
+      validado+=x.v;
+    }
+    const pctRap=total>1?Math.round(rapidas/(total-1)*100):0;
+    let est='ok';
+    if(pctRap>=50 || (ints.length && sinDatos===ints.length)) est='no';
+    else if(pctRap>=15 || sinDatos>0 || pctInt<META_INT) est='rev';
+    return {...a,total,rapidas,pctRap,ritmo,ints:ints.length,sinDatos,pctInt,cruda,validado,est};
+  }).sort((x,y)=>y.validado-x.validado || y.total-x.total);
+
+  /* ---- totales ---- */
+  const tLl=ag.reduce((s,a)=>s+a.total,0);
+  const tVal=ag.reduce((s,a)=>s+a.validado,0);
+  const tCru=ag.reduce((s,a)=>s+a.cruda,0);
+  $('tLl').textContent=tLl.toLocaleString('es-CO');
+  $('tVal').textContent=cop(tVal);
+  $('tDud').textContent=cop(tCru-tVal);
+
+  /* ---- notificación 1: velocidad imposible ---- */
+  const N=[];
+  const veloz=ag.filter(a=>a.rapidas>0).sort((x,y)=>y.rapidas-x.rapidas);
+  if(veloz.length){
+    const tot=veloz.reduce((s,a)=>s+a.rapidas,0);
+    N.push({c:'rojo',i:'⚡',h:'Velocidad imposible: no alcanzó a llamar',
+      p:`<b>${tot}</b> marcaciones se registraron a menos de <b>${MIN_SEG} segundos</b> una de otra. `+
+        `Una llamada de prospección no cabe en ese tiempo: es poco probable que la llamada se haya hecho.`,
+      q:veloz.map(a=>`${a.n} · ${a.rapidas}${a.ritmo!==null?' · '+a.ritmo+'s prom.':''}`)});
+  }
+
+  /* ---- notificación 2: interesado sin panel de información ---- */
+  const sd=ag.filter(a=>a.sinDatos>0).sort((x,y)=>y.sinDatos-x.sinDatos);
+  if(sd.length){
+    const tot=sd.reduce((s,a)=>s+a.sinDatos,0);
+    N.push({c:'ambar',i:'📋',h:'"Interesado" sin panel de información',
+      p:`<b>${tot} interesados</b> quedaron sin WhatsApp ni correo. Si de verdad hubo una conversación, `+
+        `los datos se piden ahí mismo. Sin contacto no hay a quién venderle → <b>${cop(tot*PAGO_INT)}</b> no se pagan.`,
+      q:sd.map(a=>`${a.n} · ${a.sinDatos} de ${a.ints}`)});
+  }
+
+  /* ---- notificación 3: a Speedy no le sirven estos resultados ---- */
+  const flojos=ag.filter(a=>a.total>=5 && a.pctInt<META_INT).sort((x,y)=>x.pctInt-y.pctInt);
+  if(flojos.length){
+    N.push({c:'speedy',i:'🐭',h:'A Speedy no le sirven estos resultados 💨',
+      p:`La meta es <b>${META_INT}% de interesados</b>. Estas personas están por debajo: mucho botón, poca venta. `+
+        `Speedy corre rápido, pero corre hacia el negocio — volumen sin conversión no le sirve a nadie.`,
+      q:flojos.map(a=>`${a.n} · ${a.pctInt}%`)});
+  }
+
+  if(!N.length) N.push({c:'limpio',i:'✅',h:'Sin alertas',
+    p:'Los tiempos entre llamadas son realistas, los interesados traen contacto y la conversión va sobre la meta. Trabajo limpio.',q:[]});
+
+  $('notis').innerHTML=N.map(n=>`<div class="nf ${n.c}">
+    <div class="ico">${n.i}</div>
+    <div style="flex:1;min-width:0"><h3>${n.h}</h3><p>${n.p}</p>
+    ${n.q.length?`<div class="quien">${n.q.map(x=>`<span>${x}</span>`).join('')}</div>`:''}</div></div>`).join('');
+
+  /* ---- tarjetas por persona ---- */
+  const ESTX={ok:'Confiable',rev:'Revisar',no:'No validado'};
+  $('agentes').innerHTML=ag.map(a=>{
+    const fl=[];
+    if(a.rapidas) fl.push(`<b>${a.rapidas}</b> marcaciones bajo ${MIN_SEG}s — llamada poco probable`);
+    if(a.sinDatos) fl.push(`<b>${a.sinDatos}</b> interesados sin panel de información`);
+    if(a.total>=5 && a.pctInt<META_INT) fl.push(`conversión <b>${a.pctInt}%</b> · por debajo de la meta de ${META_INT}%`);
+    const cInt=a.pctInt>=META_INT?'bien':(a.pctInt>0?'med':'mal');
+    const cRit=a.ritmo===null?'':(a.ritmo>=MIN_SEG?'bien':'mal');
+    const cRap=a.pctRap===0?'bien':(a.pctRap<15?'med':'mal');
+    return `<div class="ag">
+      <div class="agh"><div class="n">${a.n}</div><div class="est ${a.est}">${ESTX[a.est]}</div></div>
+      <div class="plt">
+        <div class="val mono ${a.validado?'':'cero'}">${cop(a.validado)}</div>
+        ${a.cruda!==a.validado?`<div class="tach mono">${cop(a.cruda)}</div>`:''}
+        <div class="lbl">Plata<br>validada</div>
+      </div>
+      <div class="mets">
+        <div><b class="mono">${a.total}</b><span>Llamadas</span></div>
+        <div class="${cRit}"><b class="mono">${a.ritmo===null?'—':a.ritmo+'s'}</b><span>Ritmo</span></div>
+        <div class="${cInt}"><b class="mono">${a.pctInt}%</b><span>Interesado</span></div>
+        <div class="${cRap}"><b class="mono">${a.pctRap}%</b><span>Dudosas</span></div>
+      </div>
+      ${fl.length?`<div class="flags">${fl.map(f=>`<i>⚠️ <span>${f}</span></i>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+cargar(); setInterval(cargar,3000);
+</script>
+</body>
+</html>
