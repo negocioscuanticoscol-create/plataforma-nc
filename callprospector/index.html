@@ -22,6 +22,12 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 /* ---------- ENTRADA ---------- */
 #gate{position:fixed;inset:0;background:linear-gradient(165deg,#0E1F3C,#1B3A6B 60%,#14294A);
   z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;gap:6px}
+#gate .masco{width:198px;height:135px;margin-bottom:2px;overflow:visible}
+#gate .masco .cuerpo{animation:correr 1.15s ease-in-out infinite}
+#gate .masco .lineas{animation:zumbar .55s linear infinite}
+@keyframes correr{0%,100%{transform:translate(0,0)}50%{transform:translate(5px,-6px)}}
+@keyframes zumbar{0%{opacity:.2;transform:translateX(9px)}55%{opacity:.7}100%{opacity:.15;transform:translateX(-11px)}}
+@media(prefers-reduced-motion:reduce){#gate .masco .cuerpo,#gate .masco .lineas{animation:none}}
 #gate .logo{font-size:31px;font-weight:800;letter-spacing:-.03em}
 #gate .logo .c{color:#fff} #gate .logo .p{color:var(--naranja2)}
 #gate .tag{color:#9DB7DA;font-size:13.5px;letter-spacing:.02em;margin-bottom:26px}
@@ -136,6 +142,30 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
 <body>
 
 <div id="gate">
+  <svg class="masco" viewBox="0 0 220 150" aria-label="Mascota CallProspector">
+    <g class="lineas" stroke="#E8621A" stroke-width="6" stroke-linecap="round" opacity=".55">
+      <line x1="4"  y1="52" x2="46" y2="52"/>
+      <line x1="0"  y1="76" x2="34" y2="76"/>
+      <line x1="10" y1="100" x2="44" y2="100"/>
+    </g>
+    <g class="cuerpo">
+      <path d="M58 108 Q42 100 46 84 Q50 70 68 68 L120 62 Q142 60 152 74 Q160 86 150 98 Q138 112 112 114 L74 116 Q62 116 58 108 Z" fill="#C9D9EE"/>
+      <path d="M60 112 q-4 12 4 18 q8 5 12-4 l3-9 Z" fill="#B0C6E4"/>
+      <path d="M104 110 q-5 13 3 19 q9 5 13-4 l3-10 Z" fill="#B0C6E4"/>
+      <path d="M50 92 Q26 96 20 78 Q16 64 30 60" fill="none" stroke="#C9D9EE" stroke-width="7" stroke-linecap="round"/>
+      <circle cx="152" cy="70" r="30" fill="#D8E4F4"/>
+      <circle cx="140" cy="46" r="15" fill="#C9D9EE"/>
+      <circle cx="140" cy="46" r="8" fill="#E8621A" opacity=".45"/>
+      <path d="M178 66 l22 6 -22 8 Z" fill="#D8E4F4"/>
+      <circle cx="196" cy="72" r="3.5" fill="#1B3A6B"/>
+      <circle cx="168" cy="64" r="4.5" fill="#1B3A6B"/>
+      <circle cx="169.5" cy="62.5" r="1.6" fill="#fff"/>
+      <path d="M128 44 Q152 26 176 48" fill="none" stroke="#E8621A" stroke-width="7" stroke-linecap="round"/>
+      <ellipse cx="174" cy="56" rx="9" ry="12" fill="#E8621A"/>
+      <path d="M170 66 Q166 82 180 84" fill="none" stroke="#E8621A" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="182" cy="85" r="5" fill="#E8621A"/>
+    </g>
+  </svg>
   <div class="logo"><span class="c">Call</span><span class="p">Prospector</span></div>
   <div class="tag">Llamadas rápidas y efectivas</div>
   <label for="nom">¿Quién está marcando?</label>
