@@ -1103,7 +1103,7 @@ const App = {
         const exceso=Math.max(0, (_cons||0) - (+(c.total||0)));   // lo que consignó de más → a comisión
         const cb=(+(d.comision||0))+exceso;
         await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},
-          body:JSON.stringify({empresa:'smart',mes,cliente:c.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:(d.kit_muestras==='SI'),folio:folio,notas:(exceso>0?('Consignó $'+(_cons).toLocaleString('es-CO')+' · excedente $'+exceso.toLocaleString('es-CO')+' a comisión'):'Generado en plataforma')})});
+          body:JSON.stringify({empresa:'smart',mes,cliente:c.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:Math.max(0,Math.round(tv-cb)),comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:(d.kit_muestras==='SI'),folio:folio,notas:(exceso>0?('Consignó $'+(_cons).toLocaleString('es-CO')+' · excedente $'+exceso.toLocaleString('es-CO')+' a comisión'):'Generado en plataforma')})});
       }
     }catch(e){ console.log('nc_ventas insert',e); }
     // 🔒 VERIFICACIÓN: confirmar que la venta SÍ quedó (si no, avisar — nunca perder comisión en silencio)
@@ -1189,7 +1189,7 @@ const App = {
       const esKit=this._esKitCot(d);
       const tv=esKit?+(p.total||d.total||0):+(d.subtotal_sin_iva||d.total||p.total||0);
       const cb=+(d.comision||0);
-      try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({empresa:'smart',mes,cliente:p.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:folio,notas:'Reparada por candado (pedido sin venta)'})}); if(r.ok) ok++; }catch(e){}
+      try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({empresa:'smart',mes,cliente:p.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:Math.max(0,Math.round(tv-cb)),comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:folio,notas:'Reparada por candado (pedido sin venta)'})}); if(r.ok) ok++; }catch(e){}
     }
     this._toast('✅ '+ok+' venta(s) reparada(s) y sumada(s) a comisión');
     this.vVentasSmart();
@@ -1503,7 +1503,7 @@ const App = {
       const esKit=this._esKitCot(d);
       const tv=esKit?+(cot.total||d.total||0):+(d.subtotal_sin_iva||d.total||cot.total||0); const cb=+(d.comision||0);
       await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({empresa:'smart',mes,cliente:cot.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:0,comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:cot.folio,notas:'Registrado al despachar'})});
+        body:JSON.stringify({empresa:'smart',mes,cliente:cot.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:Math.max(0,Math.round(tv-cb)),comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:cot.folio,notas:'Registrado al despachar'})});
     }catch(e){ console.log('_regVentaSiFalta',e); }
   },
   addGuia(id){ const box=document.getElementById('guias-'+id); if(!box) return; const i=document.createElement('input'); i.className='gguia field'; i.placeholder='N° de guía'; i.style.cssText='padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:4px'; box.appendChild(i); i.focus(); },
