@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1B3A6B">
+<title>CallProspector</title>
+<style>
+:root{
+  --azul:#1B3A6B; --azul2:#142C52; --azul3:#0E1F3C;
+  --naranja:#E8621A; --naranja2:#FF7A33;
+  --bg:#0B1830; --card:#14294A; --card2:#1B3559; --line:#2A4676;
+  --tx:#EAF1FB; --dim:#93AAC9; --faint:#6A83A6;
+  --ok:#25C08A; --warn:#F0A73C; --bad:#F0604D; --azulc:#4A9BE8;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);
+  max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;
+  -webkit-font-smoothing:antialiased;overscroll-behavior:none}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+/* ---------- ENTRADA ---------- */
+#gate{position:fixed;inset:0;background:linear-gradient(165deg,#0E1F3C,#1B3A6B 60%,#14294A);
+  z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;gap:6px}
+#gate .logo{font-size:31px;font-weight:800;letter-spacing:-.03em}
+#gate .logo .c{color:#fff} #gate .logo .p{color:var(--naranja2)}
+#gate .tag{color:#9DB7DA;font-size:13.5px;letter-spacing:.02em;margin-bottom:26px}
+#gate label{align-self:flex-start;width:100%;max-width:330px;font-size:11.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:#9DB7DA;margin-bottom:7px;font-weight:600}
+#gate input{width:100%;max-width:330px;background:rgba(255,255,255,.09);border:1.5px solid rgba(255,255,255,.22);
+  color:#fff;border-radius:13px;padding:16px;font-size:17px;text-align:center;font-weight:600}
+#gate input::placeholder{color:#7E9AC0;font-weight:400}
+#gate input:focus{outline:none;border-color:var(--naranja2);background:rgba(255,255,255,.14)}
+#gate button{width:100%;max-width:330px;background:var(--naranja);color:#fff;border:none;border-radius:13px;
+  padding:17px;font-size:17px;font-weight:800;margin-top:14px;cursor:pointer;letter-spacing:.01em}
+#gate button:active{background:#D0551429}
+#gate .hint{color:#7E9AC0;font-size:12px;margin-top:20px;text-align:center;line-height:1.55;max-width:330px}
+
+/* ---------- CABECERA ---------- */
+header{background:linear-gradient(160deg,var(--azul),var(--azul2));padding:12px 15px 14px;
+  position:sticky;top:0;z-index:20;border-bottom:2px solid var(--naranja);
+  padding-top:calc(12px + env(safe-area-inset-top))}
+.hrow{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.brand{font-size:15.5px;font-weight:800;letter-spacing:-.02em}
+.brand .p{color:var(--naranja2)}
+.live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 1.7s infinite}
+.live.off i{background:var(--bad);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.28}}
+@media(prefers-reduced-motion:reduce){.live i{animation:none}}
+.yo{font-size:11.5px;color:#9DB7DA;background:rgba(255,255,255,.1);padding:3px 9px;border-radius:20px}
+
+/* contador de plata */
+.plata{text-align:center}
+.plata .lbl{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.plata .val{font-size:41px;font-weight:800;letter-spacing:-.035em;line-height:1.05;margin:2px 0 3px;
+  color:#fff;transition:transform .18s}
+.plata .val.bump{transform:scale(1.09)}
+@media(prefers-reduced-motion:reduce){.plata .val{transition:none}}
+.meta{margin-top:8px}
+.meta .bar{height:7px;background:rgba(0,0,0,.3);border-radius:4px;overflow:hidden}
+.meta .fill{height:100%;background:linear-gradient(90deg,var(--naranja),var(--naranja2));border-radius:4px;
+  transition:width .5s ease;width:0}
+.meta .txt{display:flex;justify-content:space-between;font-size:11px;color:#9DB7DA;margin-top:5px}
+.meta .txt b{color:var(--naranja2)}
+
+/* ---------- FILTROS ---------- */
+.filt{display:flex;gap:6px;padding:10px 15px 0;overflow-x:auto}
+.filt select{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:9px;
+  padding:8px 10px;font-size:12.5px;font-family:inherit;flex:none}
+
+/* ---------- TARJETA ---------- */
+main{flex:1;padding:13px 15px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:19px;padding:19px 17px;text-align:center}
+.tags{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:11px}
+.tg{font-size:10.5px;padding:3px 10px;border-radius:12px;background:var(--card2);color:var(--dim);border:1px solid var(--line)}
+.tg.pri{background:rgba(240,96,77,.17);color:#FF9A8B;border-color:rgba(240,96,77,.45)}
+.tg.ciu{background:rgba(74,155,232,.15);color:#8FC4F5;border-color:rgba(74,155,232,.4)}
+.emp{font-size:22px;font-weight:800;line-height:1.2;margin-bottom:5px;letter-spacing:-.02em}
+.sub{color:var(--dim);font-size:13.5px;margin-bottom:2px}
+.cont{color:var(--naranja2);font-size:13.5px;font-weight:600}
+.num{font-size:29px;font-weight:800;letter-spacing:.5px;margin:13px 0 3px}
+.call{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--ok);color:#03291D;
+  text-decoration:none;font-size:20px;font-weight:800;padding:17px;border-radius:14px;margin:15px 0 4px}
+.call:active{filter:brightness(.9)}
+.res{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:13px}
+.res button{border:none;border-radius:11px;padding:14px 6px;font-size:13px;font-weight:700;cursor:pointer;
+  color:#fff;font-family:inherit;line-height:1.25;display:flex;flex-direction:column;gap:3px;align-items:center}
+.res button:active{filter:brightness(.88)}
+.res button small{font-size:10.5px;opacity:.82;font-weight:600}
+.r1{background:var(--ok);color:#03291D} .r2{background:#8B5CF6} .r3{background:#475C7A}
+.r4{background:#5A6E8C} .r5{background:#6B7A94} .r6{background:#3D4E68}
+.nav{display:flex;justify-content:space-between;gap:8px;margin-top:11px}
+.nav button{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--dim);border-radius:10px;
+  padding:11px;font-size:13px;cursor:pointer;font-family:inherit}
+.prog{text-align:center;font-size:11.5px;color:var(--faint);margin-top:10px}
+
+/* ---------- RANKING ---------- */
+.rank{margin:18px 15px 0;background:var(--card);border:1px solid var(--line);border-radius:17px;overflow:hidden}
+.rank h3{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--naranja2);
+  padding:14px 16px 10px;font-weight:700;display:flex;align-items:center;gap:8px}
+.rank h3 span{margin-left:auto;color:var(--faint);letter-spacing:0;text-transform:none;font-size:11px;font-weight:500}
+.rw{display:grid;grid-template-columns:30px 1fr auto auto;gap:10px;align-items:center;
+  padding:11px 16px;border-top:1px solid var(--line)}
+.rw .pos{font-size:14px;font-weight:800;color:var(--faint);text-align:center}
+.rw.p1 .pos{color:#F5C542} .rw.p2 .pos{color:#C9D4E0} .rw.p3 .pos{color:#D08B4F}
+.rw .nm{font-size:13.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rw .nm small{display:block;font-size:10.5px;color:var(--faint);font-weight:400}
+.rw .ll{font-size:11.5px;color:var(--dim);text-align:right}
+.rw .pl{font-size:14.5px;font-weight:800;text-align:right;color:var(--ok);min-width:74px}
+.rw.yo{background:linear-gradient(90deg,rgba(232,98,26,.16),transparent)}
+.rw.yo .nm{color:var(--naranja2)}
+.rw.yo::after{content:'TÚ';font-size:9px;font-weight:800;background:var(--naranja);color:#fff;
+  padding:2px 6px;border-radius:4px;position:absolute;margin-left:-30px}
+.rank .foot{padding:11px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint);
+  display:flex;justify-content:space-between;gap:10px}
+.rank .foot b{color:var(--dim)}
+
+/* ---------- AVISO EN VIVO ---------- */
+#toast{position:fixed;left:50%;transform:translateX(-50%) translateY(-120%);top:calc(12px + env(safe-area-inset-top));
+  background:var(--card2);border:1px solid var(--naranja);color:var(--tx);padding:11px 17px;border-radius:12px;
+  font-size:13px;z-index:60;box-shadow:0 8px 30px rgba(0,0,0,.5);transition:transform .3s ease;
+  max-width:88vw;text-align:center}
+#toast.on{transform:translateX(-50%) translateY(0)}
+#toast b{color:var(--naranja2)}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+
+footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:center;font-size:11px;color:var(--faint);line-height:1.6}
+.tarifas{margin:15px 15px 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 16px}
+.tarifas h4{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:9px;font-weight:700}
+.tarifas .t{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:var(--dim)}
+.tarifas .t b{color:var(--tx);font-weight:600}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="logo"><span class="c">Call</span><span class="p">Prospector</span></div>
+  <div class="tag">Llamadas rápidas y efectivas</div>
+  <label for="nom">¿Quién está marcando?</label>
+  <input id="nom" placeholder="Tu nombre" autocomplete="off" autocapitalize="words">
+  <button onclick="entrar()">Entrar a marcar</button>
+  <div class="hint">Cada resultado que registres suma a tu contador y te mueve en el tablero. Todos los que estén marcando ahora se ven en vivo.</div>
+</div>
+
+<header>
+  <div class="hrow">
+    <div class="brand"><span>Call</span><span class="p">Prospector</span></div>
+    <span class="yo" id="yo">—</span>
+    <div class="live" id="live"><i></i><span id="liveTx">en vivo</span></div>
+  </div>
+  <div class="plata">
+    <div class="lbl">Ganado hoy</div>
+    <div class="val mono" id="plata">$0</div>
+    <div class="meta">
+      <div class="bar"><div class="fill" id="metaFill"></div></div>
+      <div class="txt"><span id="metaTx">Meta del día $36.700</span><span id="metaFalta"></span></div>
+    </div>
+  </div>
+</header>
+
+<div class="filt">
+  <select id="fSeg" onchange="rebuild()">
+    <option value="pend" selected>🆕 Sin trabajar</option>
+    <option value="todos">Todos</option>
+    <option value="alta">Prioridad alta</option>
+  </select>
+  <select id="fCiudad" onchange="rebuild()"><option value="">Toda ciudad</option></select>
+</div>
+
+<main id="main"><div class="card"><div class="emp">Cargando distribuidores…</div></div></main>
+
+<div class="rank">
+  <h3>🏆 Tablero en vivo <span id="rkInfo">—</span></h3>
+  <div id="rkBody"></div>
+  <div class="foot"><span>Sala <b>demo</b></span><span id="rkTot">—</span></div>
+</div>
+
+<div class="tarifas">
+  <h4>Lo que paga cada resultado</h4>
+  <div class="t"><span>🔥 Interesado — con datos completos</span><b>$2.500</b></div>
+  <div class="t"><span>🏭 Competencia identificada</span><b>$600</b></div>
+  <div class="t"><span>🚫 No contactar / depurar base</span><b>$250</b></div>
+  <div class="t"><span>❌ No interesado</span><b>$350</b></div>
+  <div class="t"><span>☎️ No contesta</span><b>$150</b></div>
+  <div class="t"><span>⛔ Equivocado</span><b>$150</b></div>
+</div>
+
+<footer>
+  CallProspector · Negocios Cuánticos · Bogotá<br>
+  3.638 distribuidores en base · demostración
+</footer>
+
+<div id="toast"></div>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co';
+const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K};
+const SALA='demo', META=36700;
+
+const PAGO={'Interesado':2500,'Competencia':600,'No contactar':250,'No interesado':350,'No contesta':150,'Equivocado':150};
+
+let AGENTE=localStorage.getItem('cp_agente')||'';
+let leads=[], lista=[], idx=0, marcados={}, miPlata=0, vistos=new Set(), primeraCarga=true;
+
+const $=s=>document.getElementById(s);
+const cop=n=>'$'+Math.round(n).toLocaleString('es-CO');
+
+/* ---------- entrada ---------- */
+if(AGENTE){ $('gate').style.display='none'; arrancar(); }
+$('nom').addEventListener('keydown',e=>{ if(e.key==='Enter') entrar(); });
+function entrar(){
+  const v=$('nom').value.trim();
+  if(v.length<2){ $('nom').focus(); return; }
+  AGENTE=v; localStorage.setItem('cp_agente',v);
+  $('gate').style.display='none'; arrancar();
+}
+
+/* ---------- datos ---------- */
+async function arrancar(){
+  $('yo').textContent=AGENTE;
+  try{
+    const r=await fetch(SB+'/rest/v1/feroz_marcador_leads?empresa=eq.feroz&mundo=eq.distribuidor'+
+      '&select=fila,nombre,ciudad,depto,contacto,cel,prioridad,nota&cel=not.is.null&limit=1000',{headers:H});
+    leads=await r.json();
+    if(!Array.isArray(leads)) leads=[];
+  }catch(e){ leads=[]; }
+  const ciu=[...new Set(leads.map(l=>l.ciudad).filter(Boolean))].sort();
+  $('fCiudad').insertAdjacentHTML('beforeend',ciu.map(c=>`<option value="${c}">${c}</option>`).join(''));
+  rebuild(); sincronizar(); setInterval(sincronizar,2500);
+}
+
+function rebuild(){
+  const seg=$('fSeg').value, ciu=$('fCiudad').value;
+  lista=leads.filter(l=>{
+    if(ciu && l.ciudad!==ciu) return false;
+    if(seg==='pend' && marcados[l.fila]) return false;
+    if(seg==='alta' && !/alta/i.test(l.prioridad||'')) return false;
+    return true;
+  });
+  idx=0; render();
+}
+
+function render(){
+  if(!lista.length){ $('main').innerHTML='<div class="card"><div class="emp">No quedan registros</div><div class="sub" style="margin-top:8px">Cambia el filtro de arriba para ver más.</div></div>'; return; }
+  if(idx>=lista.length) idx=0;
+  if(idx<0) idx=lista.length-1;
+  const l=lista[idx];
+  const cel=(l.cel||'').replace(/\D/g,'');
+  $('main').innerHTML=`<div class="card">
+    <div class="tags">
+      ${/alta/i.test(l.prioridad||'')?'<span class="tg pri">Prioridad alta</span>':''}
+      ${l.ciudad?`<span class="tg ciu">${l.ciudad}</span>`:''}
+      <span class="tg">Distribuidor</span>
+    </div>
+    <div class="emp">${l.nombre||'Sin nombre'}</div>
+    ${l.depto?`<div class="sub">${l.depto}</div>`:''}
+    ${l.contacto?`<div class="cont">${l.contacto}</div>`:''}
+    <div class="num mono">${cel.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3')}</div>
+    <a class="call" href="tel:+57${cel}">📞 LLAMAR</a>
+    <div class="res">
+      <button class="r1" onclick="marcar('Interesado')">🔥 Interesado<small>$2.500</small></button>
+      <button class="r2" onclick="marcar('Competencia')">🏭 Competencia<small>$600</small></button>
+      <button class="r3" onclick="marcar('No interesado')">❌ No interesado<small>$350</small></button>
+      <button class="r4" onclick="marcar('No contesta')">☎️ No contesta<small>$150</small></button>
+      <button class="r5" onclick="marcar('Equivocado')">⛔ Equivocado<small>$150</small></button>
+      <button class="r6" onclick="marcar('No contactar')">🚫 No contactar<small>$250</small></button>
+    </div>
+    <div class="nav"><button onclick="mover(-1)">⏮ Anterior</button><button onclick="mover(1)">Siguiente ⏭</button></div>
+    <div class="prog">${idx+1} de ${lista.length.toLocaleString('es-CO')} · marca un resultado y pasa solo</div>
+  </div>`;
+}
+function mover(d){ idx+=d; render(); }
+
+/* ---------- marcar ---------- */
+function marcar(resultado){
+  const l=lista[idx]; if(!l) return;
+  const valor=PAGO[resultado]||0;
+  marcados[l.fila]=resultado;
+  miPlata+=valor; pintarPlata(true);
+  fetch(SB+'/rest/v1/mkr_llamadas',{method:'POST',
+    headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify({sala:SALA,agente:AGENTE,lead_fila:String(l.fila),lead_nombre:l.nombre||null,
+      lead_ciudad:l.ciudad||null,resultado,valor})}).catch(()=>{});
+  if($('fSeg').value==='pend'){ lista.splice(idx,1); render(); } else mover(1);
+}
+
+function pintarPlata(bump){
+  const e=$('plata'); e.textContent=cop(miPlata);
+  if(bump){ e.classList.add('bump'); setTimeout(()=>e.classList.remove('bump'),190); }
+  const pct=Math.min(100,(miPlata/META)*100);
+  $('metaFill').style.width=pct+'%';
+  $('metaFalta').textContent = miPlata>=META ? '¡Meta cumplida! 🎉' : 'Faltan '+cop(META-miPlata);
+  $('metaTx').innerHTML = miPlata>=META ? 'Meta del día <b>$36.700</b>' : 'Meta del día $36.700 · <b>'+Math.round(pct)+'%</b>';
+}
+
+/* ---------- equipo simulado (idéntico en todos los celulares) ---------- */
+const EQUIPO=[
+  {n:'Leidy Ramírez',  c:'Bogotá',   s:11, b:2},
+  {n:'Andrés Mora',    c:'Medellín', s:7,  b:5},
+  {n:'Katherine Ruiz', c:'Bogotá',   s:9,  b:1},
+  {n:'Jhon Vargas',    c:'Cali',     s:5,  b:8},
+  {n:'Marcela Peña',   c:'Bogotá',   s:8,  b:3}
+];
+function simulado(){
+  const d=new Date(), min=d.getHours()*60+d.getMinutes();
+  const t=Math.max(0,min-7*60);           // desde las 7:00
+  return EQUIPO.map(a=>{
+    const ll=Math.floor(t*(a.s/60))+a.b;
+    const pl=Math.round(ll*(430+((a.s*37)%210)));
+    return {agente:a.n,ciudad:a.c,llamadas:ll,plata:pl,sim:true};
+  });
+}
+
+/* ---------- sincronizar ---------- */
+async function sincronizar(){
+  let filas=[];
+  try{
+    const r=await fetch(SB+'/rest/v1/mkr_llamadas?sala=eq.'+SALA+'&select=id,agente,resultado,valor,lead_nombre,creado_en'+
+      '&order=creado_en.desc&limit=400',{headers:H});
+    filas=await r.json();
+    if(!Array.isArray(filas)) filas=[];
+    $('live').classList.remove('off'); $('liveTx').textContent='en vivo';
+  }catch(e){
+    $('live').classList.add('off'); $('liveTx').textContent='sin señal'; return;
+  }
+
+  // aviso cuando OTRO agente marca
+  filas.forEach(f=>{
+    if(!vistos.has(f.id)){
+      vistos.add(f.id);
+      if(!primeraCarga && f.agente!==AGENTE){
+        avisar(`<b>${f.agente}</b> marcó ${f.resultado.toLowerCase()} · +${cop(f.valor)}`);
+      }
+    }
+  });
+  primeraCarga=false;
+
+  // agrupar reales
+  const real={};
+  filas.forEach(f=>{
+    const a=real[f.agente]=real[f.agente]||{agente:f.agente,llamadas:0,plata:0,ciudad:'en línea'};
+    a.llamadas++; a.plata+=(+f.valor||0);
+  });
+  if(real[AGENTE]) miPlata=real[AGENTE].plata;
+  pintarPlata(false);
+
+  const todos=[...Object.values(real),...simulado()].sort((a,b)=>b.plata-a.plata);
+  $('rkBody').innerHTML=todos.map((a,i)=>{
+    const yo=a.agente===AGENTE;
+    return `<div class="rw ${yo?'yo':''} p${i+1}" style="position:relative">
+      <div class="pos">${i+1}</div>
+      <div class="nm">${a.agente}<small>${a.sim?a.ciudad:'📞 en línea ahora'}</small></div>
+      <div class="ll">${a.llamadas} ll.</div>
+      <div class="pl mono">${cop(a.plata)}</div>
+    </div>`;
+  }).join('');
+  const enLinea=Object.keys(real).length;
+  $('rkInfo').textContent=enLinea+' en línea · '+todos.length+' agentes';
+  $('rkTot').innerHTML='Total equipo <b>'+cop(todos.reduce((s,a)=>s+a.plata,0))+'</b>';
+}
+
+let tt;
+function avisar(html){
+  const t=$('toast'); t.innerHTML=html; t.classList.add('on');
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),2600);
+}
+</script>
+</body>
+</html>
