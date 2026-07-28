@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#1B3A6B">
+<link rel="icon" href="raton-chico.png">
+<link rel="apple-touch-icon" href="raton-chico.png">
 <title>CallProspector</title>
 <style>
 :root{
@@ -20,27 +22,24 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
 
 /* ---------- ENTRADA ---------- */
-#gate{position:fixed;inset:0;background:linear-gradient(165deg,#0E1F3C,#1B3A6B 60%,#14294A);
-  z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px;gap:6px}
-#gate .masco{width:198px;height:135px;margin-bottom:2px;overflow:visible}
-#gate .masco .cuerpo{animation:correr 1.15s ease-in-out infinite}
-#gate .masco .lineas{animation:zumbar .55s linear infinite}
-@keyframes correr{0%,100%{transform:translate(0,0)}50%{transform:translate(5px,-6px)}}
-@keyframes zumbar{0%{opacity:.2;transform:translateX(9px)}55%{opacity:.7}100%{opacity:.15;transform:translateX(-11px)}}
-@media(prefers-reduced-motion:reduce){#gate .masco .cuerpo,#gate .masco .lineas{animation:none}}
-#gate .logo{font-size:31px;font-weight:800;letter-spacing:-.03em}
-#gate .logo .c{color:#fff} #gate .logo .p{color:var(--naranja2)}
-#gate .tag{color:#9DB7DA;font-size:13.5px;letter-spacing:.02em;margin-bottom:26px}
+/* fondo claro: es el mundo donde el logo fue diseñado (azul oscuro + rojo sobre blanco) */
+#gate{position:fixed;inset:0;background:radial-gradient(120% 85% at 50% 0%,#FFFFFF,#EDF2F9 62%,#DFE8F4);
+  z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px;gap:6px}
+#gate .logo{width:100%;max-width:352px;height:auto;margin-bottom:24px;
+  animation:entrar .55s cubic-bezier(.2,.75,.3,1) both}
+@keyframes entrar{from{opacity:0;transform:translateX(-26px) scale(.96)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){#gate .logo{animation:none}}
 #gate label{align-self:flex-start;width:100%;max-width:330px;font-size:11.5px;letter-spacing:.09em;
-  text-transform:uppercase;color:#9DB7DA;margin-bottom:7px;font-weight:600}
-#gate input{width:100%;max-width:330px;background:rgba(255,255,255,.09);border:1.5px solid rgba(255,255,255,.22);
-  color:#fff;border-radius:13px;padding:16px;font-size:17px;text-align:center;font-weight:600}
-#gate input::placeholder{color:#7E9AC0;font-weight:400}
-#gate input:focus{outline:none;border-color:var(--naranja2);background:rgba(255,255,255,.14)}
+  text-transform:uppercase;color:#5B7A9C;margin-bottom:7px;font-weight:700}
+#gate input{width:100%;max-width:330px;background:#fff;border:1.5px solid #C6D4E6;
+  color:var(--azul);border-radius:13px;padding:16px;font-size:17px;text-align:center;font-weight:700}
+#gate input::placeholder{color:#9FB2C9;font-weight:400}
+#gate input:focus{outline:none;border-color:var(--naranja);box-shadow:0 0 0 3px rgba(232,98,26,.16)}
 #gate button{width:100%;max-width:330px;background:var(--naranja);color:#fff;border:none;border-radius:13px;
-  padding:17px;font-size:17px;font-weight:800;margin-top:14px;cursor:pointer;letter-spacing:.01em}
-#gate button:active{background:#D0551429}
-#gate .hint{color:#7E9AC0;font-size:12px;margin-top:20px;text-align:center;line-height:1.55;max-width:330px}
+  padding:17px;font-size:17px;font-weight:800;margin-top:14px;cursor:pointer;letter-spacing:.01em;
+  box-shadow:0 6px 18px rgba(232,98,26,.3)}
+#gate button:active{background:#D05514;box-shadow:none}
+#gate .hint{color:#6F84A0;font-size:12px;margin-top:20px;text-align:center;line-height:1.55;max-width:330px}
 
 /* ---------- CABECERA ---------- */
 header{background:linear-gradient(160deg,var(--azul),var(--azul2));padding:12px 15px 14px;
@@ -97,7 +96,10 @@ main{flex:1;padding:13px 15px 0}
 .tg{font-size:10.5px;padding:3px 10px;border-radius:12px;background:var(--card2);color:var(--dim);border:1px solid var(--line)}
 .tg.pri{background:rgba(240,96,77,.17);color:#FF9A8B;border-color:rgba(240,96,77,.45)}
 .tg.ciu{background:rgba(74,155,232,.15);color:#8FC4F5;border-color:rgba(74,155,232,.4)}
-.emp{font-size:22px;font-weight:800;line-height:1.2;margin-bottom:5px;letter-spacing:-.02em}
+.empw{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:5px;text-align:left}
+.empw .rat{width:58px;height:auto;flex:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45))}
+.emp{font-size:22px;font-weight:800;line-height:1.2;letter-spacing:-.02em;min-width:0}
+@media(max-width:360px){.empw .rat{width:46px} .emp{font-size:19.5px}}
 .sub{color:var(--dim);font-size:13.5px;margin-bottom:2px}
 .cont{color:var(--naranja2);font-size:13.5px;font-weight:600}
 .num{font-size:29px;font-weight:800;letter-spacing:.5px;margin:13px 0 3px}
@@ -156,32 +158,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
 <body>
 
 <div id="gate">
-  <svg class="masco" viewBox="0 0 220 150" aria-label="Mascota CallProspector">
-    <g class="lineas" stroke="#E8621A" stroke-width="6" stroke-linecap="round" opacity=".55">
-      <line x1="4"  y1="52" x2="46" y2="52"/>
-      <line x1="0"  y1="76" x2="34" y2="76"/>
-      <line x1="10" y1="100" x2="44" y2="100"/>
-    </g>
-    <g class="cuerpo">
-      <path d="M58 108 Q42 100 46 84 Q50 70 68 68 L120 62 Q142 60 152 74 Q160 86 150 98 Q138 112 112 114 L74 116 Q62 116 58 108 Z" fill="#C9D9EE"/>
-      <path d="M60 112 q-4 12 4 18 q8 5 12-4 l3-9 Z" fill="#B0C6E4"/>
-      <path d="M104 110 q-5 13 3 19 q9 5 13-4 l3-10 Z" fill="#B0C6E4"/>
-      <path d="M50 92 Q26 96 20 78 Q16 64 30 60" fill="none" stroke="#C9D9EE" stroke-width="7" stroke-linecap="round"/>
-      <circle cx="152" cy="70" r="30" fill="#D8E4F4"/>
-      <circle cx="140" cy="46" r="15" fill="#C9D9EE"/>
-      <circle cx="140" cy="46" r="8" fill="#E8621A" opacity=".45"/>
-      <path d="M178 66 l22 6 -22 8 Z" fill="#D8E4F4"/>
-      <circle cx="196" cy="72" r="3.5" fill="#1B3A6B"/>
-      <circle cx="168" cy="64" r="4.5" fill="#1B3A6B"/>
-      <circle cx="169.5" cy="62.5" r="1.6" fill="#fff"/>
-      <path d="M128 44 Q152 26 176 48" fill="none" stroke="#E8621A" stroke-width="7" stroke-linecap="round"/>
-      <ellipse cx="174" cy="56" rx="9" ry="12" fill="#E8621A"/>
-      <path d="M170 66 Q166 82 180 84" fill="none" stroke="#E8621A" stroke-width="5" stroke-linecap="round"/>
-      <circle cx="182" cy="85" r="5" fill="#E8621A"/>
-    </g>
-  </svg>
-  <div class="logo"><span class="c">Call</span><span class="p">Prospector</span></div>
-  <div class="tag">Llamadas rápidas y efectivas</div>
+  <img class="logo" src="logo.png" alt="CallProspector — conexión rápida de clientes potenciales">
   <label for="nom">¿Quién está marcando?</label>
   <input id="nom" placeholder="Tu nombre" autocomplete="off" autocapitalize="words">
   <button onclick="entrar()">Entrar a marcar</button>
@@ -304,7 +281,7 @@ function render(){
       ${l.ciudad?`<span class="tg ciu">${l.ciudad}</span>`:''}
       <span class="tg">Distribuidor</span>
     </div>
-    <div class="emp">${l.nombre||'Sin nombre'}</div>
+    <div class="empw"><img class="rat" src="raton-chico.png" alt=""><div class="emp">${l.nombre||'Sin nombre'}</div></div>
     ${l.depto?`<div class="sub">${l.depto}</div>`:''}
     ${l.contacto?`<div class="cont">${l.contacto}</div>`:''}
     <div class="num mono">${cel.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3')}</div>
