@@ -964,6 +964,38 @@ const App = {
     if(typeof p==='string'){ try{ p=JSON.parse(p||'[]'); }catch(e){ p=[]; } }
     const prods=Array.isArray(p)?p.length:0;
     return uds<=0 && prods===0; },
+  /* 🚨 AVISO DE MARGEN — el convenio es el precio base; lo que se logra cobrar por encima
+     es la comisión. Si una venta queda por debajo del margen esperado, avisa AL MOMENTO
+     de registrarla, que es cuando todavía se puede corregir.
+     Excepción: PetMulti 1.000 ml va al 3,5% a propósito (baja rotación). */
+  _margenVenta(d, tv, cb){
+    d=d||{}; tv=+tv||0; cb=+cb||0;
+    const conv=Math.max(0, Math.round(tv-cb));
+    if(conv<=0) return null;                                  // sin base no hay margen que medir
+    const pct=+(cb/conv*100).toFixed(1);
+    let p=d.productos; if(typeof p==='string'){ try{ p=JSON.parse(p||'[]'); }catch(e){ p=[]; } }
+    const nom=x=>String((x&&(x.ref||x.nombre))||'');
+    const rota=Array.isArray(p)&&p.some(x=>/pet/i.test(nom(x))&&/1[.,]?000/.test(nom(x)));
+    const conv5=(+d.lista_idx===4)||/convenio/i.test(String(d.lista_nombre||''));
+    const umbral=(rota||conv5)?3.5:5;                         // PetMulti 1.000 ml y lista Convenio → 3,5%
+    if(pct>=umbral) return null;                              // todo bien, no molesta
+    const promo=String(d.promo_code||'').trim();
+    return { pct, umbral, conv, nivel:(pct<0?'rojo':'naranja'),
+      msg:(pct<0 ? 'NEGATIVO: se vendió por DEBAJO del precio convenio ('+pct+'%)'
+                 : 'Margen '+pct+'% — por debajo del '+umbral+'% esperado')
+          +(promo?' · descuento '+promo:'') }; },
+  /* Banner del aviso: NO se va solo. Esto es plata, tiene que verse. */
+  _avisar(a){
+    if(!a) return;
+    const c=(a.nivel==='rojo')?{bg:'#3a0c0c',fg:'#ffb4b4',bd:'#7a1f1f'}:{bg:'#3a2a0c',fg:'#ffdda1',bd:'#7a5a1f'};
+    const w=document.createElement('div');
+    w.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);background:'+c.bg+';color:'+c.fg+';border:1px solid '+c.bd+';padding:13px 16px;border-radius:12px;font-size:13.5px;z-index:99999;box-shadow:0 6px 26px rgba(0,0,0,.35);max-width:92%;display:flex;gap:12px;align-items:center';
+    const t=document.createElement('div');
+    t.innerHTML='<b>⚠️ Aviso de margen</b><br>'+a.msg+'<br><span style="opacity:.75">Precio convenio $'+a.conv.toLocaleString('es-CO')+'</span>';
+    const b=document.createElement('button'); b.textContent='Entendido';
+    b.style.cssText='background:transparent;border:1px solid '+c.bd+';color:'+c.fg+';padding:7px 11px;border-radius:8px;cursor:pointer;font-size:12.5px;white-space:nowrap';
+    b.onclick=()=>w.remove();
+    w.appendChild(t); w.appendChild(b); document.body.appendChild(w); },
   /* 🔁 GUÍA detectada → programa reenganche de RECOMPRA a los 15 días (lo envía la tarea diaria) */
   async _programarRecompra(empresa, telefono, nombre, ref, guia){
     try{
@@ -1104,6 +1136,7 @@ const App = {
         const cb=(+(d.comision||0))+exceso;
         await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},
           body:JSON.stringify({empresa:'smart',mes,cliente:c.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:Math.max(0,Math.round(tv-cb)),comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:(d.kit_muestras==='SI'),folio:folio,notas:(exceso>0?('Consignó $'+(_cons).toLocaleString('es-CO')+' · excedente $'+exceso.toLocaleString('es-CO')+' a comisión'):'Generado en plataforma')})});
+        this._avisar(this._margenVenta(d,tv,cb));   // 🚨 avisa si el margen quedó por debajo de lo esperado
       }
     }catch(e){ console.log('nc_ventas insert',e); }
     // 🔒 VERIFICACIÓN: confirmar que la venta SÍ quedó (si no, avisar — nunca perder comisión en silencio)
@@ -1504,6 +1537,7 @@ const App = {
       const tv=esKit?+(cot.total||d.total||0):+(d.subtotal_sin_iva||d.total||cot.total||0); const cb=+(d.comision||0);
       await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
         body:JSON.stringify({empresa:'smart',mes,cliente:cot.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:Math.max(0,Math.round(tv-cb)),comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:esKit,folio:cot.folio,notas:'Registrado al despachar'})});
+      this._avisar(this._margenVenta(d,tv,cb));   // 🚨 avisa si el margen quedó por debajo de lo esperado
     }catch(e){ console.log('_regVentaSiFalta',e); }
   },
   addGuia(id){ const box=document.getElementById('guias-'+id); if(!box) return; const i=document.createElement('input'); i.className='gguia field'; i.placeholder='N° de guía'; i.style.cssText='padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:4px'; box.appendChild(i); i.focus(); },
