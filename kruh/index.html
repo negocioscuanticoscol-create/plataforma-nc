@@ -1,4 +1,4 @@
-<meta charset="utf-8">
+﻿<meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Cache-Control" content="no-store">
 <title>kruh · club del pan</title>
@@ -356,6 +356,10 @@ const App={
     this._telMap={}; leads.forEach(l=>{ const t=this._telKey(l.telefono); if(t.length<7)return;
       if(this._telMap[t]) this._telMap[t]._dup=(this._telMap[t]._dup||1)+1;
       else this._telMap[t]={id:l.id,nombre:l.nombre||'',direccion:l.direccion||'',tipo:l.tipo||'comunidad',infopromos:!!l.infopromos}; });
+    // lista para buscar por NOMBRE: se guarda el nombre normalizado (sin tildes ni mayusculas)
+    this._nomList=leads.filter(l=>String(l.nombre||'').trim()).map(l=>({
+      nombre:l.nombre||'', telefono:l.telefono||'', direccion:l.direccion||'',
+      tipo:l.tipo||'comunidad', infopromos:!!l.infopromos, _k:this._nomKey(l.nombre)}));
     this._pedPaint();
   },
   _pedPaint(){
@@ -382,7 +386,7 @@ const App={
           <div style="font-family:Fraunces,serif;font-size:17px;margin-bottom:8px">La cuenta</div>
           <input id="pd_tel" placeholder="Teléfono — se busca solo" value="${esc(this._cartTel||'')}" oninput="App.pedTelLookup(this.value)">
           <div id="pd_found" style="font-size:11px;font-weight:700;margin:4px 0 2px;${this._cartHallado?'':'display:none'}">${this._cartHallado||''}</div>
-          <input id="pd_cli" placeholder="Cliente" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App._cartCli=this.value">
+          <input id="pd_cli" placeholder="Cliente — también se busca solo" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App.pedNomLookup(this.value)">
           <input id="pd_dir" placeholder="Dirección" style="margin-bottom:6px" value="${esc(this._cartDir||'')}" oninput="App._cartDir=this.value">
           <label class="row" style="gap:6px;align-items:center;font-size:12.5px;margin-bottom:6px;cursor:pointer">
             <input id="pd_promo" type="checkbox" style="width:auto;margin:0" ${this._cartPromo?'checked':''} onchange="App._cartPromo=this.checked"> Quiero promo
@@ -432,6 +436,32 @@ const App={
     if($('pd_tipo'))$('pd_tipo').value=this._cartTipo;
     this._cartHallado=(l._dup>1?'⚠️ '+l._dup+' contactos tienen este mismo teléfono · se cargó '+l.nombre
                               :'✓ '+l.nombre+' — ya está en el CRM');
+    this._pintaHallado(); },
+  /* normaliza un nombre: sin tildes, sin mayusculas, sin espacios de sobra */
+  _nomKey(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/\s+/g,' ').trim(); },
+  /* al escribir el NOMBRE se busca igual que con el telefono y se rellena lo que exista */
+  pedNomLookup(v){ this._cartCli=v;
+    const q=this._nomKey(v);
+    if(q.length<3){ this._cartHallado=''; this._pintaHallado(); return; }
+    const lista=this._nomList||[];
+    // primero los que empiezan por lo escrito; si no, los que lo contienen
+    let m=lista.filter(l=>l._k===q);
+    if(!m.length) m=lista.filter(l=>l._k.startsWith(q));
+    if(!m.length) m=lista.filter(l=>l._k.includes(q));
+    if(!m.length){ this._cartHallado='＋ No está en el CRM — se registra como cliente nuevo';
+      this._cartTipo='nuevo'; if($('pd_tipo'))$('pd_tipo').value='nuevo';
+      this._pintaHallado(); return; }
+    if(m.length>1){ this._cartHallado='⚠️ '+m.length+' clientes con ese nombre · escribe más o usa el teléfono';
+      this._pintaHallado(); return; }
+    const l=m[0];
+    this._cartTel=l.telefono||''; this._cartDir=l.direccion||'';
+    this._cartPromo=!!l.infopromos; this._cartTipo=l.tipo||'comunidad';
+    if($('pd_tel'))$('pd_tel').value=this._cartTel;
+    if($('pd_dir'))$('pd_dir').value=this._cartDir;
+    if($('pd_promo'))$('pd_promo').checked=this._cartPromo;
+    if($('pd_tipo'))$('pd_tipo').value=this._cartTipo;
+    this._cartHallado='✓ '+l.nombre+' — ya está en el CRM';
     this._pintaHallado(); },
   _pintaHallado(){ const e=$('pd_found'); if(!e)return;
     e.textContent=this._cartHallado||''; e.style.display=this._cartHallado?'block':'none';
@@ -1199,7 +1229,7 @@ const App={
   _grupoFP(fp){ const t=this._norm(fp||'');
     for(const [k,,re] of this.FPGRUPOS) if(re.test(t))return k;
     return 'otr'; },
-  _norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim(); },
+  _norm(s){ return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); },
   _formasPago(mesV,tarBase,tarIva){
     const t={}, n={}; let tot=0;
     (mesV||[]).forEach(v=>{ const k=this._grupoFP(v.forma_pago), m=+v.monto||0;
