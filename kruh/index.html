@@ -19,8 +19,11 @@
   .brand b{color:var(--acc2)}
   .brand small{display:block;font-family:'IBM Plex Sans';font-size:9.5px;letter-spacing:.32em;color:var(--gold);margin-top:3px;text-transform:uppercase}
   .quien{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#b6a894;text-align:right}
-  nav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;overflow-x:auto}
-  .nv{max-width:920px;margin:0 auto;display:flex;gap:1px;padding:0 8px}
+  nav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+  .nv{max-width:920px;margin:0 auto;display:flex;gap:1px;padding:0 8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .nv::-webkit-scrollbar{height:0}
+  .nv2{border-top:1px solid var(--line2)}
+  .nv2 button{padding:10px 12px;font-size:12px}
   nav button{flex:0 0 auto;background:none;border:none;padding:13px 12px;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap;font-family:inherit}
   nav button.on{color:var(--ink);border-bottom-color:var(--acc)}
   h1{font-family:Fraunces,serif;font-size:25px;font-weight:600;margin:20px 0 2px}
@@ -90,7 +93,7 @@
   <div class="brand">kruh<b>.</b><small>Club del Pan</small></div>
   <div class="quien">Gestión · por Negocios Cuánticos</div>
 </div></header>
-<nav><div class="nv" id="nav"></div></nav>
+<nav><div class="nv" id="nav"></div><div class="nv nv2" id="nav2"></div></nav>
 <div class="wrap"><div id="main" class="spin" style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div></div>
 <div id="modal-host"></div>
 
@@ -111,7 +114,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['marcador','📞 Marcador'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
   view:'dashboard',
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
@@ -122,10 +125,11 @@ const App={
     if(this.rol==='gerencia') return this.TABS.map(t=>t[0]).filter(v=>v!=='usuarios');   // gerencia ve todo menos Usuarios
     return ((this._permisos||{})[this.rol]||['recetas']).filter(v=>v!=='usuarios'&&v!=='dashboard'); },
   _primeraTab(){ const t=this._tabsRol(); return t.includes('dashboard')?'dashboard':(t[0]||'recetas'); },
-  async init(){ this.rol=sessionStorage.getItem('kruh_rol')||'';
+  async init(){ /* localStorage y no sessionStorage: así no vuelve a pedir la clave en cada pestaña nueva */
+    this.rol=localStorage.getItem('kruh_rol')||sessionStorage.getItem('kruh_rol')||'';
     try{ const [us,pm]=await Promise.all([GET('kruh_usuarios?select=nombre,rol,clave,activo&limit=200'),GET('kruh_permisos?limit=50')]); this._usuarios=us; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]); }catch(e){ this._usuarios=[]; this._permisos={}; }
     if(!this.ROLES.includes(this.rol)){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go(this._primeraTab()); },
-  vLogin(){ $('nav').innerHTML=''; $('main').className='';
+  vLogin(){ $('nav').innerHTML=''; if($('nav2'))$('nav2').innerHTML=''; $('main').className='';
     $('main').innerHTML=`<div style="max-width:340px;margin:44px auto 0"><div class="card" style="text-align:center">
       <div style="font-family:Fraunces,serif;font-size:38px;color:var(--ink)">kruh<b style="color:var(--acc)">.</b></div>
       <div class="sub" style="margin:4px 0 16px">Ingresa tu clave</div>
@@ -135,8 +139,8 @@ const App={
     setTimeout(()=>{const e=$('lg_pass');if(e)e.focus();},60); },
   login(){ const p=($('lg_pass').value||'').trim(); let rol=''; for(const k in this.PASS){ if(p===this.PASS[k])rol=k; }
     if(!rol){ const u=(this._usuarios||[]).find(x=>x.clave===p&&x.activo!==false); if(u)rol=u.rol; }
-    if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; sessionStorage.setItem('kruh_rol',rol); this.init(); },
-  logout(){ sessionStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
+    if(!rol){ const e=$('lg_err'); if(e)e.style.display='block'; return; } this.rol=rol; localStorage.setItem('kruh_rol',rol); this.init(); },
+  logout(){ localStorage.removeItem('kruh_rol'); sessionStorage.removeItem('kruh_rol'); this.rol=''; this.vLogin(); },
   _okBorrar(){ const p=prompt('🔒 Clave para BORRAR:'); if(p===null)return false; if(p===this.PASS.admin||p===this.PASS.gerencia)return true; alert('Clave incorrecta'); return false; },
   /* pide clave de admin o gerencia para acciones que corrigen datos ya guardados */
   _okGerencia(que){ const p=prompt('🔒 Clave de admin o gerencia para '+que+':'); if(p===null)return false;
@@ -163,14 +167,18 @@ const App={
     const manual=meses.find(m=>m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase())||{ventas:0,costo:0,meta:40000000};
     const auto=liveVentas>0;
     const ventasM=auto?liveVentas:(+manual.ventas||0), costo=liveCosto>0?liveCosto:(+manual.costo||0);
-    const ubruta=ventasM-costo, margen=ventasM>0?ubruta/ventasM*100:0, meta=+manual.meta||40000000;
+    const ubruta=ventasM-costo;
+    /* META DEL MES (el trato con NC): se suman los meses con ventas, se saca el
+       promedio y se pone el doble. Hoy: abril a julio. */
+    const kMeses=Object.keys(ventasPorMes).filter(k=>(+ventasPorMes[k]||0)>0);
+    const promNC=kMeses.length?kMeses.reduce((a,k)=>a+(+ventasPorMes[k]||0),0)/kMeses.length:0;
+    const meta=promNC>0?promNC*2:(+manual.meta||40000000);
+    const mesesUsados=kMeses.map(k=>this.MESNOM[+k]).filter(Boolean);
     const ymAct=now.getFullYear()+'-'+String(cm).padStart(2,'0');
     const gastoLive=gastos.filter(g=>(g.fecha||g.creado_en||'').slice(0,7)===ymAct).reduce((a,g)=>a+(+g.monto||0),0);
     const gastosM=manual.cerrado?(+manual.gastos||0):(gastoLive||(+manual.gastos||0));
     const uneta=ubruta-gastosM;
     const vMes=m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase(); if(es)return ventasM; const r=ventasReales(m.mes); return r>0?r:(+m.ventas||0);};
-    const acumMC=meses.reduce((a,m)=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();return a+(vMes(m)-(es?costo:(+m.costo||0)));},0);
-    const acumGas=meses.reduce((a,m)=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();return a+(es?gastosM:(+m.gastos||0));},0);
     const registrados=leads.length, nuevosMes=leads.filter(l=>new Date(l.creado_en)>=mesIni).length;
     this.set(`<h1>Dashboard</h1><div class="sub">${esc(mesNom)} ${auto?'· <span style="color:var(--ok);font-weight:700">automático con las ventas del mes</span>':'· simulado (al ingresar pedidos se calcula solo)'} · meta ${money(meta)}</div>
       <div class="kpis">
@@ -179,18 +187,18 @@ const App={
         <div class="kpi"><b style="color:var(--ok)">${money(ubruta)}</b><span>Utilidad bruta</span></div>
         <div class="kpi"><b style="color:var(--warn)">${money(gastosM)}</b><span>Gastos del mes${manual.cerrado?' 🔒':''}</span></div>
         <div class="kpi"><b style="color:${uneta>=0?'var(--ok)':'var(--bad)'}">${money(uneta)}</b><span>Utilidad neta</span></div>
-        <div class="kpi"><b>${margen.toFixed(0)}%</b><span>Margen contribución</span></div>
         <div class="kpi"><b>${registrados}</b><span>Clientes registrados</span></div>
         <div class="kpi"><b style="color:var(--acc)">${nuevosMes}</b><span>Clientes nuevos (mes)</span></div>
       </div>
-      <div class="card"><div class="row" style="justify-content:space-between"><b>Meta del mes (NC)</b><span>${money(ventasM)} / ${money(meta)}</span></div>
-        <div class="bar" style="height:12px"><i style="width:${Math.min(100,meta>0?ventasM/meta*100:0)}%;background:var(--acc)"></i></div>
-        <div class="hint">${meta>ventasM?('Faltan '+money(meta-ventasM)+' para la meta'):'¡Meta cumplida! 🎉'}</div></div>
-      <div class="card"><div style="font-family:Fraunces,serif;font-size:16px">Margen de contribución acumulado</div>
-        <b style="font-size:24px;color:var(--acc);font-family:Fraunces,serif">${money(acumMC)}</b>
-        <div class="hint">Suma de (ventas − costo) de todos los meses. Al cambiar precios de items, este acumulado se mueve.</div>
-        <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:8px;padding-top:8px"><span class="dim">Gastos acumulados</span><b style="color:var(--warn)">${money(acumGas)}</b></div>
-        <div class="row" style="justify-content:space-between"><span>Utilidad neta acumulada</span><b style="color:${acumMC-acumGas>=0?'var(--ok)':'var(--bad)'}">${money(acumMC-acumGas)}</b></div></div>
+      <div class="card" style="border-color:${ventasM>=meta&&meta>0?'var(--ok)':'var(--acc)'};border-width:2px">
+        <div class="row" style="justify-content:space-between"><b>Meta del mes (NC)</b><span>${money(ventasM)} / ${money(meta)}</span></div>
+        <div class="bar" style="height:12px"><i style="width:${Math.min(100,meta>0?ventasM/meta*100:0)}%;background:${ventasM>=meta&&meta>0?'var(--ok)':'var(--acc)'}"></i></div>
+        <div class="hint">${meta>ventasM?('Faltan '+money(meta-ventasM)+' para la meta'):'¡Meta cumplida! 🎉'}</div>
+        ${promNC>0?`<div class="hint" style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">
+          Promedio de ${mesesUsados.length} ${mesesUsados.length===1?'mes':'meses'} (${esc(mesesUsados.join(', ').toLowerCase())}): <b>${money(promNC)}</b> · la meta es <b>el doble</b>.</div>`:''}
+        ${ventasM>=meta&&meta>0?`<div style="margin-top:8px;background:var(--okbg);border:1px solid #c3ddbb;border-radius:9px;padding:10px 12px">
+          <b style="color:var(--ok)">✅ Se duplicó el promedio</b>
+          <div style="font-size:12.5px;margin-top:2px">Ya se puede cobrar la instalación del motor de ventas.</div></div>`:''}</div>
       <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
       ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=vMes(m),cc=es?costo:(+m.costo||0),gg=es?gastosM:(+m.gastos||0),nn=v-cc-gg,mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':(ventasReales(m.mes)>0?'<span class="tag np">real</span>':'')}${m.cerrado?'<span class="tag">🔒 gastos cerrados</span>':''}</div>
         <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''}${gg?' · gastos '+money(gg):''} · meta ${money(mt)}${es?` · <a onclick="App.dashDetalleMes()" style="color:var(--acc);cursor:pointer;font-weight:700">ver detalle →</a>`:''}</div>
@@ -237,11 +245,20 @@ const App={
       <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:6px;padding-top:6px"><b>Utilidad (venta − costo)</b><b style="color:${util>=0?'var(--ok)':'var(--bad)'}">${money(util)}</b></div>
       <button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Cerrar</button>`);
   },
-  nav(){ const perm=this._tabsRol(); $('nav').innerHTML=this.TABS.filter(([v])=>perm.includes(v)).map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join(''); },
+  /* las pestañas van en dos filas para que no se salgan del cuadro */
+  FILA1:['dashboard','recetas','inventario','pedidos','ventas','precios'],
+  nav(){ const perm=this._tabsRol();
+    const vis=this.TABS.filter(([v])=>perm.includes(v));
+    const bt=([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`;
+    const f1=vis.filter(([v])=>this.FILA1.includes(v)).sort((a,b)=>this.FILA1.indexOf(a[0])-this.FILA1.indexOf(b[0]));
+    const f2=vis.filter(([v])=>!this.FILA1.includes(v));
+    $('nav').innerHTML=f1.map(bt).join('');
+    $('nav2').innerHTML=f2.map(bt).join('');
+    $('nav2').style.display=f2.length?'':'none'; },
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
-    this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marcador:this.vMarcador,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
+    this.view=v; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ const m=$('main'); m.className=''; m.style.cssText=''; m.innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -254,8 +271,36 @@ const App={
     const rBy={}; recs.forEach(r=>{(rBy[r.producto_id]=rBy[r.producto_id]||[]).push(r);});
     const pBy={}; pasos.forEach(s=>{(pBy[s.producto_id]=pBy[s.producto_id]||[]).push(s);});
     const cats=[...new Set(prods.map(p=>p.categoria||'Sin categoría'))].sort((a,b)=>this._ordenCat(a,b));
+    /* qué falta por documentar */
+    const sinRec=prods.filter(p=>!(rBy[p.id]||[]).length);
+    const sinPas=prods.filter(p=>!(pBy[p.id]||[]).length);
+    const ab=this._recAviso||'';
+    const chips=lista=>`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px">${lista.map(p=>
+      `<a onclick="App._recOpen='${p.id}';App._recAviso='';App.vRecetas();" style="cursor:pointer;font-size:11.5px;
+        background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:4px 10px;color:var(--ink2)"
+        >${esc(p.nombre)}</a>`).join('')}</div>`;
     this.set(`<h1>Recetas y costos</h1><div class="sub">Producto → peso/presentación → ingredientes con costo → proceso → costo, precio, IVA y margen</div>
       <button class="btn acc" onclick="App.prodModal()">＋ Nuevo producto</button>
+
+      <div class="card" style="margin-top:12px;border-width:2px;border-color:${(sinRec.length||sinPas.length)?'var(--warn)':'var(--ok)'}">
+        ${(sinRec.length||sinPas.length)?`
+          <div style="font-family:Fraunces,serif;font-size:16px">Falta por documentar</div>
+          <div class="row" style="justify-content:space-between;align-items:center;margin-top:8px;cursor:pointer"
+               onclick="App._recAviso=App._recAviso==='rec'?'':'rec';App.vRecetas()">
+            <span style="font-size:13.5px">${ab==='rec'?'▾':'▸'} Productos <b>sin receta</b> <span class="dim">(sin ningún ingrediente)</span></span>
+            <b style="font-size:19px;color:${sinRec.length?'var(--bad)':'var(--ok)'}">${sinRec.length}</b></div>
+          ${ab==='rec'?(sinRec.length?chips(sinRec):'<div class="hint">Ninguno, todos tienen ingredientes.</div>'):''}
+          <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--line2);cursor:pointer"
+               onclick="App._recAviso=App._recAviso==='pas'?'':'pas';App.vRecetas()">
+            <span style="font-size:13.5px">${ab==='pas'?'▾':'▸'} Productos <b>sin pasos</b> <span class="dim">(sin proceso de elaboración)</span></span>
+            <b style="font-size:19px;color:${sinPas.length?'var(--bad)':'var(--ok)'}">${sinPas.length}</b></div>
+          ${ab==='pas'?(sinPas.length?chips(sinPas):'<div class="hint">Ninguno, todos tienen pasos.</div>'):''}
+          <div class="hint" style="margin-top:8px">De ${prods.length} productos. Toca un número para ver cuáles, y el nombre para abrirlo.</div>`
+        :`<div class="row" style="justify-content:space-between;align-items:center">
+            <div><div style="font-family:Fraunces,serif;font-size:16px;color:var(--ok)">✓ Todo documentado</div>
+            <div class="hint">Los ${prods.length} productos tienen ingredientes y pasos.</div></div>
+            <div style="font-size:26px">🎉</div></div>`}
+      </div>
       ${prods.length?cats.map(cat=>`<div style="margin-top:16px"><div class="tag" style="margin-bottom:8px">${esc(cat)}</div>
         <div class="grid">${prods.filter(p=>(p.categoria||'Sin categoría')===cat).map(p=>{
           const rr=rBy[p.id]||[];
@@ -554,14 +599,25 @@ const App={
   CANALES:[['todos','Todos'],['local','🏪 Local'],['digital','📱 Digital'],['organico','🌱 Orgánico'],['empleados','👷 Empleados']],
   async vCrm(){
     this.loading();
-    const [leads,ventas]=await Promise.all([GET('kruh_leads?order=creado_en.desc&limit=2000'),GET('kruh_ventas?select=cliente,telefono,creado_en&limit=20000')]);
+    const [leads,ventas,peds]=await Promise.all([GET('kruh_leads?order=creado_en.desc&limit=2000'),GET('kruh_ventas?select=cliente,telefono,creado_en&limit=20000'),GET('kruh_pedidos?select=cliente,telefono,items&limit=5000')]);
     this._leads=leads;
     const lastTel={}, lastNom={};
     ventas.forEach(v=>{ const t=(v.telefono||'').replace(/\D/g,''), n=(v.cliente||'').trim().toLowerCase(), d=v.creado_en||'';
       if(t&&(!lastTel[t]||d>lastTel[t]))lastTel[t]=d; if(n&&(!lastNom[n]||d>lastNom[n]))lastNom[n]=d; });
     this._crmUlt={tel:lastTel,nom:lastNom};
+    /* qué producto compra más cada cliente — de los items de sus pedidos, no de categorías */
+    const acum={};
+    (peds||[]).forEach(p=>{ const k=this._crmKey(p.telefono,p.cliente); if(!k)return;
+      const o=acum[k]=acum[k]||{};
+      (p.items||[]).forEach(it=>{ const n=(it.nombre||'').trim(); if(!n)return; o[n]=(o[n]||0)+(+it.qty||0); }); });
+    this._crmTop={};
+    Object.keys(acum).forEach(k=>{ this._crmTop[k]=Object.entries(acum[k]).sort((a,b)=>b[1]-a[1]).slice(0,3); });
     this._crmPaint();
   },
+  /* misma llave para pedidos y para leads: el telefono manda, y si no hay, el nombre */
+  _crmKey(tel,nom){ const t=String(tel||'').replace(/\D/g,'');
+    if(t.length>=7) return 't:'+t;
+    const n=this._norm(nom||''); return n?'n:'+n:''; },
   /* Buscar ignora los cajones y los canales a proposito: si escribes un nombre
      lo quieres encontrar este donde este, no solo dentro de la pestaña abierta. */
   _crmFiltra(){
@@ -580,7 +636,6 @@ const App={
       ? `<div class="empty">Ningún cliente con "${esc(this._crmQ)}" — ni por nombre ni por teléfono.</div>`
       : '<div class="empty">Sin leads en este cajón.</div>';
     return lista.map(l=>{ const tel=(l.telefono||'').replace(/\D/g,'');
-      const cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);
       const ult=U.tel[tel]||U.nom[(l.nombre||'').trim().toLowerCase()]||'';
       return `<div class="item"><div class="top"><div>
         <div class="nm">${esc(l.nombre||'—')}${tel?` · <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-weight:600">${esc(l.telefono)}</a>`:''}</div>
@@ -588,7 +643,13 @@ const App={
           ${this._listaNueva(l)?'<span class="tag pe">🏷️ precios nuevos</span>':''}${l.infopromos?'<span class="tag">📣 promos</span>':''}</div></div>
         <div class="row" style="gap:10px;flex:none"><a onclick="App.leadModal('${l.id}')" style="color:var(--acc);cursor:pointer;font-weight:700">✎</a>
           <a onclick="App.leadDel('${l.id}')" style="color:var(--bad);cursor:pointer">✕</a></div></div>
-        <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap"><span class="dim" style="font-size:11px;align-self:center">Compra:</span>${this.CATCOMPRA.map(c=>`<span class="et ${cats.includes(c)?'on':''}" onclick="App.leadCat('${l.id}','${c}')">${c}</span>`).join('')}</div></div>`;}).join('');
+        ${(()=>{ const t3=(this._crmTop||{})[this._crmKey(l.telefono,l.nombre)]||[];
+          if(!t3.length) return `<div class="row" style="margin-top:7px"><span class="dim" style="font-size:11.5px">Todavía no le conocemos lo que más compra.</span></div>`;
+          const pos=['1º','2º','3º'];
+          return `<div class="row" style="margin-top:7px;gap:6px;flex-wrap:wrap;align-items:center">
+            <span class="dim" style="font-size:11px">Lo que más compra:</span>
+            ${t3.map((x,i)=>`<span class="et on" style="cursor:default"><b>${pos[i]}</b> ${esc(x[0])} <span style="opacity:.75">×${num(x[1])}</span></span>`).join('')}</div>`;})()}
+        </div>`;}).join('');
   },
   _crmCabeza(n){ const q=this._crmQ||'';
     return q ? `<b style="color:var(--acc)">${n}</b> resultado(s) para "${esc(q)}" · se busca en todo el CRM, sin importar el cajón`
@@ -1145,8 +1206,60 @@ const App={
   mpMov(id,tipo){ const m=(this._mp||[]).find(x=>x.id===id)||{}; const v=prompt((tipo==='entrada'?'Cantidad que ENTRA':'Cantidad que se CONSUME')+' ('+(m.unidad||'kg')+'):'); if(v===null)return; const q=+v||0; if(q<=0)return;
     const nueva=(+m.existencias||0)+(tipo==='entrada'?q:-q); PATCH('kruh_materiaprima?id=eq.'+id,{existencias:nueva}).then(()=>{toast('Stock actualizado');this.vMateriaPrima();}); },
 
+  /* ===================== MARKETING · cuatro frentes ===================== */
+  async vMarketing(){
+    const v=this._mkView||'';
+    if(v==='marcador')      return this.vMkMarcador();
+    if(v==='institucional') return this.vMkInstitucional();
+    if(v==='digital'||v==='organico') return this.vMkPorHacer(v);
+    this.loading();
+    const marc=await GET('kruh_marcaciones?select=resultado,creado_en&limit=5000');
+    const mesIni=new Date(); const ini=new Date(mesIni.getFullYear(),mesIni.getMonth(),1);
+    const delMes=(marc||[]).filter(m=>new Date(m.creado_en)>=ini);
+    const inte=delMes.filter(m=>m.resultado==='interesado').length;
+    const caj=(id,ic,tit,des,der)=>`<div class="item" style="cursor:pointer" onclick="App._mkView='${id}';App.vMarketing()">
+      <div class="top"><div style="display:flex;gap:11px;align-items:flex-start">
+        <div style="font-size:24px;line-height:1">${ic}</div>
+        <div><div class="nm">${tit}</div><div class="mt">${des}</div></div></div>
+        <div style="text-align:right;white-space:nowrap">${der||''}<div class="dim" style="font-size:16px">›</div></div>
+      </div></div>`;
+    this.set(`<h1>Marketing</h1><div class="sub">Los cuatro frentes por donde entran clientes. Cada cajón se abre y trabaja aparte.</div>
+      ${caj('marcador','📞','Marcador','Llamadas a la base de clientes que ya tenemos',
+            `<b style="font-size:15px">${num(delMes.length)}</b><div class="dim" style="font-size:10px">llamadas · ${num(inte)} interesados</div>`)}
+      ${caj('institucional','🏛️','Institucional','Restaurantes y hoteles — venta al por mayor',
+            `<span class="tag">2 frentes</span>`)}
+      ${caj('digital','💻','Digital','Pauta, redes y todo lo que se paga',`<span class="tag">por armar</span>`)}
+      ${caj('organico','🌱','Orgánico','Voz a voz, referidos y lo que llega solo',`<span class="tag">por armar</span>`)}`);
+  },
+  _mkVolver(){ return `<a onclick="App._mkView='';App.vMarketing()" style="color:var(--acc);cursor:pointer;font-weight:700;font-size:13px">← Marketing</a>`; },
+  vMkInstitucional(){
+    const sub=(ic,tit,des)=>`<div class="item"><div class="top"><div style="display:flex;gap:11px;align-items:flex-start">
+      <div style="font-size:24px;line-height:1">${ic}</div>
+      <div><div class="nm">${tit}</div><div class="mt">${des}</div></div></div>
+      <span class="tag">falta la base</span></div></div>`;
+    this.set(`${this._mkVolver()}<h1 style="margin-top:8px">Institucional</h1>
+      <div class="sub">Venta al por mayor. Cada frente va a tener su propia base de datos y su marcador.</div>
+      ${sub('🍽️','Restaurantes','Cocinas que compran pan a diario')}
+      ${sub('🏨','Hoteles','Desayunos y eventos — pedidos grandes y fijos')}
+      <div class="card" style="border-color:var(--acc)">
+        <div style="font-family:Fraunces,serif;font-size:16px">Lo que falta</div>
+        <div class="hint" style="margin-top:4px">Todavía no hay base de datos de restaurantes ni de hoteles. Cuando las armemos, cada una entra acá con su propio marcador y su campaña, igual que el de clientes.</div></div>`);
+  },
+  vMkPorHacer(cual){
+    const t=cual==='digital'
+      ?{ic:'💻',tit:'Digital',des:'Pauta, redes y todo lo que se paga para que lleguen.',
+         idea:'Acá irían la pauta de Meta, el alcance, cuánto costó cada cliente y qué campaña trajo más.'}
+      :{ic:'🌱',tit:'Orgánico',des:'Voz a voz, referidos y lo que llega sin pagar.',
+         idea:'Acá iría de dónde llegó cada cliente nuevo: referido, pasó por el local, Instagram, Google.'};
+    this.set(`${this._mkVolver()}<h1 style="margin-top:8px">${t.ic} ${t.tit}</h1><div class="sub">${t.des}</div>
+      <div class="card" style="border-color:var(--acc)">
+        <div style="font-family:Fraunces,serif;font-size:16px">Por armar</div>
+        <div class="hint" style="margin-top:4px">${t.idea}</div>
+        <div class="hint" style="margin-top:6px">Dime qué quieres medir acá y lo construyo.</div></div>`);
+  },
+
   /* ===================== MARCADOR · resultados (el marcador vive en marcador.html) ===================== */
-  async vMarcador(){
+  async vMkMarcador(){
     this.loading();
     const [marc,leads,camps]=await Promise.all([
       GET('kruh_marcaciones?select=*&order=creado_en.desc&limit=5000'),
@@ -1168,7 +1281,7 @@ const App={
     const porCamp={}; delMes.forEach(m=>{ const c=m.campana||'—';
       const o=porCamp[c]=porCamp[c]||{t:0,i:0}; o.t++; if(m.resultado==='interesado')o.i++; });
 
-    this.set(`<h1>Marcador</h1><div class="sub">Los resultados de las llamadas. El marcador se abre aparte, con su propio link, para quien esté llamando.</div>
+    this.set(`${this._mkVolver()}<h1 style="margin-top:8px">Marcador</h1><div class="sub">Los resultados de las llamadas. El marcador se abre aparte, con su propio link, para quien esté llamando.</div>
       <a class="btn acc" href="marcador.html" target="_blank" style="text-decoration:none;display:inline-block">📞 Abrir el marcador</a>
       <button class="btn gh" style="margin-left:6px" onclick="App.campModal()">＋ Nueva campaña</button>
 
@@ -1234,23 +1347,23 @@ const App={
     if((this._camps||[]).some(c=>c.nombre.toLowerCase()===nom.toLowerCase())){ alert('Ya existe una campaña con ese nombre'); return; }
     const r=await POST('kruh_campanas',{nombre:nom,objetivo:$('cm_obj').value.trim(),descripcion:$('cm_desc').value.trim(),activa:true});
     if(!r){ alert('No se pudo crear — ¿ya corriste el SQL de kruh_campanas?'); return; }
-    cerrar(); toast('Campaña «'+nom+'» creada · todos en cero'); this.vMarcador(); },
+    cerrar(); toast('Campaña «'+nom+'» creada · todos en cero'); this.vMkMarcador(); },
   async campActiva(id,val){
     await PATCH('kruh_campanas?id=eq.'+id,{activa:val});
-    toast(val?'Campaña reabierta':'Campaña cerrada'); this.vMarcador(); },
+    toast(val?'Campaña reabierta':'Campaña cerrada'); this.vMkMarcador(); },
 
   /* ===================== PRESUPUESTOS (todos los productos, meta del mes, 4 semanas) ===================== */
   async vPresupuestos(){
     this.loading();
     const [pres,peds,prods,vts]=await Promise.all([GET('kruh_presupuestos?order=creado_en&limit=500'),GET('kruh_pedidos?limit=3000'),GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_ventas?select=creado_en,monto&limit=20000')]);
     this._pres=pres; this._prods=prods;
-    /* META DEL MES (regla de Negocios Cuánticos): el doble del promedio mensual.
-       El promedio se saca SOLO de meses cerrados — el mes en curso va a medias y lo hundiría. */
+    /* META DEL MES (el trato con NC): se suman TODOS los meses con ventas,
+       se saca el promedio y se pone el doble. Hoy: abril a julio. */
     const porMes={}; (vts||[]).forEach(r=>{ const k=String(r.creado_en||'').slice(0,7); if(!k)return; porMes[k]=(porMes[k]||0)+(+r.monto||0); });
     const mesAct=new Date().toISOString().slice(0,7);
-    const cerrados=Object.keys(porMes).filter(k=>k<mesAct).sort();
-    const prom=cerrados.length?cerrados.reduce((a,k)=>a+porMes[k],0)/cerrados.length:0;
-    this._nc={prom,meta:prom*2,vend:porMes[mesAct]||0,meses:cerrados.length,porMes,cerrados};
+    const conVenta=Object.keys(porMes).filter(k=>(+porMes[k]||0)>0).sort();
+    const prom=conVenta.length?conVenta.reduce((a,k)=>a+porMes[k],0)/conVenta.length:0;
+    this._nc={prom,meta:prom*2,vend:porMes[mesAct]||0,meses:conVenta.length,porMes,usados:conVenta};
     // lo vendido del mes, repartido en las 4 semanas
     const now=new Date(), mesIni=new Date(now.getFullYear(),now.getMonth(),1);
     const vc={}, vm={};
@@ -1292,32 +1405,63 @@ const App={
           ${metaCant>0&&faltaC>0?`<div class="dim" style="font-size:10px">${money(faltaP)}</div>`:''}
           ${metaCant>0&&faltaC<=0?'<div class="dim" style="font-size:10px">cumplida</div>':''}</td>
       </tr>`;}).join('');
-    const nc=this._nc||{prom:0,meta:0,vend:0,meses:0};
+    const nc=this._nc||{prom:0,meta:0,vend:0,meses:0,porMes:{}};
     const ncPct=nc.meta>0?Math.min(100,nc.vend/nc.meta*100):0;
-    const ncFalta=Math.max(0,nc.meta-nc.vend), ncLogrado=nc.meta>0&&nc.vend>=nc.meta;
+    const ncLogrado=nc.meta>0&&nc.vend>=nc.meta;
+    /* cuánto de la meta ya está repartido en metas por producto */
+    const presu=datos.reduce((a,d)=>a+d.metaPesos,0);
+    const presuUnd=datos.reduce((a,d)=>a+d.metaCant,0);
+    const faltaPresu=Math.max(0,nc.meta-presu);
+    const presuPct=nc.meta>0?Math.min(100,presu/nc.meta*100):0;
+    /* los 12 meses del año, en dos filas de 6 */
+    const anio=new Date().getFullYear(), mesHoy=new Date().getMonth()+1;
+    const NOM=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const abrev=v=>v>=1000000?('$'+(v/1000000).toFixed(1).replace('.',',')+'M')
+                 :(v>=1000?('$'+Math.round(v/1000)+'K'):(v>0?money(v):'—'));
+    const celda=i=>{ const k=anio+'-'+String(i).padStart(2,'0'), v=+(nc.porMes||{})[k]||0;
+      const es=i===mesHoy;
+      return `<div style="flex:1;min-width:0;text-align:center;padding:7px 2px;border-radius:8px;
+        ${es?'background:var(--paper);border:1px solid var(--acc)':''}">
+        <div class="dim" style="font-size:10px">${NOM[i]}${es?' •':''}</div>
+        <div style="font-size:11.5px;font-weight:700;color:${v?'var(--ink)':'var(--mut)'}">${abrev(v)}</div></div>`; };
     this.set(`<h1>Presupuestos</h1><div class="sub">Todos los productos, <b>del más vendido al menos vendido</b> — así se ve cómo termina el mes. Ponle la meta a cada uno y lo vendido se llena solo, semana a semana. La columna <b>Falta</b> es lo que queda para la meta.</div>
+
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:baseline">
+          <div style="font-family:Fraunces,serif;font-size:16px">Ventas ${anio}</div>
+          <div class="dim" style="font-size:11.5px">promedio acumulado <b style="color:var(--ink)">${money(nc.prom)}</b> · ${nc.meses} ${nc.meses===1?'mes':'meses'}</div>
+        </div>
+        <div style="display:flex;gap:3px;margin-top:8px">${[1,2,3,4,5,6].map(celda).join('')}</div>
+        <div style="display:flex;gap:3px;margin-top:3px">${[7,8,9,10,11,12].map(celda).join('')}</div>
+      </div>
 
       <div class="card" style="border-color:${ncLogrado?'var(--ok)':'var(--acc)'};border-width:2px">
         <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px">
           <div><div class="dim" style="font-size:10.5px;letter-spacing:.07em">META DEL MES</div>
             <div style="font-family:Fraunces,serif;font-size:27px;font-weight:600;line-height:1.1">${money(nc.meta)}</div>
-            <div class="dim" style="font-size:11.5px">el doble del promedio (${money(nc.prom)}) · ${nc.meses} ${nc.meses===1?'mes cerrado':'meses cerrados'}</div></div>
+            <div class="dim" style="font-size:11.5px">el doble del promedio (${money(nc.prom)})</div></div>
           <div style="text-align:right"><div style="font-size:22px;font-weight:700;color:${ncLogrado?'var(--ok)':'var(--acc)'}">${ncPct.toFixed(0)}%</div>
-            <div class="dim" style="font-size:11px">vas ${money(nc.vend)}</div></div>
+            <div class="dim" style="font-size:11px">vendido ${money(nc.vend)}</div></div>
         </div>
         <div class="bar" style="margin-top:9px"><i style="width:${ncPct}%;background:${ncLogrado?'var(--ok)':'var(--acc)'}"></i></div>
-        ${ncLogrado
-          ? `<div style="margin-top:9px;background:var(--okbg);border:1px solid #c3ddbb;border-radius:9px;padding:10px 12px">
+        ${ncLogrado?`<div style="margin-top:9px;background:var(--okbg);border:1px solid #c3ddbb;border-radius:9px;padding:10px 12px">
                <b style="color:var(--ok)">✅ Meta cumplida</b>
-               <div style="font-size:12.5px;margin-top:2px">Se duplicó el promedio de ventas. Ya se puede cobrar la instalación del motor de ventas.</div></div>`
-          : `<div class="hint" style="margin-top:8px">Faltan <b>${money(ncFalta)}</b> para duplicar el promedio. El mes en curso no entra al promedio, para que no lo hunda.</div>`}
+               <div style="font-size:12.5px;margin-top:2px">Se duplicó el promedio de ventas. Ya se puede cobrar la instalación del motor de ventas.</div></div>`:''}
+
+        <div style="border-top:1px solid var(--line);margin-top:11px;padding-top:10px">
+          <div class="row" style="justify-content:space-between;align-items:baseline">
+            <span class="dim" style="font-size:11px;letter-spacing:.06em">PRESUPUESTADO EN PRODUCTOS</span>
+            <b style="font-size:15px">${money(presu)}</b></div>
+          <div class="bar" style="margin-top:5px"><i style="width:${presuPct}%;background:${faltaPresu<=0?'var(--ok)':'var(--gold)'}"></i></div>
+          <div class="row" style="justify-content:space-between;margin-top:5px;font-size:12.5px">
+            <span class="dim">${num(presuUnd)} unidades repartidas</span>
+            <b style="color:${faltaPresu<=0?'var(--ok)':'var(--bad)'}">${faltaPresu<=0?'✓ meta cubierta':'faltan '+money(faltaPresu)+' por presupuestar'}</b></div>
+          <div class="hint" style="margin-top:6px">${faltaPresu<=0
+            ?'Las metas por producto ya suman la meta del mes.'
+            :'Súbele unidades a los productos de abajo hasta que esta barra llegue a '+money(nc.meta)+'.'}</div>
+        </div>
       </div>
 
-      <div class="row" style="gap:10px;margin:12px 0;flex-wrap:wrap">
-        <div class="card" style="flex:1;min-width:120px"><div class="dim" style="font-size:10.5px">META DEL MES</div><b style="font-size:16px">${money(tMetaP)}</b><div class="dim" style="font-size:10px">${conMeta} de ${prods.length} productos</div></div>
-        <div class="card" style="flex:1;min-width:120px"><div class="dim" style="font-size:10.5px">VENDIDO</div><b style="font-size:16px;color:var(--acc)">${money(tVendP)}</b><div class="dim" style="font-size:10px">${tMetaP>0?(tVendP/tMetaP*100).toFixed(0)+'% de la meta':'sin meta'}</div></div>
-        <div class="card" style="flex:1;min-width:120px"><div class="dim" style="font-size:10.5px">FALTA</div><b style="font-size:16px;color:${tFaltaP<=0&&tMetaP>0?'var(--ok)':'var(--bad)'}">${money(tFaltaP)}</b><div class="dim" style="font-size:10px">para cumplir</div></div>
-      </div>
       <div class="tbwrap"><table class="tb" style="min-width:620px">
         <thead><tr><th style="min-width:170px">Producto</th><th style="text-align:right">Meta mes</th>
           <th style="text-align:right">S1</th><th style="text-align:right">S2</th><th style="text-align:right">S3</th><th style="text-align:right">S4</th>
@@ -1894,7 +2038,7 @@ const App={
     const [us,pm]=await Promise.all([GET('kruh_usuarios?order=creado_en&limit=200'),GET('kruh_permisos?limit=50')]);
     this._us=us; this._ase=ase||[]; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]);
     const abierta=(ase||[]).find(a=>a.inicio&&!a.fin);
-    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['marcador','📞 Marcador'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos']];
+    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['marketing','📣 Marketing'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos']];
     const RMAT=['cajera','panadero','bodeguero','chef'];
     this.set(`<h1>Usuarios y permisos</h1><div class="sub">Cada persona con su clave y rol · y qué pestaña ve cada rol</div>
       ${this._aseBloque(ase,abierta)}
