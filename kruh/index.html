@@ -111,7 +111,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['marcador','📞 Marcador'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
   view:'dashboard',
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
@@ -241,7 +241,7 @@ const App={
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
     this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marcador:this.vMarcador,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ const m=$('main'); m.className=''; m.style.cssText=''; m.innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -1145,44 +1145,196 @@ const App={
   mpMov(id,tipo){ const m=(this._mp||[]).find(x=>x.id===id)||{}; const v=prompt((tipo==='entrada'?'Cantidad que ENTRA':'Cantidad que se CONSUME')+' ('+(m.unidad||'kg')+'):'); if(v===null)return; const q=+v||0; if(q<=0)return;
     const nueva=(+m.existencias||0)+(tipo==='entrada'?q:-q); PATCH('kruh_materiaprima?id=eq.'+id,{existencias:nueva}).then(()=>{toast('Stock actualizado');this.vMateriaPrima();}); },
 
-  /* ===================== PRESUPUESTOS (meta en cantidad, 4 semanas) ===================== */
+  /* ===================== MARCADOR · resultados (el marcador vive en marcador.html) ===================== */
+  async vMarcador(){
+    this.loading();
+    const [marc,leads,camps]=await Promise.all([
+      GET('kruh_marcaciones?select=*&order=creado_en.desc&limit=5000'),
+      GET('kruh_leads?select=id,telefono&limit=3000'),
+      GET('kruh_campanas?select=*&order=creado_en.desc&limit=100')]);
+    this._camps=camps||[];
+    const conTel=(leads||[]).filter(l=>String(l.telefono||'').replace(/\D/g,'').length>=7).length;
+    const nomRes=r=>r==='interesado'?'Interesado':(r==='no_interesado'?'No interesado':(r==='habeas'?'Habeas data':r||'—'));
+    const hoy=new Date().toISOString().slice(0,10);
+    const mesIni=new Date(); mesIni.setDate(1);
+    const delMes=(marc||[]).filter(m=>new Date(m.creado_en)>=new Date(mesIni.getFullYear(),mesIni.getMonth(),1));
+    const nHoy=(marc||[]).filter(m=>String(m.creado_en||'').slice(0,10)===hoy).length;
+    const cuenta=r=>delMes.filter(m=>m.resultado===r).length;
+    const int=cuenta('interesado'), no=cuenta('no_interesado'), hab=cuenta('habeas');
+    const tot=delMes.length, pct=tot?(int/tot*100):0;
+    // llamados unicos del mes, para saber cuanto falta de la base
+    const unicos=new Set(delMes.map(m=>m.lead_id)).size;
+    // por campaña
+    const porCamp={}; delMes.forEach(m=>{ const c=m.campana||'—';
+      const o=porCamp[c]=porCamp[c]||{t:0,i:0}; o.t++; if(m.resultado==='interesado')o.i++; });
+
+    this.set(`<h1>Marcador</h1><div class="sub">Los resultados de las llamadas. El marcador se abre aparte, con su propio link, para quien esté llamando.</div>
+      <a class="btn acc" href="marcador.html" target="_blank" style="text-decoration:none;display:inline-block">📞 Abrir el marcador</a>
+      <button class="btn gh" style="margin-left:6px" onclick="App.campModal()">＋ Nueva campaña</button>
+
+      <div class="card" style="margin-top:14px"><div class="nm" style="margin-bottom:8px">Campañas</div>
+        ${(camps||[]).length?camps.map(c=>{
+          const llam=(marc||[]).filter(m=>m.campana===c.nombre);
+          const ci=llam.filter(m=>m.resultado==='interesado').length;
+          const ult=llam[0]?String(llam[0].creado_en).slice(0,10):null;
+          return `<div style="padding:9px 0;border-bottom:1px solid var(--line2)">
+            <div class="row" style="justify-content:space-between;gap:8px">
+              <div><b style="font-size:14px">${esc(c.nombre)}</b>
+                ${c.activa?'<span class="pill" style="background:var(--okbg);color:var(--ok);border:1px solid #c3ddbb;font-size:10px;padding:2px 8px;border-radius:20px;margin-left:6px">activa</span>'
+                          :'<span class="dim" style="font-size:10.5px;margin-left:6px">cerrada</span>'}
+                ${c.objetivo?`<div class="dim" style="font-size:12px;margin-top:2px"><b>Objetivo:</b> ${esc(c.objetivo)}</div>`:''}
+                ${c.descripcion?`<div class="dim" style="font-size:11.5px">${esc(c.descripcion)}</div>`:''}
+                <div class="dim" style="font-size:11px;margin-top:3px">${num(llam.length)} llamadas · <b style="color:var(--ok)">${num(ci)}</b> interesados${ult?' · última '+ult:''}</div>
+              </div>
+              <button class="btn gh sm" onclick="App.campActiva(${c.id},${c.activa?'false':'true'})">${c.activa?'Cerrar':'Reabrir'}</button>
+            </div></div>`;}).join('')
+        :'<div class="dim" style="font-size:12.5px">No hay campañas. Crea la primera para que el marcador funcione.</div>'}
+        <div class="hint" style="margin-top:9px">Al crear una campaña nueva todos los clientes vuelven a cero en ella — el historial de las anteriores no se toca.</div>
+      </div>
+
+      <div class="row" style="gap:10px;margin:14px 0;flex-wrap:wrap">
+        <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">LLAMADAS DEL MES</div><b style="font-size:19px">${num(tot)}</b><div class="dim" style="font-size:10px">${nHoy} hoy</div></div>
+        <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">INTERESADOS</div><b style="font-size:19px;color:var(--ok)">${num(int)}</b><div class="dim" style="font-size:10px">${pct.toFixed(0)}% de las llamadas</div></div>
+        <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">NO INTERESADOS</div><b style="font-size:19px;color:var(--bad)">${num(no)}</b><div class="dim" style="font-size:10px">habeas: ${num(hab)}</div></div>
+        <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">BASE CUBIERTA</div><b style="font-size:19px">${num(unicos)}/${num(conTel)}</b><div class="dim" style="font-size:10px">clientes con teléfono</div></div>
+      </div>
+
+      <div class="card"><div class="nm" style="margin-bottom:8px">Por campaña · este mes</div>
+        ${Object.keys(porCamp).length?Object.entries(porCamp).map(([c,o])=>{
+          const p=o.t?o.i/o.t*100:0;
+          return `<div style="margin-bottom:10px"><div class="row" style="justify-content:space-between"><b style="font-size:13.5px">${esc(c)}</b>
+            <span class="dim" style="font-size:12px">${num(o.t)} llamadas · <b style="color:var(--ok)">${num(o.i)}</b> interesados</span></div>
+            <div class="bar" style="margin-top:4px"><i style="width:${Math.min(100,p)}%;background:var(--ok)"></i></div></div>`;
+          }).join(''):'<div class="dim" style="font-size:12.5px">Todavía no hay llamadas este mes.</div>'}
+      </div>
+
+      <div class="nm" style="margin:16px 0 8px">Últimas llamadas</div>
+      ${(marc||[]).length?`<div class="tbwrap"><table class="tb" style="min-width:520px">
+        <thead><tr><th style="min-width:150px">Cliente</th><th>Teléfono</th><th>Campaña</th><th>Resultado</th><th>Cuándo</th></tr></thead>
+        <tbody>${marc.slice(0,60).map(m=>{
+          const col=m.resultado==='interesado'?'var(--ok)':(m.resultado==='no_interesado'?'var(--bad)':'var(--mut)');
+          return `<tr><td style="font-weight:600">${esc(m.cliente||'—')}</td>
+            <td class="dim">${esc(m.telefono||'')}</td>
+            <td>${esc(m.campana||'—')}</td>
+            <td style="font-weight:700;color:${col}">${esc(nomRes(m.resultado))}</td>
+            <td class="dim" style="white-space:nowrap">${String(m.creado_en||'').slice(0,10)}</td></tr>`;}).join('')}
+        </tbody></table></div>`
+       :`<div class="empty">Aún no hay llamadas registradas.<br><span class="dim" style="font-size:12px">Si el marcador dice que no puede guardar, falta correr el SQL de <b>kruh_marcaciones</b>.</span></div>`}`);
+  },
+  campModal(){
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">Nueva campaña</h3>
+      <div class="dim" style="font-size:12.5px;margin-bottom:6px">Los clientes arrancan en cero en esta campaña. Lo de las anteriores queda guardado.</div>
+      <label>Nombre</label><input id="cm_nom" placeholder="Ej: Reservar pan de agosto">
+      <label>Objetivo</label><input id="cm_obj" placeholder="Qué se busca con estas llamadas">
+      <label>Descripción</label><textarea id="cm_desc" placeholder="Qué se le dice al cliente"></textarea>
+      <button class="btn acc full" onclick="App.campSave()">Crear campaña</button>`); },
+  async campSave(){
+    const nom=$('cm_nom').value.trim();
+    if(!nom){ alert('Ponle nombre a la campaña'); return; }
+    if((this._camps||[]).some(c=>c.nombre.toLowerCase()===nom.toLowerCase())){ alert('Ya existe una campaña con ese nombre'); return; }
+    const r=await POST('kruh_campanas',{nombre:nom,objetivo:$('cm_obj').value.trim(),descripcion:$('cm_desc').value.trim(),activa:true});
+    if(!r){ alert('No se pudo crear — ¿ya corriste el SQL de kruh_campanas?'); return; }
+    cerrar(); toast('Campaña «'+nom+'» creada · todos en cero'); this.vMarcador(); },
+  async campActiva(id,val){
+    await PATCH('kruh_campanas?id=eq.'+id,{activa:val});
+    toast(val?'Campaña reabierta':'Campaña cerrada'); this.vMarcador(); },
+
+  /* ===================== PRESUPUESTOS (todos los productos, meta del mes, 4 semanas) ===================== */
   async vPresupuestos(){
     this.loading();
-    const [pres,peds,prods]=await Promise.all([GET('kruh_presupuestos?order=creado_en&limit=500'),GET('kruh_pedidos?limit=3000'),GET('kruh_productos?order=nombre&limit=1000')]);
+    const [pres,peds,prods,vts]=await Promise.all([GET('kruh_presupuestos?order=creado_en&limit=500'),GET('kruh_pedidos?limit=3000'),GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_ventas?select=creado_en,monto&limit=20000')]);
     this._pres=pres; this._prods=prods;
+    /* META DEL MES (regla de Negocios Cuánticos): el doble del promedio mensual.
+       El promedio se saca SOLO de meses cerrados — el mes en curso va a medias y lo hundiría. */
+    const porMes={}; (vts||[]).forEach(r=>{ const k=String(r.creado_en||'').slice(0,7); if(!k)return; porMes[k]=(porMes[k]||0)+(+r.monto||0); });
+    const mesAct=new Date().toISOString().slice(0,7);
+    const cerrados=Object.keys(porMes).filter(k=>k<mesAct).sort();
+    const prom=cerrados.length?cerrados.reduce((a,k)=>a+porMes[k],0)/cerrados.length:0;
+    this._nc={prom,meta:prom*2,vend:porMes[mesAct]||0,meses:cerrados.length,porMes,cerrados};
+    // lo vendido del mes, repartido en las 4 semanas
     const now=new Date(), mesIni=new Date(now.getFullYear(),now.getMonth(),1);
     const vc={}, vm={};
     peds.forEach(p=>{ const d=new Date(p.creado_en); if(d<mesIni)return; const s=Math.min(3,Math.floor((d.getDate()-1)/7)); (p.items||[]).forEach(it=>{ const k=it.producto_id; (vc[k]=vc[k]||[0,0,0,0])[s]+=(+it.qty||0); (vm[k]=vm[k]||[0,0,0,0])[s]+=(+it.qty||0)*(+it.precio||0); }); });
-    this.set(`<h1>Presupuestos</h1><div class="sub">Meta en cantidad por producto · el precio y el total salen de la base · dividida en 4 semanas · avance en cantidad y dinero</div>
-      <button class="btn acc" onclick="App.presModal()">＋ Nueva meta</button>
-      <div style="margin-top:14px">${pres.length?pres.map(pr=>{
-        const prod=prods.find(x=>x.id===pr.producto_id)||{}, precio=+prod.precio||0;
-        const metaCant=+pr.meta_cant||0, metaPesos=metaCant*precio, semCant=metaCant/4;
-        const arrC=vc[pr.producto_id]||[0,0,0,0], arrM=vm[pr.producto_id]||[0,0,0,0];
-        const vendCant=arrC.reduce((a,b)=>a+b,0), vendPesos=arrM.reduce((a,b)=>a+b,0);
-        const pct=metaCant>0?Math.min(100,vendCant/metaCant*100):0, faltaC=Math.max(0,metaCant-vendCant), faltaP=Math.max(0,metaPesos-vendPesos);
-        return `<div class="item"><div class="top"><div><div class="nm">${esc(pr.producto||prod.nombre||'—')}</div>
-          <div class="mt">Meta ${num(metaCant)} und × ${money(precio)} = <b>${money(metaPesos)}</b>/mes · ${num(semCant)} und/semana</div></div>
-          <div class="nm" style="color:${pct>=100?'var(--ok)':(pct>=60?'var(--warn)':'var(--bad)')}">${pct.toFixed(0)}%</div></div>
-          <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div>
-          <div class="row" style="gap:6px;margin-top:8px">${arrC.map((cn,i)=>`<div style="flex:1;text-align:center;font-size:11px"><div class="dim">S${i+1}</div><b style="color:${cn>=semCant&&semCant>0?'var(--ok)':'var(--ink2)'}">${num(cn)}</b><div class="dim">${money(arrM[i])}</div></div>`).join('')}</div>
-          <div class="hint" style="margin-top:6px">Lleva <b>${num(vendCant)} und</b> · ${money(vendPesos)} · faltan <b>${num(faltaC)} und</b> (${money(faltaP)}) <a onclick="App.presDel('${pr.id}')" style="color:var(--bad);cursor:pointer;float:right">eliminar</a></div></div>`;}).join(''):'<div class="empty">Escoge un producto y ponle su meta en cantidad; el precio y el total salen de la base.</div>'}</div>`);
+    this._vc=vc; this._vm=vm;
+    this._semActual=Math.min(3,Math.floor((now.getDate()-1)/7));
+    this._presPaint();
   },
-  presModal(){ const prods=this._prods||[];
-    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Nueva meta por producto</h3>
-      <label>Producto (del catálogo)</label>
-      <select id="pr_prod" onchange="App.presCalc()">${prods.map(p=>`<option value="${p.id}" data-n="${esc(p.nombre)}" data-pre="${p.precio||0}">${esc(p.nombre)} · ${money(p.precio)}</option>`).join('')}</select>
-      <label>Meta del mes (cantidad / unidades)</label><input id="pr_cant" type="number" oninput="App.presCalc()">
-      <div class="card" style="background:var(--paper);margin-top:8px"><div class="row" style="justify-content:space-between"><span class="dim">Precio (base)</span><b id="pr_pre">$0</b></div>
-        <div class="row" style="justify-content:space-between"><span class="dim">Total meta</span><b id="pr_tot" style="color:var(--acc)">$0</b></div>
-        <div class="row" style="justify-content:space-between"><span class="dim">Por semana</span><span id="pr_sem">0 und</span></div></div>
-      <button class="btn acc full" onclick="App.presSave()">Guardar meta</button>`); this.presCalc(); },
-  presCalc(){ const s=$('pr_prod'); if(!s)return; const o=s.options[s.selectedIndex], pre=+(o?o.dataset.pre:0)||0, cant=+($('pr_cant').value)||0;
-    if($('pr_pre'))$('pr_pre').textContent=money(pre); if($('pr_tot'))$('pr_tot').textContent=money(pre*cant); if($('pr_sem'))$('pr_sem').textContent=num(cant/4)+' und'; },
-  async presSave(){ const s=$('pr_prod'), o=s.options[s.selectedIndex]; if(!o){alert('Producto');return;} const cant=+$('pr_cant').value||0;
-    await POST('kruh_presupuestos',{producto_id:o.value,producto:o.dataset.n,meta_cant:cant,meta:cant*(+o.dataset.pre||0),periodo:'mes'});
-    cerrar(); toast('Meta guardada'); this.vPresupuestos(); },
-  async presDel(id){ if(!this._okBorrar())return; await DEL('kruh_presupuestos?id=eq.'+id); this.vPresupuestos(); },
+  /* pinta la tabla con lo que ya esta en memoria, sin volver a pedir a la base */
+  _presPaint(){
+    const prods=this._prods||[], pres=this._pres||[], vc=this._vc||{}, vm=this._vm||{}, sa=this._semActual||0;
+    let tMetaP=0, tVendP=0, tFaltaP=0, conMeta=0;
+    // se calcula todo primero para poder ordenar por lo mas vendido
+    const datos=prods.map(pd=>{
+      const pr=pres.find(x=>x.producto_id===pd.id), precio=+pd.precio||0;
+      const metaCant=pr?(+pr.meta_cant||0):0, metaPesos=metaCant*precio, semCant=metaCant/4;
+      const arrC=vc[pd.id]||[0,0,0,0], arrM=vm[pd.id]||[0,0,0,0];
+      const vendCant=arrC.reduce((a,b)=>a+b,0), vendPesos=arrM.reduce((a,b)=>a+b,0);
+      const faltaC=Math.max(0,metaCant-vendCant), faltaP=Math.max(0,metaPesos-vendPesos);
+      const pct=metaCant>0?vendCant/metaCant*100:0;
+      if(metaCant>0){ conMeta++; tMetaP+=metaPesos; tFaltaP+=faltaP; }
+      tVendP+=vendPesos;
+      return {pd,precio,metaCant,metaPesos,semCant,arrC,arrM,vendCant,vendPesos,faltaC,faltaP,pct};
+    });
+    // del mas vendido al menos vendido: asi se ve como termina el mes
+    datos.sort((a,b)=>b.vendCant-a.vendCant||b.vendPesos-a.vendPesos||String(a.pd.nombre||'').localeCompare(String(b.pd.nombre||'')));
+    const filas=datos.map((d,pos)=>{
+      const {pd,precio,metaCant,metaPesos,semCant,arrC,arrM,vendCant,vendPesos,faltaC,faltaP,pct}=d;
+      const colFalta=metaCant<=0?'var(--mut)':(faltaC<=0?'var(--ok)':(pct>=60?'var(--warn)':'var(--bad)'));
+      return `<tr>
+        <td><div style="font-weight:600"><span class="dim" style="font-size:10.5px">${pos+1}.</span> ${esc(pd.nombre||'—')}</div><div class="dim" style="font-size:10.5px">${money(precio)} c/u${metaCant>0?' · meta '+money(metaPesos):''}</div></td>
+        <td style="text-align:right"><input type="number" min="0" style="width:76px;text-align:right;padding:5px 6px;margin:0"
+             value="${metaCant||''}" placeholder="—" onchange="App.presMeta('${pd.id}',this.value)">
+          ${metaCant>0?`<div class="dim" style="font-size:10px">${num(semCant)}/sem</div>`:''}</td>
+        ${arrC.map((cn,i)=>`<td style="text-align:right;font-size:11.5px;${i===sa?'background:var(--paper)':''}">
+          <b style="color:${semCant>0?(cn>=semCant?'var(--ok)':'var(--ink2)'):'var(--ink2)'}">${cn?num(cn):'·'}</b></td>`).join('')}
+        <td style="text-align:right"><b>${num(vendCant)}</b><div class="dim" style="font-size:10px">${money(vendPesos)}</div></td>
+        <td style="text-align:right;font-weight:700;color:${colFalta}">${metaCant>0?num(faltaC):'—'}
+          ${metaCant>0&&faltaC>0?`<div class="dim" style="font-size:10px">${money(faltaP)}</div>`:''}
+          ${metaCant>0&&faltaC<=0?'<div class="dim" style="font-size:10px">cumplida</div>':''}</td>
+      </tr>`;}).join('');
+    const nc=this._nc||{prom:0,meta:0,vend:0,meses:0};
+    const ncPct=nc.meta>0?Math.min(100,nc.vend/nc.meta*100):0;
+    const ncFalta=Math.max(0,nc.meta-nc.vend), ncLogrado=nc.meta>0&&nc.vend>=nc.meta;
+    this.set(`<h1>Presupuestos</h1><div class="sub">Todos los productos, <b>del más vendido al menos vendido</b> — así se ve cómo termina el mes. Ponle la meta a cada uno y lo vendido se llena solo, semana a semana. La columna <b>Falta</b> es lo que queda para la meta.</div>
+
+      <div class="card" style="border-color:${ncLogrado?'var(--ok)':'var(--acc)'};border-width:2px">
+        <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px">
+          <div><div class="dim" style="font-size:10.5px;letter-spacing:.07em">META DEL MES</div>
+            <div style="font-family:Fraunces,serif;font-size:27px;font-weight:600;line-height:1.1">${money(nc.meta)}</div>
+            <div class="dim" style="font-size:11.5px">el doble del promedio (${money(nc.prom)}) · ${nc.meses} ${nc.meses===1?'mes cerrado':'meses cerrados'}</div></div>
+          <div style="text-align:right"><div style="font-size:22px;font-weight:700;color:${ncLogrado?'var(--ok)':'var(--acc)'}">${ncPct.toFixed(0)}%</div>
+            <div class="dim" style="font-size:11px">vas ${money(nc.vend)}</div></div>
+        </div>
+        <div class="bar" style="margin-top:9px"><i style="width:${ncPct}%;background:${ncLogrado?'var(--ok)':'var(--acc)'}"></i></div>
+        ${ncLogrado
+          ? `<div style="margin-top:9px;background:var(--okbg);border:1px solid #c3ddbb;border-radius:9px;padding:10px 12px">
+               <b style="color:var(--ok)">✅ Meta cumplida</b>
+               <div style="font-size:12.5px;margin-top:2px">Se duplicó el promedio de ventas. Ya se puede cobrar la instalación del motor de ventas.</div></div>`
+          : `<div class="hint" style="margin-top:8px">Faltan <b>${money(ncFalta)}</b> para duplicar el promedio. El mes en curso no entra al promedio, para que no lo hunda.</div>`}
+      </div>
+
+      <div class="row" style="gap:10px;margin:12px 0;flex-wrap:wrap">
+        <div class="card" style="flex:1;min-width:120px"><div class="dim" style="font-size:10.5px">META DEL MES</div><b style="font-size:16px">${money(tMetaP)}</b><div class="dim" style="font-size:10px">${conMeta} de ${prods.length} productos</div></div>
+        <div class="card" style="flex:1;min-width:120px"><div class="dim" style="font-size:10.5px">VENDIDO</div><b style="font-size:16px;color:var(--acc)">${money(tVendP)}</b><div class="dim" style="font-size:10px">${tMetaP>0?(tVendP/tMetaP*100).toFixed(0)+'% de la meta':'sin meta'}</div></div>
+        <div class="card" style="flex:1;min-width:120px"><div class="dim" style="font-size:10.5px">FALTA</div><b style="font-size:16px;color:${tFaltaP<=0&&tMetaP>0?'var(--ok)':'var(--bad)'}">${money(tFaltaP)}</b><div class="dim" style="font-size:10px">para cumplir</div></div>
+      </div>
+      <div class="tbwrap"><table class="tb" style="min-width:620px">
+        <thead><tr><th style="min-width:170px">Producto</th><th style="text-align:right">Meta mes</th>
+          <th style="text-align:right">S1</th><th style="text-align:right">S2</th><th style="text-align:right">S3</th><th style="text-align:right">S4</th>
+          <th style="text-align:right">Vendido</th><th style="text-align:right">Falta</th></tr></thead>
+        <tbody>${filas}</tbody></table></div>
+      <div class="hint" style="margin-top:8px">La semana en curso va sombreada. Deja la meta vacía o en 0 si ese producto no entra al presupuesto.</div>`);
+  },
+  /* guarda la meta del mes de un producto: si ya existe la actualiza, si no la crea */
+  async presMeta(pid,v){
+    const cant=Math.max(0,+v||0), prod=(this._prods||[]).find(x=>x.id===pid); if(!prod)return;
+    const precio=+prod.precio||0, pr=(this._pres||[]).find(x=>x.producto_id===pid);
+    if(pr){ await PATCH('kruh_presupuestos?id=eq.'+pr.id,{meta_cant:cant,meta:cant*precio});
+      pr.meta_cant=cant; pr.meta=cant*precio; }
+    else { const nuevo=await POST('kruh_presupuestos',{producto_id:pid,producto:prod.nombre,meta_cant:cant,meta:cant*precio,periodo:'mes'});
+      if(nuevo)(this._pres=this._pres||[]).push(nuevo);
+      else { toast('No se pudo guardar'); return; } }
+    toast('Meta de '+prod.nombre+': '+num(cant)); this._presPaint(); },
 
   /* ===================== VENTAS (clientes, estilo Smart) ===================== */
   async vVentas(){
@@ -1742,7 +1894,7 @@ const App={
     const [us,pm]=await Promise.all([GET('kruh_usuarios?order=creado_en&limit=200'),GET('kruh_permisos?limit=50')]);
     this._us=us; this._ase=ase||[]; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]);
     const abierta=(ase||[]).find(a=>a.inicio&&!a.fin);
-    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos']];
+    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['marcador','📞 Marcador'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos']];
     const RMAT=['cajera','panadero','bodeguero','chef'];
     this.set(`<h1>Usuarios y permisos</h1><div class="sub">Cada persona con su clave y rol · y qué pestaña ve cada rol</div>
       ${this._aseBloque(ase,abierta)}
