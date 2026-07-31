@@ -3789,30 +3789,39 @@ const App = {
   },
 
   /* ---------- PERMISOS (qué ve cada rol) ---------- */
+  /* pestañas que se pueden repartir · la llave es la misma que usa el nav */
+  CED_MODS:[['panel','📈 Panel'],['crm','📇 CRM'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],
+    ['despachos','🚚 Despachos'],['cartera','💳 Cartera'],['clientes','👥 Clientes'],
+    ['planta','🏭 Planta'],['comisiones','🧾 Comisiones']],
+
   async vPermisos(){
     this.loading();
-    const { data:cfg } = await this.sb.from('config').select('value').eq('key','nav_permisos').maybeSingle();
-    this._permisos = cfg?cfg.value:{};
-    const MODS=[['dashboard','📊 Tablero'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],['despachos','🚚 Despachos'],['ventas','💰 Ventas'],['crm','📇 CRM'],['clientes','👥 Clientes'],['cobertura','🗺️ Cobertura'],['planta','🏭 Planta'],['admin','⚙️ Equipo']];
-    const ROLES=[['director','Director General'],['gerente','Gerente'],['vendedor','Vendedor'],['facturacion','Facturación'],['bodega','Bodega'],['planta','Jefe de Planta']];
-    let html=`<h1>🔐 Permisos</h1><div class="sub">Marca qué módulos ve cada rol</div>
-      <div class="hint" style="margin-bottom:10px">El Admin (tú) siempre ve todo. Cada persona ve según su rol (lo asignas en ⚙️ Equipo).</div>`;
-    ROLES.forEach(([rk,rn])=>{
-      const allowed=(this._permisos[rk]||[]);
-      html+=`<div class="card"><label>${rn}</label>`+
-        MODS.map(([mk,mn])=>`<label style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:14px;cursor:pointer"><input type="checkbox" data-rol="${rk}" data-mod="${mk}" ${allowed.includes(mk)?'checked':''} style="width:18px;height:18px;accent-color:var(--naranja)">${mn}</label>`).join('')+
-        `</div>`;
-    });
-    html+=`<button class="btn btn-main" onclick="App.guardarPermisos()">Guardar permisos</button>`;
-    this.set(html);
+    const { data:pm=[] } = await this.sb.from('ced_permisos').select('*').order('cargo');
+    this._cedPerm={}; (pm||[]).forEach(p=>this._cedPerm[p.cargo]=p.tabs||[]);
+    const cargos=this.CED_CARGOS;
+    this.set(`<h1>🔐 Permisos</h1><div class="sub">Qué pestañas ve cada cargo</div>
+      <div class="hint" style="margin-bottom:10px">El cargo se le pone a cada persona en 👤 <b>Usuarios</b>. Tú, como admin, siempre ves todo.</div>
+      ${cargos.map(c=>{
+        const on=this._cedPerm[c]||[];
+        return `<div class="card">
+          <div style="font-weight:800;font-size:15px;text-transform:capitalize;margin-bottom:6px">${esc(c)}
+            <span style="font-weight:400;color:var(--suave);font-size:12px">· ${on.length} pestaña${on.length===1?'':'s'}</span></div>
+          ${this.CED_MODS.map(([mk,mn])=>`<label style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:14px;cursor:pointer">
+            <input type="checkbox" data-cargo="${esc(c)}" data-mod="${mk}" ${on.includes(mk)?'checked':''}
+              style="width:18px;height:18px;accent-color:var(--naranja)">${mn}</label>`).join('')}
+        </div>`;
+      }).join('')}
+      <button class="btn btn-main" onclick="App.guardarPermisos()">Guardar permisos</button>`);
   },
+
   async guardarPermisos(){
-    const nuevo={admin:["dashboard","cotizaciones","pedidos","despachos","ventas","clientes","crm","cobertura","planta","admin","permisos"]};
-    ['director','gerente','vendedor','facturacion','bodega','planta'].forEach(rk=>nuevo[rk]=[]);
-    document.querySelectorAll('#main input[data-rol]').forEach(i=>{ if(i.checked) nuevo[i.dataset.rol].push(i.dataset.mod); });
-    const { error } = await this.sb.from('config').update({value:nuevo, updated_at:new Date().toISOString()}).eq('key','nav_permisos');
-    if(error){ alert('Error: '+error.message); return; }
-    this._permisos=nuevo; this.pintarNav(); this.toast('Permisos guardados ✅');
+    const nuevo={}; this.CED_CARGOS.forEach(c=>nuevo[c]=[]);
+    document.querySelectorAll('#main input[data-cargo]').forEach(i=>{ if(i.checked) nuevo[i.dataset.cargo].push(i.dataset.mod); });
+    for(const cargo of this.CED_CARGOS){
+      const { error } = await this.sb.from('ced_permisos').upsert({cargo, tabs:nuevo[cargo]},{onConflict:'cargo'});
+      if(error){ alert('Error guardando '+cargo+': '+error.message); return; }
+    }
+    this._cedPerm=nuevo; this.toast('Permisos guardados ✅');
   },
 
   /* ---------- ADMIN (equipo) ---------- */
@@ -3820,45 +3829,69 @@ const App = {
 
   async vAdmin(){
     this.loading();
-    const [ru,rc,rp] = await Promise.all([
-      this.sb.from('ced_usuarios').select('*').order('ced').order('nombre'),
-      this.sb.from('ced').select('nombre,ciudad,principal').eq('activo',true).order('principal',{ascending:false}),
-      this.sb.from('perfiles').select('*').order('creado_en')
+    const [ru,rc] = await Promise.all([
+      this.sb.from('ced_usuarios').select('*').order('nombre'),
+      this.sb.from('ced').select('nombre,ciudad,principal').eq('activo',true).order('principal',{ascending:false})
     ]);
-    const us=ru.data||[], ceds=(rc.data||[]);
-    // perfiles es compartida con Smart: acá solo se muestra la gente de esta red
-    const perf=(rp.data||[]).filter(u=>String(u.empresa||'').toLowerCase()!=='smart');
-    this._us=us; this._ceds=ceds.map(c=>c.nombre);
-    if(!this._ceds.length) this._ceds=['Principal'];
+    const us=ru.data||[], ceds=rc.data||[];
+    this._us=us;
+    this._ceds=ceds.length?ceds:[{nombre:'Principal',principal:true}];
+    if(this._cedSel && !this._ceds.some(c=>c.nombre===this._cedSel)) this._cedSel=null;
+    this._cedSel ? this._vUsuariosDe(this._cedSel) : this._vCeds();
+  },
 
-    const porCed=this._ceds.map(c=>{
-      const lista=us.filter(u=>u.ced===c);
-      const info=ceds.find(x=>x.nombre===c)||{};
-      return `<div class="card">
-        <div style="font-weight:800;font-size:15px">${info.principal?'👑 ':'🏭 '}${esc(c)}
-          <span style="font-weight:400;color:var(--suave);font-size:12px">${esc(info.ciudad||'')} · ${lista.length} persona${lista.length===1?'':'s'}</span></div>
-        ${lista.length?lista.map(u=>`
-          <div class="item" style="margin:9px 0 0">
-            <div class="top">
-              <div>
-                <div class="nom">${esc(u.nombre)} ${u.activo===false?'<span style="color:#dc2626;font-size:11px;font-weight:800">🔒 INACTIVO</span>':''}</div>
-                <div class="meta" style="text-transform:capitalize">${esc(u.cargo||'—')}</div>
-                <div class="meta">👤 <b style="color:var(--texto);font-family:monospace">${esc(u.usuario||'—')}</b>
-                  &nbsp; 🔑 <b style="color:var(--texto);font-family:monospace">${esc(u.clave||'—')}</b></div>
-              </div>
-              <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.usModal('${u.id}')">✎</button>
-            </div>
-          </div>`).join(''):'<div class="hint" style="margin-top:6px">Todavía nadie en este CED.</div>'}
-      </div>`;
-    }).join('');
-
+  /* paso 1 · escoger el CED */
+  _vCeds(){
+    const us=this._us||[];
     this.set(`
-      <h1>Usuarios</h1><div class="sub">A quién se le generó cada usuario, su cargo y su clave</div>
-      <button class="btn btn-main" onclick="App.usModal()">＋ Nuevo usuario</button>
-      ${porCed}
-      <h1 style="font-size:17px;margin-top:22px">Acceso a la plataforma</h1>
-      <div class="sub">Quién puede entrar hoy · se maneja aparte de la lista de arriba</div>`);
-    this._vAdminAcceso(perf);
+      <h1>Usuarios</h1><div class="sub">Entra a un CED para ver y crear su gente</div>
+      ${this._ceds.map(c=>{
+        const n=us.filter(u=>u.ced===c.nombre).length;
+        return `<div class="item" style="cursor:pointer" onclick="App.cedAbrir('${esc(c.nombre)}')">
+          <div class="top">
+            <div>
+              <div class="nom">${c.principal?'👑 ':'🏭 '}${esc(c.nombre)}</div>
+              <div class="meta">${esc(c.ciudad||'')}${c.principal?' · administra la red':''}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="tot">${n}</div>
+              <div class="meta">${n===1?'persona':'personas'}</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+      <div class="card" style="border:2px solid #dc2626;background:#fef2f2;margin-top:16px">
+        <div style="font-weight:800;color:#b91c1c">🔴 Cerrar sesión en TODOS los equipos</div>
+        <div style="font-size:12.5px;color:#7f1d1d;margin:5px 0 9px">¿Dejaste la app abierta en un computador ajeno? Esto cierra todas las sesiones. Tú solo vuelves a entrar.</div>
+        <button class="btn" style="background:#dc2626;color:#fff;width:100%;font-weight:800" onclick="App.cerrarTodasSesiones()">🔒 Cerrar todas las sesiones ahora</button>
+      </div>`);
+  },
+
+  cedAbrir(nombre){ this._cedSel=nombre; this._vUsuariosDe(nombre); },
+  cedVolver(){ this._cedSel=null; this._vCeds(); },
+
+  /* paso 2 · la gente de ese CED */
+  _vUsuariosDe(ced){
+    const lista=(this._us||[]).filter(u=>u.ced===ced);
+    const info=(this._ceds||[]).find(c=>c.nombre===ced)||{};
+    this.set(`
+      <div style="font-size:13px;color:var(--azul);cursor:pointer;margin-bottom:8px" onclick="App.cedVolver()">‹ Todos los CED</div>
+      <h1>${info.principal?'👑 ':'🏭 '}${esc(ced)}</h1>
+      <div class="sub">${lista.length} ${lista.length===1?'persona':'personas'}${info.ciudad?' · '+esc(info.ciudad):''}</div>
+      <button class="btn btn-main" onclick="App.usModal()">＋ Crear usuario</button>
+      ${lista.length?lista.map(u=>`
+        <div class="item">
+          <div class="top">
+            <div>
+              <div class="nom">${esc(u.nombre)} ${u.activo===false?'<span style="color:#dc2626;font-size:11px;font-weight:800">🔒 INACTIVO</span>':''}</div>
+              <div class="meta" style="text-transform:capitalize;font-weight:700;color:var(--texto)">${esc(u.cargo||'—')}</div>
+              <div class="meta">👤 <b style="font-family:monospace;color:var(--texto)">${esc(u.usuario||'—')}</b></div>
+              <div class="meta">🔑 <b style="font-family:monospace;color:var(--texto)">${esc(u.clave||'—')}</b></div>
+            </div>
+            <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.usModal('${u.id}')">✎</button>
+          </div>
+        </div>`).join(''):'<div class="empty">Todavía no hay nadie en este CED.<br>Toca “Crear usuario”.</div>'}
+      <div class="hint" style="margin-top:12px">El <b>cargo</b> decide qué pestañas ve — se configura en 🔐 Permisos.</div>`);
   },
 
   _vAdminAcceso(perf){
@@ -3882,13 +3915,12 @@ const App = {
   },
   usModal(id){
     const u=(this._us||[]).find(x=>x.id===id)||{};
-    const ceds=this._ceds||['Principal'];
-    this.modal(`<h3>${id?'Editar usuario':'Nuevo usuario'}</h3>
-      <div class="sub">A quién se le genera, en qué CED y con qué clave entra</div>
+    const ced=u.ced||this._cedSel||'Principal';
+    this.modal(`<h3>${id?'Editar usuario':'Crear usuario'}</h3>
+      <div class="sub">Para <b style="color:var(--naranja)">${esc(ced)}</b></div>
+      <input type="hidden" id="u_ced" value="${esc(ced)}">
       <label>Nombre de la persona</label>
       <input id="u_nom" class="field" value="${esc(u.nombre||'')}" placeholder="Nombre y apellido">
-      <label>CED</label>
-      <select id="u_ced" class="field">${ceds.map(c=>`<option ${u.ced===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
       <label>Cargo</label>
       <select id="u_car" class="field" style="text-transform:capitalize">${this.CED_CARGOS.map(c=>`<option ${u.cargo===c?'selected':''}>${c}</option>`).join('')}</select>
       <label>Usuario con el que entra</label>
