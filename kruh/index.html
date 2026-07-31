@@ -116,6 +116,7 @@ const App={
   cerrar,
   TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
   view:'dashboard',
+  _savingPedido:false,
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
   ROLES:['admin','gerencia','cajera','panadero','bodeguero','chef'],
@@ -393,6 +394,7 @@ const App={
   async vPedidos(){
     this.loading();
     const [prods,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_leads?select=id,nombre,telefono,direccion,tipo,infopromos&limit=3000'),GET('kruh_pedidos?select=items&limit=20000')]);
+    this._leads=leads;
     // los que más se venden, de primeras
     const vend={}; hist.forEach(p=>(p.items||[]).forEach(i=>{ if(i.producto_id)vend[i.producto_id]=(vend[i.producto_id]||0)+(+i.qty||0); }));
     prods.sort((a,b)=>(vend[b.id]||0)-(vend[a.id]||0)||String(a.nombre||'').localeCompare(String(b.nombre||'')));
@@ -454,7 +456,7 @@ const App={
             <div class="row" style="justify-content:space-between;align-items:center"><span class="dim">Domicilio</span><input id="pd_dom" type="number" placeholder="0" value="${this._cartDom||''}" oninput="App.domSet(this.value)" style="width:92px;text-align:right;padding:5px 8px"></div>
             <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Total</span><b id="pd_total" style="font-size:18px;color:var(--acc)">${money(total)}</b></div>
           </div>
-          <button class="btn acc full" onclick="App.pedGuardar()" ${nItems?'':'disabled style="opacity:.5"'}>Generar pedido</button>
+          <button id="pd_save" class="btn acc full" onclick="App.pedGuardar()" ${(!nItems||this._savingPedido)?'disabled style="opacity:.5"':''}>${this._savingPedido?'Guardando…':'Generar pedido'}</button>
           <button class="btn gh full" style="margin-top:6px" onclick="App.vaciarCuenta()">Vaciar</button>
         </div>
       </div>
@@ -512,6 +514,27 @@ const App={
     e.textContent=this._cartHallado||''; e.style.display=this._cartHallado?'block':'none';
     const h=this._cartHallado||'';
     e.style.color=/^⚠️/.test(h)?'var(--warn)':(/^✓/.test(h)?'var(--ok)':'var(--acc)'); },
+  _normLeadName(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); },
+  _findLeadMatch(tel,nom,excludeId){
+    const phone=this._telKey(String(tel||''));
+    const q=this._normLeadName(nom||'');
+    const source=this._leads||[];
+    const cand=source.filter(l=>!excludeId || l.id!==excludeId);
+    if(phone.length>=7){
+      const byPhone=cand.filter(l=>this._telKey(l.telefono)===phone);
+      if(byPhone.length){
+        const exact=byPhone.find(l=>this._normLeadName(l.nombre||'')===q);
+        return exact||byPhone[0];
+      }
+    }
+    if(q){
+      const byName=cand.filter(l=>this._normLeadName(l.nombre||'')===q);
+      if(byName.length) return byName[0];
+      const byPart=cand.filter(l=>this._normLeadName(l.nombre||'').includes(q) || q.includes(this._normLeadName(l.nombre||'')));
+      if(byPart.length) return byPart[0];
+    }
+    return null;
+  },
   /* guarda en memoria lo que este escrito, para que no se pierda al repintar la cuenta */
   _leerCart(){ if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value;
     if($('pd_dir'))this._cartDir=$('pd_dir').value; if($('pd_promo'))this._cartPromo=$('pd_promo').checked;
@@ -538,48 +561,58 @@ const App={
     if($('pd_dval'))$('pd_dval').textContent='−'+money(desc);
     if($('pd_dline'))$('pd_dline').style.display=desc>0?'flex':'none';
     if($('pd_total'))$('pd_total').textContent=money(bruto-desc+dom); },
-  async pedGuardar(){ const cart=this._cart||{}, prods=this._prods||[], items=[]; const fp=this._cartFP||'Efectivo', esTar=/tarjeta/i.test(fp); let sub=0, iva=0, bruto=0;
+  async pedGuardar(){ if(this._savingPedido) return; const cart=this._cart||{}, prods=this._prods||[], items=[]; const fp=this._cartFP||'Efectivo', esTar=/tarjeta/i.test(fp); let sub=0, iva=0, bruto=0;
     for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0});
       if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
     if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0);
     const desc=Math.min(Math.max(0,+(this._cartDesc||0)),bruto);
     const fac=bruto>0?(bruto-desc)/bruto:1; sub*=fac; iva*=fac;
     const total=bruto-desc+dom;
-    let ped=await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,descuento:desc,total,forma_pago:fp,estado:'nuevo'});
-    if(!ped) ped=await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});   // sin la columna descuento
-    if(!ped){ toast('⚠️ No se pudo guardar el pedido'); return; }
-    const saldos=[];
-    for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); const nuevo=(+((p&&p.existencias)||0))-it.qty; if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:nuevo}); saldos.push({nombre:it.nombre,qty:it.qty,saldo:nuevo}); }
-    const bv={cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp};
-    if(!await POST('kruh_ventas',{...bv,descuento:desc})) await POST('kruh_ventas',bv);   // sin la columna descuento
-    if(dom>0) await this._sumarDomicilio(dom,fp);
-    const nuevoCli=await this._guardarClientePedido(cli,tel);
-    this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; this._cartDesc=0;
-    this._cartDir=''; this._cartPromo=false; this._cartTipo='comunidad'; this._cartHallado='';
-   
-    toast('Pedido generado'); await this.vPedidos();
-    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3>
-      ${nuevoCli?`<div style="border:1.5px solid var(--ok);background:var(--okbg);border-radius:9px;padding:8px 11px;margin-bottom:9px;font-size:13px">👤 <b style="color:var(--ok)">${esc(nuevoCli)}</b> quedó registrado en el CRM</div>`:''}
-      <div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)')}">quedan ${s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`); },
+    this._savingPedido=true; const btn=$('pd_save'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; btn.style.opacity='.5'; }
+    try{
+      let ped=await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,descuento:desc,total,forma_pago:fp,estado:'nuevo'});
+      if(!ped) ped=await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});   // sin la columna descuento
+      if(!ped){ toast('⚠️ No se pudo guardar el pedido'); return; }
+      const saldos=[];
+      for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); const nuevo=(+((p&&p.existencias)||0))-it.qty; if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:nuevo}); saldos.push({nombre:it.nombre,qty:it.qty,saldo:nuevo}); }
+      const bv={cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp};
+      if(!await POST('kruh_ventas',{...bv,descuento:desc})) await POST('kruh_ventas',bv);   // sin la columna descuento
+      if(dom>0) await this._sumarDomicilio(dom,fp);
+      const nuevoCli=await this._guardarClientePedido(cli,tel);
+      this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; this._cartDesc=0;
+      this._cartDir=''; this._cartPromo=false; this._cartTipo='comunidad'; this._cartHallado='';
+      
+      toast('Pedido generado'); await this.vPedidos();
+      modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3>
+        ${nuevoCli?`<div style="border:1.5px solid var(--ok);background:var(--okbg);border-radius:9px;padding:8px 11px;margin-bottom:9px;font-size:13px">👤 <b style="color:var(--ok)">${esc(nuevoCli)}</b> quedó registrado en el CRM</div>`:''}
+        <div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)')}">quedan ${s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`);
+    } finally {
+      this._savingPedido=false; const b=$('pd_save'); if(b){ b.disabled=false; b.textContent='Generar pedido'; b.style.opacity=''; }
+    }
+  },
 
   /* si el cliente del pedido no está en el CRM, se registra solo */
   async _guardarClientePedido(cli,tel){
     const nom=String(cli||'').trim(), k=this._telKey(tel);
-    if(!nom || k.length<7) return '';                       // sin teléfono no se puede evitar duplicados
+    if(!nom) return '';
     const dir=(this._cartDir||'').trim(), promo=!!this._cartPromo, tipo=this._cartTipo||'comunidad';
-    const ex=(this._telMap||{})[k];
+    const ex=this._findLeadMatch(tel,cli);
     if(ex){ // ya está en el CRM: solo se actualiza lo que cambió
       const b={}; if(dir&&dir!==ex.direccion)b.direccion=dir;
       if(promo!==!!ex.infopromos)b.infopromos=promo;
       if(tipo!==ex.tipo)b.tipo=tipo;
+      if(!this._telKey(ex.telefono)&&k.length>=7) b.telefono=String(tel||'').trim();
       if(Object.keys(b).length){ const r=await PATCH('kruh_leads?id=eq.'+ex.id,b);
         if(r&&!r.ok) toast('⚠️ El pedido quedó, pero el CRM no se actualizó'); else Object.assign(ex,b); }
-      return ''; }
+      return '';
+    }
+    if(k.length<7) return '';
     const b={nombre:nom,telefono:String(tel||'').trim(),direccion:dir,infopromos:promo,
       etapa:'contactado',tipo:tipo,canal:'local',interes:'Registrado desde un pedido'};
     const r=await POST('kruh_leads',b);
     if(!r) return '';
     this._telMap=this._telMap||{}; this._telMap[k]={id:r.id,nombre:nom,direccion:dir,tipo:tipo,infopromos:promo};
+    if(this._leads) this._leads.push({id:r.id,...b});
     return nom; },
 
   /* el domicilio cobrado en la cuenta cae solo en Gastos, acumulado por día */
@@ -708,13 +741,13 @@ const App={
   leadTel(){ const d=$('l_dup'); if(!d)return;
     const k=this._telKey($('l_tel')?$('l_tel').value:'');
     if(k.length<7){ d.innerHTML=''; this._leadDup=null; return; }
-    const y=(this._leads||[]).find(l=>l.id!==this._leadEdit&&this._telKey(l.telefono)===k);
+    const y=this._findLeadMatch($('l_tel').value, $('l_nom').value, this._leadEdit);
     this._leadDup=y||null;
     d.innerHTML=y
       ? `<div style="margin:6px 0 2px;border:1.5px solid var(--bad);background:var(--badbg);border-radius:9px;padding:8px 11px;font-size:13px">
-           ⚠️ <b style="color:var(--bad)">Ese teléfono ya está registrado</b><br>
+           ⚠️ <b style="color:var(--bad)">Ya existe un cliente con ese teléfono o nombre parecido</b><br>
            <b>${esc(y.nombre||'—')}</b>${y.ciudad?' · '+esc(y.ciudad):''}${y.creado_en?' · desde '+esc(String(y.creado_en).slice(0,10)):''}
-           <div class="hint" style="margin-top:3px">Si guardas, te va a quedar repetido.</div></div>`
+           <div class="hint" style="margin-top:3px">Se va a unir al registro existente en vez de crear uno nuevo.</div></div>`
       : `<div style="margin:6px 0 2px;font-size:12.5px;color:var(--ok);font-weight:700">✔ Teléfono libre, no está registrado</div>`; },
   /* nueva lista: check de promos, check de cliente nuevo, u origen = Cliente nuevo */
   _listaNueva(l){ return !!(l.infopromos||l.cliente_nuevo||((l.tipo==='nuevo')&&((l.canal||'local')==='local'))); },
@@ -722,8 +755,14 @@ const App={
     const b={nombre:$('l_nom').value.trim(),telefono:$('l_tel').value.trim(),direccion:$('l_dir').value.trim(),ciudad:$('l_ciu').value.trim(),instagram:$('l_ig').value.trim(),cedula:$('l_ced').value.trim(),interes:$('l_int').value.trim(),etapa:'contactado',tipo:org[2],canal:org[3],
       infopromos:!!($('l_promos')&&$('l_promos').checked), cliente_nuevo:!!($('l_nuevo')&&$('l_nuevo').checked)};
     if(!b.nombre){alert('Nombre');return;}
-    const dup=this._leadDup;
-    if(dup && !confirm('El teléfono '+($('l_tel').value||'')+' ya está registrado a nombre de '+(dup.nombre||'—')+'.\n\n¿Guardar de todos modos y dejarlo repetido?'))return;
+    const dup=this._findLeadMatch(b.telefono,b.nombre,id);
+    if(dup){
+      const merge=confirm('Ya existe un cliente parecido en el CRM: '+(dup.nombre||'—')+'\n\n¿Deseas actualizar ese registro y no crear otro?');
+      if(!merge) return;
+      const r=await PATCH('kruh_leads?id=eq.'+dup.id,{...b,telefono:b.telefono||dup.telefono||''});
+      if(!r||!r.ok){ toast('⚠️ No se pudo unir al cliente existente'); return; }
+      this._leadDup=null; cerrar(); toast('Cliente unido al registro existente'); this.vCrm(); return;
+    }
     let r;
     if(id){ r=await PATCH('kruh_leads?id=eq.'+id,b);
       if(r&&!r.ok){ const {infopromos,cliente_nuevo,...base}=b; r=await PATCH('kruh_leads?id=eq.'+id,base);
@@ -1691,6 +1730,14 @@ const App={
         if(k===hoyK)add('dia',n+' ||'+fp,fp);
         if(k.slice(0,7)===mesK)add('mes',n,'');
         if(k.slice(0,4)===anoK)add('ano',n,''); }); });
+    // ventas sin pedido en app (carga manual) → "Consumidor Final" en los cajones
+    (ventas||[]).filter(v=>(v.producto||'')==='Consumidor Final').forEach(v=>{
+      const k=this._diaKey(v.creado_en); if(!k)return; const tt=+v.monto||0;
+      const addCF=(b,key,fp)=>{const o=B[b][key]=B[b][key]||{n:'Consumidor Final',fp,q:0,v:0,d:0}; o.v+=tt;};
+      if(k===hoyK){ COBRADO.dia+=tt; addCF('dia','Consumidor Final ||Efectivo','Efectivo'); }
+      if(k.slice(0,7)===mesK){ COBRADO.mes+=tt; addCF('mes','Consumidor Final',''); }
+      if(k.slice(0,4)===anoK){ COBRADO.ano+=tt; addCF('ano','Consumidor Final',''); }
+    });
     const tot=b=>COBRADO[b]||0;
     const CJ=[['dia','📅 Día','hoy '+f.getDate()+' de '+(this.MESNOM[f.getMonth()+1]||'').toLowerCase(),'👥 '+cli.dia.size+' cliente(s)'],
               ['mes','🗓️ Mes',(this.MESNOM[f.getMonth()+1]||'')+' '+anoK,'👥 '+cli.mes.size+' cliente(s)'],
@@ -1719,7 +1766,7 @@ const App={
         <tbody>${filas.map(x=>{const cob=x.v-x.d; return `<tr>
           <td style="padding-left:10px;font-weight:600">${esc(x.k)}</td>
           ${conFP?`<td style="padding-left:10px;font-size:12px;color:var(--ink2)">${esc(x.fp)}</td>`:''}
-          <td style="text-align:right;padding-right:10px">${num(x.q)}</td>
+          <td style="text-align:right;padding-right:10px">${x.q>0?num(x.q):'—'}</td>
           <td style="text-align:right;padding-right:10px;color:var(--mut)">${money(x.v)}</td>
           ${hayDesc?`<td style="text-align:right;padding-right:10px;color:${x.d>0?'var(--bad)':'var(--mut)'}">${x.d>0?'−'+money(x.d):'—'}</td>`:''}
           <td style="text-align:right;padding-right:10px;font-weight:700;color:var(--acc)">${money(cob)}</td>
