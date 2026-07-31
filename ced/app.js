@@ -3823,7 +3823,9 @@ const App = {
       this.sb.from('ced').select('nombre,ciudad,principal').eq('activo',true).order('principal',{ascending:false}),
       this.sb.from('perfiles').select('*').order('creado_en')
     ]);
-    const us=ru.data||[], ceds=(rc.data||[]), perf=rp.data||[];
+    const us=ru.data||[], ceds=(rc.data||[]);
+    // perfiles es compartida con Smart: acá solo se muestra la gente de esta red
+    const perf=(rp.data||[]).filter(u=>String(u.empresa||'').toLowerCase()!=='smart');
     this._us=us; this._ceds=ceds.map(c=>c.nombre);
     if(!this._ceds.length) this._ceds=['Principal'];
 
