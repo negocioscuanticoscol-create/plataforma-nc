@@ -52,6 +52,10 @@
   .topbar .who b{display:block;font-size:13px}
   .topbar .rol{display:inline-block;background:var(--negro);color:#fff;font-size:10px;padding:2px 7px;border-radius:20px;text-transform:uppercase;letter-spacing:.5px}
   .logout{background:none;border:none;color:var(--suave);font-size:12px;cursor:pointer;margin-left:10px}
+  /* el ? del manual · siempre a la mano, en cualquier pantalla */
+  .ayuda{margin-left:10px;width:28px;height:28px;flex:none;border-radius:50%;border:1.5px solid var(--linea);
+    background:#fff;color:var(--naranja);font-weight:800;font-size:15px;cursor:pointer;line-height:1}
+  .ayuda:active{background:var(--gris)}
 
   #main{flex:1;padding:14px 14px 120px}
   h1{font-size:19px;margin-bottom:4px}
@@ -193,6 +197,7 @@
     <img src="../assets/logo.png" alt="Feroz">
     <div style="display:flex;align-items:center">
       <div class="who"><b id="me_nombre">—</b><span class="rol" id="me_rol">—</span></div>
+      <button class="ayuda" onclick="App.manual()" title="Cómo se usa esta pantalla">?</button>
       <button class="logout" onclick="App.logout()">Salir</button>
     </div>
   </div>
@@ -206,7 +211,7 @@
 <script>
   // Versión fija → el navegador CACHEA los archivos (carga 1 vez y luego instantáneo).
   // Cuando se cambie el código, subir este número (NCVER) y el usuario hace Ctrl+Shift+R una vez.
-  var NCVER='20260731-ced9';
+  var NCVER='20260731-ced10';
   ['config.js','geo-co.js','app.js'].forEach(function(s){
     document.write('<scr'+'ipt src="'+s+'?v='+NCVER+'"><\/scr'+'ipt>');
   });

@@ -57,6 +57,71 @@ const App = {
 
   async logout(){ await this.sb.auth.signOut(); location.reload(); },
 
+  /* quién es esta persona dentro de la red: su CED y su cargo.
+     Las cuentas de la red usan el correo interno usuario@ced.local */
+  async cargarCedUser(){
+    this.cedUser=null;
+    const em=String(this.user&&this.user.email||'');
+    if(!em.endsWith('@ced.local')) return;
+    const { data } = await this.sb.from('ced_usuarios').select('*')
+      .eq('usuario', em.replace('@ced.local','')).maybeSingle();
+    if(data) this.cedUser=data;
+  },
+  miCargo(){ return (this.cedUser&&this.cedUser.cargo)||null; },
+
+  /* ---------- MANUAL DE USUARIO ----------
+     Cada pestaña y cada botón tiene su ficha en ced_manual. Se muestra la del
+     módulo en el que estás parado, y solo lo que le toca a tu cargo. */
+  async manual(){
+    this.modal('<div class="spin">Cargando el manual…</div>');
+    const { data:fichas=[] } = await this.sb.from('ced_manual').select('*')
+      .eq('modulo', this.view).order('orden');
+    const cargo=this.miCargo(), esAdmin=this.perfil&&this.perfil.rol==='admin';
+    const vis=(fichas||[]).filter(f=>{
+      const c=f.cargos||[];
+      return !c.length || !cargo || c.includes(cargo);
+    });
+    const pestana=vis.find(f=>!f.elemento), botones=vis.filter(f=>f.elemento);
+    this.modal(`
+      <h3>${pestana?esc(pestana.titulo):'Manual'}</h3>
+      ${pestana?`
+        <div class="card" style="background:#fff7ed;border-color:#fed7aa">
+          <div style="font-weight:800;font-size:12px;color:#9a3412;text-transform:uppercase;letter-spacing:.05em">Para qué sirve</div>
+          <div style="margin-top:4px">${esc(pestana.para_que||'—')}</div>
+          <div style="font-weight:800;font-size:12px;color:#9a3412;text-transform:uppercase;letter-spacing:.05em;margin-top:11px">Cómo se usa</div>
+          <div style="margin-top:4px">${esc(pestana.como_usar||'—')}</div>
+          ${esAdmin?`<button class="btn-sm btn-ghost" style="border:1px solid var(--linea);margin-top:10px" onclick="App.manualEditar('${pestana.id}')">✎ Corregir</button>`:''}
+        </div>`:'<div class="empty">Esta pestaña todavía no tiene manual.</div>'}
+      ${botones.length?`<h3 style="font-size:15px;margin:16px 0 8px">Los botones de esta pantalla</h3>
+        ${botones.map(f=>`<div class="item">
+          <div class="nom">${esc(f.titulo)}</div>
+          <div style="font-size:13px;margin-top:4px">${esc(f.para_que||'')}</div>
+          <div style="font-size:13px;color:var(--suave);margin-top:5px">${esc(f.como_usar||'')}</div>
+          ${esAdmin?`<button class="btn-sm btn-ghost" style="border:1px solid var(--linea);margin-top:8px" onclick="App.manualEditar('${f.id}')">✎ Corregir</button>`:''}
+        </div>`).join('')}`:''}
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cerrar</button>`);
+    this._manual=vis;
+  },
+
+  manualEditar(id){
+    const f=(this._manual||[]).find(x=>x.id===id); if(!f) return;
+    this.modal(`<h3>Corregir el manual</h3>
+      <div class="sub">${esc(f.titulo)}</div>
+      <label>Para qué sirve</label>
+      <textarea id="mn_p" class="field" rows="3">${esc(f.para_que||'')}</textarea>
+      <label>Cómo se usa</label>
+      <textarea id="mn_c" class="field" rows="4">${esc(f.como_usar||'')}</textarea>
+      <button class="btn btn-main" onclick="App.manualGuardar('${id}')">Guardar</button>
+      <button class="btn btn-ghost" onclick="App.manual()">Volver</button>`);
+  },
+
+  async manualGuardar(id){
+    const { error } = await this.sb.from('ced_manual')
+      .update({ para_que:$('mn_p').value.trim(), como_usar:$('mn_c').value.trim() }).eq('id',id);
+    if(error){ alert('Error: '+error.message); return; }
+    this.toast('Manual actualizado'); this.manual();
+  },
+
   async afterLogin(){
     // cargar / asegurar perfil
     let { data:perf } = await this.sb.from('perfiles').select('*').eq('id', this.user.id).maybeSingle();
@@ -73,6 +138,7 @@ const App = {
       alert('🔒 Tu acceso es solo para '+dest+'. Entra por el enlace de '+dest+' (?empresa='+this.perfil.empresa+').');
       location.href = location.pathname+'?empresa='+this.perfil.empresa; return;
     }
+    await this.cargarCedUser();
     this._loginTs=Date.now();
     this._startHeartbeat();
     $('view-login').classList.add('hide'); $('app').classList.remove('hide');
