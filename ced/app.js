@@ -3963,22 +3963,13 @@ const App = {
           : 'Error: '+error.message);
         return;
       }
-      // 2) la cuenta con la que entra de verdad
-      if(!id){
-        // cliente aparte: si no, signUp bota TU sesión y te saca de la app
-        const tmp=supabase.createClient(C.SUPABASE_URL, C.SUPABASE_KEY,
-          {auth:{persistSession:false, autoRefreshToken:false, detectSessionInUrl:false}});
-        const { error:e2 } = await tmp.auth.signUp({ email:correo, password:b.clave,
-          options:{ data:{ nombre:b.nombre, ced:b.ced, cargo:b.cargo } } });
-        if(e2 && !/already/i.test(e2.message)){
-          alert('La ficha quedó guardada, pero la cuenta de ingreso no: '+e2.message);
-        }
-      } else if(prev.clave!==b.clave || prev.usuario!==b.usuario){
-        const { data:r, error:e3 } = await this.sb.rpc('ced_set_clave',
-          { p_email:this.usCorreo(prev.usuario||b.usuario), p_clave:b.clave });
-        if(e3) alert('No se pudo cambiar la clave de ingreso: '+e3.message);
-        else if(r && r!=='ok') alert(r);
-      }
+      // 2) la cuenta con la que entra de verdad.
+      // Se crea desde la base (ced_crear_usuario), no con signUp: el registro
+      // público está cerrado a propósito y signUp quedaría bloqueado.
+      const { data:r, error:e2 } = await this.sb.rpc('ced_crear_usuario',
+        { p_email:correo, p_clave:b.clave, p_nombre:b.nombre, p_ced:b.ced, p_cargo:b.cargo });
+      if(e2){ alert('La ficha quedó guardada, pero la cuenta de ingreso no: '+e2.message); }
+      else if(r && r!=='ok'){ alert('La ficha quedó guardada, pero la cuenta de ingreso no: '+r); }
       this.cerrarModal(); this.toast('Usuario guardado'); this.vAdmin();
     } finally { if(btn){ btn.disabled=false; btn.textContent='Guardar'; } }
   },
