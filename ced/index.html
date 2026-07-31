@@ -149,15 +149,15 @@
     <img src="../assets/logo.png" alt="Feroz">
     <div class="tit">Centro Empresarial de Dotaciones</div>
     <div id="login-form">
-      <label>Correo</label>
-      <input id="lg_email" type="email" inputmode="email" placeholder="tucorreo@correo.com" autocomplete="username">
+      <label>Usuario</label>
+      <input id="lg_email" type="email" inputmode="email" placeholder="tu usuario" autocomplete="username">
       <label id="lbl_nombre" class="hide">Tu nombre</label>
       <input id="lg_nombre" class="field hide" placeholder="Nombre y apellido" style="border-radius:10px">
-      <label>Contraseña</label>
+      <label>Clave</label>
       <input id="lg_pass" type="password" placeholder="••••••••" autocomplete="current-password">
       <button class="btn btn-main" id="btn_login" onclick="App.login()">Entrar</button>
       <button class="btn btn-ghost hide" id="btn_signup" onclick="App.signup()">Crear cuenta</button>
-      <div class="switch" id="sw_signup" onclick="App.modoSignup(true)">¿Primera vez? Crear cuenta</div>
+      <div class="hint" style="text-align:center;margin-top:12px">Las cuentas las crea el administrador desde <b>Usuarios</b>.</div>
       <div class="switch hide" id="sw_login" onclick="App.modoSignup(false)">Ya tengo cuenta · Entrar</div>
       <div class="msg" id="lg_msg"></div>
     </div>
@@ -192,7 +192,7 @@
 <script>
   // Versión fija → el navegador CACHEA los archivos (carga 1 vez y luego instantáneo).
   // Cuando se cambie el código, subir este número (NCVER) y el usuario hace Ctrl+Shift+R una vez.
-  var NCVER='20260731-ced1';
+  var NCVER='20260731-ced2';
   ['config.js','geo-co.js','app.js'].forEach(function(s){
     document.write('<scr'+'ipt src="'+s+'?v='+NCVER+'"><\/scr'+'ipt>');
   });

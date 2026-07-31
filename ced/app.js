@@ -34,11 +34,13 @@ const App = {
   msg(t, ok){ const m=$('lg_msg'); m.className='msg'+(t?(ok?' ok':' err'):''); m.textContent=t; },
 
   async login(){
-    const email=$('lg_email').value.trim(), pass=$('lg_pass').value;
-    if(!email||!pass){ this.msg('Escribe correo y contraseña.'); return; }
+    const dicho=$('lg_email').value.trim(), pass=$('lg_pass').value;
+    if(!dicho||!pass){ this.msg('Escribe tu usuario y tu clave.'); return; }
+    // los de la red entran con usuario suelto; los correos de siempre siguen sirviendo
+    const email = dicho.includes('@') ? dicho : this.usCorreo(dicho);
     this.msg('Entrando…', true);
     const { data, error } = await this.sb.auth.signInWithPassword({ email, password:pass });
-    if(error){ this.msg(error.message.includes('Invalid')?'Correo o contraseña incorrectos.':error.message); return; }
+    if(error){ this.msg(error.message.includes('Invalid')?'Usuario o clave incorrectos.':error.message); return; }
     this.user = data.user; await this.afterLogin();
   },
 
@@ -3841,7 +3843,8 @@ const App = {
               <div>
                 <div class="nom">${esc(u.nombre)} ${u.activo===false?'<span style="color:#dc2626;font-size:11px;font-weight:800">🔒 INACTIVO</span>':''}</div>
                 <div class="meta" style="text-transform:capitalize">${esc(u.cargo||'—')}</div>
-                <div class="meta">🔑 <b style="color:var(--texto);font-family:monospace">${esc(u.clave||'—')}</b></div>
+                <div class="meta">👤 <b style="color:var(--texto);font-family:monospace">${esc(u.usuario||'—')}</b>
+                  &nbsp; 🔑 <b style="color:var(--texto);font-family:monospace">${esc(u.clave||'—')}</b></div>
               </div>
               <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.usModal('${u.id}')">✎</button>
             </div>
@@ -3888,8 +3891,12 @@ const App = {
       <select id="u_ced" class="field">${ceds.map(c=>`<option ${u.ced===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
       <label>Cargo</label>
       <select id="u_car" class="field" style="text-transform:capitalize">${this.CED_CARGOS.map(c=>`<option ${u.cargo===c?'selected':''}>${c}</option>`).join('')}</select>
+      <label>Usuario con el que entra</label>
+      <input id="u_usr" class="field" value="${esc(u.usuario||'')}" placeholder="se arma solo con el nombre"
+             oninput="this.dataset.tocado=1">
+      <div class="hint">Es lo que escribe en el login. Sin arroba, sin correo.</div>
       <label>Clave</label>
-      <input id="u_cla" class="field" value="${esc(u.clave||'')}" placeholder="clave de entrada">
+      <input id="u_cla" class="field" value="${esc(u.clave||'')}" placeholder="mínimo 6 caracteres">
       <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
         <input type="checkbox" id="u_act" style="width:auto" ${u.activo===false?'':'checked'}> Puede entrar
       </label>
@@ -3898,18 +3905,50 @@ const App = {
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
   },
 
+  /* "Marcela Ruiz" -> "marcela.ruiz" · sin tildes ni ñ, para poder escribirlo rápido */
+  usSlug(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .toLowerCase().replace(/[^a-z0-9\s.]/g,'').trim().replace(/\s+/g,'.').slice(0,30); },
+  usCorreo(usuario){ return this.usSlug(usuario)+'@ced.local'; },
+
   async usGuardar(id){
+    const prev=(this._us||[]).find(x=>x.id===id)||{};
     const b={ nombre:$('u_nom').value.trim(), ced:$('u_ced').value, cargo:$('u_car').value,
               clave:$('u_cla').value.trim(), activo:$('u_act').checked };
+    b.usuario = this.usSlug($('u_usr').value.trim() || b.nombre);
     if(!b.nombre||!b.clave){ alert('El nombre y la clave son obligatorios.'); return; }
-    const { error } = id ? await this.sb.from('ced_usuarios').update(b).eq('id',id)
-                         : await this.sb.from('ced_usuarios').insert(b);
-    if(error){
-      alert(/duplicate|unique/i.test(error.message)
-        ? 'Ya hay alguien con ese nombre en ese CED.' : 'Error: '+error.message);
-      return;
-    }
-    this.cerrarModal(); this.toast('Usuario guardado'); this.vAdmin();
+    if(b.clave.length<6){ alert('La clave debe tener al menos 6 caracteres.'); return; }
+    if(!b.usuario){ alert('No se pudo armar el usuario. Escríbelo a mano.'); return; }
+
+    const correo=this.usCorreo(b.usuario);
+    const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+    try{
+      // 1) la ficha que tú ves
+      const { error } = id ? await this.sb.from('ced_usuarios').update(b).eq('id',id)
+                           : await this.sb.from('ced_usuarios').insert(b);
+      if(error){
+        alert(/duplicate|unique/i.test(error.message)
+          ? 'Ya existe alguien con ese nombre en ese CED, o ese usuario ya está tomado.'
+          : 'Error: '+error.message);
+        return;
+      }
+      // 2) la cuenta con la que entra de verdad
+      if(!id){
+        // cliente aparte: si no, signUp bota TU sesión y te saca de la app
+        const tmp=supabase.createClient(C.SUPABASE_URL, C.SUPABASE_KEY,
+          {auth:{persistSession:false, autoRefreshToken:false, detectSessionInUrl:false}});
+        const { error:e2 } = await tmp.auth.signUp({ email:correo, password:b.clave,
+          options:{ data:{ nombre:b.nombre, ced:b.ced, cargo:b.cargo } } });
+        if(e2 && !/already/i.test(e2.message)){
+          alert('La ficha quedó guardada, pero la cuenta de ingreso no: '+e2.message);
+        }
+      } else if(prev.clave!==b.clave || prev.usuario!==b.usuario){
+        const { data:r, error:e3 } = await this.sb.rpc('ced_set_clave',
+          { p_email:this.usCorreo(prev.usuario||b.usuario), p_clave:b.clave });
+        if(e3) alert('No se pudo cambiar la clave de ingreso: '+e3.message);
+        else if(r && r!=='ok') alert(r);
+      }
+      this.cerrarModal(); this.toast('Usuario guardado'); this.vAdmin();
+    } finally { if(btn){ btn.disabled=false; btn.textContent='Guardar'; } }
   },
 
   async usBorrar(id){
