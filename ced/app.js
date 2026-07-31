@@ -137,7 +137,7 @@ const App = {
     // hilera 2 = base de plataforma (solo admin la tiene en permitidos → solo a él le aparece)
     const ROW2=[
       {v:'datos', ic:'🗄️', t:'Datos'},
-      {v:'admin', ic:'⚙️', t:'Equipo'},
+      {v:'admin', ic:'👤', t:'Usuarios'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
     const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','datos','admin','permisos'];
@@ -3814,11 +3814,50 @@ const App = {
   },
 
   /* ---------- ADMIN (equipo) ---------- */
+  CED_CARGOS:['gerente','contabilidad','bodega','cajera'],
+
   async vAdmin(){
     this.loading();
-    const { data:perf=[] } = await this.sb.from('perfiles').select('*').order('creado_en');
+    const [ru,rc,rp] = await Promise.all([
+      this.sb.from('ced_usuarios').select('*').order('ced').order('nombre'),
+      this.sb.from('ced').select('nombre,ciudad,principal').eq('activo',true).order('principal',{ascending:false}),
+      this.sb.from('perfiles').select('*').order('creado_en')
+    ]);
+    const us=ru.data||[], ceds=(rc.data||[]), perf=rp.data||[];
+    this._us=us; this._ceds=ceds.map(c=>c.nombre);
+    if(!this._ceds.length) this._ceds=['Principal'];
+
+    const porCed=this._ceds.map(c=>{
+      const lista=us.filter(u=>u.ced===c);
+      const info=ceds.find(x=>x.nombre===c)||{};
+      return `<div class="card">
+        <div style="font-weight:800;font-size:15px">${info.principal?'👑 ':'🏭 '}${esc(c)}
+          <span style="font-weight:400;color:var(--suave);font-size:12px">${esc(info.ciudad||'')} · ${lista.length} persona${lista.length===1?'':'s'}</span></div>
+        ${lista.length?lista.map(u=>`
+          <div class="item" style="margin:9px 0 0">
+            <div class="top">
+              <div>
+                <div class="nom">${esc(u.nombre)} ${u.activo===false?'<span style="color:#dc2626;font-size:11px;font-weight:800">🔒 INACTIVO</span>':''}</div>
+                <div class="meta" style="text-transform:capitalize">${esc(u.cargo||'—')}</div>
+                <div class="meta">🔑 <b style="color:var(--texto);font-family:monospace">${esc(u.clave||'—')}</b></div>
+              </div>
+              <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.usModal('${u.id}')">✎</button>
+            </div>
+          </div>`).join(''):'<div class="hint" style="margin-top:6px">Todavía nadie en este CED.</div>'}
+      </div>`;
+    }).join('');
+
     this.set(`
-      <h1>Equipo</h1><div class="sub">Asigna el rol de cada persona</div>
+      <h1>Usuarios</h1><div class="sub">A quién se le generó cada usuario, su cargo y su clave</div>
+      <button class="btn btn-main" onclick="App.usModal()">＋ Nuevo usuario</button>
+      ${porCed}
+      <h1 style="font-size:17px;margin-top:22px">Acceso a la plataforma</h1>
+      <div class="sub">Quién puede entrar hoy · se maneja aparte de la lista de arriba</div>`);
+    this._vAdminAcceso(perf);
+  },
+
+  _vAdminAcceso(perf){
+    $('main').insertAdjacentHTML('beforeend',`
       ${perf.map(u=>`<div class="item"><div class="top"><div>
         <div class="nom">${esc(u.nombre||'')} ${u.activo===false?'<span style="color:#dc2626;font-size:11px;font-weight:800">🔒 BLOQUEADO</span>':'<span style="color:#16a34a;font-size:11px;font-weight:700">● activo</span>'}</div><div class="meta">${esc(u.id.slice(0,8))}…</div>
       </div></div>
@@ -3836,6 +3875,48 @@ const App = {
       </div>
     `);
   },
+  usModal(id){
+    const u=(this._us||[]).find(x=>x.id===id)||{};
+    const ceds=this._ceds||['Principal'];
+    this.modal(`<h3>${id?'Editar usuario':'Nuevo usuario'}</h3>
+      <div class="sub">A quién se le genera, en qué CED y con qué clave entra</div>
+      <label>Nombre de la persona</label>
+      <input id="u_nom" class="field" value="${esc(u.nombre||'')}" placeholder="Nombre y apellido">
+      <label>CED</label>
+      <select id="u_ced" class="field">${ceds.map(c=>`<option ${u.ced===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      <label>Cargo</label>
+      <select id="u_car" class="field" style="text-transform:capitalize">${this.CED_CARGOS.map(c=>`<option ${u.cargo===c?'selected':''}>${c}</option>`).join('')}</select>
+      <label>Clave</label>
+      <input id="u_cla" class="field" value="${esc(u.clave||'')}" placeholder="clave de entrada">
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        <input type="checkbox" id="u_act" style="width:auto" ${u.activo===false?'':'checked'}> Puede entrar
+      </label>
+      <button class="btn btn-main" onclick="App.usGuardar('${id||''}')">Guardar</button>
+      ${id?`<button class="btn" style="background:#fde8e8;color:#b3261e" onclick="App.usBorrar('${id}')">Eliminar usuario</button>`:''}
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+  },
+
+  async usGuardar(id){
+    const b={ nombre:$('u_nom').value.trim(), ced:$('u_ced').value, cargo:$('u_car').value,
+              clave:$('u_cla').value.trim(), activo:$('u_act').checked };
+    if(!b.nombre||!b.clave){ alert('El nombre y la clave son obligatorios.'); return; }
+    const { error } = id ? await this.sb.from('ced_usuarios').update(b).eq('id',id)
+                         : await this.sb.from('ced_usuarios').insert(b);
+    if(error){
+      alert(/duplicate|unique/i.test(error.message)
+        ? 'Ya hay alguien con ese nombre en ese CED.' : 'Error: '+error.message);
+      return;
+    }
+    this.cerrarModal(); this.toast('Usuario guardado'); this.vAdmin();
+  },
+
+  async usBorrar(id){
+    if(!confirm('¿Eliminar este usuario? No podrá entrar más.')) return;
+    const { error } = await this.sb.from('ced_usuarios').delete().eq('id',id);
+    if(error){ alert('Error: '+error.message); return; }
+    this.cerrarModal(); this.toast('Usuario eliminado'); this.vAdmin();
+  },
+
   async cambiarRol(id,rol){
     const { error } = await this.sb.from('perfiles').update({rol}).eq('id',id);
     if(error) alert('Error: '+error.message); else this.toast('Rol actualizado');

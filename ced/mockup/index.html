@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup · CED Red de Distribución</title>
+<style>
+  /* paleta de Alpaca: rojo de marca sobre gris claro.
+     Como la marca ya es roja, lo crítico va en un rojo más oscuro y sobre fondo,
+     para que no se confunda con el acento. */
+  :root{
+    --acc:#d81f26; --acc2:#f0353c; --accBg:#fde8e8;
+    --negro:#15171c; --gris:#f4f5f7; --blanco:#fff;
+    --verde:#2e9e4f; --verdeBg:#e7f6ec;
+    --mal:#b3261e; --malBg:#fdecec;
+    --azul:#2f6fed; --azulBg:#eaf0fd;
+    --amarillo:#b45309; --amarilloBg:#fff4e5;
+    --linea:#e3e5ea; --linea2:#f0f1f4; --texto:#1d1f24; --suave:#6b7280; --tenue:#9aa1ac;
+    --sombra:0 1px 2px rgba(21,23,28,.05),0 12px 28px -20px rgba(21,23,28,.4);
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--gris);color:var(--texto);line-height:1.55;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px 80px}
+
+  /* cabecera */
+  .top{padding:44px 0 26px;border-bottom:3px solid var(--acc)}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--acc);font-weight:700}
+  h1{font-size:clamp(28px,5vw,42px);font-weight:800;letter-spacing:-.03em;line-height:1.06;
+    margin:11px 0 10px;text-wrap:balance}
+  .lede{color:var(--suave);font-size:17px;max-width:68ch}
+  .tagz{display:flex;gap:7px;flex-wrap:wrap;margin-top:17px}
+  .tagz span{font-family:var(--mono);font-size:11px;background:var(--blanco);
+    border:1px solid var(--linea);border-radius:6px;padding:5px 10px;color:var(--suave)}
+  .tagz b{color:var(--texto)}
+
+  h2{font-size:12px;letter-spacing:.17em;text-transform:uppercase;color:var(--tenue);font-weight:700;
+    font-family:var(--mono);padding-bottom:9px;border-bottom:1px solid var(--linea);margin:44px 0 20px}
+  h3{font-size:19px;font-weight:800;letter-spacing:-.02em;margin-bottom:7px;text-wrap:balance}
+  p{max-width:66ch;margin-bottom:12px}
+
+  /* el cambio */
+  .cambio{display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center;
+    background:var(--blanco);border:1px solid var(--linea);border-radius:16px;padding:24px;box-shadow:var(--sombra)}
+  @media(max-width:700px){.cambio{grid-template-columns:1fr;gap:12px}.cambio .flecha{transform:rotate(90deg)}}
+  .cambio .lado .k{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--tenue);font-weight:700;margin-bottom:5px}
+  .cambio .lado .v{font-size:21px;font-weight:800;letter-spacing:-.02em}
+  .cambio .lado .d{font-size:13px;color:var(--suave);margin-top:4px;line-height:1.5}
+  .cambio .flecha{font-size:26px;color:var(--acc);font-weight:800}
+  .cambio .lado.new{background:var(--accBg);margin:-10px;padding:10px 14px;border-radius:12px}
+
+  /* tabla de módulos */
+  .tw{overflow-x:auto;border:1px solid var(--linea);border-radius:14px;background:var(--blanco);box-shadow:var(--sombra)}
+  table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--tenue);
+    text-align:left;padding:12px 14px;border-bottom:1px solid var(--linea);font-weight:700;background:var(--gris)}
+  td{padding:12px 14px;border-bottom:1px solid var(--linea2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td .m{font-weight:700}
+  td .n{font-size:12.5px;color:var(--suave);margin-top:2px;line-height:1.5}
+  .chip{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.06em;
+    text-transform:uppercase;padding:4px 9px;border-radius:5px;white-space:nowrap}
+  .chip.q{background:var(--verdeBg);color:var(--verde);border:1px solid #bfe3ca}
+  .chip.c{background:var(--amarilloBg);color:var(--amarillo);border:1px solid #f0dcbb}
+  .chip.f{background:var(--malBg);color:var(--mal);border:1px solid #f0c4c4}
+  .chip.n{background:var(--accBg);color:var(--acc);border:1px solid #f4c7c7}
+  .chip.d{background:var(--azulBg);color:var(--azul);border:1px solid #c5d6f8}
+
+  /* teléfonos */
+  .board{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:26px 20px;margin-top:20px}
+  .step .lbl{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+  .step .n{width:25px;height:25px;border-radius:8px;background:var(--acc);color:#fff;font-weight:800;
+    font-family:var(--mono);font-size:11.5px;display:flex;align-items:center;justify-content:center;flex:none}
+  .step .tt{font-weight:700;font-size:14.5px}
+  .step .ds{font-size:12px;color:var(--suave);margin:-4px 0 10px 34px;line-height:1.5}
+  .phone{background:var(--blanco);border:1px solid var(--linea);border-radius:22px;padding:7px;box-shadow:var(--sombra)}
+  .screen{background:var(--gris);border-radius:17px;overflow:hidden;min-height:430px;display:flex;flex-direction:column}
+  .notch{height:19px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;
+    font-size:9px;color:var(--tenue);font-family:var(--mono);background:var(--blanco)}
+  .hdr{background:var(--negro);color:#fff;padding:10px 13px}
+  .hdr .h1{font-size:13px;font-weight:800} .hdr .h1 span{color:var(--acc2)}
+  .hdr .sb{font-size:10px;color:#9aa1ac;margin-top:2px}
+  .body{padding:11px;flex:1;display:flex;flex-direction:column;gap:8px}
+  .tabs{display:flex;gap:2px;background:var(--blanco);border-bottom:1px solid var(--linea);padding:0 6px;overflow:hidden}
+  .tabs b{font-size:9.5px;padding:8px 6px;color:var(--tenue);font-weight:700;white-space:nowrap}
+  .tabs b.on{color:var(--texto);box-shadow:inset 0 -2px 0 var(--acc)}
+
+  .c{background:var(--blanco);border:1px solid var(--linea);border-radius:11px;padding:10px 11px}
+  .c .t{font-size:9.5px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--tenue);font-weight:700}
+  .c .v{font-size:19px;font-weight:800;letter-spacing:-.02em;margin-top:2px}
+  .c .s{font-size:10.5px;color:var(--suave);margin-top:1px}
+  .c .v.ok{color:var(--verde)} .c .v.mal{color:var(--mal)} .c .v.na{color:var(--acc)}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .row{display:flex;justify-content:space-between;align-items:center;background:var(--blanco);
+    border:1px solid var(--linea);border-radius:10px;padding:9px 11px;gap:9px}
+  .row .n2{font-size:12.5px;font-weight:600;min-width:0}
+  .row .n2 small{display:block;font-size:10.5px;color:var(--suave);font-weight:400}
+  .row .val{font-size:13px;font-weight:800;white-space:nowrap;font-family:var(--mono)}
+  .row .val.mal{color:var(--mal)} .row .val.ok{color:var(--verde)}
+  .bar{height:6px;background:var(--linea);border-radius:4px;overflow:hidden;margin-top:6px}
+  .bar i{display:block;height:100%;background:var(--acc);border-radius:4px}
+  .btn{border:none;border-radius:10px;padding:11px;font-weight:800;font-size:12.5px;color:#fff;
+    background:var(--acc);width:100%;font-family:inherit;cursor:default}
+  .btn.g{background:var(--verde)} .btn.gh{background:var(--blanco);color:var(--suave);border:1px solid var(--linea)}
+  .fld{background:var(--blanco);border:1px solid var(--linea);border-radius:9px;padding:9px 10px;
+    color:var(--tenue);font-size:11.5px;width:100%}
+  .lbl{font-size:9.5px;font-family:var(--mono);letter-spacing:.07em;text-transform:uppercase;
+    color:var(--tenue);font-weight:700;margin-top:2px}
+  .pill{font-size:9.5px;padding:2px 8px;border-radius:10px;background:var(--gris);
+    border:1px solid var(--linea);color:var(--suave)}
+  .pill.ok{background:var(--verdeBg);border-color:#bfe3ca;color:var(--verde)}
+  .pill.mal{background:var(--malBg);border-color:#f0c4c4;color:var(--mal)}
+  .pill.warn{background:var(--amarilloBg);border-color:#f0dcbb;color:var(--amarillo)}
+  .mini{font-size:10.5px;color:var(--suave);line-height:1.5}
+  /* franja de logos de las marcas representadas · no son botones, no se tocan */
+  .logos{display:flex;align-items:center;justify-content:center;gap:10px 14px;flex-wrap:wrap}
+  .logos img{height:15px;width:auto;opacity:.55;filter:grayscale(1)}
+  .logos .wm{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--tenue)}
+  .logos .hueco{font-family:var(--mono);font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:#c8ccd3;border:1px dashed var(--linea);border-radius:4px;padding:5px 9px}
+  .tb2{width:100%;border-collapse:collapse;font-size:10.5px}
+  .tb2 th{font-size:8.5px;padding:4px 3px;text-align:right;background:transparent;border-bottom:1px solid var(--linea)}
+  .tb2 th:first-child{text-align:left}
+  .tb2 td{padding:5px 3px;border-bottom:1px solid var(--linea2);text-align:right;font-family:var(--mono)}
+  .tb2 td:first-child{text-align:left;font-family:inherit;font-weight:600}
+
+  /* dos CEDs */
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+  @media(max-width:700px){.dos{grid-template-columns:1fr}}
+  .dos .caja{background:var(--blanco);border:1px solid var(--linea);border-radius:14px;padding:18px;box-shadow:var(--sombra)}
+  .dos .caja h4{font-size:16px;font-weight:800;margin-bottom:3px}
+  .dos .caja .q{font-size:12.5px;color:var(--suave);margin-bottom:12px}
+  .dos .caja .li{display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;
+    border-bottom:1px solid var(--linea2)}
+  .dos .caja .li:last-child{border:none}
+  .dos .caja .li b{font-family:var(--mono)}
+
+  /* preguntas */
+  .q{background:var(--accBg);border:1px solid #f4c7c7;border-radius:14px;padding:20px 22px;margin-bottom:12px}
+  .q h3{color:#8f1c16}
+  .q p{color:#7a2420;font-size:14px;max-width:none}
+  .q p b{color:#5c1a17}
+
+  /* qué hace cada botón */
+  .bts{margin-top:9px;background:var(--blanco);border:1px solid var(--linea);border-radius:11px;padding:11px 13px}
+  .bts .h{font-size:9.5px;font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;
+    color:var(--tenue);font-weight:700;margin-bottom:6px}
+  .bt{font-size:11.5px;color:var(--suave);line-height:1.5;padding:4px 0;border-bottom:1px solid var(--linea2)}
+  .bt:last-child{border-bottom:none}
+  .bt b{color:var(--texto);font-weight:700}
+  .bt i{font-style:normal;color:var(--acc);font-weight:700}
+
+  /* la barra de pestañas de la app */
+  .navapp{background:var(--negro);border-radius:14px;padding:14px 16px;margin-top:18px;overflow-x:auto}
+  .navapp .fila{display:flex;gap:7px;min-width:min-content}
+  .navapp .fila+.fila{margin-top:7px}
+  .navapp b{font-size:12px;font-weight:700;color:#c9ced6;background:rgba(255,255,255,.08);
+    border-radius:8px;padding:8px 12px;white-space:nowrap}
+  .navapp b.on{background:var(--acc);color:#fff}
+  .navapp b.solo{background:transparent;border:1px dashed rgba(255,255,255,.28);color:#8b929c}
+
+  .nota{margin-top:44px;padding-top:20px;border-top:1px solid var(--linea);font-family:var(--mono);
+    font-size:11.5px;color:var(--tenue);line-height:1.75}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div class="eyebrow">Mockup · Negocios Cuánticos</div>
+  <h1>CED · Red de Distribución</h1>
+  <p class="lede">La app de Feroz deja de ser de una marca y pasa a ser la de cada distribuidor.
+    Un CED es un <b>centro de stand-by</b>: la mercancía que tiene es nuestra, no suya.
+    Recibe, guarda y mueve — y ahora también ve si le está quedando plata.</p>
+  <div class="tagz">
+    <span><b>20</b> pantallas</span>
+    <span><b>2</b> módulos nuevos</span>
+    <span>Mockup · no funcional</span>
+    <span>31 jul 2026</span>
+  </div>
+  <p style="margin-top:18px;font-size:14px;color:var(--suave)">
+    Primero las pantallas. La estructura, las decisiones por módulo y lo que falta definir
+    van al final.</p>
+</div>
+
+<h2>🔑 La entrada · antes de las pestañas</h2>
+<p>Una sola puerta para toda la red. <b>Arriba el CED, abajo las marcas</b>: el distribuidor
+  no entra a "la app de Feroz", entra a la suya — y adentro ve las marcas que le mandaron
+  mercancía. La marca pasa a ser un filtro, no otra aplicación.</p>
+
+<div class="board">
+  <div class="step">
+    <div class="lbl"><div class="n">0</div><div class="tt">La puerta</div></div>
+    <div class="ds">Lo mismo para todos: distribuidor y principal entran por aquí.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>7:40</span><span>▮▮▮</span></div>
+      <div class="body" style="justify-content:center;gap:11px;padding:22px 15px">
+        <div style="text-align:center;margin-bottom:2px">
+          <div style="font-size:34px;font-weight:800;letter-spacing:-.04em;color:var(--acc);line-height:1">CED</div>
+          <div class="mini" style="margin-top:4px">Centro Empresarial de Dotaciones</div>
+        </div>
+        <div class="fld">Usuario o celular</div>
+        <div class="fld">Clave</div>
+        <button class="btn">Entrar</button>
+        <div class="mini" style="text-align:center">¿Olvidaste la clave?</div>
+        <div style="margin-top:auto;padding-top:13px;border-top:1px solid var(--linea)">
+          <div class="lbl" style="text-align:center;margin-bottom:10px">Marcas que representamos</div>
+          <div class="logos">
+            <img src="logo-feroz.png" alt="Feroz">
+            <span class="wm">ALPACA</span>
+            <span class="wm">LOS INDESTRUCTIBLES</span>
+            <span class="hueco">logo</span>
+            <span class="hueco">logo</span>
+          </div>
+        </div>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>Entrar</b> lleva a su CED directo. Si solo tiene uno, no pregunta nada más</div>
+      <div class="bt"><b>Los logos de abajo</b> no se tocan: son respaldo, no menú. Dicen qué marcas
+        representa la red, como en un aviso de vitrina</div>
+      <div class="bt"><i>Una marca nueva</i> en la red aparece aquí sola, sin app aparte ni URL nueva</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">0b</div><div class="tt">Un CED, varias marcas</div></div>
+    <div class="ds">Lo primero al entrar: qué tiene parqueado y <b>de quién es</b>.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>7:41</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🏭 CED <span>Medellín Sur</span></div><div class="sb">Itagüí · Envigado · Sabaneta</div></div>
+      <div class="body">
+        <div class="lbl">Marcas que manejas</div>
+        <div class="row"><div class="n2">🥾 Feroz<small>9 referencias · $18,4M parqueado</small></div><div class="val">›</div></div>
+        <div class="row"><div class="n2">👟 Alpaca<small>4 referencias · $6,1M parqueado</small></div><div class="val">›</div></div>
+        <div class="c"><div class="t">Todo junto en stand-by</div><div class="v">$24.500.000</div>
+          <div class="s">13 referencias · nada de esto es tuyo</div></div>
+        <div class="row" style="border-color:#f0c4c4;background:var(--malBg)">
+          <div class="n2">Por liquidar<small>Feroz $3,2M · Alpaca $0</small></div><div class="val mal">$3,2M</div></div>
+        <button class="btn gh" style="margin-top:auto">Ver todo junto ›</button>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>Tocar una marca</b> filtra toda la app por ella: inventario, ventas y pedidos</div>
+      <div class="bt"><b>Ver todo junto</b> quita el filtro. Es la vista por defecto</div>
+      <div class="bt"><b>Por liquidar</b> se abre partido por marca, porque se le paga a cada una aparte</div>
+      <div class="bt"><i>Si solo maneja una marca</i> esta pantalla no aparece: entra derecho al Tablero</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">0c</div><div class="tt">👑 El principal entra distinto</div></div>
+    <div class="ds">Misma puerta, pero a él le pregunta a cuál CED va.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>7:42</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">👑 CED <span>principal</span></div><div class="sb">Administra la red · 2 CEDs</div></div>
+      <div class="body">
+        <div class="lbl">Entrar como</div>
+        <div class="row" style="border-color:#f4c7c7;background:var(--accBg)">
+          <div class="n2">📊 La red completa<small>lo de todos, sumado</small></div><div class="val">›</div></div>
+        <div class="lbl">O ver lo que ve un CED</div>
+        <div class="row"><div class="n2">🏭 Puente Aranda<small>Feroz · 312 clientes</small></div><div class="val ok">$28,4M</div></div>
+        <div class="row"><div class="n2">🏭 Medellín Sur<small>Feroz + Alpaca · 178 clientes</small></div><div class="val mal">$16,9M</div></div>
+        <div class="row" style="border-style:dashed"><div class="n2" style="color:var(--tenue)">＋ Crear un CED</div><div class="val">›</div></div>
+        <div class="mini" style="margin-top:auto">Entra a la vista de cualquiera para ver <b>exactamente</b> lo que ese ve.</div>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>La red completa</b> abre las 8 pestañas de administración</div>
+      <div class="bt"><b>Entrar a un CED</b> lo suplanta para soporte — <i>de solo mirar</i>, no puede grabar por él</div>
+      <div class="bt"><b>Crear un CED</b> pide ciudad, marcas que va a manejar y bodegas que puede ver</div>
+      <div class="bt"><i>El distribuidor nunca ve esta pantalla</i>, aunque escriba la dirección a mano</div>
+    </div>
+  </div>
+</div>
+
+<p style="margin-top:20px;font-size:13.5px;color:var(--suave)">Falta decidir dos cosas de esta pantalla:
+  <b>si el usuario es del CED o de la persona</b> (si el distribuidor tiene vendedores, ¿entran con la
+  misma clave o cada uno con la suya?), y <b>quién crea esa clave</b> — NC se la entrega, o el
+  distribuidor se registra solo y el principal lo aprueba.</p>
+
+<h2>Las pestañas · son dos apps distintas</h2>
+<p>Mismo código, misma URL. Pero <b>el CED principal y un CED distribuidor no ven las mismas
+  pestañas</b>: cada rol entra a lo suyo.</p>
+
+<div style="font-size:13.5px;font-weight:700;margin:16px 0 -6px">🏭 CED distribuidor · lo que opera</div>
+<div class="navapp">
+  <div class="fila">
+    <b class="on">📊 Tablero</b><b>🎯 CRM</b><b>👥 Clientes</b><b>📋 Pedidos</b>
+  </div>
+  <div class="fila">
+    <b>🏭 Inventario</b><b>💰 Ventas</b><b>🧾 Gastos</b><b>📈 Resultados</b><b>💬 Digital</b>
+  </div>
+</div>
+<p style="font-size:12.5px;color:var(--suave);margin-top:8px">
+  9 pestañas. No ve planta, ni proveeduría, ni a los otros CEDs.</p>
+
+<div style="font-size:13.5px;font-weight:700;margin:22px 0 -6px">👑 CED principal · lo que administra</div>
+<div class="navapp">
+  <div class="fila">
+    <b class="on">📊 La red</b><b>＋ CEDs y aliados</b><b>🧩 Proveeduría</b><b>🎯 Metas de todos</b>
+  </div>
+  <div class="fila">
+    <b>🏭 Planta</b><b>🏭 Bodegas</b><b>🔑 Permisos</b><b>💰 Comisiones</b>
+  </div>
+</div>
+<p style="font-size:12.5px;color:var(--suave);margin-top:8px">
+  Otras 8, distintas. También puede entrar a la vista de cualquier CED para ver lo que ese ve.</p>
+
+<h2>📊 Tablero · la pestaña de entrada</h2>
+<div class="board">
+  <div class="step">
+    <div class="lbl"><div class="n">1</div><div class="tt">Lo primero que ve</div></div>
+    <div class="ds">Su mes, no el de la marca.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>8:12</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">📊 Tablero · <span>julio</span></div><div class="sb">CED Puente Aranda</div></div>
+      <div class="body">
+        <div class="c"><div class="t">Ventas del mes</div><div class="v">$28.400.000</div>
+          <div class="bar"><i style="width:73%"></i></div>
+          <div class="s">73% de la meta · faltan $10,6M</div></div>
+        <div class="g2">
+          <div class="c"><div class="t">Utilidad</div><div class="v ok" style="font-size:16px">$4.180.000</div><div class="s">14,7%</div></div>
+          <div class="c"><div class="t">Gastos</div><div class="v" style="font-size:16px">18,7%</div><div class="s">de la venta</div></div>
+        </div>
+        <div class="lbl">Necesita atención</div>
+        <div class="row" style="border-color:#f0dcbb;background:var(--amarilloBg)">
+          <div class="n2">Botín 320 quieto<small>94 días sin moverse · $4,8M</small></div><div class="val">›</div></div>
+        <div class="row" style="border-color:#f0c4c4;background:var(--malBg)">
+          <div class="n2">Por liquidar a Feroz<small>vence en 3 días</small></div><div class="val mal">$4,1M</div></div>
+        <div class="lbl">Hoy</div>
+        <div class="g2">
+          <div class="c"><div class="t">Cotizaciones</div><div class="v" style="font-size:16px">6</div></div>
+          <div class="c"><div class="t">Por despachar</div><div class="v" style="font-size:16px">3</div></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>Julio ▾</b> cambia de mes; los números se recalculan</div>
+      <div class="bt"><b>Barra de la meta</b> lleva a <i>Metas</i>, a ver el detalle por referencia</div>
+      <div class="bt"><b>Botín 320 quieto</b> abre <i>Inventario</i> filtrado en esa referencia</div>
+      <div class="bt"><b>Por liquidar</b> abre la ficha del proveedor en <i>Proveedores</i></div>
+      <div class="bt"><b>Cotizaciones / Por despachar</b> saltan a esas pestañas ya filtradas</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">2</div><div class="tt">🎯 CRM · por canal</div></div>
+    <div class="ds">Los cajones son <b>por dónde llegó</b>, no por etapa. Es para seguimiento.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>8:20</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🎯 CRM</div><div class="sb">312 contactos · seguimiento</div></div>
+      <div class="body">
+        <div class="tabs" style="border-radius:9px;border:1px solid var(--linea);padding:0 4px">
+          <b class="on">Nuevos</b><b>Digital</b><b>Orgánico</b><b>Marcador</b><b>Presencial</b></div>
+        <div class="mini">A mano · Redes · Web · Marcador · <b>Barrido en calle</b></div>
+        <div class="fld">🔍 Buscar por nombre o teléfono</div>
+        <div class="row"><div class="n2">Ferretería El Tornillo<small>a mano · hace 2 días</small></div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <span style="width:13px;height:13px;border-radius:50%;background:var(--verde);display:block"></span>
+            <span style="width:13px;height:13px;border-radius:50%;border:2px solid var(--linea);display:block"></span></div></div>
+        <div class="row"><div class="n2">Dotaciones La 68<small>a mano · hoy</small></div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <span style="width:13px;height:13px;border-radius:50%;background:var(--verde);display:block"></span>
+            <span style="width:13px;height:13px;border-radius:50%;background:var(--verde);display:block"></span></div></div>
+        <div class="row"><div class="n2">Suministros JR<small>a mano · hace 5 días</small></div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <span style="width:13px;height:13px;border-radius:50%;border:2px solid var(--linea);display:block"></span>
+            <span style="width:13px;height:13px;border-radius:50%;border:2px solid var(--linea);display:block"></span></div></div>
+        <div class="row"><div class="n2">EPP del Centro<small>a mano · hace 1 semana</small></div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <span style="width:13px;height:13px;border-radius:50%;border:2px solid var(--linea);display:block"></span>
+            <span style="width:13px;height:13px;border-radius:50%;background:var(--verde);display:block"></span></div></div>
+        <div class="mini">🟢 compró este mes · el 2º círculo lo marcas tú al hacerle seguimiento.
+          <b>Todos lo tienen, en los cuatro cajones.</b></div>
+        <div class="g2">
+          <div><button class="btn gh" style="font-size:11.5px;padding:10px">🧹 Borrar seguimiento</button></div>
+          <div><button class="btn" style="font-size:11.5px;padding:10px">＋ Nuevo a mano</button></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>Nuevos</b> los que uno mete a mano</div>
+      <div class="bt"><b>Digital</b> los que llegan de redes, como en Smart</div>
+      <div class="bt"><b>Orgánico</b> los que escriben a la página web</div>
+      <div class="bt"><b>Marcador</b> los que salieron del marcador Lupe — <i>solo el resultado</i></div>
+      <div class="bt"><b>Presencial</b> abre la <i>app de Barrido</i> y aquí solo queda el resumen</div>
+      <div class="bt"><b>El círculo de seguimiento lo tienen todos</b>, sin importar el cajón.
+        Se toca para marcarlo y se vuelve a tocar para quitarlo</div>
+      <div class="bt"><b>🧹 Borrar seguimiento</b> limpia todos los círculos de una,
+        para arrancar la ronda de nuevo</div>
+      <div class="bt"><i>Quitamos «Contactados»:</i> era lo mismo que Nuevos</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">3</div><div class="tt">☎️ Marcador · resultados</div></div>
+    <div class="ds">Aquí no se marca: se ve el resultado y se salta a Lupe.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>8:35</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">☎️ Marcador</div><div class="sb">Resultados de tu zona</div></div>
+      <div class="body">
+        <div class="g2">
+          <div class="c"><div class="t">Llamadas del mes</div><div class="v" style="font-size:17px">412</div></div>
+          <div class="c"><div class="t">Interesados</div><div class="v ok" style="font-size:17px">38</div>
+            <div class="s">9,2%</div></div>
+        </div>
+        <div class="c"><div class="t">Por llamar en tu zona</div><div class="v">1.240</div>
+          <div class="s">Puente Aranda · 4 barrios</div></div>
+        <button class="btn">☎️ Abrir Lupe y marcar</button>
+        <div class="lbl">Últimos interesados</div>
+        <div class="row"><div class="n2">Ferretería El Roble<small>hoy · Marcela</small></div>
+          <div class="val" style="font-size:15px">📲</div></div>
+        <div class="row"><div class="n2">EPP Industrial<small>ayer · Jhon</small></div>
+          <div class="val" style="font-size:15px">📲</div></div>
+        <div class="row"><div class="n2">Almacén La 30<small>hace 2 días · Marcela</small></div>
+          <div class="val" style="font-size:15px">📲</div></div>
+        <div class="c"><div class="mini">Esta pestaña es de <b>resultado y seguimiento</b>.
+          Para marcar se entra a <b>Lupe</b>, que es la app del marcador.</div></div>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>☎️ Abrir Lupe y marcar</b> salta a la app del marcador con su base</div>
+      <div class="bt"><b>Los interesados</b> entran al <i>CRM</i>, cajón «Marcador»</div>
+      <div class="bt"><b>📲</b> le escribe por WhatsApp para hacerle seguimiento</div>
+      <div class="bt"><i>Aquí no se marca:</i> se mide y se le hace seguimiento a lo que ya salió</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">4</div><div class="tt">📋 Pedidos</div></div>
+    <div class="ds">Cotización y pedido son <b>lo mismo</b>: nace cotización y se convierte.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:02</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">📋 Pedidos</div><div class="sb">6 en cola · 2 vencen hoy</div></div>
+      <div class="body">
+        <div class="g2">
+          <div class="c"><div class="t">En cola</div><div class="v" style="font-size:20px">6</div></div>
+          <div class="c"><div class="t">En juego</div><div class="v na" style="font-size:20px">$12,4M</div></div>
+        </div>
+        <div class="c">
+          <div class="t" style="margin-bottom:6px">📊 Resumen de cotizaciones</div>
+          <div class="g2" style="gap:6px">
+            <div class="c" style="padding:7px 8px"><div class="v" style="font-size:15px">148</div>
+              <div class="s">Acumuladas · $412M</div></div>
+            <div class="c" style="padding:7px 8px"><div class="v" style="font-size:15px">31</div>
+              <div class="s">Del mes · $61,2M</div></div>
+          </div>
+          <div class="c" style="padding:7px 8px;margin-top:6px;border-color:#f0c4c4">
+            <div class="v mal" style="font-size:15px">19</div><div class="s">Perdidas · $38,4M</div></div>
+          <div class="mini" style="border-top:1px solid var(--linea);margin-top:7px;padding-top:6px">
+            🗂️ Motivos: Precio <b>8</b> · Plazo <b>5</b> · Competencia <b>3</b> ·
+            Sin inventario <b>2</b> · Otro <b>1</b></div>
+        </div>
+        <div class="g2">
+          <div><button class="btn gh" style="padding:14px;line-height:1.45">📋<br>Registro</button></div>
+          <div><button class="btn" style="padding:14px;line-height:1.45">🧮<br>Hacer cotización</button></div>
+        </div>
+        <div class="fld">🔍 Nombre o celular</div>
+        <div class="lbl">📝 Pendientes de aprobar · 6</div>
+        <div class="row" style="border-color:#f0dcbb"><div class="n2">#1842 · El Tornillo
+          <small style="color:var(--amarillo)">vence hoy</small></div>
+          <div class="val">$4.900.000</div></div>
+        <div class="row"><div class="n2">#1841 · Dotaciones La 68<small>enviada ayer</small></div>
+          <div class="val">$2.100.000</div></div>
+        <div class="row"><div class="n2">#1838 · Suministros JR<small>hace 4 días</small></div>
+          <div class="val">$1.750.000</div></div>
+        <div class="g2">
+          <div><button class="btn g" style="font-size:11px;padding:10px">✓ Generar pedido</button></div>
+          <div><button class="btn gh" style="font-size:11px;padding:10px">✗ Cancelado</button></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Un solo módulo · formato Feroz</div>
+      <div class="bt"><b>Nace como cotización</b> y vive en la cola hasta que se decida</div>
+      <div class="bt"><b>✓ Generar pedido</b> la convierte en pedido: ahí se escoge quién factura
+        y se descarga el inventario</div>
+      <div class="bt"><b>✗ Cancelado</b> la convierte en perdida y <i>pide la razón</i>:
+        precio, plazo, competencia, sin inventario, ya no lo necesita, otro</div>
+      <div class="bt"><b>Los motivos se acumulan</b> en el resumen — así se ve por qué se pierde</div>
+      <div class="bt"><b>📋 Registro</b> el histórico · <b>🧮 Hacer cotización</b> arma una nueva</div>
+      <div class="bt"><i>No son dos pestañas:</i> es el mismo documento cambiando de estado</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n" style="font-size:10px">4b</div><div class="tt">📦 Pedidos</div></div>
+    <div class="ds">Aquí se decide quién factura y se descarga el inventario.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:08</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">📦 Pedido #1842</div><div class="sb">Ferretería El Tornillo</div></div>
+      <div class="body">
+        <div class="lbl">¿Quién factura esta venta?</div>
+        <div class="row" style="border-color:#f4c7c7;background:var(--accBg)">
+          <div class="n2">🥾 Feroz<small>consigna a: Bancolombia 0459 8827 1140</small></div>
+          <div class="val">✓</div></div>
+        <div class="mini">Feroz · Alpaca · Mi CED — la cuenta sale sola al escoger</div>
+        <div class="lbl">¿Con qué documento sale?</div>
+        <div class="g2">
+          <div class="fld" style="color:var(--texto);font-weight:700">Remisión ✓</div>
+          <div class="fld">Factura</div>
+        </div>
+        <div class="mini">Las dos preguntas se hacen <b>al pasar la cotización a pedido</b>, y quedan grabadas</div>
+        <div class="lbl">Lo que pidió</div>
+        <table class="tb2">
+          <thead><tr><th>Ref · talla · color</th><th>Und</th><th>Valor</th></tr></thead>
+          <tbody>
+            <tr><td>Bota 701 · 38 · negro</td><td>24</td><td>$2,35M</td></tr>
+            <tr><td>Bota 701 · 40 · miel</td><td>18</td><td>$1,76M</td></tr>
+            <tr><td>Botín 320 · 39 · café</td><td>10</td><td>$0,79M</td></tr>
+          </tbody>
+        </table>
+        <div class="mini">Tallas y colores salen del <b>inventario</b>: solo deja pedir lo que hay</div>
+        <div class="c" style="border-color:#bfe3ca;background:var(--verdeBg)">
+          <div class="t" style="color:var(--verde)">Tu comisión · 8%</div>
+          <div class="v ok">$392.000</div>
+          <div class="s">condiciones tomadas de la referencia</div></div>
+        <button class="btn g">Confirmar pedido</button>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué pasa al confirmar</div>
+      <div class="bt"><b>1.</b> Descarga las unidades del <i>inventario</i> de la bodega</div>
+      <div class="bt"><b>2.</b> Guarda la <i>relación de condiciones de comisión</i> de cada referencia</div>
+      <div class="bt"><b>3.</b> Lo deja en <i>Ventas</i>, con la comisión en paralelo</div>
+      <div class="bt"><i>Por qué en paralelo:</i> la comisión es de lo que viven los CEDs.
+        Va al lado de la venta, no sumada dentro</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">5</div><div class="tt">💰 Ventas</div></div>
+    <div class="ds">Mismo formato que Kruh: KPIs arriba y clientes con seguimiento.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:15</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">💰 Ventas · <span>julio</span></div><div class="sb">CED Puente Aranda</div></div>
+      <div class="body">
+        <div class="c"><div class="t">Facturado por mí</div><div class="v">$28.400.000</div>
+          <div class="s">762 pares · 41 ventas</div></div>
+        <div class="c" style="border-color:#f4c7c7;background:var(--accBg)">
+          <div class="t">Facturado por otras empresas</div><div class="v" style="font-size:17px">$9.800.000</div>
+          <div class="s">tu comisión: <b>$784.000</b></div></div>
+        <div class="lbl">Quién compró · 🟢 este mes</div>
+        <div class="row"><div class="n2">Ferretería El Tornillo<small>14 compras · $4,2M</small></div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <span style="width:13px;height:13px;border-radius:50%;background:var(--verde);display:block"></span>
+            <span style="width:13px;height:13px;border-radius:50%;background:var(--verde);display:block"></span></div></div>
+        <div class="row"><div class="n2">Dotaciones La 68<small>9 compras · $2,8M</small></div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <span style="width:13px;height:13px;border-radius:50%;background:var(--verde);display:block"></span>
+            <span style="width:13px;height:13px;border-radius:50%;border:2px solid var(--linea);display:block"></span></div></div>
+        <div class="row"><div class="n2">Almacén La 30<small>no compra hace 2 meses</small></div>
+          <div style="display:flex;gap:5px;align-items:center">
+            <span style="width:13px;height:13px;border-radius:50%;border:2px solid var(--linea);display:block"></span>
+            <span style="width:13px;height:13px;border-radius:50%;border:2px solid var(--linea);display:block"></span></div></div>
+        <div class="lbl">Resumen por referencia</div>
+        <table class="tb2">
+          <thead><tr><th>Ref</th><th>Pares</th><th>Venta</th></tr></thead>
+          <tbody>
+            <tr><td>Bota 701</td><td>312</td><td>$11,8M</td></tr>
+            <tr><td>Bota 705</td><td>198</td><td>$9,2M</td></tr>
+            <tr><td>Botín 320</td><td>142</td><td>$5,1M</td></tr>
+          </tbody>
+        </table>
+        <button class="btn gh">⬇ Excel contabilidad</button>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>Julio ▾</b> cambia el mes</div>
+      <div class="bt"><b>🟢 compró este mes</b> · el 2º círculo lo marcas tú al hacerle seguimiento</div>
+      <div class="bt"><b>Tocar un cliente</b> abre su historial de compras</div>
+      <div class="bt"><b>Facturado por otras</b> lleva al listado de esas ventas y sus comisiones</div>
+      <div class="bt"><b>⬇ Excel</b> saca el mes para contabilidad</div>
+      <div class="bt"><i>La comisión va en paralelo,</i> nunca sumada dentro de las ventas</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">6</div><div class="tt">🏭 Inventario · sus cajones</div></div>
+    <div class="ds">Ingreso, Bodegas y Proveedor viven aquí adentro.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:22</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🏭 Inventario</div><div class="sb">1.840 pares · $46,2M</div></div>
+      <div class="body">
+        <div class="tabs" style="border-radius:9px;border:1px solid var(--linea);padding:0 4px">
+          <b class="on">Ingreso</b><b>Bodegas</b><b>Proveedor</b></div>
+        <div class="lbl">Ingreso · lo que llega</div>
+        <div class="row" style="border-color:#f0dcbb;background:var(--amarilloBg)">
+          <div class="n2">🚛 Remesa 8841 · Feroz<small>llega mañana · 210 pares</small></div>
+          <div class="val">recibir</div></div>
+        <div class="row"><div class="n2">🚛 Remesa 8836 · Alpaca<small>recibida hoy · 84 pares</small></div>
+          <div class="val ok">✓</div></div>
+        <div class="lbl">Bodegas · las que puedes ver</div>
+        <div class="row"><div class="n2">Fábrica Bogotá<small>2.418 pares</small></div><div class="val">ver</div></div>
+        <div class="row"><div class="n2">Mi bodega<small>340 pares</small></div><div class="val">ver</div></div>
+        <div class="row" style="opacity:.5"><div class="n2">🔒 Bodega Cali<small>sin permiso</small></div>
+          <div class="val" style="font-size:11px">—</div></div>
+        <div class="lbl">Proveedor</div>
+        <div class="row"><div class="n2">Crear proveedor y referencias<small>listas de precios y comisiones</small></div>
+          <div class="val">›</div></div>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Los tres cajones</div>
+      <div class="bt"><b>Ingreso</b> lo que va llegando: se recibe y suma a la bodega</div>
+      <div class="bt"><b>Bodegas</b> las que el administrador le abrió. Las demás salen con 🔒</div>
+      <div class="bt"><b>Proveedor</b> crear proveedor, crear referencia con sus condiciones,
+        listas de precios y condiciones de comisión</div>
+      <div class="bt"><i>De aquí saca Pedidos</i> las tallas y colores disponibles</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">6</div><div class="tt">💬 Digital y 🌱 Orgánico</div></div>
+    <div class="ds">Su pauta, su número, su gasto.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:28</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">💬 Digital</div><div class="sb">Tu pauta · tu número</div></div>
+      <div class="body">
+        <div class="c"><div class="t">Invertido este mes</div><div class="v na">$620.000</div>
+          <div class="s">de tu bolsillo · cuenta propia</div></div>
+        <div class="g2">
+          <div class="c"><div class="t">Leads</div><div class="v" style="font-size:16px">84</div></div>
+          <div class="c"><div class="t">Costo por lead</div><div class="v" style="font-size:16px">$7.380</div></div>
+        </div>
+        <div class="lbl">De esos leads</div>
+        <div class="row"><div class="n2">Se volvieron clientes</div><div class="val ok">11</div></div>
+        <div class="row"><div class="n2">Costo por cliente</div><div class="val">$56.363</div></div>
+        <div class="lbl">🌱 Orgánico · sin pagar</div>
+        <div class="row"><div class="n2">Referidos</div><div class="val">23</div></div>
+        <div class="row"><div class="n2">Pasaron por el local</div><div class="val">31</div></div>
+        <div class="row"><div class="n2">Instagram</div><div class="val">9</div></div>
+        <div class="c"><div class="mini">Tu WhatsApp conectado: <b>310 445 8890</b>.
+          La pauta la pagas tú, con tu cuenta.</div></div>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>Cada CED tiene su cuenta</b> de pauta y su número. No es una bolsa común</div>
+      <div class="bt"><b>Los leads</b> caen directo a su <i>CRM</i>, ya etiquetados con el origen</div>
+      <div class="bt"><b>Costo por cliente</b> sale de cruzar la pauta con las ventas cerradas</div>
+      <div class="bt"><i>Orgánico</i> es solo lectura: cuenta de dónde llegó, no se administra</div>
+    </div>
+  </div>
+
+</div>
+
+<h2>🧾 Gastos · el módulo nuevo</h2>
+<p>Un distribuidor de calzado no gasta como una panadería. Estos rubros salen de cómo opera
+  un almacén de dotación: local, gente, transporte y la mercancía que le compra a Feroz.</p>
+<div class="board">
+
+  <div class="step">
+    <div class="lbl"><div class="n">1</div><div class="tt">El mes de un vistazo</div></div>
+    <div class="ds">Lo primero: ¿me está quedando plata o no?</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:41</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🧾 Gastos · <span>julio</span></div><div class="sb">CED Puente Aranda</div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>＋ Registrar gasto</b> abre el formulario con los rubros ya cargados</div>
+      <div class="bt"><b>Tocar un rubro</b> muestra el detalle de ese mes: cada movimiento y su soporte</div>
+      <div class="bt"><b>Nómina</b> abre la lista de personas, no un solo valor</div>
+      <div class="bt"><i>Utilidad del mes</i> se recalcula sola con cada gasto que entra</div>
+    </div>
+      <div class="body">
+        <div class="c"><div class="t">Utilidad del mes</div><div class="v ok">$4.180.000</div>
+          <div class="s">ventas $28.4M − costo $18.9M − gastos $5.3M</div></div>
+        <div class="g2">
+          <div class="c"><div class="t">Gastos</div><div class="v na">$5.320.000</div><div class="s">18,7% de las ventas</div></div>
+          <div class="c"><div class="t">Mes pasado</div><div class="v">$4.980.000</div><div class="s">+6,8%</div></div>
+        </div>
+        <div class="lbl">Los más grandes</div>
+        <div class="row"><div class="n2">Nómina<small>3 personas</small></div><div class="val">$2.100.000</div></div>
+        <div class="row"><div class="n2">Arriendo del local<small>día 5</small></div><div class="val">$1.400.000</div></div>
+        <div class="row"><div class="n2">Fletes y transporte<small>14 despachos</small></div><div class="val">$680.000</div></div>
+        <div class="row"><div class="n2">Servicios<small>luz, agua, internet</small></div><div class="val">$420.000</div></div>
+        <div class="row"><div class="n2">Publicidad local</div><div class="val">$320.000</div></div>
+        <div class="row"><div class="n2">Empaques<small>cajas y bolsas</small></div><div class="val">$240.000</div></div>
+        <div class="row"><div class="n2">Aseo y papelería</div><div class="val">$180.000</div></div>
+        <div class="c"><div class="mini">Todo lo que compra <b>menos la mercancía</b> entra aquí.
+          La mercancía va por Proveedores porque es nuestra.</div></div>
+        <button class="btn">＋ Registrar gasto</button>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">2</div><div class="tt">Registrar un gasto</div></div>
+    <div class="ds">Rubros ya cargados, y si no está, escribe cuál.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:44</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">＋ Nuevo gasto</div><div class="sb">Julio 2026</div></div>
+      <div class="body">
+        <div class="lbl">Rubro</div>
+        <div class="fld">Otro ▾</div>
+        <div class="mini">Nómina · Arriendo · Servicios · <b>Aseo</b> · <b>Papelería</b> · Fletes ·
+          Publicidad · Impuestos · Mercancía · <b>Otro</b></div>
+        <div class="lbl" style="color:var(--acc)">¿Cuál?</div>
+        <div class="fld" style="color:var(--texto);border-color:var(--acc)">Mantenimiento de la vitrina</div>
+        <div class="mini">Al escoger «Otro» se abre esta casilla. Lo que escribas queda
+          disponible para la próxima vez.</div>
+        <div class="lbl">Valor</div>
+        <div class="fld" style="font-size:16px;color:var(--texto);font-weight:700">$180.000</div>
+        <div class="g2" style="margin-top:2px">
+          <div><div class="lbl">Tipo</div><div class="fld">Variable ▾</div></div>
+          <div><div class="lbl">Se repite</div><div class="fld">No ▾</div></div>
+        </div>
+        <div class="lbl">A quién se le pagó</div>
+        <div class="fld">Vidrios JR ▾</div>
+        <div class="lbl">Soporte</div>
+        <div class="fld">📷 Foto de la factura</div>
+        <button class="btn g">Guardar gasto</button>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">2b</div><div class="tt">Nómina</div></div>
+    <div class="ds">Persona por persona, con cargo y cédula.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:46</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">👥 Nómina</div><div class="sb">Julio 2026 · 3 personas</div></div>
+      <div class="body">
+        <div class="c"><div class="t">Total nómina del mes</div><div class="v">$2.100.000</div>
+          <div class="s">7,4% de las ventas</div></div>
+        <div class="row"><div class="n2">Marcela Ruiz<small>Vendedora · CC 52.114.887</small></div>
+          <div class="val">$900.000</div></div>
+        <div class="row"><div class="n2">Jhon Bermúdez<small>Bodeguero · CC 80.442.109</small></div>
+          <div class="val">$750.000</div></div>
+        <div class="row"><div class="n2">Sandra Peña<small>Aseo · CC 39.887.220</small></div>
+          <div class="val">$450.000</div></div>
+        <div class="lbl">Agregar a alguien</div>
+        <div class="fld">Nombre completo</div>
+        <div class="g2">
+          <div><div class="lbl">Cargo</div><div class="fld">Vendedora ▾</div></div>
+          <div><div class="lbl">Cédula</div><div class="fld">Número</div></div>
+        </div>
+        <div class="lbl">Valor mensual</div><div class="fld">$0</div>
+        <button class="btn g">Agregar a la nómina</button>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">3</div><div class="tt">Mes a mes</div></div>
+    <div class="ds">Para ver si el gasto se está desbordando.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:47</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">📈 Gastos vs ventas</div><div class="sb">Los 6 meses</div></div>
+      <div class="body">
+        <table class="tb2">
+          <thead><tr><th>Mes</th><th>Ventas</th><th>Gastos</th><th>%</th><th>Utilidad</th></tr></thead>
+          <tbody>
+            <tr><td>Feb</td><td>$21,4M</td><td>$4,6M</td><td>21%</td><td>$2,1M</td></tr>
+            <tr><td>Mar</td><td>$24,8M</td><td>$4,7M</td><td>19%</td><td>$3,2M</td></tr>
+            <tr><td>Abr</td><td>$19,2M</td><td>$4,9M</td><td style="color:var(--mal)">26%</td><td style="color:var(--mal)">−$180K</td></tr>
+            <tr><td>May</td><td>$26,1M</td><td>$5,0M</td><td>19%</td><td>$3,6M</td></tr>
+            <tr><td>Jun</td><td>$25,7M</td><td>$5,0M</td><td>19%</td><td>$3,4M</td></tr>
+            <tr><td>Jul</td><td>$28,4M</td><td>$5,3M</td><td>19%</td><td>$4,2M</td></tr>
+          </tbody>
+        </table>
+        <div class="c" style="border-color:#f0c4c4;background:var(--malBg)">
+          <div class="t" style="color:var(--mal)">⚠️ Abril se fue en rojo</div>
+          <div class="mini" style="color:#8f1c16">Vendiste $19,2M y gastaste $4,9M — 26% de las ventas.
+            El gasto casi no baja cuando la venta baja: por eso duele.</div></div>
+        <div class="c"><div class="t">Regla sana</div>
+          <div class="mini">Los gastos no deberían pasar del <b>20% de las ventas</b>.
+            Cuando pasa de ahí, la app avisa.</div></div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">4</div><div class="tt">Cajones: fijos, variables, todos</div></div>
+    <div class="ds">Lo que se paga vendas o no vendas.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:50</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🗂️ Gastos por tipo</div><div class="sb">Julio 2026</div></div>
+      <div class="body">
+        <div class="tabs" style="border-radius:9px;border:1px solid var(--linea);padding:0 4px">
+          <b class="on">Fijos</b><b>Variables</b><b>Todos</b></div>
+        <div class="c"><div class="t">Cuánto necesitas vender para no perder</div>
+          <div class="v na">$14.900.000</div>
+          <div class="s">tu punto de equilibrio este mes</div>
+          <div class="bar"><i style="width:100%;background:var(--verde)"></i></div>
+          <div class="mini" style="margin-top:5px">Vas en $28,4M · <b style="color:var(--verde)">ya lo pasaste</b></div></div>
+        <div class="lbl">Fijos · se pagan igual</div>
+        <div class="row"><div class="n2">Nómina</div><div class="val">$2.100.000</div></div>
+        <div class="row"><div class="n2">Arriendo</div><div class="val">$1.400.000</div></div>
+        <div class="row"><div class="n2">Servicios</div><div class="val">$420.000</div></div>
+        <div class="row"><div class="n2">Aseo</div><div class="val">$120.000</div></div>
+        <div class="row"><div class="n2">Papelería</div><div class="val">$60.000</div></div>
+        <div class="c"><div class="mini">Los fijos son <b>$4.100.000</b>. Ese es el piso que hay
+          que cubrir cada mes antes de ganar el primer peso.<br>
+          Los variables —fletes, publicidad— están en el otro cajón.</div></div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n" style="font-size:9px">📈</div><div class="tt">Resultados · pestaña aparte</div></div>
+    <div class="ds">Ya no vive dentro de Gastos: es su propia pestaña.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>9:53</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">📈 Resultados</div><div class="sb">Julio 2026</div></div>
+      <div class="body">
+        <div class="row"><div class="n2">Ventas</div><div class="val">$28.400.000</div></div>
+        <div class="row"><div class="n2">− Costo de la mercancía<small>lo que le pagaste a Feroz</small></div>
+          <div class="val">$18.900.000</div></div>
+        <div class="c" style="border-color:#bfe3ca;background:var(--verdeBg)">
+          <div class="t" style="color:var(--verde)">= Utilidad bruta</div>
+          <div class="v ok">$9.500.000</div>
+          <div class="s"><b>Rentabilidad bruta 33,5%</b> · por cada $100 que vendes te quedan $33,50
+            antes de gastos</div></div>
+        <div class="row"><div class="n2">− Gastos del mes</div><div class="val">$5.320.000</div></div>
+        <div class="c" style="border-color:#bfe3ca;background:var(--verdeBg)">
+          <div class="t" style="color:var(--verde)">= Utilidad neta</div>
+          <div class="v ok">$4.180.000</div>
+          <div class="s"><b>Rentabilidad neta 14,7%</b></div></div>
+        <div class="c"><div class="t">Gastos vs venta</div>
+          <div class="v">18,7%</div>
+          <div class="bar"><i style="width:19%;background:var(--verde)"></i></div>
+          <div class="mini" style="margin-top:5px">De cada $100 vendidos, $18,70 se van en gastos.
+            Sano por debajo de 20%.</div></div>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+
+<h2>🚚 Proveedores · solo mercancía</h2>
+<p>Aquí solo entran <b>las empresas nuestras que le mandan mercancía</b>. Empaques, transporte,
+  arriendo y todo lo demás que él compra va por Gastos. Así esta pantalla muestra exactamente
+  una cosa: <b>cómo maneja lo nuestro</b>.</p>
+<div class="board">
+
+  <div class="step">
+    <div class="lbl"><div class="n">5</div><div class="tt">Quién le manda mercancía</div></div>
+    <div class="ds">Solo empresas nuestras. Cada una con lo que tiene parqueado ahí.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>10:02</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🚚 Mercancía en stand-by</div><div class="sb">CED Puente Aranda</div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>Tocar una empresa</b> abre su ficha: qué tiene parqueado y qué falta liquidar</div>
+      <div class="bt"><b>En camino</b> muestra las remesas despachadas que aún no llegan</div>
+      <div class="bt"><i>No hay botón de comprar:</i> la mercancía la manda la empresa, no la pide el CED</div>
+    </div>
+      <div class="body">
+        <div class="c"><div class="t">Mercancía nuestra que tienes</div><div class="v">$46.200.000</div>
+          <div class="s">1.840 pares · de 2 empresas</div></div>
+        <div class="row" style="border-color:#f4c7c7;background:var(--accBg)">
+          <div class="n2">🥾 Feroz<small>1.410 pares · 11 referencias</small></div>
+          <div class="val">$34.800.000</div></div>
+        <div class="row"><div class="n2">👟 Alpaca<small>430 pares · 4 referencias</small></div>
+          <div class="val">$11.400.000</div></div>
+        <div class="lbl">En camino</div>
+        <div class="row" style="border-color:#f0dcbb;background:var(--amarilloBg)">
+          <div class="n2">🚛 Feroz · remesa 8841<small>sale hoy · llega en 2 días</small></div>
+          <div class="val">$8.200.000</div></div>
+        <div class="c"><div class="mini">Esta mercancía <b>no es tuya</b>: está en stand-by.
+          Se liquida cuando se vende, no cuando llega.</div></div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">6</div><div class="tt">La ficha de Feroz</div></div>
+    <div class="ds">Qué tiene de ellos, qué vendió y qué falta liquidar.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>10:05</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🥾 Feroz</div><div class="sb">En stand-by desde marzo 2026</div></div>
+      <div class="body">
+        <div class="g2">
+          <div class="c"><div class="t">Parqueado</div><div class="v" style="font-size:16px">$34,8M</div>
+            <div class="s">1.410 pares</div></div>
+          <div class="c"><div class="t">Vendido del mes</div><div class="v" style="font-size:16px">$18,9M</div>
+            <div class="s">762 pares</div></div>
+        </div>
+        <div class="c" style="border-color:#f0c4c4;background:var(--malBg)">
+          <div class="t" style="color:var(--mal)">Vendido y sin liquidar</div>
+          <div class="v mal">$4.100.000</div>
+          <div class="s">se liquida cada 15 días · vence en 3</div></div>
+        <div class="lbl">Rotación · qué tan rápido se mueve</div>
+        <div class="row"><div class="n2">Bota 701<small>rota cada 12 días</small></div>
+          <div class="val ok">rápida</div></div>
+        <div class="row"><div class="n2">Bota 705<small>rota cada 19 días</small></div>
+          <div class="val ok">bien</div></div>
+        <div class="row" style="border-color:#f0dcbb"><div class="n2">Botín 320<small>94 días sin moverse</small></div>
+          <div class="val" style="color:var(--amarillo)">quieta</div></div>
+        <div style="flex:1"></div>
+        <button class="btn g">Liquidar lo vendido</button>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">7</div><div class="tt">Qué le compro y a cómo</div></div>
+    <div class="ds">Precio de compra contra precio de venta: el margen real.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>10:08</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">💰 Mi margen</div><div class="sb">Por referencia</div></div>
+      <div class="body">
+        <table class="tb2">
+          <thead><tr><th>Referencia</th><th>Compro</th><th>Vendo</th><th>Margen</th></tr></thead>
+          <tbody>
+            <tr><td>Bota 701</td><td>$62.000</td><td>$98.000</td><td style="color:var(--verde)">37%</td></tr>
+            <tr><td>Bota 705</td><td>$71.000</td><td>$115.000</td><td style="color:var(--verde)">38%</td></tr>
+            <tr><td>Botín 320</td><td>$54.000</td><td>$79.000</td><td style="color:var(--verde)">32%</td></tr>
+            <tr><td>Bota dieléctrica</td><td>$88.000</td><td>$119.000</td><td style="color:var(--amarillo)">26%</td></tr>
+            <tr><td>Bota 701 · lote</td><td>$62.000</td><td>$71.000</td><td style="color:var(--mal)">13%</td></tr>
+          </tbody>
+        </table>
+        <div class="c" style="border-color:#f0dcbb;background:var(--amarilloBg)">
+          <div class="t" style="color:var(--amarillo)">⚠️ Ojo con la 701 por lote</div>
+          <div class="mini" style="color:#7a4a08">Con 13% de margen no alcanzas a cubrir tus gastos,
+            que van en 19% de las ventas. <b>Ese lote te cuesta plata.</b></div></div>
+        <div class="c"><div class="mini">La app cruza tu costo de compra con tu precio de venta.
+          Si un producto no da para cubrir los gastos, avisa.</div></div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">8</div><div class="tt">La hoja del proveedor</div></div>
+    <div class="ds">Un solo formato con todo: empresa, listas y condiciones.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>10:11</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">📄 Hoja de proveedor</div><div class="sb">Todo en un solo lugar</div></div>
+      <div class="body">
+        <div class="mini" style="background:var(--accBg);border:1px solid #f4c7c7;border-radius:9px;padding:8px 10px">
+          Solo empresas que <b>mandan mercancía</b>. Lo demás va por Gastos.</div>
+        <div class="lbl">La empresa</div>
+        <div class="fld">Feroz S.A.S.</div>
+        <div class="g2">
+          <div><div class="fld">NIT 901.220.554</div></div>
+          <div><div class="fld">601 745 2210</div></div>
+        </div>
+        <div class="fld">Cra 56 #17-40 · Bogotá</div>
+        <div class="fld">Contacto: Javier Mora · 310 445 8890</div>
+
+        <div class="lbl">Listas de precios</div>
+        <div class="row"><div class="n2">📥 De compra<small>lo que te cuesta a ti</small></div>
+          <div class="val">Lista B</div></div>
+        <div class="row"><div class="n2">📤 De venta<small>a cómo lo vendes</small></div>
+          <div class="val">Sugerida</div></div>
+
+        <div class="lbl">Referencias que te vende</div>
+        <div class="row"><div class="n2">Bota 701<small>Tallas 35–45 · negro, miel</small></div>
+          <div class="val">$62.000</div></div>
+        <div class="row"><div class="n2">Bota 705<small>Tallas 36–44 · negro</small></div>
+          <div class="val">$71.000</div></div>
+        <div class="row"><div class="n2">Botín 320<small>Tallas 35–43 · café, negro</small></div>
+          <div class="val">$54.000</div></div>
+
+        <div class="lbl">Condiciones</div>
+        <div class="g2">
+          <div><div class="fld">Crédito 30 días</div></div>
+          <div><div class="fld">Cupo $20M</div></div>
+        </div>
+        <div class="fld">Pedido mínimo $400.000</div>
+        <button class="btn g">Guardar hoja</button>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">8b</div><div class="tt">Quién factura</div></div>
+    <div class="ds">A veces factura el proveedor, no el CED. Se escoge en la cotización.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>10:14</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">📋 Cotización #1842</div><div class="sb">Ferretería El Tornillo</div></div>
+      <div class="body">
+        <div class="lbl">¿Quién factura esta venta?</div>
+        <div class="row" style="border-color:#f4c7c7;background:var(--accBg)">
+          <div class="n2">🥾 Feroz <span class="pill warn">directo</span><small>factura la empresa</small></div>
+          <div class="val">✓</div></div>
+        <div class="row" style="opacity:.55"><div class="n2">👟 Alpaca<small>factura la empresa</small></div>
+          <div class="val" style="font-size:11px">—</div></div>
+        <div class="row" style="opacity:.55"><div class="n2">🏭 Mi CED<small>facturo yo</small></div>
+          <div class="val" style="font-size:11px">—</div></div>
+        <div class="mini">Cualquiera de nuestras empresas puede facturar. Se escoge aquí,
+          venta por venta.</div>
+
+        <div class="lbl">El cliente consigna a</div>
+        <div class="c" style="border-color:#f4c7c7">
+          <div class="mini"><b>Feroz S.A.S.</b> · NIT 901.220.554<br>
+            Bancolombia corriente <b>· 0459 8827 1140</b></div></div>
+        <div class="mini">Esta cuenta sale sola según quién factura. El vendedor no la escribe
+          a mano, para que no se equivoque.</div>
+
+        <div class="lbl">Qué te queda a ti</div>
+        <div class="row"><div class="n2">Valor de la venta</div><div class="val">$4.900.000</div></div>
+        <div class="c" style="border-color:#bfe3ca;background:var(--verdeBg)">
+          <div class="t" style="color:var(--verde)">Tu comisión · 8%</div>
+          <div class="v ok">$392.000</div>
+          <div class="s">No entra plata a tu caja ni sale de tu inventario.
+            <b>Solo llevas la comisión.</b></div></div>
+        <div class="c"><div class="mini">Cuando factura el proveedor, esta venta
+          <b>no suma a tus ventas ni a tu costo</b> — suma a tus comisiones. Si no se separa,
+          la rentabilidad queda inflada.</div></div>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+
+<h2>Lo que cambió con tus decisiones</h2>
+<p>Tres pantallas que no existían y ahora sí, porque definiste cómo funcionan.</p>
+<div class="board">
+
+  <div class="step">
+    <div class="lbl"><div class="n">9</div><div class="tt">Inventario · varias bodegas</div></div>
+    <div class="ds">Ve todas, pero solo entra a las que le abrieron.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>11:02</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🏭 Inventario</div><div class="sb">CED Puente Aranda</div></div>
+      <div class="body">
+        <div class="lbl">Bodegas a las que tienes acceso</div>
+        <div class="row" style="border-color:#f4c7c7;background:var(--accBg)">
+          <div class="n2">🏭 Fábrica Bogotá <span class="pill ok">abierta</span><small>2.418 pares</small></div>
+          <div class="val">ver</div></div>
+        <div class="row"><div class="n2">📦 Mi bodega<small>340 pares</small></div><div class="val">ver</div></div>
+        <div class="row"><div class="n2">🏭 CD Medellín <span class="pill ok">abierta</span><small>1.120 pares</small></div>
+          <div class="val">ver</div></div>
+        <div class="lbl">Existen pero no las ves</div>
+        <div class="row" style="opacity:.5"><div class="n2">🔒 Bodega Cali<small>sin permiso</small></div>
+          <div class="val" style="font-size:11px">—</div></div>
+        <div class="row" style="opacity:.5"><div class="n2">🔒 Bodega Barranquilla<small>sin permiso</small></div>
+          <div class="val" style="font-size:11px">—</div></div>
+        <div class="c"><div class="mini">El <b>administrador</b> decide qué bodegas ve cada CED.
+          Así uno puede pedirle a fábrica y a Medellín, pero no ver Cali.</div></div>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">10</div><div class="tt">La referencia y su comisión</div></div>
+    <div class="ds">Vive dentro de Proveedores. La comisión va pegada al producto.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>11:06</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🥾 Bota 701</div><div class="sb">Proveedor: Feroz</div></div>
+      <div class="body">
+        <div class="lbl">Lista de precios</div>
+        <div class="fld">Lista B · Distribuidor ▾</div>
+        <div class="mini">A · Fábrica · B · Distribuidor · C · Mayorista · D · Institucional</div>
+        <div class="g2">
+          <div><div class="lbl">Precio de lista</div><div class="fld" style="color:var(--texto);font-weight:700">$62.000</div></div>
+          <div><div class="lbl">Precio sugerido</div><div class="fld" style="color:var(--texto);font-weight:700">$98.000</div></div>
+        </div>
+        <div class="lbl">Condiciones de intermediación</div>
+        <div class="fld">Consignación ▾</div>
+        <div class="mini">Compra en firme · Consignación · Cruce por pedido</div>
+        <div class="g2">
+          <div><div class="lbl">Comisión</div><div class="fld" style="color:var(--texto);font-weight:700">8%</div></div>
+          <div><div class="lbl">Se paga</div><div class="fld">Al recaudo ▾</div></div>
+        </div>
+        <div class="c" style="border-color:#bfe3ca;background:var(--verdeBg)">
+          <div class="mini" style="color:#1c6b34">Vendiendo a $98.000 te quedan
+            <b>$36.000 de margen</b> más <b>$7.840 de comisión</b>.</div></div>
+        <button class="btn g">Guardar referencia</button>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">11</div><div class="tt">Metas · desde el principal</div></div>
+    <div class="ds">Por CED, por referencia y por mes.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>11:10</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🎯 Metas de la red</div><div class="sb">CED principal · agosto 2026</div></div>
+      <div class="body">
+        <div class="lbl">CED</div>
+        <div class="fld">Puente Aranda ▾</div>
+        <table class="tb2">
+          <thead><tr><th>Referencia</th><th>Meta</th><th>Va</th><th>%</th></tr></thead>
+          <tbody>
+            <tr><td>Bota 701</td><td>180</td><td>142</td><td style="color:var(--verde)">79%</td></tr>
+            <tr><td>Bota 705</td><td>120</td><td>96</td><td style="color:var(--verde)">80%</td></tr>
+            <tr><td>Botín 320</td><td>90</td><td>31</td><td style="color:var(--mal)">34%</td></tr>
+            <tr><td>Dieléctrica</td><td>60</td><td>58</td><td style="color:var(--verde)">97%</td></tr>
+          </tbody>
+        </table>
+        <div class="c"><div class="t">Total del mes</div>
+          <div class="v">327 <span style="font-size:13px;color:var(--suave)">de 450</span></div>
+          <div class="bar"><i style="width:73%"></i></div>
+          <div class="mini" style="margin-top:5px">73% · faltan 123 pares</div></div>
+        <div class="c" style="border-color:#f0dcbb;background:var(--amarilloBg)">
+          <div class="t" style="color:var(--amarillo)">Botín 320 va en 34%</div>
+          <div class="mini" style="color:#7a4a08">Es la única por debajo. Vale la pena mirar
+            si es precio, si no hay inventario, o si no la están ofreciendo.</div></div>
+        <button class="btn">Guardar metas de agosto</button>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+
+<h2>Solo para el administrador general</h2>
+<p>Tres pantallas que ningún CED ve. <b>Entre CEDs no se ven nada entre ellos</b> — ni ventas,
+  ni precios, ni clientes, ni gastos. El administrador general sí lo ve todo.</p>
+<div class="board">
+
+  <div class="step">
+    <div class="lbl"><div class="n" style="font-size:9px">👤</div><div class="tt">Usuarios · quién entra y con qué clave</div></div>
+    <div class="ds">Lo que se escriba aquí <b>manda sobre el código</b>: las claves salen de la base, no de app.js.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>11:24</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">👤 Usuarios</div><div class="sb">CED principal · 9 personas</div></div>
+      <div class="body">
+        <div class="tabs" style="border-radius:9px;border:1px solid var(--linea);padding:0 4px">
+          <b class="on">Todos</b><b>Principal</b><b>Tolima</b><b>Av 68</b></div>
+        <div class="lbl">Agregar a alguien</div>
+        <div class="g2">
+          <div class="fld">CED · Tolima ▾</div>
+          <div class="fld">Cargo · Bodega ▾</div>
+        </div>
+        <div class="fld">Nombre y apellido</div>
+        <div class="g2">
+          <div class="fld">Clave</div>
+          <button class="btn">Guardar</button>
+        </div>
+        <div class="lbl">Ya registrados</div>
+        <div class="row"><div class="n2">Gerente general<small>Principal · gerente</small></div><div class="val">🔑 ✎</div></div>
+        <div class="row"><div class="n2">Contadora<small>Principal · contabilidad</small></div><div class="val">🔑 ✎</div></div>
+        <div class="row"><div class="n2">Gerente Tolima<small>Tolima · gerente</small></div><div class="val">🔑 ✎</div></div>
+        <div class="row"><div class="n2">Bodeguero Av 68<small>Av 68 · bodega</small></div><div class="val">🔑 ✎</div></div>
+        <div class="row" style="opacity:.5"><div class="n2">Cajera Av 68<small>Av 68 · cajera · inactiva</small></div>
+          <div class="val" style="font-size:11px">—</div></div>
+        <div class="mini" style="margin-top:auto">El <b>CED</b> decide qué datos ve · el <b>cargo</b> decide qué pestañas.</div>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">Qué hace cada cosa</div>
+      <div class="bt"><b>CED ▾</b> Principal · Tolima · Av 68 — y las que se vayan abriendo</div>
+      <div class="bt"><b>Cargo ▾</b> gerente · contabilidad · bodega · cajera</div>
+      <div class="bt"><b>Guardar</b> escribe en la base. <i>Esa persona ya puede entrar</i>, sin tocar código</div>
+      <div class="bt"><b>Inactivar</b> le quita la entrada sin borrarle el historial de lo que hizo</div>
+      <div class="bt"><i>Las claves de hoy están escritas dentro del código</i> — como en kruh.
+        Esta pestaña las reemplaza</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n" style="font-size:9px">🧩</div><div class="tt">Estructuración de proveeduría</div></div>
+    <div class="ds">La pantalla que alimenta a todas las demás. Solo el principal.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>11:16</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">🧩 Proveeduría</div><div class="sb">CED principal</div></div>
+      <div class="body">
+        <div class="lbl">Quién le manda</div>
+        <div class="fld">Feroz S.A.S. ▾</div>
+        <div class="mini">Feroz · Alpaca · las empresas nuestras que despachan</div>
+        <div class="lbl">Qué le manda</div>
+        <div class="row"><div class="n2">Bota 701<small>tallas 35–45 · negro, miel</small></div><div class="val">✓</div></div>
+        <div class="row"><div class="n2">Bota 705<small>tallas 36–44 · negro</small></div><div class="val">✓</div></div>
+        <div class="row" style="opacity:.5"><div class="n2">Botín 320<small>no se le manda</small></div>
+          <div class="val" style="font-size:11px">—</div></div>
+        <div class="lbl">Política de venta</div>
+        <div class="g2">
+          <div><div class="fld">Lista B ▾</div></div>
+          <div><div class="fld">Consignación ▾</div></div>
+        </div>
+        <div class="lbl">Política de comisiones</div>
+        <div class="g2">
+          <div><div class="fld" style="color:var(--texto);font-weight:700">8%</div></div>
+          <div><div class="fld">Al recaudo ▾</div></div>
+        </div>
+        <div class="lbl">Quién factura</div>
+        <div class="fld">Feroz directo ▾</div>
+        <div class="mini">Feroz · Alpaca · el CED — define la cuenta de consignación</div>
+        <button class="btn g">Guardar estructura</button>
+      </div>
+    </div></div>
+    <div class="bts"><div class="h">De aquí sale todo lo demás</div>
+      <div class="bt">Cuando el CED <b>lista un pedido</b>, le salen <i>estas condiciones</i>:
+        precio, comisión y quién factura</div>
+      <div class="bt">Cuando <b>lista el inventario</b>, le salen <i>estas referencias</i>
+        con sus tallas, colores y bodegas</div>
+      <div class="bt">Si una referencia no está marcada aquí, <b>ese CED no la ve ni la puede vender</b></div>
+      <div class="bt"><i>Se define una vez por CED,</i> y toda la app obedece</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">12</div><div class="tt">Crear CED o aliado</div></div>
+    <div class="ds">La hoja de alta de un distribuidor nuevo.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>11:20</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">＋ Nuevo CED</div><div class="sb">Administrador general</div></div>
+      <div class="body">
+        <div class="lbl">La empresa</div>
+        <div class="fld">Distribuciones El Roble S.A.S.</div>
+        <div class="g2">
+          <div><div class="fld">NIT 901.887.220</div></div>
+          <div><div class="fld">604 332 1180</div></div>
+        </div>
+        <div class="lbl">Tipo</div>
+        <div class="fld">CED distribuidor ▾</div>
+        <div class="mini">CED principal · CED distribuidor · Aliado</div>
+        <div class="lbl">Responsable</div>
+        <div class="fld">Andrés Mora · 310 445 8890</div>
+        <div class="lbl">Territorio</div>
+        <div class="g2">
+          <div><div class="fld">Antioquia ▾</div></div>
+          <div><div class="fld">Itagüí ▾</div></div>
+        </div>
+        <div class="lbl">Lista de precios de compra</div>
+        <div class="fld" style="border-color:var(--acc);color:var(--texto)">Lista C · Mayorista ▾</div>
+        <div class="lbl">Bodegas que puede ver</div>
+        <div class="fld">Fábrica Bogotá, CD Medellín ▾</div>
+        <button class="btn g">Crear CED</button>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="step">
+    <div class="lbl"><div class="n">13</div><div class="tt">Informe de toda la red</div></div>
+    <div class="ds">Todos juntos, o uno por uno.</div>
+    <div class="phone"><div class="screen">
+      <div class="notch"><span>11:24</span><span>▮▮▮</span></div>
+      <div class="hdr"><div class="h1">📊 La red</div><div class="sb">Julio 2026 · 4 CEDs</div></div>
+      <div class="body">
+        <div class="tabs" style="border-radius:9px;border:1px solid var(--linea);padding:0 4px">
+          <b class="on">Todos</b><b>Uno por uno</b></div>
+        <table class="tb2">
+          <thead><tr><th>CED</th><th>Ventas</th><th>Gastos</th><th>Utilidad</th></tr></thead>
+          <tbody>
+            <tr><td>Puente Aranda</td><td>$28,4M</td><td>19%</td><td style="color:var(--verde)">$4,2M</td></tr>
+            <tr><td>Bogotá Norte</td><td>$22,1M</td><td>18%</td><td style="color:var(--verde)">$3,1M</td></tr>
+            <tr><td>Medellín Sur</td><td>$16,9M</td><td style="color:var(--mal)">24%</td><td style="color:var(--mal)">$890K</td></tr>
+            <tr><td>Costa</td><td>$19,4M</td><td>20%</td><td style="color:var(--verde)">$2,3M</td></tr>
+          </tbody>
+        </table>
+        <div class="c"><div class="t">Inventario valorizado de la red</div>
+          <div class="v">$186.400.000</div>
+          <div class="s">6.180 pares en 4 CEDs</div></div>
+        <div class="c" style="border-color:#f0dcbb;background:var(--amarilloBg)">
+          <div class="t" style="color:var(--amarillo)">⏳ Quietas hace rato</div>
+          <div class="mini" style="color:#7a4a08">
+            <b>Botín 320</b> · 94 días sin moverse · $4,8M<br>
+            <b>Bota dieléctrica</b> · 61 días · $6,2M<br>
+            <b>Bota 705 café</b> · 48 días · $2,1M</div></div>
+        <div class="c"><div class="mini">El tiempo sin movimiento es por referencia y por CED.
+          Es plata quieta en una bodega: sirve para mover entre CEDs antes de producir más.</div></div>
+      </div>
+    </div></div>
+  </div>
+
+</div>
+
+<h2>La misma app para dos CEDs</h2>
+<p>Un solo código, una sola URL. Lo que cambia es lo que la base le deja ver a cada uno —
+  igual que hicimos en CallProspector.</p>
+<div class="dos">
+  <div class="caja">
+    <h4>🏭 CED Puente Aranda</h4>
+    <div class="q">Bogotá · 4 barrios · Feroz</div>
+    <div class="li"><span>Clientes</span><b>312</b></div>
+    <div class="li"><span>Ventas de julio</span><b>$28.400.000</b></div>
+    <div class="li"><span>Gastos</span><b>$5.320.000 · 19%</b></div>
+    <div class="li"><span>Le debe a Feroz</span><b>$9.800.000</b></div>
+    <div class="li"><span>Referencias que maneja</span><b>14</b></div>
+    <div class="li"><span>Utilidad</span><b style="color:var(--verde)">$4.180.000</b></div>
+  </div>
+  <div class="caja">
+    <h4>🏭 CED Medellín Sur</h4>
+    <div class="q">Itagüí, Envigado, Sabaneta · Feroz + Alpaca</div>
+    <div class="li"><span>Clientes</span><b>178</b></div>
+    <div class="li"><span>Ventas de julio</span><b>$16.900.000</b></div>
+    <div class="li"><span>Gastos</span><b>$4.100.000 · 24%</b></div>
+    <div class="li"><span>Le debe a Feroz</span><b>$3.200.000</b></div>
+    <div class="li"><span>Referencias que maneja</span><b>9</b></div>
+    <div class="li"><span>Utilidad</span><b style="color:var(--mal)">$890.000</b></div>
+  </div>
+</div>
+<p style="margin-top:14px">Ahí se ve solo el valor para vos: <b>Medellín está en problemas y Puente Aranda no.</b>
+  Vende casi la mitad pero gasta casi lo mismo — 24% contra 19%. Sin el módulo de gastos
+  eso no se nota hasta que el distribuidor deja de pedir.</p>
+
+<h2>El cambio</h2>
+<div class="cambio">
+  <div class="lado">
+    <div class="k">Hoy</div>
+    <div class="v">App de Feroz</div>
+    <div class="d">Una marca, una operación. El distribuidor es un dato adentro: aparece como cliente,
+      pero no tiene dónde entrar ni qué mirar.</div>
+  </div>
+  <div class="flecha">→</div>
+  <div class="lado new">
+    <div class="k">Se convierte en</div>
+    <div class="v">App del CED</div>
+    <div class="d">Cada distribuidor entra a la suya y ve su propio negocio: sus clientes,
+      su inventario, sus ventas, <b>sus gastos y sus proveedores</b>. Feroz pasa a ser
+      un CED más — el primero, no el dueño.</div>
+  </div>
+</div>
+<p style="margin-top:16px">Lo que entendió el cliente y por eso vale la pena: <b>sus aliados también
+  necesitan tecnología</b>. Si el distribuidor ordena sus finanzas y sus procesos con la app,
+  vende más y compra más. La herramienta deja de ser un gasto de Feroz y se vuelve un motivo
+  para quedarse en la red.</p>
+
+<h2>Qué es un CED, exactamente</h2>
+<div class="cambio" style="grid-template-columns:1fr">
+  <div class="lado">
+    <div class="k">La definición que ordena todo lo demás</div>
+    <div class="v">Un CED es un centro de stand-by</div>
+    <div class="d" style="font-size:14px;margin-top:8px">
+      La mercancía que está en un CED <b>no es del CED</b>: es nuestra, en tránsito,
+      esperando a moverse. El distribuidor no compra para revender — <b>recibe, guarda y mueve</b>.
+      Por eso lo que gana es comisión o margen sobre lo que rota, no la diferencia entre
+      lo que compró y lo que vendió.<br><br>
+      Y como <b>varias de nuestras empresas</b> le pueden enviar mercancía en tránsito —y
+      cualquiera de ellas puede facturar— el CED necesita ver claro
+      <b>de quién es cada cosa que tiene parqueada</b>.
+    </div>
+  </div>
+</div>
+<p style="margin-top:15px">De ahí sale una regla que separa los dos módulos nuevos:
+  <b>Proveedores es solo mercancía</b> —lo nuestro que él maneja— y
+  <b>todo lo demás que compra va por Gastos</b>: aseo, papelería, empaques, transporte, arriendo.
+  Así lo que se ve en Proveedores es exactamente nuestro manejo, sin ruido.</p>
+
+<h2>Hay dos tipos de CED</h2>
+<div class="cambio">
+  <div class="lado new">
+    <div class="k">Manda</div>
+    <div class="v">CED principal</div>
+    <div class="d">El del control total. Ve la <b>planta</b>, pone las <b>metas de todos</b>
+      por referencia y por mes, decide <b>qué bodegas ve cada quien</b> y define las
+      <b>listas de precios y comisiones</b> de cada referencia.</div>
+  </div>
+  <div class="flecha">→</div>
+  <div class="lado">
+    <div class="k">Opera</div>
+    <div class="v">CED distribuidor</div>
+    <div class="d">Ve y trabaja lo suyo: sus clientes, sus prospectos, su pauta con su propio
+      número y su propio gasto, sus ventas, sus gastos y sus proveedores.
+      Las bodegas que le abrieron, ni una más.</div>
+  </div>
+</div>
+<p style="margin-top:15px">Es la misma app. Lo único que cambia es el rol con el que entras —
+  igual que en CallProspector. <b>Feroz se vuelve el CED principal</b>, no desaparece:
+  deja de ser el dueño de la app para ser el que la administra.</p>
+
+<h2>Qué pasa con cada módulo</h2>
+<p>Esto es una propuesta, no una decisión. Lo importante es que cada módulo tenga una respuesta
+  antes de tocar código — hoy la app tiene 3.719 líneas y cambiar de opinión después sale caro.</p>
+<div class="tw">
+  <table>
+    <thead><tr><th style="min-width:150px">Módulo</th><th style="width:110px">Qué le pasa</th><th>Por qué</th></tr></thead>
+    <tbody>
+      <tr><td><div class="m">📊 Tablero</div></td><td><span class="chip c">Por CED</span></td>
+        <td class="n">Definimos qué datos muestra, y cada CED ve <b>solo lo suyo</b>.</td></tr>
+      <tr><td><div class="m">🎯 CRM / Prospectos</div></td><td><span class="chip c">Por CED</span></td>
+        <td class="n">Filtrado por CED. Cada distribuidor trabaja los suyos y no ve los del vecino.</td></tr>
+      <tr><td><div class="m">☎️ Marcador</div></td><td><span class="chip c">Por CED</span></td>
+        <td class="n">Se queda, filtrado por CED. Se apoya en las bases de CallProspector.</td></tr>
+      <tr><td><div class="m">💬 Digital</div></td><td><span class="chip c">Por CED</span></td>
+        <td class="n"><b>Cada uno maneja su propia pauta</b>: va conectada a su número de WhatsApp
+          y la pauta la paga él. Son cuentas separadas, no una bolsa común.</td></tr>
+      <tr><td><div class="m">🌱 Orgánico</div></td><td><span class="chip c">Por CED</span></td>
+        <td class="n">Igual: de dónde le llegaron los clientes a ese CED.</td></tr>
+      <tr><td><div class="m">👥 Clientes</div></td><td><span class="chip c">Por CED</span></td>
+        <td class="n">Los del CED. Es lo que el distribuidor más va a usar.</td></tr>
+      <tr><td><div class="m">📋 Cotizaciones / Pedidos</div></td><td><span class="chip q">Queda</span></td>
+        <td class="n">El corazón de la operación. Sin cambios de fondo.</td></tr>
+      <tr><td><div class="m">🏭 Inventario</div></td><td><span class="chip c">Cambia</span></td>
+        <td class="n"><b>Ven todas las bodegas</b>, pero el administrador decide
+          <b>qué bodegas ve cada CED</b>. No es una bodega por distribuidor: es acceso por permiso.</td></tr>
+      <tr><td><div class="m">💰 Ventas</div></td><td><span class="chip q">Igual</span></td>
+        <td class="n">Sin cambios.</td></tr>
+      <tr><td><div class="m">💰 Comisiones</div></td><td><span class="chip c">Se mueve</span></td>
+        <td class="n">Dejan de ser una pestaña suelta. Se definen <b>al crear la referencia,
+          dentro de Proveedores</b>: tipo de lista de precios, condiciones de intermediación
+          y comisión. Así la comisión vive pegada al producto, no aparte.</td></tr>
+      <tr><td><div class="m">🎯 Metas</div></td><td><span class="chip c">Cambia</span></td>
+        <td class="n">Una meta <b>por CED, por referencia y por mes</b>. Se ponen desde una pestaña
+          que vive en el <b>CED principal</b>, el del control total.</td></tr>
+      <tr><td><div class="m">🚚 Despachos</div></td><td><span class="chip d">Por definir</span></td>
+        <td class="n">Queda pendiente si son dos tramos (fábrica→CED y CED→cliente) o uno solo.</td></tr>
+      <tr><td><div class="m">🏭 Planta</div></td><td><span class="chip f">Solo el principal</span></td>
+        <td class="n">La producción solo la ve el CED principal. Y algo importante:
+          <b>el precio de planta carga las condiciones de negociación</b> — el precio no viaja solo,
+          viaja con sus condiciones pegadas.</td></tr>
+      <tr><td><div class="m">📦 Kit</div></td><td><span class="chip f">Se elimina</span></td>
+        <td class="n">Era de otra marca. No existe más. Lo que aquí se maneja son <b>Muestras</b>,
+          que ya viven en otro lado.</td></tr>
+      <tr><td><div class="m">🧾 Gastos</div></td><td><span class="chip n">Nuevo</span></td>
+        <td class="n"><b>Por distribuidor.</b> Sin esto sabe cuánto vendió, pero no si ganó.</td></tr>
+      <tr><td><div class="m">🚚 Proveedores</div></td><td><span class="chip n">Nuevo</span></td>
+        <td class="n">Feroz es su proveedor principal, pero no el único. Y aquí adentro viven
+          las referencias con su lista de precios y su comisión.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<h2>Lo que hay que decidir antes de programar</h2>
+
+<div class="q">
+  <h3>La pauta separada, ¿cómo se conecta?</h3>
+  <p>Cada CED con su número y su pauta pagada aparte es lo correcto, pero implica que
+    <b>cada uno tenga su propia cuenta de Meta</b> y su propio WhatsApp conectado.
+    ¿Eso lo monta NC por ellos, o cada distribuidor llega con lo suyo?</p>
+</div>
+
+<div class="q">
+  <h3>Despachos: ¿uno o dos tramos?</h3>
+  <p>Es lo único del listado de módulos que quedó sin definir. Si el CED despacha a su cliente
+    final, hay un segundo tramo que hoy no existe en la app.</p>
+</div>
+
+<div class="q" style="background:var(--verdeBg);border-color:#bfe3ca">
+  <h3 style="color:#1c7a3e">✓ RESUELTO · La venta suma, la facture quien la facture</h3>
+  <p style="color:#245c39">Suma a la meta del CED en los tres casos: si factura el proveedor, si factura
+    el CED, y si el CED <b style="color:#14512b">remisiona y genera</b>. Movió producto, cuenta.</p>
+  <p style="color:#245c39">De ahí sale una regla para el cotizador: <b style="color:#14512b">al pasar la
+    cotización a pedido, la app pregunta dos cosas y las graba</b> — <b style="color:#14512b">quién
+    factura</b>, porque de eso depende el precio de planta con sus condiciones pegadas, y
+    <b style="color:#14512b">con qué documento sale, remisión o factura</b>. No se deduce ni se
+    deja para después: se pregunta en el momento y queda escrito en el pedido.</p>
+</div>
+
+<div class="q">
+  <h3>El aislamiento entre CEDs hay que probarlo, no confiarlo</h3>
+  <p>Quedó claro que entre CEDs no se ven nada. Eso no se garantiza con esconder botones:
+    se garantiza en la base, con reglas que impidan leer datos ajenos aunque alguien
+    cambie la dirección a mano. <b>Es lo primero que hay que montar y lo primero que
+    hay que intentar romper.</b></p>
+</div>
+
+<div class="nota">
+  Mockup no funcional · datos de ejemplo · para acordar la estructura antes de tocar app.js (3.719 líneas).<br>
+  Los 13 módulos existentes salen del código real. Gastos y Proveedores se apoyan en los que ya
+  funcionan en Kruh, para no inventar de cero.<br>
+  CED · Red de Distribución · Negocios Cuánticos
+</div>
+
+</div>
+</body>
+</html>
