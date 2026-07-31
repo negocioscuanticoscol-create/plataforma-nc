@@ -196,6 +196,7 @@ const App = {
       {v:'crm', ic:'📇', t:'CRM'},
       {v:'cotizaciones', ic:'📝', t:'Cotizar'},
       {v:'pedidos', ic:'📦', t:'Pedidos'},
+      {v:'inventario', ic:'📦', t:'Inventario'},
       {v:'despachos', ic:'🚚', t:'Despachos'},
       {v:'cartera', ic:'💳', t:'Cartera'},
       {v:'planta', ic:'🏭', t:'Planta'},
@@ -259,7 +260,7 @@ const App = {
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
-      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos}[view] || this.vDashboard).call(this);
+      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario}[view] || this.vDashboard).call(this);
   },
   set(html){ $('main').innerHTML = this._subnav() + html; },
   enConstruccion(view){
@@ -4059,6 +4060,190 @@ const App = {
   toast(t){ const d=document.createElement('div'); d.textContent=t;
     d.style.cssText='position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#15171c;color:#fff;padding:10px 18px;border-radius:20px;z-index:80;font-size:13px';
     document.body.appendChild(d); setTimeout(()=>d.remove(),1800); },
+
+  /* ===================== INVENTARIO · por CED =====================
+     Cada sucursal ve solo su bodega (eso lo garantiza la base, no esta pantalla).
+     El grano es referencia + color + talla. */
+  async vInventario(){
+    this.loading();
+    const [ri,rm] = await Promise.all([
+      this.sb.from('inventario').select('*').order('referencia').order('talla'),
+      this.sb.from('inv_movimientos').select('*').order('creado_en',{ascending:false}).limit(500)
+    ]);
+    const inv=ri.data||[], movs=rm.data||[];
+    this._inv=inv; this._movs=movs;
+
+    // cobertura: cuantos pares salieron este mes, para saber cuantos dias aguanta
+    const hoy=new Date(), ym=hoy.toISOString().slice(0,7), diaDelMes=Math.max(1,hoy.getDate());
+    const salMes={};
+    movs.filter(m=>m.tipo==='salida' && String(m.creado_en||'').slice(0,7)===ym)
+        .forEach(m=>{ salMes[m.referencia]=(salMes[m.referencia]||0)+(+m.cantidad||0); });
+
+    const gr={};
+    inv.forEach(r=>{ const k=r.referencia+'||'+(r.color||'');
+      if(!gr[k]) gr[k]={ref:r.referencia, color:r.color||'', tallas:[], total:0};
+      gr[k].tallas.push(r); gr[k].total+=(+r.stock||0); });
+    const grupos=Object.values(gr).sort((a,b)=>String(a.ref).localeCompare(String(b.ref)));
+    const totPares=inv.reduce((a,r)=>a+(+r.stock||0),0);
+    const enCero=grupos.filter(g=>g.total<=0).length;
+    const donde=(this.cedUser&&this.cedUser.ced)||'toda la red';
+
+    this.set(`
+      <h1>📦 Inventario</h1><div class="sub">Bodega de ${esc(donde)} · lo que hay hoy</div>
+      <div class="kpis">
+        <div class="kpi naranja"><b>${totPares}</b><span>pares en bodega</span></div>
+        <div class="kpi"><b>${grupos.length}</b><span>referencias</span></div>
+      </div>
+      ${enCero?`<div class="card" style="border-color:#f0c4c4;background:#fdecec;padding:11px">
+        <b style="color:#b3261e">🔴 ${enCero} referencia(s) en cero</b></div>`:''}
+      <div class="acciones-item" style="margin-bottom:12px">
+        <button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.invIngresar()">＋ Ingresar inventario</button>
+        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.invAuditoria()">🔍 Auditoría</button>
+        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.invGarantia()">🛡️ Garantía</button>
+        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.invMovs()">📋 Movimientos</button>
+      </div>
+      <h1 style="font-size:16px">Saldos</h1>
+      <div class="sub">Índice de cobertura: cuántos días aguanta al ritmo de venta de este mes</div>
+      ${grupos.length?grupos.map(g=>{
+        const consumoDia=(salMes[g.ref]||0)/diaDelMes;
+        const dias = consumoDia>0 ? g.total/consumoDia : null;
+        const col = g.total<=0?'var(--rojo)':(dias!==null&&dias<7?'#b45309':'var(--verde)');
+        const txt = g.total<=0?'sin existencias'
+                  : (dias===null?'no ha salido nada este mes'
+                  : 'cobertura '+dias.toFixed(0)+' días · salieron '+(salMes[g.ref]||0)+' este mes');
+        return `<div class="item">
+          <div class="top">
+            <div><div class="nom">${esc(g.ref)}${g.color?' · '+esc(g.color):''}</div>
+              <div class="meta" style="color:${col};font-weight:700">${txt}</div></div>
+            <div class="tot">${g.total}</div>
+          </div>
+          <div class="grid-tallas">${g.tallas.map(t=>`<div class="t">
+            <span>${t.talla}</span><b style="display:block;padding:4px 0;color:${(+t.stock||0)<=0?'var(--rojo)':'var(--texto)'}">${+t.stock||0}</b>
+          </div>`).join('')}</div>
+        </div>`;
+      }).join(''):'<div class="empty">Esta bodega todavía no tiene mercancía.<br>Toca “Ingresar inventario”.</div>'}`);
+  },
+
+  _invCampos(u){ return `
+    <label>Referencia</label><input id="iv_ref" class="field" value="${esc(u&&u.ref||'')}" placeholder="701">
+    <div class="row2">
+      <div><label>Color</label><input id="iv_col" class="field" value="${esc(u&&u.color||'')}" placeholder="negro"></div>
+      <div><label>Talla</label><input id="iv_tal" class="field" type="number" value="${esc(u&&u.talla||'')}" placeholder="38"></div>
+    </div>`; },
+
+  invIngresar(){
+    this.modal(`<h3>＋ Ingresar inventario</h3>
+      <div class="sub">Mercancía que llega a la bodega</div>
+      ${this._invCampos()}
+      <label>Cuántos pares entran</label><input id="iv_can" class="field" type="number" placeholder="0">
+      <label>De dónde viene</label><input id="iv_mot" class="field" placeholder="Remisión 1234 · traslado · compra">
+      <button class="btn btn-main" onclick="App.invIngresarOk()">Ingresar</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+  },
+  async invIngresarOk(){
+    const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim(), talla=+$('iv_tal').value||0;
+    const can=+$('iv_can').value||0, mot=$('iv_mot').value.trim();
+    if(!ref||!talla||can<=0){ alert('Referencia, talla y cantidad son obligatorios.'); return; }
+    const ok=await this._invSumar(ref,color,talla,can,'entrada',mot||'Ingreso de inventario');
+    if(!ok) return;
+    this.cerrarModal(); this.toast('＋'+can+' pares'); this.vInventario();
+  },
+
+  /* suma (o resta, si viene negativo) y deja el movimiento escrito */
+  async _invSumar(ref,color,talla,cant,tipo,motivo){
+    const mio=(this.cedUser&&this.cedUser.ced)||'Principal';
+    const actual=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color && +r.talla===+talla);
+    const nuevo=(+((actual&&actual.stock)||0))+cant;
+    if(nuevo<0){ alert('No alcanza: en esa talla hay '+((actual&&actual.stock)||0)+' pares.'); return false; }
+    const fila={referencia:ref, color:color, talla:talla, stock:nuevo,
+                actualizado_en:new Date().toISOString(), ced:(actual&&actual.ced)||mio};
+    const { error } = await this.sb.from('inventario').upsert(fila,{onConflict:'ced,referencia,color,talla'});
+    if(error){ alert('No se pudo guardar el inventario: '+error.message); return false; }
+    await this.sb.from('inv_movimientos').insert({ referencia:ref, color:color, talla:talla, tipo:tipo,
+      cantidad:Math.abs(cant), motivo:motivo, usuario:(this.perfil&&this.perfil.nombre)||'' });
+    return true;
+  },
+
+  invAuditoria(){
+    this.modal(`<h3>🔍 Auditoría</h3>
+      <div class="sub">Contar lo que hay de verdad y compararlo con lo que dice la app</div>
+      ${this._invCampos()}
+      <label>Cuántos pares contaste</label><input id="iv_con" class="field" type="number" placeholder="0"
+        oninput="App.invAudDif()">
+      <div id="iv_dif" class="hint"></div>
+      <label>Nota</label><input id="iv_nota" class="field" placeholder="quién contó, qué se encontró">
+      <button class="btn btn-main" onclick="App.invAuditoriaOk(true)">Guardar y ajustar el saldo</button>
+      <button class="btn btn-ghost" onclick="App.invAuditoriaOk(false)">Solo dejar constancia</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+  },
+  invAudDif(){
+    const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim(), talla=+$('iv_tal').value||0;
+    const a=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color && +r.talla===+talla);
+    const sis=+((a&&a.stock)||0), con=+$('iv_con').value||0, d=con-sis;
+    $('iv_dif').innerHTML = (!ref||!talla) ? 'Escribe referencia y talla para comparar.'
+      : `La app dice <b>${sis}</b> · contaste <b>${con}</b> · <b style="color:${d===0?'var(--verde)':'var(--rojo)'}">${d===0?'cuadra':(d>0?'sobran '+d:'faltan '+Math.abs(d))}</b>`;
+  },
+  async invAuditoriaOk(ajustar){
+    const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim(), talla=+$('iv_tal').value||0;
+    const con=+$('iv_con').value||0, nota=$('iv_nota').value.trim();
+    if(!ref||!talla){ alert('Referencia y talla son obligatorias.'); return; }
+    const a=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color && +r.talla===+talla);
+    const sis=+((a&&a.stock)||0);
+    const { error } = await this.sb.from('inv_auditoria').insert({ referencia:ref, color:color, talla:talla,
+      sistema:sis, contado:con, ajustado:!!ajustar, nota:nota, usuario:(this.perfil&&this.perfil.nombre)||'' });
+    if(error){ alert('Error: '+error.message); return; }
+    if(ajustar && con!==sis){
+      const ok=await this._invSumar(ref,color,talla,con-sis,'ajuste','Auditoría'+(nota?' · '+nota:''));
+      if(!ok) return;
+    }
+    this.cerrarModal(); this.toast(ajustar?'Auditoría guardada y saldo ajustado':'Auditoría guardada'); this.vInventario();
+  },
+
+  invGarantia(){
+    this.modal(`<h3>🛡️ Garantía</h3>
+      <div class="sub">Par que vuelve por falla · se descuenta de la bodega</div>
+      ${this._invCampos()}
+      <label>Cuántos pares</label><input id="iv_can" class="field" type="number" value="1">
+      <label>Cuál es la falla</label><input id="iv_falla" class="field" placeholder="suela despegada, costura, tallaje…">
+      <label>Foto</label><input id="iv_foto" class="field" type="file" accept="image/*">
+      <div class="hint">La foto es la prueba: sin ella la planta suele devolver el caso.</div>
+      <button class="btn btn-main" onclick="App.invGarantiaOk()">Registrar garantía</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+  },
+  async invGarantiaOk(){
+    const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim(), talla=+$('iv_tal').value||0;
+    const can=+$('iv_can').value||0, falla=$('iv_falla').value.trim(), f=$('iv_foto').files[0];
+    if(!ref||!talla||can<=0){ alert('Referencia, talla y cantidad son obligatorias.'); return; }
+    let foto=null;
+    if(f){
+      const nom='ced/'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9._-]/g,'');
+      const { error:eu } = await this.sb.storage.from('garantias').upload(nom,f);
+      if(eu) alert('La garantía se guarda, pero la foto no subió: '+eu.message);
+      else foto = this.sb.storage.from('garantias').getPublicUrl(nom).data.publicUrl;
+    }
+    const { error } = await this.sb.from('garantias').insert({ tipo:'garantia', estado:'abierta',
+      referencia:ref, color:color, talla:talla, pares:can, falla:falla, foto_url:foto,
+      motivo:falla, notas:'Registrada desde Inventario' });
+    if(error){ alert('Error: '+error.message); return; }
+    const ok=await this._invSumar(ref,color,talla,-can,'garantia','Garantía'+(falla?' · '+falla:''));
+    if(!ok) return;
+    this.cerrarModal(); this.toast('Garantía registrada · −'+can+' pares'); this.vInventario();
+  },
+
+  invMovs(){
+    const m=this._movs||[];
+    const nom={entrada:'＋ Entrada', salida:'− Salida', ajuste:'⚖ Ajuste', garantia:'🛡 Garantía'};
+    this.modal(`<h3>📋 Movimientos</h3>
+      <div class="sub">Todo lo que entró y salió de esta bodega</div>
+      ${m.length?m.slice(0,120).map(x=>`<div class="item" style="padding:10px">
+        <div class="top">
+          <div><div class="nom" style="font-size:14px">${esc(x.referencia)}${x.color?' · '+esc(x.color):''} <small class="dim">talla ${x.talla||'—'}</small></div>
+            <div class="meta">${nom[x.tipo]||esc(x.tipo)} · ${esc(String(x.creado_en||'').slice(0,10))}${x.usuario?' · '+esc(x.usuario):''}</div>
+            ${x.motivo?`<div class="meta">${esc(x.motivo)}</div>`:''}</div>
+          <div class="tot" style="color:${x.tipo==='entrada'?'var(--verde)':'var(--rojo)'}">${x.tipo==='entrada'?'+':'−'}${x.cantidad}</div>
+        </div></div>`).join(''):'<div class="empty">Todavía no hay movimientos.</div>'}
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cerrar</button>`);
+  },
 
   /* ---------- modal ---------- */
   modal(html){ $('modal-host').innerHTML=`<div class="modal"><div class="box">${html}</div></div>`; },
