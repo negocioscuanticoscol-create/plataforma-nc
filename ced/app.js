@@ -196,7 +196,7 @@ const App = {
       {v:'crm', ic:'📇', t:'CRM'},
       {v:'cotizaciones', ic:'📝', t:'Cotizar'},
       {v:'pedidos', ic:'📦', t:'Pedidos'},
-      {v:'inventario', ic:'📦', t:'Inventario'},
+      {v:'inventario', ic:'🗃️', t:'Inventario'},
       {v:'despachos', ic:'🚚', t:'Despachos'},
       {v:'cartera', ic:'💳', t:'Cartera'},
       {v:'planta', ic:'🏭', t:'Planta'},
@@ -209,11 +209,11 @@ const App = {
       {v:'admin', ic:'👤', t:'Usuarios'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones'],
-      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones'],
-      vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
-      facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
+    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','datos','admin','permisos'];
+    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario'],
+      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario'],
+      vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario'],
+      facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos','inventario'], planta:['dashboard','pedidos','planta','inventario']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
     if(r==='admin') permitidos=TODOS;
     this._permitidos=permitidos;
