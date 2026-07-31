@@ -3825,7 +3825,7 @@ const App = {
   },
 
   /* ---------- ADMIN (equipo) ---------- */
-  CED_CARGOS:['gerente','contabilidad','bodega','cajera'],
+  CED_CARGOS:['gerente','administrador','contabilidad','finanzas','bodega','cajera'],
 
   async vAdmin(){
     this.loading();
