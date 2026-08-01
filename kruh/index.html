@@ -1714,12 +1714,21 @@ const App={
        B guarda el bruto por producto, que NO es lo mismo: un pedido con descuento suma
        en B lo que valen los productos aunque no se haya cobrado. Antes el cajón mostraba
        ese bruto y no cuadraba con la tabla de venta día por día, que sí usa lo cobrado. */
-    const COBRADO={dia:0,mes:0,ano:0}, DESC={dia:0,mes:0,ano:0};
+    /* El TOTAL del cajón sale de kruh_ventas, la MISMA fuente que la tabla de
+       venta día por día. Antes salía de kruh_pedidos y por eso no cuadraban:
+       las ventas cargadas a mano (importaciones, ajustes de cierre) están en
+       ventas pero no tienen pedido, así que el cajón las ignoraba. Cada pedido
+       de la app genera su venta, así que sumar ventas no duplica nada. */
+    const COBRADO={dia:0,mes:0,ano:0}, DESC={dia:0,mes:0,ano:0}, DEPED={dia:0,mes:0,ano:0};
+    (ventas||[]).forEach(v=>{ const k=this._diaKey(v.creado_en); if(!k)return; const tt=+v.monto||0;
+      if(k===hoyK)COBRADO.dia+=tt;
+      if(k.slice(0,7)===mesK)COBRADO.mes+=tt;
+      if(k.slice(0,4)===anoK)COBRADO.ano+=tt; });
     (peds||[]).forEach(p=>{ const k=this._diaKey(p.creado_en); if(!k)return; const fp=(p.forma_pago||'—').trim()||'—';
       const tt=+p.total||0, dd=+p.descuento||0;
-      if(k===hoyK){ COBRADO.dia+=tt; DESC.dia+=dd; }
-      if(k.slice(0,7)===mesK){ COBRADO.mes+=tt; DESC.mes+=dd; }
-      if(k.slice(0,4)===anoK){ COBRADO.ano+=tt; DESC.ano+=dd; }
+      if(k===hoyK){ DEPED.dia+=tt; DESC.dia+=dd; }
+      if(k.slice(0,7)===mesK){ DEPED.mes+=tt; DESC.mes+=dd; }
+      if(k.slice(0,4)===anoK){ DEPED.ano+=tt; DESC.ano+=dd; }
       // el descuento del pedido se reparte entre sus productos, a prorrata del valor de
       // cada uno. Así la columna "cobrado" de la tabla cuadra con la plata que entró.
       const bru=(p.items||[]).reduce((s,i)=>s+(+i.qty||0)*(+i.precio||0),0);
@@ -1730,13 +1739,15 @@ const App={
         if(k===hoyK)add('dia',n+' ||'+fp,fp);
         if(k.slice(0,7)===mesK)add('mes',n,'');
         if(k.slice(0,4)===anoK)add('ano',n,''); }); });
-    // ventas sin pedido en app (carga manual) → "Consumidor Final" en los cajones
-    (ventas||[]).filter(v=>(v.producto||'')==='Consumidor Final').forEach(v=>{
-      const k=this._diaKey(v.creado_en); if(!k)return; const tt=+v.monto||0;
-      const addCF=(b,key,fp)=>{const o=B[b][key]=B[b][key]||{n:'Consumidor Final',fp,q:0,v:0,d:0}; o.v+=tt;};
-      if(k===hoyK){ COBRADO.dia+=tt; addCF('dia','Consumidor Final ||Efectivo','Efectivo'); }
-      if(k.slice(0,7)===mesK){ COBRADO.mes+=tt; addCF('mes','Consumidor Final',''); }
-      if(k.slice(0,4)===anoK){ COBRADO.ano+=tt; addCF('ano','Consumidor Final',''); }
+    /* Lo que se vendió sin pasar por un pedido de la app (importaciones, ajustes
+       de cierre, ventas registradas a mano) se muestra como UNA línea, para que
+       el detalle sume exactamente lo mismo que el total del cajón. */
+    ['dia','mes','ano'].forEach(b=>{
+      const resto=Math.round((COBRADO[b]||0)-(DEPED[b]||0));
+      if(resto>0){
+        const key = b==='dia' ? 'Ventas sin pedido ||—' : 'Ventas sin pedido';
+        B[b][key]={n:'Ventas sin pedido (carga manual)', fp:'—', q:0, v:resto, d:0};
+      }
     });
     const tot=b=>COBRADO[b]||0;
     const CJ=[['dia','📅 Día','hoy '+f.getDate()+' de '+(this.MESNOM[f.getMonth()+1]||'').toLowerCase(),'👥 '+cli.dia.size+' cliente(s)'],
