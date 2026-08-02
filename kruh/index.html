@@ -170,7 +170,7 @@ const App={
   /* ===================== DASHBOARD ===================== */
   async vDashboard(){
     this.loading();
-    const [meses,leads,ventas,peds,recs,gastos]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en&limit=5000'),GETALL('kruh_ventas?select=monto,creado_en&limit=8000'),GETALL('kruh_pedidos?select=items,creado_en&limit=3000'),GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000'),GET('kruh_gastos?select=monto,fecha,creado_en&limit=5000')]);
+    const [meses,leads,ventas,peds,recs,gastos]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en&limit=5000'),GETALL('kruh_ventas?select=monto,creado_en,producto&limit=8000'),GETALL('kruh_pedidos?select=items,creado_en&limit=3000'),GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000'),GET('kruh_gastos?select=monto,fecha,creado_en&limit=5000')]);
     const now=new Date(), cm=now.getMonth()+1, mesIni=new Date(now.getFullYear(),now.getMonth(),1), mesNom=this.MESNOM[cm]||'';
     // del mes en curso hacia atrás; los meses futuros quedan de últimas
     const rango=m=>{ const o=+m.orden||99; return o<=cm?o:o-1000; };
@@ -223,7 +223,68 @@ const App={
       <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
       <div class="sub" style="margin-bottom:8px">Toca un mes para ver la venta de cada día.</div>
       <div id="dashLista">${this._dashLista()}</div>
-      ${this.esAdmin?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
+      ${this.esAdmin?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}
+      <h1 style="font-size:18px;margin-top:24px">Qué día se vende más</h1>
+      <div class="sub" style="margin-bottom:8px">Todo el histórico junto. Toca un día para ver qué se vende ese día.</div>
+      <div id="dashSem">${this._dashSemana()}</div>`);
+  },
+  /* Comportamiento por día de la semana. Es la base de la tendencia: con esto
+     se sabe qué día produce más y qué hay que tener listo ese día. */
+  _dashSemana(){
+    const V=((this._dashCtx||{}).ventas)||[]; if(!V.length) return '';
+    const DIA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const por={}, fechas={};
+    V.forEach(v=>{ const d=new Date(v.creado_en); if(isNaN(d))return; const w=d.getDay();
+      const o=por[w]=por[w]||{n:0,t:0}; o.t+=+v.monto||0; o.n++;
+      (fechas[w]=fechas[w]||new Set()).add(this._diaKey(d)); });
+    const filas=Object.keys(por).map(w=>{const o=por[w],ds=(fechas[w]||new Set()).size;
+      return {w:+w,n:o.n,t:o.t,ds,prom:ds?o.t/ds:0,tk:o.n?o.t/o.n:0};});
+    if(!filas.length) return '';
+    const gt=filas.reduce((a,f)=>a+f.t,0), max=Math.max(...filas.map(f=>f.prom));
+    filas.sort((a,b)=>b.prom-a.prom);
+    const ab=this._dashDow;
+    return `<div class="card" style="padding:12px 14px">
+      <div style="display:flex;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);border-bottom:1px solid var(--line);padding-bottom:6px">
+        <span style="flex:1">Día</span><span style="width:120px;text-align:right">Promedio por día</span>
+        <span style="width:58px;text-align:right">Días</span><span style="width:58px;text-align:right">Ventas</span>
+        <span style="width:80px;text-align:right">Ticket</span><span style="width:52px;text-align:right">Peso</span></div>
+      ${filas.map((f,i)=>{const o=ab===f.w;return `<div>
+        <div onclick="App.dashDow(${f.w})" style="display:flex;gap:8px;align-items:center;padding:8px 0;font-size:13.5px;cursor:pointer;border-bottom:1px solid var(--line2)">
+          <span style="flex:1;font-weight:${i===0?'800':'600'}">${o?'▾':'▸'} ${DIA[f.w]}${i===0?' <span class="tag np">el mejor</span>':''}</span>
+          <span style="width:120px;text-align:right;font-weight:800">${money(Math.round(f.prom))}</span>
+          <span style="width:58px;text-align:right;color:var(--mut)">${f.ds}</span>
+          <span style="width:58px;text-align:right;color:var(--mut)">${f.n}</span>
+          <span style="width:80px;text-align:right;color:var(--mut)">${money(Math.round(f.tk))}</span>
+          <span style="width:52px;text-align:right;color:var(--mut)">${gt?(f.t/gt*100).toFixed(1):0}%</span></div>
+        <div style="height:6px;background:var(--line2);border-radius:3px;margin-bottom:${o?'8px':'4px'};overflow:hidden">
+          <i style="display:block;height:100%;width:${max?f.prom/max*100:0}%;background:${i===0?'var(--ok)':'var(--acc2)'}"></i></div>
+        ${o?this._dashDowProds(f.w):''}</div>`;}).join('')}
+      <div class="hint" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">
+        El promedio por día es lo que se compara, no el total: cada día de la semana ha caído
+        una cantidad distinta de veces en el histórico.</div></div>`;
+  },
+  dashDow(w){ this._dashDow=(this._dashDow===w)?null:w;
+    const c=$('dashSem'); if(c) c.innerHTML=this._dashSemana(); },
+  /* Qué producto se mueve ese día de la semana → cuánto hay que hornear. */
+  _dashDowProds(w){
+    const V=((this._dashCtx||{}).ventas)||[], cuenta={};
+    let dias=new Set();
+    V.forEach(v=>{ const d=new Date(v.creado_en); if(isNaN(d)||d.getDay()!==w)return;
+      dias.add(this._diaKey(d));
+      String(v.producto||'').split(',').forEach(p=>{
+        const m=p.match(/^\s*(.+?)\s*[x×]\s*(\d+)\s*$/); if(!m)return;
+        cuenta[m[1].trim()]=(cuenta[m[1].trim()]||0)+(+m[2]||0); }); });
+    const lista=Object.entries(cuenta).sort((a,b)=>b[1]-a[1]);
+    if(!lista.length) return '';
+    const nd=dias.size||1, top=lista.slice(0,8), mx=top[0][1];
+    return `<div style="background:var(--paper);border-radius:9px;padding:10px 12px;margin-bottom:8px">
+      <div class="hint" style="margin-bottom:6px">Lo que más se vende ese día · la columna de la derecha es el <b>promedio por día</b>, que es lo que hay que tener listo</div>
+      ${top.map(([n,q])=>`<div style="display:flex;gap:8px;align-items:center;padding:2.5px 0;font-size:12.5px">
+        <span style="flex:0 0 auto;width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n)}</span>
+        <span style="flex:1;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${q/mx*100}%;background:var(--acc)"></i></span>
+        <span style="width:56px;text-align:right;color:var(--mut)">${q} und</span>
+        <span style="width:52px;text-align:right;font-weight:700">${(q/nd).toFixed(1)}/día</span></div>`).join('')}
+      ${lista.length>8?`<div class="hint" style="margin-top:5px">y ${lista.length-8} productos más</div>`:''}</div>`;
   },
   /* Mes a mes. Se dibuja aparte para poder abrir y cerrar el detalle de días
      sin volver a pedirle nada a la base. */
