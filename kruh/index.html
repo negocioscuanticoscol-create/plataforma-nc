@@ -419,7 +419,7 @@ const App={
     prods.sort((a,b)=>(vend[b.id]||0)-(vend[a.id]||0)||String(a.nombre||'').localeCompare(String(b.nombre||'')));
     this._prods=prods; this._cart=this._cart||{};
     // mapa por telefono con TODO el contacto. Si hay repetidos se guarda el primero y se cuenta
-    this._telMap={}; leads.forEach(l=>{ const t=this._telKey(l.telefono); if(t.length<7)return;
+    this._telMap={}; leads.forEach(l=>{ const t=this._telKey(l.telefono); if(t.length<10)return;
       if(this._telMap[t]) this._telMap[t]._dup=(this._telMap[t]._dup||1)+1;
       else this._telMap[t]={id:l.id,nombre:l.nombre||'',direccion:l.direccion||'',tipo:l.tipo||'comunidad',infopromos:!!l.infopromos}; });
     // lista para buscar por NOMBRE: se guarda el nombre normalizado (sin tildes ni mayusculas)
@@ -450,7 +450,7 @@ const App={
         </div></div>
         <div style="flex:0 0 228px;position:sticky;top:58px" class="card">
           <div style="font-family:Fraunces,serif;font-size:17px;margin-bottom:8px">La cuenta</div>
-          <input id="pd_tel" placeholder="Teléfono — se busca solo" value="${esc(this._cartTel||'')}" oninput="App.pedTelLookup(this.value)">
+          <input id="pd_tel" type="tel" inputmode="numeric" maxlength="14" placeholder="Celular — 10 dígitos" value="${esc(this._cartTel||'')}" oninput="App.pedTelLookup(this.value)">
           <div id="pd_found" style="font-size:11px;font-weight:700;margin:4px 0 2px;${this._cartHallado?'':'display:none'}">${this._cartHallado||''}</div>
           <input id="pd_cli" placeholder="Cliente — también se busca solo" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App.pedNomLookup(this.value)">
           <input id="pd_dir" placeholder="Dirección" style="margin-bottom:6px" value="${esc(this._cartDir||'')}" oninput="App._cartDir=this.value">
@@ -488,9 +488,9 @@ const App={
     this._pedPaint(); toast('Cuenta vaciada'); },
   /* al escribir el telefono se busca en el CRM y se rellena TODO lo que exista */
   pedTelLookup(v){ this._cartTel=v;
-    const t=this._telKey(v), l=t.length>=7?(this._telMap||{})[t]:null;
+    const t=this._telKey(v), l=t.length>=10?(this._telMap||{})[t]:null;
     if(!l){ // no está en el CRM: con el teléfono ya completo se marca solo como cliente nuevo
-      if(t.length>=7){ this._cartTipo='nuevo'; if($('pd_tipo'))$('pd_tipo').value='nuevo';
+      if(t.length>=10){ this._cartTipo='nuevo'; if($('pd_tipo'))$('pd_tipo').value='nuevo';
         this._cartHallado='＋ No está en el CRM — se registra como cliente nuevo'; }
       else this._cartHallado='';
       this._pintaHallado(); return; }
@@ -530,8 +530,12 @@ const App={
     this._cartHallado='✓ '+l.nombre+' — ya está en el CRM';
     this._pintaHallado(); },
   _pintaHallado(){ const e=$('pd_found'); if(!e)return;
-    e.textContent=this._cartHallado||''; e.style.display=this._cartHallado?'block':'none';
-    const h=this._cartHallado||'';
+    /* si todavia no son 10 digitos se avisa ahi mismo: un celular colombiano
+       tiene 10, y sin eso el cliente NO se puede registrar en el CRM. */
+    let h=this._cartHallado||'';
+    if(!h){ const d=this._telKey(this._cartTel||'');
+      if(d.length>0 && d.length<10) h='⚠️ Faltan '+(10-d.length)+' dígito(s) — un celular tiene 10'; }
+    e.textContent=h; e.style.display=h?'block':'none';
     e.style.color=/^⚠️/.test(h)?'var(--warn)':(/^✓/.test(h)?'var(--ok)':'var(--acc)'); },
   _normLeadName(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); },
   _findLeadMatch(tel,nom,excludeId){
@@ -539,7 +543,7 @@ const App={
     const q=this._normLeadName(nom||'');
     const source=this._leads||[];
     const cand=source.filter(l=>!excludeId || l.id!==excludeId);
-    if(phone.length>=7){
+    if(phone.length>=10){
       const byPhone=cand.filter(l=>this._telKey(l.telefono)===phone);
       if(byPhone.length){
         const exact=byPhone.find(l=>this._normLeadName(l.nombre||'')===q);
@@ -622,13 +626,16 @@ const App={
       const bv={cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp};
       if(!await POST('kruh_ventas',{...bv,descuento:desc})) await POST('kruh_ventas',bv);   // sin la columna descuento
       if(dom>0) await this._sumarDomicilio(dom,fp);
-      const nuevoCli=await this._guardarClientePedido(cli,tel);
+      const resCli=await this._guardarClientePedido(cli,tel)||{}; const nuevoCli=resCli.nuevo||'';
       this._cart={}; this._cartCli=''; this._cartTel=''; this._cartDom=0; this._cartDesc=0;
       this._cartDir=''; this._cartPromo=false; this._cartTipo='comunidad'; this._cartHallado='';
       
       toast('Pedido generado'); await this.vPedidos();
       modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3>
         ${nuevoCli?`<div style="border:1.5px solid var(--ok);background:var(--okbg);border-radius:9px;padding:8px 11px;margin-bottom:9px;font-size:13px">👤 <b style="color:var(--ok)">${esc(nuevoCli)}</b> quedó registrado en el CRM</div>`:''}
+        ${resCli.falta?`<div style="border:1.5px solid var(--warn);background:var(--badbg);border-radius:9px;padding:9px 11px;margin-bottom:9px;font-size:13px">
+          ⚠️ <b style="color:var(--warn)">Este cliente NO quedó en el CRM</b><br>
+          <span style="font-size:12.5px">Falta ${esc(resCli.falta)}. La venta sí quedó registrada, pero no vas a poder buscarlo después ni enviarle promociones.</span></div>`:''}
         <div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo===null?'var(--mut)':(s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)'))}">${s.saldo===null?'servicio':'quedan '+s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`);
     } finally {
       this._savingPedido=false; const b=$('pd_save'); if(b){ b.disabled=false; b.textContent='Generar pedido'; b.style.opacity=''; }
@@ -638,26 +645,29 @@ const App={
   /* si el cliente del pedido no está en el CRM, se registra solo */
   async _guardarClientePedido(cli,tel){
     const nom=String(cli||'').trim(), k=this._telKey(tel);
-    if(!nom) return '';
+    /* Devuelve {nuevo} si lo registro, o {falta} diciendo por que no pudo.
+       Antes devolvia '' en los dos casos y la cajera nunca se enteraba de que
+       el cliente no habia quedado guardado. */
+    if(!nom) return {falta:'el nombre del cliente'};
     const dir=(this._cartDir||'').trim(), promo=!!this._cartPromo, tipo=this._cartTipo||'comunidad';
     const ex=this._findLeadMatch(tel,cli);
     if(ex){ // ya está en el CRM: solo se actualiza lo que cambió
       const b={}; if(dir&&dir!==ex.direccion)b.direccion=dir;
       if(promo!==!!ex.infopromos)b.infopromos=promo;
       if(tipo!==ex.tipo)b.tipo=tipo;
-      if(!this._telKey(ex.telefono)&&k.length>=7) b.telefono=String(tel||'').trim();
+      if(!this._telKey(ex.telefono)&&k.length>=10) b.telefono=String(tel||'').trim();
       if(Object.keys(b).length){ const r=await PATCH('kruh_leads?id=eq.'+ex.id,b);
         if(r&&!r.ok) toast('⚠️ El pedido quedó, pero el CRM no se actualizó'); else Object.assign(ex,b); }
-      return '';
+      return {};
     }
-    if(k.length<7) return '';
+    if(k.length<10) return {falta: k.length? 'el celular completo (van '+k.length+' de 10 dígitos)' : 'el celular'};
     const b={nombre:nom,telefono:String(tel||'').trim(),direccion:dir,infopromos:promo,
       etapa:'contactado',tipo:tipo,canal:'local',interes:'Registrado desde un pedido'};
     const r=await POST('kruh_leads',b);
-    if(!r) return '';
+    if(!r) return {falta:'no se pudo guardar en el CRM'};
     this._telMap=this._telMap||{}; this._telMap[k]={id:r.id,nombre:nom,direccion:dir,tipo:tipo,infopromos:promo};
     if(this._leads) this._leads.push({id:r.id,...b});
-    return nom; },
+    return {nuevo:nom}; },
 
   /* el domicilio cobrado en la cuenta cae solo en Gastos, acumulado por día */
   async _sumarDomicilio(valor,fp){
@@ -693,7 +703,7 @@ const App={
   },
   /* misma llave para pedidos y para leads: el telefono manda, y si no hay, el nombre */
   _crmKey(tel,nom){ const t=String(tel||'').replace(/\D/g,'');
-    if(t.length>=7) return 't:'+t;
+    if(t.length>=10) return 't:'+t;
     const n=this._norm(nom||''); return n?'n:'+n:''; },
   /* Buscar ignora los cajones y los canales a proposito: si escribes un nombre
      lo quieres encontrar este donde este, no solo dentro de la pestaña abierta. */
