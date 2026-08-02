@@ -1287,7 +1287,7 @@ const App={
             <b>${money(tc[c].t)}</b>${esc(c)}<div style="font-size:11px;opacity:.75">${tc[c].n} compra(s) · ${n} proveedor(es)</div></div>`;}).join('')}
         <div class="cajon ${caj==='compra'?'on':''}" onclick="App._provTab='compra';App.vProveedores()">🛒 Registrar compra</div>
         <div class="cajon ${caj==='mov'?'on':''}" onclick="App._provTab=App._provTab==='mov'?'':'mov';App.vProveedores()">
-          <b>${mov.length}</b>📈 Movimientos<div style="font-size:11px;opacity:.75">precios y fluctuación</div></div></div>
+          <b>${mov.filter(c=>(+c.cantidad||0)>0).length+comp.filter(g=>this._esCompra(g)).length}</b>📈 Movimientos<div style="font-size:11px;opacity:.75">precios y fluctuación</div></div></div>
       ${caj==='mov'?this._movHTML():(caj==='compra'?this._provCompraHTML(provs):(!caj?'<div class="empty">👆 Toca un cajón para ver sus compras y sus proveedores.</div>':`
       <h1 style="font-size:17px">Compras de ${esc(caj)} · ${esc(nom)}</h1>
       <div class="row" style="gap:8px;margin-bottom:10px"><button class="btn acc sm" onclick="App.compraNueva('${esc(caj)}')">＋ Nueva compra</button></div>
@@ -1300,67 +1300,91 @@ const App={
   /* ---- Movimientos: cómo se ha movido el precio de cada insumo ----
      Se puede mirar por insumo (¿subió la harina?) o por proveedor
      (¿quién me está subiendo los precios?). */
+  /* Junta las dos fuentes de compra que tiene la app:
+       - kruh_compras: la compra detallada (cantidad + precio unitario) → sirve para fluctuación
+       - kruh_gastos:  la factura (solo el monto) → sirve para saber en qué se gastó
+     Las facturas viejas no traen cantidad, así que no entran al cálculo de %. */
+  _movDatos(){
+    const out=[];
+    (this._mov||[]).forEach(c=>out.push({
+      fecha:String(c.fecha||'').slice(0,10), prov:String(c.proveedor||'').trim()||'— sin proveedor —',
+      item:String(c.insumo||'').trim()||'—', cant:+c.cantidad||0, pu:+c.precio_unit||0,
+      total:+c.total||0, uni:c.unidad||'', tipo:(+c.cantidad||0)>0?'compra':'arranque' }));
+    (this._gastos||[]).filter(g=>this._esCompra(g)).forEach(g=>{
+      const fe=this._gasFecha(g); const con=String(g.concepto||'').trim();
+      if(!fe||(!con&&!(+g.monto||0))) return;
+      out.push({ fecha:fe, prov:String(g.proveedor||'').trim()||'— sin proveedor —',
+        item:con||'(sin concepto)', cant:0, pu:0, total:+g.monto||0, uni:'', tipo:'factura' }); });
+    return out;
+  },
   _movHTML(){
-    const mov=this._mov||[];
-    if(!mov.length) return `<div class="card" style="border-left:4px solid var(--acc)">
+    const todo=this._movDatos();
+    if(!todo.length) return `<div class="card" style="border-left:4px solid var(--acc)">
       <b>Todavía no hay movimientos</b>
       <div style="font-size:13.5px;margin-top:6px">Cada compra que registres en <b>🛒 Registrar compra</b> queda acá con su precio,
-      y desde la segunda compra del mismo insumo ya se ve si subió o bajó.</div>
-      <div class="hint" style="margin-top:7px">Antes de hoy las compras no dejaban rastro: el precio nuevo pisaba al viejo.
-      Por eso el historial arranca desde cero.</div></div>`;
+      y desde la segunda compra del mismo insumo ya se ve si subió o bajó.</div></div>`;
     const modo=this._movModo||'insumo', q=(this._movQ||'').trim().toLowerCase();
+    const mesesM=[...new Set(todo.map(c=>c.fecha.slice(0,7)).filter(Boolean))].sort().reverse();
+    const mm=(this._movMes===undefined)?'':this._movMes;
+    const datos=mm?todo.filter(c=>c.fecha.slice(0,7)===mm):todo;
     const grupos={};
-    mov.forEach(c=>{ const k=modo==='insumo'?String(c.insumo||'—').trim():String(c.proveedor||'— sin proveedor —').trim();
-      (grupos[k]=grupos[k]||[]).push(c); });
+    datos.forEach(c=>{ const k=modo==='insumo'?c.item:c.prov; (grupos[k]=grupos[k]||[]).push(c); });
     let claves=Object.keys(grupos).sort((a,b)=>a.localeCompare(b));
     if(q) claves=claves.filter(k=>k.toLowerCase().includes(q));
-    const tot=mov.reduce((a,c)=>a+(+c.total||0),0), nReal=mov.filter(c=>(+c.cantidad||0)>0).length;
+    const tot=datos.reduce((a,c)=>a+c.total,0);
+    const nReal=datos.filter(c=>c.tipo!=='arranque').length, nDet=datos.filter(c=>c.tipo==='compra').length;
     return `<div class="row" style="gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-        <button class="btn ${modo==='insumo'?'acc':'gh'} sm" onclick="App._movModo='insumo';App.vProveedores()">Por insumo</button>
-        <button class="btn ${modo==='prov'?'acc':'gh'} sm" onclick="App._movModo='prov';App.vProveedores()">Por proveedor</button>
-        <input placeholder="Buscar…" value="${esc(this._movQ||'')}" oninput="App._movQ=this.value;clearTimeout(App._movT);App._movT=setTimeout(()=>App.vProveedores(),350)" style="flex:1;min-width:130px;width:auto">
+        <button class="btn ${modo==='insumo'?'acc':'gh'} sm" onclick="App._movModo='insumo';App._movOpen='';App.vProveedores()">Por insumo</button>
+        <button class="btn ${modo==='prov'?'acc':'gh'} sm" onclick="App._movModo='prov';App._movOpen='';App.vProveedores()">Por proveedor</button>
+        <select onchange="App._movMes=this.value;App._movOpen='';App.vProveedores()" style="width:auto">
+          <option value="" ${mm?'':'selected'}>Todos los meses</option>
+          ${mesesM.map(m=>`<option value="${esc(m)}" ${m===mm?'selected':''}>${esc(this._ymNom(m))} ${esc(m.slice(0,4))}</option>`).join('')}</select>
+        <input placeholder="Buscar…" value="${esc(this._movQ||'')}" oninput="App._movQ=this.value;clearTimeout(App._movT);App._movT=setTimeout(()=>App.vProveedores(),350)" style="flex:1;min-width:120px;width:auto">
         <span class="dim" style="font-size:12px">${nReal} compra${nReal===1?'':'s'} · ${money(tot)}</span></div>
-      ${nReal===0?`<div class="card" style="border-left:4px solid var(--acc);margin-bottom:10px">
-        <b>Arrancando el historial</b>
-        <div style="font-size:13px;margin-top:5px">Están sembrados los ${mov.length} precios que hoy tiene cada insumo, como punto de partida.
-        No son compras: no suman plata. Desde la primera compra que registres ya se ve la variación.</div></div>`:''}
+      ${nDet===0?`<div class="card" style="border-left:4px solid var(--acc);margin-bottom:10px;padding:10px 13px">
+        <b style="font-size:13.5px">Las compras de antes son facturas, no traen precio por unidad</b>
+        <div style="font-size:12.5px;margin-top:4px">Se ve <b>en qué se gastó y con quién</b>, pero no si el insumo subió o bajó: la factura
+        guarda el monto, no la cantidad. Desde <b>🛒 Registrar compra</b> sí queda el precio por unidad y ahí arranca la fluctuación.</div></div>`:''}
       ${claves.length?claves.map(k=>{
-        const cs=grupos[k].slice().sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
-        const ult=cs[0], pre=cs.length>1?cs[1]:null;
-        const pu=+ult.precio_unit||0, pp=pre?(+pre.precio_unit||0):null;
-        const dif=(pp&&pp>0)?((pu-pp)/pp*100):null;
-        const precios=cs.map(c=>+c.precio_unit||0).filter(x=>x>0);
+        const cs=grupos[k].slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+        const conPre=cs.filter(c=>c.pu>0).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+        const ult=conPre[0]||null, pre=conPre[1]||null;
+        const dif=(ult&&pre&&pre.pu>0)?((ult.pu-pre.pu)/pre.pu*100):null;
+        const precios=conPre.map(c=>c.pu);
         const mn=precios.length?Math.min(...precios):0, mx=precios.length?Math.max(...precios):0;
-        const gastado=cs.reduce((a,c)=>a+(+c.total||0),0);
-        const abierto=this._movOpen===k;
+        const gastado=cs.reduce((a,c)=>a+c.total,0), nc=cs.filter(c=>c.tipo!=='arranque').length;
+        const abierto=this._movOpen===k, kj=esc(k).replace(/'/g,"\\'");
         return `<div class="item">
-          <div class="top" style="display:flex;justify-content:space-between;cursor:pointer" onclick="App._movOpen=App._movOpen==='${esc(k).replace(/'/g,"\\'")}'?'':'${esc(k).replace(/'/g,"\\'")}';App.vProveedores()">
-            <div style="flex:1"><div class="nm">${abierto?'▾':'▸'} ${esc(k)}</div>
-              <div class="mt">${(()=>{const r=cs.filter(c=>(+c.cantidad||0)>0).length;
-                return r?r+' compra'+(r===1?'':'s')+' · '+money(gastado):'sin compras aún';})()}${mx>mn?` · entre ${money(mn)} y ${money(mx)}`:''}</div></div>
+          <div class="top" style="display:flex;justify-content:space-between;cursor:pointer;gap:8px" onclick="App._movOpen=App._movOpen==='${kj}'?'':'${kj}';App.vProveedores()">
+            <div style="flex:1;min-width:0"><div class="nm">${abierto?'▾':'▸'} ${esc(k)}</div>
+              <div class="mt">${nc?nc+' compra'+(nc===1?'':'s')+' · '+money(gastado):'sin compras en el periodo'}${mx>mn?` · entre ${money(mn)} y ${money(mx)}`:''}</div></div>
             <div style="text-align:right;flex:none">
-              <div style="font-weight:800;font-size:15px">${money(pu)}${ult.unidad?'<span style="font-size:11px;color:var(--mut)">/'+esc(ult.unidad)+'</span>':''}</div>
-              ${dif===null?'<div style="font-size:11.5px;color:var(--mut)">precio de arranque</div>'
-                :`<div style="font-size:11.5px;font-weight:700;color:${dif>0.5?'var(--bad)':(dif<-0.5?'var(--ok)':'var(--mut)')}">${dif>0.5?'▲ +':(dif<-0.5?'▼ ':'= ')}${Math.abs(dif)<0.5?'igual':Math.abs(dif).toFixed(0)+'%'}</div>`}</div></div>
+              ${ult?`<div style="font-weight:800;font-size:15px">${money(ult.pu)}${ult.uni?'<span style="font-size:11px;color:var(--mut)">/'+esc(ult.uni)+'</span>':''}</div>`
+                   :`<div style="font-weight:800;font-size:15px">${money(gastado)}</div>`}
+              ${ult?(dif===null?'<div style="font-size:11.5px;color:var(--mut)">precio de arranque</div>'
+                :`<div style="font-size:11.5px;font-weight:700;color:${dif>0.5?'var(--bad)':(dif<-0.5?'var(--ok)':'var(--mut)')}">${dif>0.5?'▲ +':(dif<-0.5?'▼ ':'= ')}${Math.abs(dif)<0.5?'igual':Math.abs(dif).toFixed(0)+'%'}</div>`)
+                :'<div style="font-size:11.5px;color:var(--mut)">solo factura</div>'}</div></div>
           ${abierto?this._movDetalle(cs,modo):''}</div>`;}).join('')
-      :`<div class="empty">Nada que coincida con “${esc(this._movQ||'')}”.</div>`}`;
+      :`<div class="empty">Nada que coincida${q?' con “'+esc(this._movQ||'')+'”':''}${mm?' en '+esc(this._ymNom(mm)):''}.</div>`}`;
   },
   _movDetalle(cs,modo){
-    const ord=cs.slice().sort((a,b)=>String(a.fecha||'').localeCompare(String(b.fecha||'')));
-    const precios=ord.map(c=>+c.precio_unit||0).filter(x=>x>0);
-    const mx=precios.length?Math.max(...precios):1;
+    const ord=cs.slice().sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    const precios=ord.filter(c=>c.pu>0).map(c=>c.pu), mxp=precios.length?Math.max(...precios):0;
+    const montos=ord.filter(c=>!c.pu).map(c=>c.total), mxm=montos.length?Math.max(...montos):0;
+    let antPu=null;
     return `<div style="margin-top:9px;border-top:1px dashed var(--line);padding-top:8px">
-      ${ord.map((c,i)=>{ const pu=+c.precio_unit||0, ant=i>0?(+ord[i-1].precio_unit||0):null;
-        const d=(ant&&ant>0)?((pu-ant)/ant*100):null;
+      ${ord.map(c=>{ let d=null;
+        if(c.pu>0){ if(antPu&&antPu>0) d=(c.pu-antPu)/antPu*100; antPu=c.pu; }
+        const col=d===null?'var(--acc2)':(d>0.5?'var(--bad)':(d<-0.5?'var(--ok)':'var(--acc2)'));
+        const anch=c.pu>0?(mxp?c.pu/mxp*100:0):(mxm?c.total/mxm*100:0);
         return `<div style="display:flex;gap:8px;align-items:center;font-size:12.5px;padding:3px 0;border-bottom:1px solid var(--line2)">
-          <span style="width:74px;flex:0 0 auto;color:var(--mut)">${esc(String(c.fecha||'').slice(5))}</span>
-          <span style="flex:1;height:6px;background:var(--line2);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${mx?pu/mx*100:0}%;background:${d===null?'var(--acc2)':(d>0.5?'var(--bad)':(d<-0.5?'var(--ok)':'var(--acc2)'))}"></i></span>
-          <span style="width:78px;text-align:right;font-weight:700;flex:0 0 auto">${money(pu)}</span>
-          <span style="width:52px;text-align:right;flex:0 0 auto;font-size:11.5px;color:${d===null?'var(--mut)':(d>0.5?'var(--bad)':(d<-0.5?'var(--ok)':'var(--mut)'))}">${d===null?'—':(Math.abs(d)<0.5?'=':(d>0?'+':'')+d.toFixed(0)+'%')}</span>
-          <span style="width:104px;text-align:right;flex:0 0 auto;color:var(--mut);font-size:11.5px">${(+c.cantidad||0)>0?num(c.cantidad)+' '+esc(c.unidad||'')+' · '+money(c.total):'<i>arranque</i>'}</span>
-          <span style="width:118px;text-align:right;flex:0 0 auto;color:var(--mut);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(modo==='insumo'?(c.proveedor||'—'):(c.insumo||'—'))}</span>
-        </div>`;}).join('')}
-      ${ord.length===1?'<div class="hint" style="margin-top:5px">Con un solo dato todavía no hay con qué comparar. En la próxima compra ya sale la variación.</div>':''}</div>`;
+          <span style="width:52px;flex:0 0 auto;color:var(--mut)">${esc(c.fecha.slice(5))}</span>
+          <span style="flex:1;min-width:30px;height:6px;background:var(--line2);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${anch}%;background:${c.pu>0?col:'var(--line)'}"></i></span>
+          <span style="width:84px;text-align:right;font-weight:700;flex:0 0 auto">${c.pu>0?money(c.pu)+(c.uni?'<span style="font-size:10.5px;color:var(--mut)">/'+esc(c.uni)+'</span>':''):'<span style="color:var(--mut);font-weight:400">—</span>'}</span>
+          <span style="width:46px;text-align:right;flex:0 0 auto;font-size:11.5px;color:${d===null?'var(--mut)':(d>0.5?'var(--bad)':(d<-0.5?'var(--ok)':'var(--mut)'))}">${d===null?'':(Math.abs(d)<0.5?'=':(d>0?'+':'')+d.toFixed(0)+'%')}</span>
+          <span style="width:112px;text-align:right;flex:0 0 auto;color:var(--mut);font-size:11.5px">${c.tipo==='arranque'?'<i>arranque</i>':(c.cant>0?num(c.cant)+' '+esc(c.uni||'')+' · '+money(c.total):'factura · '+money(c.total))}</span>
+          <span style="width:112px;text-align:right;flex:0 0 auto;color:var(--mut);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(modo==='insumo'?c.prov:c.item)}</span>
+        </div>`;}).join('')}</div>`;
   },
   _catCompra(g){ const c=String(g.rubro||'').toLowerCase();
     if(/empaq|envase|frasco|desechab|bandeja/.test(c))return 'Empaques';
