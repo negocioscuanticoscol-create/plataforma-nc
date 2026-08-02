@@ -387,40 +387,44 @@ const App={
   /* ===================== RECETAS = HOJA DE COSTOS ===================== */
   async vRecetas(){
     this.loading();
-    const [prods,recs,provs,pasos,mp]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_recetas?order=creado_en&limit=5000'),GET('kruh_proveedores?order=nombre&limit=2000'),GET('kruh_pasos?order=orden,creado_en&limit=5000'),GET('kruh_materiaprima?order=nombre&limit=2000')]);
+    const [prods,recs,provs,mp]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_recetas?order=creado_en&limit=5000'),GET('kruh_proveedores?order=nombre&limit=2000'),GET('kruh_materiaprima?order=nombre&limit=2000')]);
     this._prods=prods; this._provs=provs; this._mp=mp;
     this._recsAll=recs;
     const rBy={}; recs.forEach(r=>{(rBy[r.producto_id]=rBy[r.producto_id]||[]).push(r);});
-    const pBy={}; pasos.forEach(s=>{(pBy[s.producto_id]=pBy[s.producto_id]||[]).push(s);});
+    /* precio de hoy de cada materia prima, para no costear con precios viejos */
+    const mpIdx={}; mp.forEach(m=>{mpIdx[String(m.nombre||'').trim().toLowerCase()]={cu:+m.costo_unit||0,uni:m.unidad||''};});
+    const viejo=r=>{const m=mpIdx[String(r.ingrediente||'').trim().toLowerCase()];
+      return (m && Math.abs((+r.costo_unit||0)-m.cu)>0.009)?m:null;};
     const cats=[...new Set(prods.map(p=>p.categoria||'Sin categoría'))].sort((a,b)=>this._ordenCat(a,b));
     /* qué falta por documentar */
     const sinRec=prods.filter(p=>!(rBy[p.id]||[]).length);
-    const sinPas=prods.filter(p=>!(pBy[p.id]||[]).length);
+    const desact=recs.filter(viejo);
+    const prodsDesact=[...new Set(desact.map(r=>r.producto_id))].map(id=>prods.find(p=>p.id===id)).filter(Boolean);
     const ab=this._recAviso||'';
     const chips=lista=>`<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px">${lista.map(p=>
       `<a onclick="App._recOpen='${p.id}';App._recAviso='';App.vRecetas();" style="cursor:pointer;font-size:11.5px;
         background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:4px 10px;color:var(--ink2)"
         >${esc(p.nombre)}</a>`).join('')}</div>`;
-    this.set(`<h1>Recetas y costos</h1><div class="sub">Producto → peso/presentación → ingredientes con costo → proceso → costo, precio, IVA y margen</div>
+    this.set(`<h1>Recetas y costos</h1><div class="sub">Producto → ingredientes → cuánto consume de cada uno al precio de Compras → costo, precio, IVA y margen</div>
       <button class="btn acc" onclick="App.prodModal()">＋ Nuevo producto</button>
 
-      <div class="card" style="margin-top:12px;border-width:2px;border-color:${(sinRec.length||sinPas.length)?'var(--warn)':'var(--ok)'}">
-        ${(sinRec.length||sinPas.length)?`
-          <div style="font-family:Fraunces,serif;font-size:16px">Falta por documentar</div>
+      <div class="card" style="margin-top:12px;border-width:2px;border-color:${(sinRec.length||prodsDesact.length)?'var(--warn)':'var(--ok)'}">
+        ${(sinRec.length||prodsDesact.length)?`
+          <div style="font-family:Fraunces,serif;font-size:16px">Falta por revisar</div>
           <div class="row" style="justify-content:space-between;align-items:center;margin-top:8px;cursor:pointer"
                onclick="App._recAviso=App._recAviso==='rec'?'':'rec';App.vRecetas()">
             <span style="font-size:13.5px">${ab==='rec'?'▾':'▸'} Productos <b>sin receta</b> <span class="dim">(sin ningún ingrediente)</span></span>
             <b style="font-size:19px;color:${sinRec.length?'var(--bad)':'var(--ok)'}">${sinRec.length}</b></div>
           ${ab==='rec'?(sinRec.length?chips(sinRec):'<div class="hint">Ninguno, todos tienen ingredientes.</div>'):''}
           <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--line2);cursor:pointer"
-               onclick="App._recAviso=App._recAviso==='pas'?'':'pas';App.vRecetas()">
-            <span style="font-size:13.5px">${ab==='pas'?'▾':'▸'} Productos <b>sin pasos</b> <span class="dim">(sin proceso de elaboración)</span></span>
-            <b style="font-size:19px;color:${sinPas.length?'var(--bad)':'var(--ok)'}">${sinPas.length}</b></div>
-          ${ab==='pas'?(sinPas.length?chips(sinPas):'<div class="hint">Ninguno, todos tienen pasos.</div>'):''}
+               onclick="App._recAviso=App._recAviso==='pre'?'':'pre';App.vRecetas()">
+            <span style="font-size:13.5px">${ab==='pre'?'▾':'▸'} Productos con <b>precio viejo</b> <span class="dim">(la materia prima cambió de valor)</span></span>
+            <b style="font-size:19px;color:${prodsDesact.length?'var(--bad)':'var(--ok)'}">${prodsDesact.length}</b></div>
+          ${ab==='pre'?(prodsDesact.length?chips(prodsDesact)+`<div style="margin-top:8px"><button class="btn gh sm" onclick="App.recSyncTodo()">↻ Actualizar todos con el precio de Compras</button></div>`:'<div class="hint">Ninguno, todos están al precio de hoy.</div>'):''}
           <div class="hint" style="margin-top:8px">De ${prods.length} productos. Toca un número para ver cuáles, y el nombre para abrirlo.</div>`
         :`<div class="row" style="justify-content:space-between;align-items:center">
-            <div><div style="font-family:Fraunces,serif;font-size:16px;color:var(--ok)">✓ Todo documentado</div>
-            <div class="hint">Los ${prods.length} productos tienen ingredientes y pasos.</div></div>
+            <div><div style="font-family:Fraunces,serif;font-size:16px;color:var(--ok)">✓ Todo al día</div>
+            <div class="hint">Los ${prods.length} productos tienen ingredientes y están costeados al precio de hoy.</div></div>
             <div style="font-size:26px">🎉</div></div>`}
       </div>
       ${prods.length?cats.map(cat=>`<div style="margin-top:16px"><div class="tag" style="margin-bottom:8px">${esc(cat)}</div>
@@ -434,13 +438,21 @@ const App={
               <div class="mt">${p.peso?num(p.peso)+' '+esc(p.unidad||'g')+' · ':''}${esc(p.presentacion||'')} <span class="tag ${p.perecedero?'pe':'np'}">${p.perecedero?'Perecedero':'No perecedero'}</span>${p.refrigeracion?' <span class="tag" style="background:#e0f0f5;color:#0b5b73">❄️ Refrigeración</span>':''}</div></div>
               <button class="btn gh sm" onclick="App.prodModal('${p.id}')">✎</button></div>
             ${abierto?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px">
-              <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Ingredientes</div>
-              ${rr.length?rr.map(r=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0"><span>• ${esc(r.ingrediente)} <small class="dim">${num(r.cantidad)} ${esc(r.unidad||'')}</small></span><span style="white-space:nowrap">${money((+r.cantidad||0)*(+r.costo_unit||0))} <a onclick="App.recModal('${p.id}','${r.id}')" style="color:var(--acc);cursor:pointer;margin-left:5px">✎</a> <a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:2px">✕</a></span></div>`).join(''):'<div class="hint">Sin ingredientes.</div>'}
-              <button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Adicionar ingrediente</button></div>
-            <div style="margin-top:9px;border-top:1px dashed var(--line);padding-top:9px">
-              <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:4px">Pasos de elaboración</div>
-              ${(pBy[p.id]||[]).map((s,i)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0;align-items:flex-start"><span><b>${i+1}.</b> ${esc(s.texto)}</span><span style="flex:none;white-space:nowrap"><a onclick="App.pasoEdit('${s.id}')" style="color:var(--acc);cursor:pointer;margin-right:6px">✎</a><a onclick="App.pasoDel('${s.id}')" style="color:var(--bad);cursor:pointer">✕</a></span></div>`).join('')||'<div class="hint">Sin pasos.</div>'}
-              <button class="btn gh sm full" onclick="App.pasoAdd('${p.id}')">＋ Adicionar paso</button></div>
+              <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:5px">
+                <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)">Ingredientes · cuánto consume</div>
+                <div style="font-size:10px;color:var(--mut)">${rr.length} ${rr.length===1?'ingrediente':'ingredientes'}</div></div>
+              ${rr.length?rr.map(r=>{const v=viejo(r),cu=+r.costo_unit||0,cant=+r.cantidad||0,u=esc(r.unidad||'');
+                return `<div style="padding:3px 0;border-bottom:1px solid var(--line2)">
+                  <div class="row" style="justify-content:space-between;font-size:12.5px;align-items:baseline">
+                    <span style="flex:1">${esc(r.ingrediente)}</span>
+                    <span style="color:var(--mut);white-space:nowrap;margin-right:8px">${num(cant)} ${u} × ${money(cu)}/${u||'u'}</span>
+                    <b style="white-space:nowrap">${money(cant*cu)}</b>
+                    <span style="flex:none;white-space:nowrap;margin-left:6px"><a onclick="App.recModal('${p.id}','${r.id}')" style="color:var(--acc);cursor:pointer">✎</a> <a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:2px">✕</a></span></div>
+                  ${v?`<div style="font-size:11.5px;color:var(--warn);padding:1px 0 2px">⚠️ En Compras hoy vale <b>${money(v.cu)}/${esc(v.uni||u||'u')}</b> · quedaría en <b>${money(cant*v.cu)}</b>
+                    <a onclick="App.recSyncUno('${r.id}',${v.cu})" style="color:var(--acc);cursor:pointer;font-weight:700;margin-left:4px">actualizar</a></div>`:''}
+                </div>`;}).join(''):'<div class="hint">Sin ingredientes.</div>'}
+              <button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Adicionar ingrediente</button>
+              ${rr.some(viejo)?`<button class="btn gh sm full" onclick="App.recSync('${p.id}')" style="color:var(--warn)">↻ Actualizar todos con el precio de Compras</button>`:''}</div>
             <div style="margin-top:10px;background:var(--paper);border-radius:9px;padding:9px 11px;font-size:12.5px">
               <div class="row" style="justify-content:space-between"><span class="dim">Costo ingredientes</span><b>${money(costo)}</b></div>
               <div class="row" style="justify-content:space-between"><span class="dim">Precio venta</span><b>${money(precio)}</b></div>
@@ -468,7 +480,7 @@ const App={
       <label class="btn gh sm" style="cursor:pointer;white-space:nowrap">📷 Adicionar<input type="file" accept="image/*" style="display:none" onchange="App.subirFoto(this,'${id||''}')"></label></div>
       <img id="p_foto_prev" src="${esc(p.foto_url||'')}" style="${p.foto_url?'':'display:none;'}max-width:130px;border-radius:8px;margin-top:6px">
       <button class="btn acc full" onclick="App.prodSave('${id||''}')">Guardar producto</button>
-      <div class="hint">Los ingredientes y los pasos se agregan en el cajón del producto.</div>
+      <div class="hint">Los ingredientes se agregan en el cajón del producto.</div>
       ${id?`<button class="btn gh full" onclick="App.prodDel('${id}')" style="color:var(--bad)">Eliminar producto</button>`:''}`);
   },
   CATPROD:['Panadería','Conservas','Repostería','Productos Eventos','Servicio'],
@@ -498,9 +510,25 @@ const App={
     if(ingId)await PATCH('kruh_recetas?id=eq.'+ingId,b); else await POST('kruh_recetas',b);
     cerrar(); toast(ingId?'Ingrediente actualizado':'Ingrediente agregado'); this.vRecetas(); },
   async recDel(id){ await DEL('kruh_recetas?id=eq.'+id); this.vRecetas(); },
-  async pasoAdd(pid){ const t=prompt('Paso de elaboración:'); if(!t||!t.trim())return; const n=(await GET('kruh_pasos?producto_id=eq.'+pid+'&select=id')).length; await POST('kruh_pasos',{producto_id:pid,texto:t.trim(),orden:n+1}); toast('Paso agregado'); this.vRecetas(); },
-  async pasoDel(id){ await DEL('kruh_pasos?id=eq.'+id); this.vRecetas(); },
-  async pasoEdit(id){ const cur=((await GET('kruh_pasos?id=eq.'+id+'&select=texto'))[0]||{}).texto||''; const t=prompt('Editar paso:',cur); if(t===null)return; await PATCH('kruh_pasos?id=eq.'+id,{texto:t.trim()}); toast('Paso actualizado'); this.vRecetas(); },
+  /* El costo del ingrediente es una copia del precio de Compras del día que se
+     agregó. Cuando la materia prima cambia de valor, la receta queda costeando
+     con un precio viejo: esto la vuelve a poner al día. */
+  _mpIdx(){ const o={}; (this._mp||[]).forEach(m=>{o[String(m.nombre||'').trim().toLowerCase()]=+m.costo_unit||0;}); return o; },
+  async recSyncUno(id,cu){ await PATCH('kruh_recetas?id=eq.'+id,{costo_unit:cu}); toast('Precio actualizado'); this.vRecetas(); },
+  async recSync(pid){ const idx=this._mpIdx();
+    const pend=(this._recsAll||[]).filter(r=>r.producto_id===pid).filter(r=>{
+      const k=String(r.ingrediente||'').trim().toLowerCase();
+      return (k in idx) && Math.abs((+r.costo_unit||0)-idx[k])>0.009; });
+    if(!pend.length){toast('Ya estaban al día');return;}
+    for(const r of pend) await PATCH('kruh_recetas?id=eq.'+r.id,{costo_unit:idx[String(r.ingrediente||'').trim().toLowerCase()]});
+    toast(pend.length+(pend.length===1?' ingrediente actualizado':' ingredientes actualizados')); this.vRecetas(); },
+  async recSyncTodo(){ const idx=this._mpIdx();
+    const pend=(this._recsAll||[]).filter(r=>{ const k=String(r.ingrediente||'').trim().toLowerCase();
+      return (k in idx) && Math.abs((+r.costo_unit||0)-idx[k])>0.009; });
+    if(!pend.length){toast('Ya estaban al día');return;}
+    if(!confirm('Se van a actualizar '+pend.length+' ingredientes con el precio de Compras. ¿Seguir?'))return;
+    for(const r of pend) await PATCH('kruh_recetas?id=eq.'+r.id,{costo_unit:idx[String(r.ingrediente||'').trim().toLowerCase()]});
+    toast(pend.length+' ingredientes actualizados'); this.vRecetas(); },
   async subirFoto(input,prodId){ const f=input.files&&input.files[0]; if(!f)return;
     const ext=(f.name.split('.').pop()||'jpg').toLowerCase(), path='p-'+(prodId||'nuevo')+'-'+Date.now()+'.'+ext;
     toast('Subiendo foto…');
