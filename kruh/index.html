@@ -200,6 +200,7 @@ const App={
     const uneta=ubruta-gastosM;
     const vMes=m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase(); if(es)return ventasM; const r=ventasReales(m.mes); return r>0?r:(+m.ventas||0);};
     const registrados=leads.length, nuevosMes=leads.filter(l=>new Date(l.creado_en)>=mesIni).length;
+    this._dashCtx={meses,mesNom,auto,costo,gastosM,meta,ventasReales,vMes,ventas};
     this.set(`<h1>Dashboard</h1><div class="sub">${esc(mesNom)} ${auto?'· <span style="color:var(--ok);font-weight:700">automático con las ventas del mes</span>':'· simulado (al ingresar pedidos se calcula solo)'} · meta ${money(meta)}</div>
       <div class="kpis">
         <div class="kpi dark"><b>${money(ventasM)}</b><span>Ventas del mes</span></div>
@@ -220,12 +221,52 @@ const App={
           <b style="color:var(--ok)">✅ Se duplicó el promedio</b>
           <div style="font-size:12.5px;margin-top:2px">Ya se puede cobrar la instalación del motor de ventas.</div></div>`:''}</div>
       <h1 style="font-size:18px;margin-top:20px">Mes a mes vs meta</h1>
-      ${meses.map(m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();const v=vMes(m),cc=es?costo:(+m.costo||0),gg=es?gastosM:(+m.gastos||0),nn=v-cc-gg,mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0;return `<div class="item"><div class="top"><div><div class="nm">${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':(ventasReales(m.mes)>0?'<span class="tag np">real</span>':'')}${m.cerrado?'<span class="tag">🔒 gastos cerrados</span>':''}</div>
-        <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''}${gg?' · gastos '+money(gg):''} · meta ${money(mt)}${es?` · <a onclick="App.dashDetalleMes()" style="color:var(--acc);cursor:pointer;font-weight:700">ver detalle →</a>`:''}</div>
-        <div class="mt">Utilidad neta <b style="color:${nn>=0?'var(--ok)':'var(--bad)'}">${money(nn)}</b></div></div>
-        ${this.esAdmin?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
-        <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div></div>`;}).join('')}
+      <div class="sub" style="margin-bottom:8px">Toca un mes para ver la venta de cada día.</div>
+      <div id="dashLista">${this._dashLista()}</div>
       ${this.esAdmin?`<button class="btn acc full" onclick="App.dashModal()">＋ Agregar mes</button>`:''}`);
+  },
+  /* Mes a mes. Se dibuja aparte para poder abrir y cerrar el detalle de días
+     sin volver a pedirle nada a la base. */
+  _dashLista(){
+    const c=this._dashCtx; if(!c) return '';
+    const {meses,mesNom,auto,costo,gastosM,meta,ventasReales,vMes}=c, abierto=this._dashMes||'';
+    return (meses||[]).map(m=>{
+      const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();
+      const v=vMes(m),cc=es?costo:(+m.costo||0),gg=es?gastosM:(+m.gastos||0),nn=v-cc-gg;
+      const mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0,ab=abierto===m.mes;
+      return `<div class="item"${ab?' style="border-color:var(--acc)"':''}><div class="top">
+        <div style="cursor:pointer;flex:1" onclick="App.dashMes('${esc(m.mes)}')">
+        <div class="nm">${ab?'▾':'▸'} ${esc(m.mes)} ${es&&auto?'<span class="tag np">en vivo</span>':(ventasReales(m.mes)>0?'<span class="tag np">real</span>':'')}${m.cerrado?'<span class="tag">🔒 gastos cerrados</span>':''}</div>
+        <div class="mt">Ventas ${money(v)}${cc?' · costo '+money(cc):''}${gg?' · gastos '+money(gg):''} · meta ${money(mt)}</div>
+        <div class="mt">Utilidad neta <b style="color:${nn>=0?'var(--ok)':'var(--bad)'}">${money(nn)}</b>${es?` · <a onclick="event.stopPropagation();App.dashDetalleMes()" style="color:var(--acc);cursor:pointer;font-weight:700">ver detalle →</a>`:''}</div></div>
+        ${this.esAdmin?`<button class="btn gh sm" onclick="App.dashModal('${esc(m.mes)}')">✎</button>`:''}</div>
+        <div class="bar"><i style="width:${pct}%;background:${pct>=100?'var(--ok)':'var(--acc)'}"></i></div>
+        ${ab?this._dashDias(m.mes):''}</div>`;}).join('');
+  },
+  dashMes(mes){ this._dashMes=(this._dashMes===mes)?'':mes;
+    const cont=$('dashLista'); if(cont) cont.innerHTML=this._dashLista(); },
+  /* Venta de cada día del mes, sacada de las mismas ventas que ya se cargaron. */
+  _dashDias(mes){
+    const idx=this.MESNOM.findIndex(x=>x&&x.toLowerCase()===String(mes||'').toLowerCase());
+    const ano=new Date().getFullYear(), por={};
+    if(idx>0) ((this._dashCtx||{}).ventas||[]).forEach(v=>{
+      const d=new Date(v.creado_en); if(isNaN(d)||d.getFullYear()!==ano||d.getMonth()+1!==idx) return;
+      const k=this._diaKey(d), o=por[k]=por[k]||{t:0,n:0}; o.t+=+v.monto||0; o.n++; });
+    const ks=Object.keys(por).sort();
+    if(!ks.length) return `<div class="hint" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+      Este mes no tiene ventas cargadas en la app.</div>`;
+    const max=Math.max(...ks.map(k=>por[k].t)), DIA=['dom','lun','mar','mié','jue','vie','sáb'];
+    const tot=ks.reduce((a,k)=>a+por[k].t,0), nv=ks.reduce((a,k)=>a+por[k].n,0);
+    const ult=new Date(ano,idx,0).getDate(), faltan=ult-ks.length;
+    return `<div style="margin-top:10px;border-top:1px solid var(--line);padding-top:9px">
+      <div class="hint" style="margin-bottom:7px"><b>${ks.length}</b> ${ks.length===1?'día':'días'} con venta · <b>${nv}</b> ventas · promedio <b>${money(Math.round(tot/ks.length))}</b> por día${faltan>0?` · <span style="color:var(--warn)">${faltan} ${faltan===1?'día sin venta cargada':'días sin venta cargada'}</span>`:''}</div>
+      ${ks.map(k=>{const o=por[k],d=new Date(k+'T12:00:00'),p=max>0?o.t/max*100:0;
+        return `<div style="display:flex;align-items:center;gap:9px;padding:3.5px 0;font-size:13px">
+          <span style="width:58px;color:var(--mut);flex:0 0 auto">${String(d.getDate()).padStart(2,'0')} ${DIA[d.getDay()]}</span>
+          <span style="flex:1;height:7px;background:var(--line2);border-radius:4px;overflow:hidden"><i style="display:block;height:100%;width:${p}%;background:var(--acc2)"></i></span>
+          <span style="width:52px;text-align:right;color:var(--mut);flex:0 0 auto">${o.n} vta${o.n===1?'':'s'}</span>
+          <span style="width:86px;text-align:right;font-weight:700;flex:0 0 auto">${money(o.t)}</span>
+        </div>`;}).join('')}</div>`;
   },
   dashModal(mes){ const m=(this._dash||[]).find(x=>x.mes===mes)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${mes?'Editar '+esc(mes):'Nuevo mes'}</h3>
