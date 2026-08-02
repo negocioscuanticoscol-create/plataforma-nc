@@ -105,6 +105,25 @@ const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;
 const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const num=n=>Math.round(+n||0).toLocaleString('es-CO');
 async function GET(p){ const r=await fetch(SB+'/rest/v1/'+p,{headers:H}); return r.ok?r.json():[]; }
+/* OJO: el servidor NUNCA devuelve más de 1000 filas, aunque se le pida limit=20000.
+   Lo hace en silencio, sin error. Con más de 1000 ventas la app empezaba a perder
+   las más nuevas y los totales salían por debajo de la realidad. GETALL pide de a
+   1000 hasta que se acaban, así ninguna pantalla vuelve a quedarse corta. */
+async function GETALL(p){
+  const base=p.replace(/[?&](limit|offset)=\d+/g,'');
+  const sep=base.includes('?')?'&':'?';
+  const out=[]; let off=0;
+  for(let i=0;i<60;i++){
+    const r=await fetch(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H});
+    if(!r.ok) break;
+    const b=await r.json();
+    if(!Array.isArray(b)||!b.length) break;
+    out.push(...b);
+    if(b.length<1000) break;
+    off+=1000;
+  }
+  return out;
+}
 async function POST(t,b){ const r=await fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(b)}); return r.ok?(await r.json())[0]:null; }
 async function PATCH(t,b){ return fetch(SB+'/rest/v1/'+t,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); }
 async function DEL(t){ return fetch(SB+'/rest/v1/'+t,{method:'DELETE',headers:H}); }
@@ -151,7 +170,7 @@ const App={
   /* ===================== DASHBOARD ===================== */
   async vDashboard(){
     this.loading();
-    const [meses,leads,ventas,peds,recs,gastos]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en&limit=5000'),GET('kruh_ventas?select=monto,creado_en&limit=8000'),GET('kruh_pedidos?select=items,creado_en&limit=3000'),GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000'),GET('kruh_gastos?select=monto,fecha,creado_en&limit=5000')]);
+    const [meses,leads,ventas,peds,recs,gastos]=await Promise.all([GET('kruh_dashboard?order=orden&limit=24'),GET('kruh_leads?select=creado_en&limit=5000'),GETALL('kruh_ventas?select=monto,creado_en&limit=8000'),GETALL('kruh_pedidos?select=items,creado_en&limit=3000'),GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000'),GET('kruh_gastos?select=monto,fecha,creado_en&limit=5000')]);
     const now=new Date(), cm=now.getMonth()+1, mesIni=new Date(now.getFullYear(),now.getMonth(),1), mesNom=this.MESNOM[cm]||'';
     // del mes en curso hacia atrás; los meses futuros quedan de últimas
     const rango=m=>{ const o=+m.orden||99; return o<=cm?o:o-1000; };
@@ -222,11 +241,11 @@ const App={
   async dashDetalleMes(){
     const now=new Date(), mesIni=new Date(now.getFullYear(),now.getMonth(),1);
     const [movs,prods,recs,ventas,peds]=await Promise.all([
-      GET('kruh_movimientos?select=producto_id,tipo,cantidad,creado_en&limit=10000'),
+      GETALL('kruh_movimientos?select=producto_id,tipo,cantidad,creado_en&limit=10000'),
       GET('kruh_productos?select=id,nombre&limit=1000'),
       GET('kruh_recetas?select=producto_id,cantidad,costo_unit&limit=5000'),
-      GET('kruh_ventas?select=monto,creado_en&limit=8000'),
-      GET('kruh_pedidos?select=creado_en&limit=3000')]);
+      GETALL('kruh_ventas?select=monto,creado_en&limit=8000'),
+      GETALL('kruh_pedidos?select=creado_en&limit=3000')]);
     const nombre={}; prods.forEach(p=>nombre[p.id]=p.nombre);
     const costoU={}; recs.forEach(r=>costoU[r.producto_id]=(costoU[r.producto_id]||0)+(+r.cantidad||0)*(+r.costo_unit||0));
     const prodBy={}; movs.forEach(m=>{ if(m.tipo==='entrada' && new Date(m.creado_en)>=mesIni) prodBy[m.producto_id]=(prodBy[m.producto_id]||0)+(+m.cantidad||0); });
@@ -393,7 +412,7 @@ const App={
   FPPEDIDO:['Efectivo','Nequi','Transferencia','Tarjeta crédito'],
   async vPedidos(){
     this.loading();
-    const [prods,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_leads?select=id,nombre,telefono,direccion,tipo,infopromos&limit=3000'),GET('kruh_pedidos?select=items&limit=20000')]);
+    const [prods,leads,hist]=await Promise.all([GET('kruh_productos?order=categoria,nombre&limit=1000'),GET('kruh_leads?select=id,nombre,telefono,direccion,tipo,infopromos&limit=3000'),GETALL('kruh_pedidos?select=items&limit=20000')]);
     this._leads=leads;
     // los que más se venden, de primeras
     const vend={}; hist.forEach(p=>(p.items||[]).forEach(i=>{ if(i.producto_id)vend[i.producto_id]=(vend[i.producto_id]||0)+(+i.qty||0); }));
@@ -632,7 +651,7 @@ const App={
   CANALES:[['todos','Todos'],['local','🏪 Local'],['digital','📱 Digital'],['organico','🌱 Orgánico'],['empleados','👷 Empleados']],
   async vCrm(){
     this.loading();
-    const [leads,ventas,peds]=await Promise.all([GET('kruh_leads?order=creado_en.desc&limit=2000'),GET('kruh_ventas?select=cliente,telefono,creado_en&limit=20000'),GET('kruh_pedidos?select=cliente,telefono,items&limit=5000')]);
+    const [leads,ventas,peds]=await Promise.all([GET('kruh_leads?order=creado_en.desc&limit=2000'),GETALL('kruh_ventas?select=cliente,telefono,creado_en&limit=20000'),GETALL('kruh_pedidos?select=cliente,telefono,items&limit=5000')]);
     this._leads=leads;
     const lastTel={}, lastNom={};
     ventas.forEach(v=>{ const t=(v.telefono||'').replace(/\D/g,''), n=(v.cliente||'').trim().toLowerCase(), d=v.creado_en||'';
@@ -782,7 +801,7 @@ const App={
   /* ===================== INVENTARIO + índice de cobertura ===================== */
   async vInventario(){
     this.loading();
-    const [prods,movs,ventas]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_movimientos?order=creado_en.desc&limit=1000'),GET('kruh_ventas?select=monto,creado_en&limit=20000')]);
+    const [prods,movs,ventas]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GETALL('kruh_movimientos?order=creado_en.desc&limit=1000'),GETALL('kruh_ventas?select=monto,creado_en&limit=20000')]);
     this._prods=prods; this._movs=movs;
     // consumo diario prom (salidas ult 30 dias) — las perdidas NO cuentan, no salio nada del estante
     const hoy=new Date(), d30=new Date(hoy-30*864e5);
@@ -1394,7 +1413,7 @@ const App={
   /* ===================== PRESUPUESTOS (todos los productos, meta del mes, 4 semanas) ===================== */
   async vPresupuestos(){
     this.loading();
-    const [pres,peds,prods,vts]=await Promise.all([GET('kruh_presupuestos?order=creado_en&limit=500'),GET('kruh_pedidos?limit=3000'),GET('kruh_productos?order=nombre&limit=1000'),GET('kruh_ventas?select=creado_en,monto&limit=20000')]);
+    const [pres,peds,prods,vts]=await Promise.all([GET('kruh_presupuestos?order=creado_en&limit=500'),GETALL('kruh_pedidos?limit=3000'),GET('kruh_productos?order=nombre&limit=1000'),GETALL('kruh_ventas?select=creado_en,monto&limit=20000')]);
     this._pres=pres; this._prods=prods;
     /* META DEL MES (el trato con NC): se suman TODOS los meses con ventas,
        se saca el promedio y se pone el doble. Hoy: abril a julio. */
@@ -1522,7 +1541,7 @@ const App={
   /* ===================== VENTAS (clientes, estilo Smart) ===================== */
   async vVentas(){
     this.loading();
-    const [ventas,seg,peds,leads,movsV,prodsV]=await Promise.all([GET('kruh_ventas?order=creado_en.desc&limit=8000'),GET('kruh_seguimiento?limit=3000'),GET('kruh_pedidos?select=items,creado_en,forma_pago,total,descuento,domicilio&limit=3000'),GET('kruh_leads?select=creado_en&limit=5000'),GET('kruh_movimientos?tipo=in.(muestra,perdida)&select=producto_id,tipo,cantidad,creado_en&limit=20000'),GET('kruh_productos?select=id,nombre,precio&limit=1000')]);
+    const [ventas,seg,peds,leads,movsV,prodsV]=await Promise.all([GETALL('kruh_ventas?order=creado_en.desc&limit=8000'),GET('kruh_seguimiento?limit=3000'),GETALL('kruh_pedidos?select=items,creado_en,forma_pago,total,descuento,domicilio&limit=3000'),GET('kruh_leads?select=creado_en&limit=5000'),GETALL('kruh_movimientos?tipo=in.(muestra,perdida)&select=producto_id,tipo,cantidad,creado_en&limit=20000'),GET('kruh_productos?select=id,nombre,precio&limit=1000')]);
     const segSet={}; seg.forEach(s=>segSet[s.cliente]=s.contactado);
     const mesIni=new Date(); mesIni.setDate(1); mesIni.setHours(0,0,0,0);
     const by={};
@@ -1802,7 +1821,7 @@ const App={
   async ventaSave(){ const b={cliente:$('v_cli').value.trim(),telefono:$('v_tel').value.trim(),producto:$('v_pro').value.trim(),monto:+$('v_mon').value||0};
     if(!b.cliente){alert('Cliente');return;} await POST('kruh_ventas',b); cerrar(); toast('Venta registrada'); this.vVentas(); },
   async ventasExcel(){ toast('Generando Excel…');
-    const v=await GET('kruh_ventas?order=creado_en.desc&limit=20000');
+    const v=await GETALL('kruh_ventas?order=creado_en.desc&limit=20000');
     const cols=['Fecha','Cliente','Teléfono','Productos','Forma de pago','Subtotal','IVA','Domicilio','Total'];
     const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
     const rows=v.map(r=>[(r.creado_en||'').slice(0,10),r.cliente||'',r.telefono||'',r.producto||'',r.forma_pago||'',(+r.subtotal||0),(+r.iva||0),(+r.domicilio||0),(+r.monto||0)].map(q).join(';'));
