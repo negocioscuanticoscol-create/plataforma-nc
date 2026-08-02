@@ -593,7 +593,19 @@ const App={
       if(!ped) ped=await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});   // sin la columna descuento
       if(!ped){ toast('⚠️ No se pudo guardar el pedido'); return; }
       const saldos=[];
-      for(const it of items){ await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')}); const p=prods.find(x=>x.id===it.producto_id); const nuevo=(+((p&&p.existencias)||0))-it.qty; if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:nuevo}); saldos.push({nombre:it.nombre,qty:it.qty,saldo:nuevo}); }
+      /* Los SERVICIOS (domicilio, empaque…) se venden y se cuentan como cualquier
+         línea del pedido, pero NO tienen inventario: no descuentan existencias ni
+         generan movimiento. Antes DOMICILIO se descontaba como si fuera pan y
+         terminaba en negativo. */
+      for(const it of items){
+        const p=prods.find(x=>x.id===it.producto_id);
+        if(p && String(p.categoria||'').toLowerCase()==='servicio'){
+          saldos.push({nombre:it.nombre,qty:it.qty,saldo:null}); continue;
+        }
+        await POST('kruh_movimientos',{producto_id:it.producto_id,tipo:'salida',cantidad:it.qty,motivo:'Pedido '+(cli||'')});
+        const nuevo=(+((p&&p.existencias)||0))-it.qty;
+        if(p)await PATCH('kruh_productos?id=eq.'+it.producto_id,{existencias:nuevo});
+        saldos.push({nombre:it.nombre,qty:it.qty,saldo:nuevo}); }
       const bv={cliente:cli||'Mostrador',telefono:tel,producto:items.map(i=>i.nombre+' ×'+i.qty).join(', '),subtotal:sub,iva,domicilio:dom,monto:total,forma_pago:fp};
       if(!await POST('kruh_ventas',{...bv,descuento:desc})) await POST('kruh_ventas',bv);   // sin la columna descuento
       if(dom>0) await this._sumarDomicilio(dom,fp);
@@ -604,7 +616,7 @@ const App={
       toast('Pedido generado'); await this.vPedidos();
       modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3>
         ${nuevoCli?`<div style="border:1.5px solid var(--ok);background:var(--okbg);border-radius:9px;padding:8px 11px;margin-bottom:9px;font-size:13px">👤 <b style="color:var(--ok)">${esc(nuevoCli)}</b> quedó registrado en el CRM</div>`:''}
-        <div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)')}">quedan ${s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`);
+        <div class="dim" style="font-size:12.5px;margin-bottom:10px">Inventario descontado · saldo actual:</div>${saldos.map(s=>`<div class="row" style="justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--line2)"><span>${esc(s.nombre)} <small class="dim">×${s.qty}</small></span><b style="color:${s.saldo===null?'var(--mut)':(s.saldo<0?'var(--bad)':(s.saldo<=0?'var(--warn)':'var(--ink)'))}">${s.saldo===null?'servicio':'quedan '+s.saldo}</b></div>`).join('')}<button class="btn acc full" style="margin-top:12px" onclick="cerrar()">Listo</button>`);
     } finally {
       this._savingPedido=false; const b=$('pd_save'); if(b){ b.disabled=false; b.textContent='Generar pedido'; b.style.opacity=''; }
     }
