@@ -1260,8 +1260,8 @@ const App={
   /* ===================== PROVEEDORES ===================== */
   async vProveedores(){
     this.loading();
-    const [provs,pp,comp,mov]=await Promise.all([GET('kruh_proveedores?order=categoria,nombre&limit=2000'),GET('kruh_prov_productos?order=nombre&limit=5000'),GET('kruh_gastos?order=fecha&limit=5000'),GETALL('kruh_compras?order=fecha.desc,creado_en.desc&limit=5000')]);
-    this._provs=provs; this._pp=pp; this._gastos=comp; this._mov=mov;
+    const [provs,pp,comp,mov,mp,rec]=await Promise.all([GET('kruh_proveedores?order=categoria,nombre&limit=2000'),GET('kruh_prov_productos?order=nombre&limit=5000'),GET('kruh_gastos?order=fecha&limit=5000'),GETALL('kruh_compras?order=fecha.desc,creado_en.desc&limit=5000'),GET('kruh_materiaprima?order=nombre&limit=2000'),GET('kruh_recetas?select=id,ingrediente&limit=5000')]);
+    this._provs=provs; this._pp=pp; this._gastos=comp; this._mov=mov; this._mp=mp; this._recsAll=rec;
     const ppBy={}; pp.forEach(x=>{(ppBy[x.proveedor_id]=ppBy[x.proveedor_id]||[]).push(x);});
     const caj=this._provTab||'';
     const mes=this._gasMes||this._mesActual(); this._gasMes=mes;
@@ -1466,15 +1466,56 @@ const App={
       <div id="cp_wrap" style="display:none;margin-top:8px">
         <label>2. Escoge el producto que tiene</label>
         <select id="cp_prod" onchange="App.cpPre()"></select>
-        <div class="g2"><div><label>Cantidad</label><input id="cp_cant" type="number"></div>
-        <div><label>Precio x unidad</label><input id="cp_precio" type="number"></div></div>
+        <div class="g2"><div><label>Cantidad</label><input id="cp_cant" type="number" oninput="App.cpCalc()"></div>
+        <div><label id="cp_lpre">Precio x unidad</label><input id="cp_precio" type="number" oninput="App.cpCalc()"></div></div>
+        <div id="cp_esp"></div>
         <button class="btn acc full" onclick="App.cpSave()">Registrar compra → materia prima</button></div></div>
-      <div class="hint">La compra suma al stock y deja ese precio como el costo del insumo. Desde ahí,
-        todas las recetas que lo usan quedan costeadas a ese valor, hasta la próxima compra.</div>`;
+      <div class="hint">La compra suma al stock y recalcula el costo del insumo mezclando lo que queda en
+        bodega con lo que entra. Ese costo baja solo a todas las recetas que lo usan.</div>`;
   },
   cpProds(){ const pid=$('cp_prov').value, prods=(this._pp||[]).filter(x=>x.proveedor_id===pid), w=$('cp_wrap'); if(!pid){w.style.display='none';return;} w.style.display='block';
     $('cp_prod').innerHTML=prods.length?prods.map(x=>`<option value="${x.id}" data-n="${esc(x.nombre)}" data-uni="${esc(x.unidad||'kg')}" data-val="${x.valor||0}">${esc(x.nombre)} · ${money(x.valor)}/${esc(x.unidad||'kg')}</option>`).join(''):'<option value="">— sin productos; agrégalos en el directorio del proveedor —</option>'; this.cpPre(); },
-  cpPre(){ const s=$('cp_prod'), o=s&&s.options[s.selectedIndex]; if(o&&o.dataset&&o.dataset.val&&$('cp_precio')&&!$('cp_precio').value)$('cp_precio').value=o.dataset.val; },
+  cpPre(){ const s=$('cp_prod'), o=s&&s.options[s.selectedIndex];
+    if(o&&o.dataset&&o.dataset.val&&$('cp_precio')&&!$('cp_precio').value)$('cp_precio').value=o.dataset.val;
+    const l=$('cp_lpre'); if(l&&o&&o.dataset) l.textContent='Precio x '+(o.dataset.uni||'unidad');
+    this.cpCalc(); },
+  /* El insumo tal como está hoy en Compras, para poder comparar contra lo que
+     se está digitando. Se busca por el producto del proveedor y, si no,
+     por nombre (que es como quedaron enlazados los insumos viejos). */
+  _cpInsumo(){ const s=$('cp_prod'), o=s&&s.options[s.selectedIndex]; if(!o||!o.value) return null;
+    const mp=this._mp||[];
+    return mp.find(m=>m.prov_producto_id===o.value)
+        || mp.find(m=>String(m.nombre||'').trim().toLowerCase()===String(o.dataset.n||'').trim().toLowerCase())
+        || null; },
+  /* Espejo en vivo: antes de grabar se ve el total, en cuánto queda el costo y
+     un aviso si el salto es tan grande que huele a error de digitación
+     (el clásico: poner el precio del bulto en la casilla del kilo). */
+  cpCalc(){ const c=$('cp_esp'); if(!c) return;
+    const cant=+($('cp_cant')||{}).value||0, precio=+($('cp_precio')||{}).value||0;
+    if(cant<=0||precio<=0){ c.innerHTML=''; return; }
+    const m=this._cpInsumo(), uni=(m&&m.unidad)|| (($('cp_prod')||{}).options?($('cp_prod').options[$('cp_prod').selectedIndex].dataset.uni||''):'') ||'unidad';
+    const total=cant*precio;
+    let html=`<div style="background:var(--paper);border-radius:9px;padding:9px 11px;margin:8px 0;font-size:12.5px">
+      <div class="row" style="justify-content:space-between"><span class="dim">${num(cant)} ${esc(uni)} × ${money(precio)}</span><b>${money(total)}</b></div>`;
+    if(m){
+      const ant=+m.costo_unit||0, saldo=+m.existencias||0;
+      const prom=(saldo>0&&ant>0)?((saldo*ant+cant*precio)/(saldo+cant)):precio;
+      const dif=ant>0?((precio-ant)/ant*100):null;
+      html+=`<div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px">
+        <span class="dim">Venía en</span><span>${money(ant)}/${esc(uni)}${dif!==null?` <b style="color:${dif>0.5?'var(--bad)':(dif<-0.5?'var(--ok)':'var(--mut)')}">${dif>0?'+':''}${dif.toFixed(0)}%</b>`:''}</span></div>
+      <div class="row" style="justify-content:space-between"><span class="dim">Queda${saldo>0?' (mezclado con '+num(saldo)+' '+esc(uni)+' en bodega)':''}</span>
+        <b style="color:var(--acc)">${money(Math.round(prom))}/${esc(uni)}</b></div>`;
+      const rec=(this._recsAll||[]).filter(r=>String(r.ingrediente||'').trim().toLowerCase()===String(m.nombre||'').trim().toLowerCase()).length;
+      if(rec) html+=`<div class="hint" style="margin-top:4px">Va a recostear ${rec} receta${rec===1?'':'s'}.</div>`;
+      if(dif!==null&&dif>=80) html+=`<div style="background:var(--badbg);border-radius:7px;padding:7px 9px;margin-top:7px;font-size:12px;color:var(--bad)">
+        <b>⚠️ Ojo con este precio</b><br>Subió ${dif.toFixed(0)}% de un tirón. ¿No estarás poniendo lo que costó
+        <b>todo el bulto</b> en la casilla del precio por ${esc(uni)}? Ahí va el precio de <b>un solo ${esc(uni)}</b>.</div>`;
+      else if(dif!==null&&dif<=-50) html+=`<div style="background:var(--okbg);border-radius:7px;padding:7px 9px;margin-top:7px;font-size:12px;color:var(--ok)">
+        <b>Bajó ${Math.abs(dif).toFixed(0)}%</b> · si es real, buenísimo. Si no, revisa la cantidad y el precio antes de grabar.</div>`;
+    } else {
+      html+=`<div class="hint" style="margin-top:5px">Insumo nuevo: queda costeado a ${money(precio)}/${esc(uni)}.</div>`;
+    }
+    c.innerHTML=html+'</div>'; },
   async cpSave(){ const s=$('cp_prod'), o=s.options[s.selectedIndex]; if(!o||!o.value){alert('Escoge un producto');return;}
     const cant=+$('cp_cant').value||0, precio=+$('cp_precio').value||0; if(cant<=0){alert('Pon la cantidad');return;}
     const pid=$('cp_prov').value, provNom=((this._provs||[]).find(x=>x.id===pid)||{}).nombre||'';
@@ -1544,8 +1585,8 @@ const App={
   /* ===================== MATERIA PRIMA ===================== */
   async vMateriaPrima(){
     this.loading();
-    const [mp,provs]=await Promise.all([GET('kruh_materiaprima?order=categoria,nombre&limit=2000'),GET('kruh_proveedores?order=nombre&limit=2000')]);
-    this._mp=mp; this._provs=provs;
+    const [mp,provs,mov]=await Promise.all([GET('kruh_materiaprima?order=categoria,nombre&limit=2000'),GET('kruh_proveedores?order=nombre&limit=2000'),GETALL('kruh_compras?order=fecha.desc,creado_en.desc&limit=5000')]);
+    this._mp=mp; this._provs=provs; this._mov=mov;
     const bajos=mp.filter(m=>(+m.existencias||0)<=(+m.stock_min||0)&&(+m.stock_min||0)>0);
     const valor=mp.reduce((a,m)=>a+(+m.existencias||0)*(+m.costo_unit||0),0);
     const caj=this._mpTab||'';
@@ -1561,8 +1602,47 @@ const App={
       <div class="row" style="gap:10px;margin-bottom:12px;flex-wrap:wrap">
         ${this.CATCOMPRAS.map(c=>{const l=mp.filter(m=>cat(m)===c), v=l.reduce((a,m)=>a+(+m.existencias||0)*(+m.costo_unit||0),0);
           return `<div class="cajon ${caj===c?'on':''}" onclick="App._mpTab=App._mpTab==='${esc(c)}'?'':'${esc(c)}';App.vMateriaPrima()"><b>${money(v)}</b>${esc(c)}<div style="font-size:11px;opacity:.75">${l.length} insumo(s)</div></div>`;}).join('')}
+        <div class="cajon ${caj==='mov'?'on':''}" onclick="App._mpTab=App._mpTab==='mov'?'':'mov';App.vMateriaPrima()">
+          <b>${mov.filter(c=>(+c.cantidad||0)>0).length}</b>📈 Movimientos<div style="font-size:11px;opacity:.75">compras por mes</div></div>
         <div class="cajon ${caj==='nuevo'?'on':''}" onclick="App._mpTab='nuevo';App.vMateriaPrima()">＋ Nuevo insumo</div></div>
-      ${caj==='nuevo'?this._mpNuevoHTML(provs):(caj?this._mpListaHTML(mp.filter(m=>cat(m)===caj),caj):'<div class="empty">👆 Toca un cajón para ver sus insumos.</div>')}`);
+      ${caj==='mov'?this._mpMovHTML():(caj==='nuevo'?this._mpNuevoHTML(provs):(caj?this._mpListaHTML(mp.filter(m=>cat(m)===caj),caj):'<div class="empty">👆 Toca un cajón para ver sus insumos.</div>'))}`);
+  },
+  /* Movimientos de compra de insumos, mes por mes. Es el mismo selector que usan
+     Proveedores y Gastos, para que se lea igual en las tres pantallas. */
+  _mpMovHTML(){
+    const mov=(this._mov||[]).filter(c=>(+c.cantidad||0)>0);
+    if(!mov.length) return `<div class="card" style="border-left:4px solid var(--acc)">
+      <b>Todavía no hay compras registradas acá</b>
+      <div style="font-size:13.5px;margin-top:5px">Cada compra que entres por <b>Proveedores → 🛒 Registrar compra</b>
+      queda en este listado con su cantidad, lo que se pagó y a cuánto quedó costeado el insumo.</div>
+      <div class="hint" style="margin-top:6px">Las compras de julio están en Proveedores → 📈 Movimientos: son facturas y no traen cantidad.</div></div>`;
+    const meses=[...new Set(mov.map(c=>String(c.fecha||'').slice(0,7)).filter(Boolean))].sort().reverse();
+    const mm=(this._mpMes&&meses.includes(this._mpMes))?this._mpMes:(meses[0]||'');
+    const del=mov.filter(c=>String(c.fecha||'').slice(0,7)===mm)
+      .sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
+    const tot=del.reduce((a,c)=>a+(+c.total||0),0);
+    const subio=del.filter(c=>(+c.precio_anterior||0)>0&&(+c.precio_unit||0)>(+c.precio_anterior||0)).length;
+    const bajo=del.filter(c=>(+c.precio_anterior||0)>0&&(+c.precio_unit||0)<(+c.precio_anterior||0)).length;
+    return `<div class="row" style="gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+        <span class="dim" style="font-size:12px">Mes:</span>
+        <select onchange="App._mpMes=this.value;App.vMateriaPrima()" style="width:auto">
+          ${meses.map(m=>`<option value="${esc(m)}" ${m===mm?'selected':''}>${esc(this._ymNom(m))} ${esc(m.slice(0,4))}</option>`).join('')}</select>
+        <span class="dim" style="font-size:12px;margin-left:auto">${del.length} compra${del.length===1?'':'s'} · ${money(tot)}</span></div>
+      ${(subio||bajo)?`<div class="row" style="gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        ${subio?`<span class="tag pe">▲ ${subio} ${subio===1?'insumo subió':'insumos subieron'}</span>`:''}
+        ${bajo?`<span class="tag np">▼ ${bajo} ${bajo===1?'insumo bajó':'insumos bajaron'}</span>`:''}</div>`:''}
+      ${del.length?del.map(c=>{const pu=+c.precio_unit||0, ant=+c.precio_anterior||0, prom=+c.costo_promedio||0;
+        const d=ant>0?((pu-ant)/ant*100):null, u=esc(c.unidad||'');
+        return `<div class="item"><div class="top" style="display:flex;justify-content:space-between;gap:8px">
+          <div style="flex:1;min-width:0"><div class="nm">${esc(c.insumo||'—')}</div>
+            <div class="mt">${esc(String(c.fecha||'').slice(5))}${c.proveedor?' · 🚚 '+esc(c.proveedor):''} · ${num(c.cantidad)} ${u}</div></div>
+          <div style="text-align:right;flex:none">
+            <div style="font-weight:800;font-size:15px">${money(c.total)}</div>
+            <div style="font-size:11.5px;color:var(--mut)">${money(pu)}/${u}${d!==null?` <b style="color:${d>0.5?'var(--bad)':(d<-0.5?'var(--ok)':'var(--mut)')}">${d>0?'+':''}${d.toFixed(0)}%</b>`:''}</div></div></div>
+          ${(prom>0&&Math.abs(prom-pu)>0.009)?`<div class="hint" style="margin-top:5px;border-top:1px solid var(--line2);padding-top:5px">
+            Pagaste ${money(pu)}/${u}, pero quedaban ${num(c.existencias_antes)} ${u} en bodega a ${money(ant)} →
+            la receta quedó costeada a <b style="color:var(--acc)">${money(Math.round(prom))}/${u}</b>.</div>`:''}</div>`;}).join('')
+      :`<div class="empty">Sin compras en ${esc(this._ymNom(mm))}.</div>`}`;
   },
   _mpNuevoHTML(provs){ return `<div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:8px">Nuevo insumo</div>
     <div class="g2"><div><label>Nombre</label><input id="mp_nom"></div><div><label>Categoría</label><input id="mp_cat" placeholder="Harinas, Lácteos…"></div></div>
