@@ -1025,6 +1025,7 @@ const App={
         <div class="kpi" style="border:1.5px solid var(--bad)"><b style="color:var(--bad)"><span id="kpi_perd">${num(perTotD)}</span> <small style="font-size:15px;font-weight:400">(<span id="kpi_per">${num(perTot)}</span>)</small></b><span>❌ V. perdidas · hoy (mes)</span></div>
         <div class="kpi dark"><b>${money(prods.reduce((a,p)=>a+(+p.existencias||0)*(+p.precio||0),0))}</b><span>Valor en existencias</span></div></div>
       <div class="row" style="gap:6px;margin-bottom:10px"><button class="et ${tab==='exist'?'on':''}" onclick="App._invTab='exist';App.vInventario()">Existencias</button>
+        <button class="et ${tab==='cuadre'?'on':''}" onclick="App._invTab='cuadre';App.vInventario()">Cuadre del día</button>
         <button class="et ${tab==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button>
         <button class="et ${tab==='tend'?'on':''}" onclick="App._invTab='tend';App.vInventario()">Tendencias</button></div>
       ${tab==='exist'?
@@ -1037,7 +1038,9 @@ const App={
             <div id="mu_${p.id}" style="font-size:10.5px;color:var(--ok);font-weight:700;margin-top:4px;${musBy[p.id]?'':'display:none'}">${this._txtMus(p.id)}</div>
             <div id="pe_${p.id}" style="font-size:10.5px;color:var(--bad);font-weight:700;margin-top:2px;${perBy[p.id]?'':'display:none'}">${this._txtPer(p.id)}</div>
             </div>`;}).join('')}</div>`:'<div class="empty">Sin productos.</div>')
-        : tab==='mov'?(movs.length?movs.slice(0,300).map(m=>{const p=prods.find(x=>x.id===m.producto_id);
+        : tab==='cuadre'? this._invCuadre(prods,movs)
+        : tab==='mov'?(movs.length?this._invMovLista(prods,movs):'<div class="empty">Sin movimientos.</div>')
+        : tab==='__viejo'?(movs.length?movs.slice(0,300).map(m=>{const p=prods.find(x=>x.id===m.producto_id);
             const q=+m.cantidad||0, corr=(m.tipo==='muestra'&&q<0);   // muestras devueltas por el ✏️
             const cvn=m.tipo==='conv_menos', cvp=m.tipo==='conv_mas';
             const ic=corr?'↩️':(cvn||cvp?'🔄':(m.tipo==='entrada'?'⬆️':(m.tipo==='muestra'?'🎁':(m.tipo==='perdida'?'❌':'⬇️'))));
@@ -1047,6 +1050,141 @@ const App={
             return `<div class="item"><div class="top"><div><div class="nm">${ic} ${esc(p?p.nombre:'—')}${tg}</div><div class="mt">${esc(m.motivo||'')} · 📅 ${new Date(m.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</div></div><div class="nm" style="color:${cl}">${sg}${num(Math.abs(q))}</div></div></div>`;}).join(''):'<div class="empty">Sin movimientos.</div>')
         : tendHTML}`);
   },
+  /* ===== CUADRE DEL DÍA =====
+     La pregunta que responde: ¿con cuánto arrancó el día, cuánto se produjo,
+     cuánto se vendió y con cuánto cerró? Si esa cuenta no da, el inventario
+     está mal y acá se ve exactamente en qué producto y qué día. */
+  _invCuadre(prods,movs){
+    const nom={}; prods.forEach(p=>nom[p.id]=p.nombre);
+    /* saldo acumulado por producto hasta cada día: el final de un día es el
+       inicial del siguiente, que es como debería comportarse en la vida real */
+    const ord=(movs||[]).slice().sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
+    const dias={};
+    ord.forEach(m=>{ const k=this._diaKey(m.creado_en); if(!k)return;
+      const d=dias[k]=dias[k]||{}; const r=d[m.producto_id]=d[m.producto_id]||{ini:0,prod:0,vta:0,mue:0,baja:0,otro:0};
+      const q=+m.cantidad||0, t=m.tipo;
+      if(t==='inicial') r.ini+=q; else if(t==='entrada') r.prod+=q;
+      else if(t==='salida') r.vta+=q; else if(t==='muestra') r.mue+=q;
+      else if(t==='baja') r.baja+=q; else if(t==='perdida') {} else r.otro+=q*this._sgn(t); });
+    const fechas=Object.keys(dias).sort().reverse();
+    if(!fechas.length) return '<div class="empty">Sin movimientos todavía.</div>';
+    const sel=(this._cuaDia&&dias[this._cuaDia])?this._cuaDia:fechas[0];
+    /* arrastre: se recorre desde el principio para saber con qué abrió el día */
+    const saldo={};
+    fechas.slice().reverse().forEach(k=>{ const d=dias[k];
+      Object.keys(d).forEach(pid=>{ const r=d[pid]; r.abre=saldo[pid]||0;
+        r.cierra=r.abre+r.ini+r.prod-r.vta-r.mue-r.baja+r.otro; saldo[pid]=r.cierra; }); });
+    const dd=dias[sel], pids=Object.keys(dd).sort((a,b)=>String(nom[a]||'').localeCompare(String(nom[b]||'')));
+    const T=pids.reduce((a,pid)=>{const r=dd[pid];
+      return {abre:a.abre+r.abre,ini:a.ini+r.ini,prod:a.prod+r.prod,vta:a.vta+r.vta,
+              otr:a.otr+r.mue+r.baja,cierra:a.cierra+r.cierra};},{abre:0,ini:0,prod:0,vta:0,otr:0,cierra:0});
+    const neg=pids.filter(pid=>dd[pid].cierra<0);
+    const f=new Date(sel+'T12:00:00'), DIA=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    return `<div class="row" style="gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+        <span class="dim" style="font-size:12px">Día:</span>
+        <select onchange="App._cuaDia=this.value;App.vInventario()" style="width:auto">
+          ${fechas.map(k=>{const x=new Date(k+'T12:00:00');
+            return `<option value="${k}" ${k===sel?'selected':''}>${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')} ${DIA[x.getDay()].slice(0,3)}</option>`;}).join('')}</select>
+        <button class="btn gh sm" onclick="App.invInicialModal()">📋 Cargar inventario inicial</button>
+        <span class="dim" style="font-size:12px;margin-left:auto">${DIA[f.getDay()]} ${String(f.getDate()).padStart(2,'0')}</span></div>
+      ${neg.length?`<div class="card" style="border-left:4px solid var(--bad);padding:10px 13px;margin-bottom:10px">
+        <b style="color:var(--bad)">${neg.length} producto${neg.length===1?'':'s'} cierra${neg.length===1?'':'n'} en negativo</b>
+        <div style="font-size:12.5px;margin-top:4px">Se vendió más de lo que el sistema sabía que había. Casi siempre es porque
+        <b>había producto en el estante antes de arrancar el inventario</b> y ese conteo inicial nunca se cargó.
+        Con <b>📋 Cargar inventario inicial</b> se pone el conteo real y la cuenta cierra.</div></div>`:''}
+      <div class="card" style="padding:10px 12px;overflow-x:auto">
+        <div style="min-width:520px">
+          <div style="display:flex;gap:6px;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);border-bottom:1px solid var(--line);padding-bottom:6px">
+            <span style="flex:1">Producto</span><span style="width:58px;text-align:right">Abrió</span>
+            <span style="width:58px;text-align:right">+Inic.</span><span style="width:62px;text-align:right">+Prod.</span>
+            <span style="width:62px;text-align:right">−Venta</span><span style="width:62px;text-align:right">−Otros</span>
+            <span style="width:58px;text-align:right">Cerró</span></div>
+          ${pids.map(pid=>{const r=dd[pid], mal=r.cierra<0;
+            return `<div style="display:flex;gap:6px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--line2);${mal?'background:var(--badbg)':''}">
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nom[pid]||'—')}</span>
+              <span style="width:58px;text-align:right;color:var(--mut)">${r.abre||''}</span>
+              <span style="width:58px;text-align:right;color:var(--acc)">${r.ini?(r.ini>0?'+':'')+r.ini:''}</span>
+              <span style="width:62px;text-align:right;color:var(--ok)">${r.prod?'+'+r.prod:''}</span>
+              <span style="width:62px;text-align:right;color:var(--bad)">${r.vta?'−'+r.vta:''}</span>
+              <span style="width:62px;text-align:right;color:var(--warn)">${(r.mue+r.baja)?'−'+(r.mue+r.baja):''}</span>
+              <span style="width:58px;text-align:right;font-weight:800;color:${mal?'var(--bad)':'var(--ink)'}">${r.cierra}</span></div>`;}).join('')}
+          <div style="display:flex;gap:6px;font-size:13px;padding:7px 0 0;font-weight:800;border-top:2px solid var(--ink);margin-top:4px">
+            <span style="flex:1">TOTAL</span><span style="width:58px;text-align:right">${T.abre}</span>
+            <span style="width:58px;text-align:right">${T.ini?'+'+T.ini:''}</span><span style="width:62px;text-align:right">+${T.prod}</span>
+            <span style="width:62px;text-align:right">−${T.vta}</span><span style="width:62px;text-align:right">${T.otr?'−'+T.otr:''}</span>
+            <span style="width:58px;text-align:right">${T.cierra}</span></div></div></div>
+      <div class="hint" style="margin-top:7px">Abrió + Inicial + Producción − Venta − Otros = Cerró.
+        Y lo que cerró hoy es lo que abre mañana. Si un número no cuadra, el error está en ese día y ese producto.</div>`;
+  },
+  /* ===== MOVIMIENTOS: producción una por una, ventas consolidadas del día ===== */
+  _invMovLista(prods,movs){
+    const nom={}; prods.forEach(p=>nom[p.id]=p.nombre);
+    const dias={};
+    (movs||[]).forEach(m=>{ const k=this._diaKey(m.creado_en); if(!k)return;
+      const d=dias[k]=dias[k]||{ent:[],vta:{},otr:[]};
+      if(m.tipo==='entrada'||m.tipo==='inicial') d.ent.push(m);
+      else if(m.tipo==='salida'){ d.vta[m.producto_id]=(d.vta[m.producto_id]||0)+(+m.cantidad||0); }
+      else d.otr.push(m); });
+    const fechas=Object.keys(dias).sort().reverse().slice(0,31);
+    const DIA=['dom','lun','mar','mié','jue','vie','sáb'];
+    return fechas.map(k=>{ const d=dias[k], f=new Date(k+'T12:00:00');
+      const tp=d.ent.reduce((a,m)=>a+(+m.cantidad||0),0);
+      const pv=Object.keys(d.vta).sort((a,b)=>d.vta[b]-d.vta[a]);
+      const tv=pv.reduce((a,pid)=>a+d.vta[pid],0);
+      const to=d.otr.reduce((a,m)=>a+(m.tipo==='perdida'?0:(+m.cantidad||0)),0);
+      return `<div class="card" style="padding:11px 13px">
+        <div class="row" style="justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:6px">
+          <b style="font-family:Fraunces,serif;font-size:15px">${String(f.getDate()).padStart(2,'0')}/${String(f.getMonth()+1).padStart(2,'0')} ${DIA[f.getDay()]}</b>
+          <span style="font-size:12px;color:var(--mut)"><b style="color:var(--ok)">+${tp}</b> producción · <b style="color:var(--bad)">−${tv}</b> venta${to?' · <b style="color:var(--warn)">−'+to+'</b> otros':''}</span></div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:8px 0 3px">⬆️ Producción que entró</div>
+        ${d.ent.length?d.ent.map(m=>`<div style="display:flex;gap:8px;font-size:12.5px;padding:2.5px 0;align-items:baseline">
+            <span style="width:44px;flex:0 0 auto;color:var(--mut)">${new Date(m.creado_en).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'})}</span>
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nom[m.producto_id]||'—')}${m.tipo==='inicial'?' <span class="tag pe">conteo inicial</span>':''}</span>
+            <span style="flex:0 0 auto;font-weight:700;color:${(+m.cantidad||0)<0?'var(--warn)':'var(--ok)'}">${(+m.cantidad||0)<0?'':'+'}${num(m.cantidad)}</span></div>`).join('')
+          :'<div class="hint">Sin producción registrada este día.</div>'}
+        <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:9px 0 3px;border-top:1px dashed var(--line);padding-top:7px">⬇️ Venta del día (consolidada)</div>
+        ${pv.length?pv.map(pid=>`<div style="display:flex;gap:8px;font-size:12.5px;padding:2.5px 0">
+            <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nom[pid]||'—')}</span>
+            <span style="flex:0 0 auto;font-weight:700;color:var(--bad)">−${d.vta[pid]}</span></div>`).join('')
+          :'<div class="hint">Sin ventas este día.</div>'}
+        ${d.otr.length?`<div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:9px 0 3px;border-top:1px dashed var(--line);padding-top:7px">Otros movimientos</div>
+          ${d.otr.map(m=>{const t=m.tipo, ic=t==='muestra'?'🎁':(t==='perdida'?'❌':(t==='baja'?'⬇️':'🔄'));
+            return `<div style="display:flex;gap:8px;font-size:12.5px;padding:2.5px 0">
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${ic} ${esc(nom[m.producto_id]||'—')} <span class="dim" style="font-size:11px">${esc(m.motivo||t)}</span></span>
+              <span style="flex:0 0 auto;font-weight:700;color:${t==='perdida'?'var(--mut)':'var(--warn)'}">${t==='perdida'?'(no toca stock)':'−'+num(Math.abs(+m.cantidad||0))}</span></div>`;}).join('')}`:''}
+      </div>`;}).join('');
+  },
+  /* Cargar el conteo físico. Es la pieza que faltaba: el inventario arrancó en
+     cero el 27 de julio aunque el estante tenía producto, y por eso hay negativos. */
+  invInicialModal(){
+    const prods=(this._prods||[]).filter(p=>String(p.categoria||'').toLowerCase()!=='servicio');
+    modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">Cargar inventario inicial</h3>
+      <div class="hint" style="margin-bottom:9px">Cuenta lo que hay <b>en el estante ahora</b> y escríbelo. Se suma al inventario
+      como conteo inicial, no como producción, así que no daña las cifras de producción del día.
+      Deja en blanco lo que no quieras tocar.</div>
+      <div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:9px;padding:8px">
+      ${prods.map(p=>`<div style="display:flex;gap:8px;align-items:center;padding:3px 0">
+        <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.nombre)}</span>
+        <span style="width:62px;text-align:right;font-size:11.5px;color:${(+p.existencias||0)<0?'var(--bad)':'var(--mut)'}">hoy ${num(p.existencias)}</span>
+        <input id="ini_${p.id}" type="number" placeholder="—" style="width:74px;margin:0"></div>`).join('')}
+      </div>
+      <button class="btn acc full" onclick="App.invInicialSave()">Guardar conteo</button>`);
+  },
+  async invInicialSave(){
+    const prods=(this._prods||[]).filter(p=>String(p.categoria||'').toLowerCase()!=='servicio');
+    const cambios=[];
+    prods.forEach(p=>{ const el=$('ini_'+p.id); if(!el||el.value==='')return;
+      const real=+el.value; if(isNaN(real))return;
+      const hay=+p.existencias||0, dif=real-hay;
+      if(Math.abs(dif)<0.0001) return;
+      cambios.push({p,real,dif}); });
+    if(!cambios.length){ toast('No hay nada que cambiar'); cerrar(); return; }
+    if(!confirm('Se van a ajustar '+cambios.length+' producto(s) al conteo real. ¿Seguir?')) return;
+    for(const c of cambios){
+      await POST('kruh_movimientos',{producto_id:c.p.id,tipo:'inicial',cantidad:c.dif,motivo:'Inventario inicial (conteo físico)'});
+      await PATCH('kruh_productos?id=eq.'+c.p.id,{existencias:c.real});
+    }
+    cerrar(); toast(cambios.length+' producto(s) cuadrados con el conteo'); this.vInventario(); },
   /* textos de los contadores: siempre "hoy (mes)". El mes se recalcula desde el dia 1, no se borra nada */
   _txtMus(id){ return '🎁 Muestras — hoy '+num((this._musDia||{})[id]||0)+' ('+num((this._musBy||{})[id]||0)+' en el mes)'; },
   _txtPer(id){ return '❌ V. perdidas — hoy '+num((this._perDia||{})[id]||0)+' ('+num((this._perBy||{})[id]||0)+' en el mes)'; },
@@ -1064,7 +1202,10 @@ const App={
      conv_mas/conv_menos son los dos lados de una conversion: uno resta el entero
      y el otro suma las porciones. NO son 'entrada', a proposito: el Dashboard
      cuenta las entradas como produccion y contaria dos veces el mismo costo. */
-  _sgn(t){ return (t==='entrada'||t==='conv_mas')?1:(t==='perdida'?0:-1); },
+  /* 'inicial' suma al inventario igual que una entrada, pero es un tipo aparte a
+     propósito: el Dashboard cuenta las entradas como producción del día y contar
+     el conteo físico ahí inflaría la producción. */
+  _sgn(t){ return (t==='entrada'||t==='conv_mas'||t==='inicial')?1:(t==='perdida'?0:-1); },
   invProd(id){ this._invProd=id; this.vInventario(); },
   invAcc(k){ this._invAcc=k; this.vInventario(); },
   _panelMov(prods,movs){
