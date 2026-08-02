@@ -92,6 +92,24 @@ const esc=s=>String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&am
 const $$=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const hoy=()=>new Date().toISOString().slice(0,10);
 const mesAct=()=>new Date().toISOString().slice(0,7);
+
+/* El servidor NUNCA devuelve mas de 1000 filas aunque se le pida mas, y lo hace
+   en silencio. GETALL pide de a 1000 hasta agotar, para que ninguna pantalla
+   se quede corta cuando la tabla crece. */
+async function GETALL(p){
+  const base=String(p).replace(/[?&](limit|offset)=\d+/g,'');
+  const sep=base.includes('?')?'&':'?';
+  const out=[];
+  for(let i=0,off=0;i<60;i++,off+=1000){
+    let r; try{ r=await fetch(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H}); }catch(e){ break; }
+    if(!r.ok) break;
+    let b; try{ b=await r.json(); }catch(e){ break; }
+    if(!Array.isArray(b)||!b.length) break;
+    out.push(...b);
+    if(b.length<1000) break;
+  }
+  return out;
+}
 async function api(p,o={}){
   try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H,...o}); const t=await r.text();
     if(!r.ok){ console.warn('API',p,t.slice(0,120)); return []; }

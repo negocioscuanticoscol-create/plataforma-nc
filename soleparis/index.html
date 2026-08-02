@@ -167,8 +167,25 @@ const App = {
   _saveLocal(k,a){ try{ localStorage.setItem(k,JSON.stringify(a)); }catch(e){} },
   async _fetchTable(t){
     try{
-      const r=await fetch(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc&limit=5000',{headers:this._H()});
-      if(r.ok){ this._onl[t]=true; return await this._reconcile(t, await r.json()); }
+      
+/* El servidor NUNCA devuelve mas de 1000 filas, aunque se le pida mas, y lo hace
+   en silencio. Esta funcion pide de a 1000 hasta agotar. */
+async function _paginar(url, headers){
+  const base = url.replace(/[?&](limit|offset)=\d+/g,'');
+  const sep = base.includes('?') ? '&' : '?';
+  const out = []; 
+  for(let i=0, off=0; i<60; i++, off+=1000){
+    let r; try{ r = await fetch(base+sep+'limit=1000&offset='+off, {headers}); }catch(e){ break; }
+    if(!r.ok) break;
+    let b; try{ b = await r.json(); }catch(e){ break; }
+    if(!Array.isArray(b) || !b.length) break;
+    out.push(...b);
+    if(b.length < 1000) break;
+  }
+  return out;
+}
+const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',this._H());
+      if(d && d.length!==undefined){ this._onl[t]=true; return await this._reconcile(t, d); }
     }catch(e){}
     this._onl[t]=false;
     return this._loadLocal(t);

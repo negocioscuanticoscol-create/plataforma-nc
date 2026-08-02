@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1B3A6B">
+<link rel="icon" href="raton-chico.png">
+<title>Bases · CallProspector</title>
+<style>
+:root{
+  --azul:#1B3A6B; --azul2:#142C52;
+  --naranja:#E8621A; --naranja2:#FF7A33;
+  --bg:#0B1830; --card:#14294A; --card2:#1B3559; --line:#2A4676;
+  --tx:#EAF1FB; --dim:#93AAC9; --faint:#6A83A6;
+  --ok:#25C08A; --warn:#F0A73C; --bad:#F0604D; --azulc:#4A9BE8;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);
+  max-width:640px;margin:0 auto;min-height:100vh;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+header{background:linear-gradient(160deg,var(--azul),var(--azul2));padding:12px 15px 14px;
+  position:sticky;top:0;z-index:20;border-bottom:2px solid var(--naranja);
+  padding-top:calc(12px + env(safe-area-inset-top))}
+.hrow{display:flex;align-items:center;gap:10px}
+.back{background:rgba(255,255,255,.12);color:#fff;text-decoration:none;font-size:12.5px;font-weight:700;
+  padding:6px 12px;border-radius:20px;white-space:nowrap}
+.tit{font-size:15.5px;font-weight:800;letter-spacing:-.02em}
+.tit small{display:block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#9DB7DA;font-weight:600}
+
+main{padding:15px}
+h2{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:18px 0 9px}
+h2:first-child{margin-top:0}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:15px;margin-bottom:11px}
+.bcard{cursor:pointer}
+.bcard:active{filter:brightness(1.1)}
+.bn{font-size:15.5px;font-weight:800;letter-spacing:-.01em}
+.bd{font-size:12px;color:var(--dim);margin-top:3px;line-height:1.5}
+.bd b{color:var(--tx);font-weight:600}
+.brow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.cnt{text-align:right;white-space:nowrap}
+.cnt b{display:block;font-size:19px;font-weight:800;color:var(--naranja2)}
+.cnt span{font-size:10px;color:var(--faint)}
+.pills{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
+.pill{font-size:10.5px;padding:3px 9px;border-radius:12px;background:var(--card2);
+  border:1px solid var(--line);color:var(--dim)}
+.pill.on{background:rgba(232,98,26,.16);border-color:rgba(232,98,26,.5);color:var(--naranja2)}
+.pill.off{opacity:.45}
+
+label{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+  font-weight:700;margin:12px 0 5px}
+input,select{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--tx);
+  border-radius:10px;padding:11px;font-size:14.5px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:var(--naranja)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
+
+.btn{width:100%;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:800;
+  cursor:pointer;font-family:inherit;background:var(--naranja);color:#fff;margin-top:14px}
+.btn:active{filter:brightness(.88)}
+.btn.gh{background:transparent;border:1px solid var(--line);color:var(--dim);font-weight:700;font-size:13.5px;padding:12px}
+.btn[disabled]{background:var(--faint);cursor:default}
+
+/* contador vivo del filtro */
+.hit{background:var(--card2);border:1.5px solid var(--naranja);border-radius:13px;padding:15px;
+  text-align:center;margin-top:14px}
+.hit b{display:block;font-size:33px;font-weight:800;letter-spacing:-.03em;color:var(--naranja2);line-height:1.1}
+.hit span{font-size:12px;color:var(--dim)}
+.hit.cero{border-color:var(--bad)} .hit.cero b{color:var(--bad)}
+
+/* botonería y tarifas */
+.res{display:flex;flex-direction:column;gap:7px}
+.rline{display:flex;align-items:center;gap:9px;background:var(--card2);border:1px solid var(--line);
+  border-radius:10px;padding:9px 11px}
+.rline.off{opacity:.42}
+.chk{width:21px;height:21px;border-radius:6px;border:1.5px solid var(--line);background:var(--bg);
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;
+  color:var(--faint);flex:none;cursor:pointer}
+.chk.on{background:var(--naranja);border-color:var(--naranja);color:#fff}
+.rline .rn{flex:1;font-size:13.5px;font-weight:600;min-width:0}
+.rline input{width:92px;flex:none;text-align:right;padding:8px 10px;font-size:13.5px}
+
+.ag{display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--card2);
+  border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
+.ag .an{flex:1;font-size:13.5px;font-weight:600}
+.ag .an small{display:block;font-size:11px;color:var(--faint);font-weight:400}
+.ag.no{opacity:.4}
+
+.vacio{text-align:center;color:var(--faint);font-size:13.5px;padding:40px 20px;line-height:1.65}
+.aviso{background:rgba(240,96,77,.12);border:1px solid rgba(240,96,77,.4);border-radius:12px;
+  padding:13px 15px;font-size:13px;color:#FF9A8B;line-height:1.55;margin-bottom:12px}
+.aviso b{color:#fff}
+#toast{position:fixed;left:50%;transform:translateX(-50%) translateY(-140%);top:calc(12px + env(safe-area-inset-top));
+  background:var(--card2);border:1px solid var(--naranja);color:var(--tx);padding:11px 17px;border-radius:12px;
+  font-size:13px;z-index:60;transition:transform .3s ease;max-width:88vw;text-align:center}
+#toast.on{transform:translateX(-50%) translateY(0)}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+
+<header><div class="hrow">
+  <a class="back" href="index.html">‹ Volver</a>
+  <div class="tit">Bases de datos<small>Configuración y segmentos</small></div>
+</div></header>
+
+<main id="main"><div class="vacio">Cargando…</div></main>
+<div id="toast"></div>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co';
+const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+
+const $=s=>document.getElementById(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cop=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+const num=n=>(+n||0).toLocaleString('es-CO');
+
+
+/* El servidor NUNCA devuelve mas de 1000 filas aunque se le pida mas, y lo hace
+   en silencio. GETALL pide de a 1000 hasta agotar. */
+async function GETALL(p){
+  const base=String(p).replace(/[?&](limit|offset)=\d+/g,'');
+  const sep=base.includes('?')?'&':'?';
+  const out=[];
+  for(let i=0,off=0;i<60;i++,off+=1000){
+    let r; try{ r=await fetch(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H}); }catch(e){ break; }
+    if(!r.ok) break;
+    let b; try{ b=await r.json(); }catch(e){ break; }
+    if(!Array.isArray(b)||!b.length) break;
+    out.push(...b); if(b.length<1000) break;
+  }
+  return out;
+}
+async function GET(p){ const r=await fetch(SB+'/rest/v1/'+p,{headers:H}); return r.ok?r.json():null; }
+async function POST(t,b){ const r=await fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(b)}); return r.ok?(await r.json())[0]:null; }
+async function PATCH(t,b){ const r=await fetch(SB+'/rest/v1/'+t,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); return r.ok; }
+async function DEL(t){ const r=await fetch(SB+'/rest/v1/'+t,{method:'DELETE',headers:H}); return r.ok; }
+let tt; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on');
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),2200); }
+
+/* la cadena de selectores, en orden */
+const SEL=[
+  ['cliente','Cliente','a quién le llegan los interesados'],
+  ['marca','Marca','de qué se habla en la llamada'],
+  ['canal','Canal',''],
+  ['sector','Sector',''],
+  ['subsector','Subsector',''],
+  ['departamento','Departamento',''],
+  ['ciudad','Ciudad',''],
+  ['barrio','Barrio',''],
+  ['ced','CED',''],
+  ['nivel','Nivel mínimo','quién puede llamarla']
+];
+/* los selectores geográficos dependen del anterior */
+const PADRE={ciudad:'departamento', barrio:'ciudad', subsector:'sector'};
+
+const RESULTADOS=[
+  ['Interesado','🔥 Interesado',2500],
+  ['Competencia','🏭 Competencia',600],
+  ['No interesado','❌ No interesado',350],
+  ['No contesta','☎️ No contesta',150],
+  ['Equivocado','⛔ Equivocado',150],
+  ['No contactar','🚫 No contactar',250]
+];
+const NIVELES=['principiante','intermedio','avanzado','asesor'];
+
+const A={
+  leads:[], bases:[], agentes:[], clientes:[], asign:[],
+  vista:'lista', ed:null, edAg:new Set(),
+
+  async init(){
+    const [leads,bases,agentes,clientes,asign]=await Promise.all([
+      GETALL('mkr_leads?select=cliente,marca,canal,sector,subsector,departamento,ciudad,barrio,ced,nivel,aplica&limit=20000'),
+      GET('mkr_bases?select=*&order=creado_en.desc&limit=200'),
+      GET('mkr_agentes?select=*&order=nombre&limit=300'),
+      GETALL('nc_clientes?select=slug,nombre,apps&order=nombre&limit=100'),
+      GET('mkr_asignaciones?select=*&limit=3000')
+    ]);
+    if(leads===null||bases===null){
+      $('main').innerHTML=`<div class="aviso"><b>Faltan las tablas.</b><br>
+        Todavía no se ha corrido el SQL de <b>mkr_leads</b> y <b>mkr_bases</b>.
+        Esta pantalla funciona apenas existan.</div>`;
+      return;
+    }
+    this.leads=(leads||[]).filter(l=>l.aplica!==false);
+    this.bases=bases||[]; this.agentes=agentes||[]; this.clientes=clientes||[]; this.asign=asign||[];
+    this.pintar();
+  },
+
+  /* valores distintos de una columna, respetando lo ya escogido antes */
+  opciones(campo,f){
+    const p=PADRE[campo];
+    let base=this.leads;
+    if(p && f[p] && f[p]!=='todos') base=base.filter(l=>l[p]===f[p]);
+    const m={};
+    base.forEach(l=>{ const v=l[campo]; if(!v||v==='todos')return; m[v]=(m[v]||0)+1; });
+    return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+  },
+
+  /* cuántos prospectos caen en un filtro. 'todos' = no filtra */
+  cuenta(f){
+    return this.leads.filter(l=>SEL.every(([k])=>{
+      const v=f[k]; if(!v||v==='todos')return true;
+      if(k==='nivel') return true;               // el nivel es de la persona, no del prospecto
+      return l[k]===v;
+    })).length;
+  },
+
+  /* ------------- LISTA ------------- */
+  pintar(){
+    if(this.vista==='editor') return this.pintarEditor();
+    const bs=this.bases.map(b=>{
+      const n=this.cuenta(b);
+      const seg=SEL.filter(([k])=>b[k]&&b[k]!=='todos').map(([k,t])=>`<span class="pill on">${esc(b[k])}</span>`).join('')
+        ||'<span class="pill">toda la base</span>';
+      const nAg=this.asign.filter(a=>a.base_id===b.id).length;
+      return `<div class="card bcard" onclick="A.abrir(${b.id})">
+        <div class="brow">
+          <div style="min-width:0">
+            <div class="bn">${esc(b.nombre)}${b.activa?'':' <span style="font-size:11px;color:var(--bad)">· apagada</span>'}</div>
+            <div class="bd">Los interesados van a <b>${esc(b.cliente||'—')}</b> · ${nAg} ${nAg===1?'persona asignada':'personas asignadas'}</div>
+          </div>
+          <div class="cnt"><b class="mono">${num(n)}</b><span>prospectos</span></div>
+        </div>
+        <div class="pills">${seg}</div>
+      </div>`;
+    }).join('');
+    $('main').innerHTML=`
+      <h2>Bases configuradas</h2>
+      ${bs||'<div class="vacio">Todavía no hay ninguna base.<br>Crea la primera para que el marcador tenga qué mostrar.</div>'}
+      <button class="btn" onclick="A.nueva()">＋ Nueva base</button>
+      <div class="vacio" style="padding:16px 4px;font-size:12px">
+        ${num(this.leads.length)} prospectos llamables en total · ${this.agentes.length} personas registradas</div>`;
+  },
+
+  /* ------------- EDITOR ------------- */
+  nueva(){
+    const f={nombre:''}; SEL.forEach(([k])=>f[k]='todos');
+    f.cliente=(this.clientes[0]||{}).slug||'';
+    f.botones=RESULTADOS.map(r=>r[0]);
+    f.tarifas={}; RESULTADOS.forEach(([k,,v])=>f.tarifas[k]=v);
+    f.activa=true;
+    this.ed=f; this.edAg=new Set(); this.vista='editor'; this.pintar(); window.scrollTo(0,0);
+  },
+  abrir(id){
+    const b=this.bases.find(x=>x.id===id); if(!b)return;
+    const f={...b};
+    f.botones=Array.isArray(b.botones)?b.botones:RESULTADOS.map(r=>r[0]);
+    f.tarifas=(b.tarifas&&typeof b.tarifas==='object')?{...b.tarifas}:{};
+    RESULTADOS.forEach(([k,,v])=>{ if(f.tarifas[k]==null)f.tarifas[k]=v; });
+    this.ed=f;
+    this.edAg=new Set(this.asign.filter(a=>a.base_id===id).map(a=>a.agente_id));
+    this.vista='editor'; this.pintar(); window.scrollTo(0,0);
+  },
+  cerrar(){ this.ed=null; this.vista='lista'; this.pintar(); window.scrollTo(0,0); },
+
+  set(k,v){ this.ed[k]=v;
+    // al cambiar un padre, el hijo vuelve a 'todos'
+    Object.entries(PADRE).forEach(([hijo,padre])=>{ if(padre===k) this.ed[hijo]='todos'; });
+    this.pintar(); },
+  toggleRes(k){ const b=new Set(this.ed.botones||[]); b.has(k)?b.delete(k):b.add(k);
+    this.ed.botones=[...b]; this.pintar(); },
+  setTar(k,v){ this.ed.tarifas[k]=Math.max(0,+v||0); },
+  toggleAg(id){ this.edAg.has(id)?this.edAg.delete(id):this.edAg.add(id); this.pintar(); },
+
+  pintarEditor(){
+    const f=this.ed, n=this.cuenta(f);
+    const nuevo=!f.id;
+
+    const selHTML=SEL.map(([k,t,ayuda])=>{
+      let ops;
+      if(k==='cliente'){
+        ops=this.clientes.map(c=>`<option value="${esc(c.slug)}"${f.cliente===c.slug?' selected':''}>${esc(c.nombre)}</option>`).join('');
+        return `<div><label>${t}${ayuda?' · <span style="text-transform:none;letter-spacing:0;font-weight:400">'+ayuda+'</span>':''}</label>
+          <select onchange="A.set('cliente',this.value)">${ops||'<option>sin clientes</option>'}</select></div>`;
+      }
+      if(k==='nivel'){
+        ops=`<option value="todos"${f.nivel==='todos'?' selected':''}>Todos</option>`+
+            NIVELES.map(x=>`<option value="${x}"${f.nivel===x?' selected':''}>${x}</option>`).join('');
+        return `<div><label>${t}${ayuda?' · <span style="text-transform:none;letter-spacing:0;font-weight:400">'+ayuda+'</span>':''}</label>
+          <select onchange="A.set('nivel',this.value)">${ops}</select></div>`;
+      }
+      const lista=this.opciones(k,f);
+      ops=`<option value="todos"${(f[k]||'todos')==='todos'?' selected':''}>Todos</option>`+
+          lista.map(([v,c])=>`<option value="${esc(v)}"${f[k]===v?' selected':''}>${esc(v)} (${num(c)})</option>`).join('');
+      return `<div><label>${t}</label><select onchange="A.set('${k}',this.value)">${ops}</select></div>`;
+    }).join('');
+
+    const res=RESULTADOS.map(([k,t,def])=>{
+      const on=(f.botones||[]).includes(k);
+      return `<div class="rline ${on?'':'off'}">
+        <div class="chk ${on?'on':''}" onclick="A.toggleRes('${k}')">${on?'✓':''}</div>
+        <div class="rn" onclick="A.toggleRes('${k}')">${t}</div>
+        <input type="number" min="0" step="50" value="${f.tarifas[k]??def}" ${on?'':'disabled'}
+          onchange="A.setTar('${k}',this.value)"></div>`;
+    }).join('');
+
+    const nivOK=a=>{ if(!f.nivel||f.nivel==='todos')return true;
+      return NIVELES.indexOf(a.nivel)>=NIVELES.indexOf(f.nivel); };
+    const ags=this.agentes.filter(a=>a.rol==='telemercaderista'||!a.rol).map(a=>{
+      const ok=nivOK(a), on=this.edAg.has(a.id);
+      return `<div class="ag ${ok?'':'no'}">
+        <div class="chk ${on?'on':''}" ${ok?`onclick="A.toggleAg(${a.id})"`:''}>${on?'✓':(ok?'':'🔒')}</div>
+        <div class="an">${esc(a.nombre)}<small>${esc(a.nivel||'—')}${a.estado&&a.estado!=='activo'?' · '+esc(a.estado):''}${ok?'':' · le falta nivel'}</small></div>
+      </div>`;
+    }).join('');
+
+    $('main').innerHTML=`
+      <h2>${nuevo?'Nueva base':'Editar base'}</h2>
+      <div class="card">
+        <label>Nombre de la base</label>
+        <input id="b_nom" placeholder="Ej: Smart · Lácteos yogurt Medellín" value="${esc(f.nombre||'')}"
+          oninput="A.ed.nombre=this.value">
+      </div>
+
+      <h2>Segmento</h2>
+      <div class="card"><div class="g2">${selHTML}</div>
+        <div class="hit ${n?'':'cero'}">
+          <b class="mono">${num(n)}</b>
+          <span>${n?'prospectos caen en este filtro':'ningún prospecto cae aquí — afloja algún filtro'}</span>
+        </div>
+      </div>
+
+      <h2>Botonería y tarifas</h2>
+      <div class="card">
+        <div style="font-size:12.5px;color:var(--dim);margin-bottom:10px;line-height:1.5">
+          Lo que se apaga no se le muestra al que marca. En distribuidores tiene sentido
+          <b style="color:var(--tx)">Competencia</b>; en cliente final normalmente no.</div>
+        <div class="res">${res}</div>
+      </div>
+
+      <h2>Quién la trabaja</h2>
+      <div class="card">
+        ${ags||'<div class="vacio" style="padding:18px">No hay personas registradas todavía.</div>'}
+        <div style="font-size:12px;color:var(--faint);margin-top:8px;line-height:1.5">
+          Los que aparecen con 🔒 no alcanzan el nivel mínimo de esta base.</div>
+      </div>
+
+      <button class="btn" onclick="A.guardar()">${nuevo?'Crear base':'Guardar cambios'}</button>
+      <button class="btn gh" onclick="A.cerrar()">Cancelar</button>
+      ${nuevo?'':`<button class="btn gh" style="color:var(--bad);border-color:rgba(240,96,77,.4)" onclick="A.borrar()">Eliminar esta base</button>`}
+      <div style="height:20px"></div>`;
+  },
+
+  async guardar(){
+    const f=this.ed;
+    if(!String(f.nombre||'').trim()){ toast('Ponle nombre a la base'); return; }
+    if(!f.cliente){ toast('Escoge el cliente'); return; }
+    if(!(f.botones||[]).length){ toast('Deja al menos un botón prendido'); return; }
+    const tar={}; (f.botones||[]).forEach(k=>tar[k]=+f.tarifas[k]||0);
+    const b={nombre:f.nombre.trim(), cliente:f.cliente, activa:f.activa!==false,
+      botones:f.botones, tarifas:tar, app_destino:f.cliente};
+    SEL.forEach(([k])=>{ if(k!=='cliente') b[k]=f[k]||'todos'; });
+
+    let id=f.id;
+    if(id){ if(!await PATCH('mkr_bases?id=eq.'+id,b)){ toast('No se pudo guardar'); return; } }
+    else { const r=await POST('mkr_bases',b); if(!r){ toast('No se pudo crear'); return; } id=r.id; }
+
+    // asignaciones: se borran las de esta base y se vuelven a poner
+    await DEL('mkr_asignaciones?base_id=eq.'+id);
+    const nuevas=[...this.edAg].map(a=>({base_id:id,agente_id:a}));
+    if(nuevas.length) await POST('mkr_asignaciones',nuevas);
+
+    toast('Base guardada');
+    await this.init(); this.vista='lista'; this.ed=null; this.pintar(); window.scrollTo(0,0);
+  },
+
+  async borrar(){
+    if(!confirm('¿Eliminar la base "'+this.ed.nombre+'"?\n\nNo se borra ningún prospecto ni ninguna llamada.'))return;
+    await DEL('mkr_asignaciones?base_id=eq.'+this.ed.id);
+    await DEL('mkr_bases?id=eq.'+this.ed.id);
+    toast('Base eliminada');
+    await this.init(); this.vista='lista'; this.ed=null; this.pintar();
+  }
+};
+A.init();
+</script>
+</body>
+</html>

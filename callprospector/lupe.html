@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1B3A6B">
+<link rel="icon" href="raton-chico.png">
+<link rel="apple-touch-icon" href="raton-chico.png">
+<title>Lupe marca y gana · CallProspector</title>
+<style>
+:root{
+  --azul:#1B3A6B; --azul2:#142C52;
+  --naranja:#E8621A; --naranja2:#FF7A33;
+  --bg:#0B1830; --card:#14294A; --card2:#1B3559; --line:#2A4676;
+  --tx:#EAF1FB; --dim:#93AAC9; --faint:#6A83A6;
+  --ok:#25C08A; --warn:#F0A73C; --bad:#F0604D; --azulc:#4A9BE8;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);
+  max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;
+  -webkit-font-smoothing:antialiased;overscroll-behavior:none}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+/* ---------- ENTRADA ---------- */
+#gate{position:fixed;inset:0;background:radial-gradient(120% 85% at 50% 0%,#FFFFFF,#EDF2F9 62%,#DFE8F4);
+  z-index:100;display:flex;align-items:center;justify-content:center;padding:26px;overflow-y:auto}
+/* el que centra de verdad es este: si no, las etiquetas se van en línea */
+#gateBody{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:5px;width:100%;max-width:330px;margin:auto}
+#gate .lupe{width:100%;max-width:215px;height:auto;animation:entrar .55s cubic-bezier(.2,.75,.3,1) both}
+#gate .lema{font-size:23px;font-weight:800;color:var(--azul);letter-spacing:-.025em;
+  margin:0 0 4px;text-align:center;line-height:1.2}
+#gate .lema b{color:var(--naranja)}
+#gate .logo{width:100%;max-width:330px;height:auto;margin-bottom:7px;
+  animation:entrar .55s cubic-bezier(.2,.75,.3,1) both}
+@media(prefers-reduced-motion:reduce){#gate .logo{animation:none}}
+#gate .slogan{font-size:12.5px;color:#5B7A9C;text-align:center;max-width:320px;
+  margin-bottom:20px;line-height:1.5;font-weight:600}
+@keyframes entrar{from{opacity:0;transform:translateX(-26px) scale(.96)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){#gate .lupe{animation:none}}
+#gate label{display:block;align-self:flex-start;width:100%;font-size:11px;letter-spacing:.09em;
+  text-transform:uppercase;color:#5B7A9C;margin-bottom:6px;font-weight:700}
+#gate input{width:100%;max-width:330px;background:#fff;border:1.5px solid #C6D4E6;
+  color:var(--azul);border-radius:13px;padding:15px;font-size:16.5px;text-align:center;font-weight:700}
+#gate input::placeholder{color:#9FB2C9;font-weight:400}
+#gate input:focus{outline:none;border-color:var(--naranja);box-shadow:0 0 0 3px rgba(232,98,26,.16)}
+#gate button{width:100%;max-width:330px;background:var(--naranja);color:#fff;border:none;border-radius:13px;
+  padding:16px;font-size:16.5px;font-weight:800;margin-top:13px;cursor:pointer;
+  box-shadow:0 6px 18px rgba(232,98,26,.3);font-family:inherit}
+#gate button:active{background:#D05514;box-shadow:none}
+#gate button.gh{background:transparent;border:1.5px solid #C6D4E6;color:var(--azul);
+  box-shadow:none;margin-top:9px;font-size:15px}
+#gate button.gh:active{background:#E4EBF4}
+#gate .hint{color:#6F84A0;font-size:12px;margin-top:18px;text-align:center;line-height:1.55;max-width:330px}
+#gate .link{margin-top:15px;font-size:12.5px;color:var(--naranja);font-weight:700;cursor:pointer}
+#gate .err{color:#C0362C;font-size:12.5px;margin-top:10px;text-align:center;max-width:330px;font-weight:600;line-height:1.5}
+#gate .buscando{color:#8FA4BE;font-size:12.5px;margin-top:11px;text-align:center;font-weight:600}
+#gate .bien{font-size:13px;color:#5B7A9C;font-weight:600;letter-spacing:.03em}
+#gate .ced1{font-size:52px;font-weight:800;color:var(--azul);letter-spacing:-.04em;line-height:1}
+#gate .ced2{font-size:16px;font-weight:700;color:var(--naranja);letter-spacing:.02em;margin-bottom:20px}
+#gate .marcas{display:flex;align-items:center;justify-content:center;gap:16px;
+  margin-bottom:22px;padding-bottom:20px;border-bottom:1px solid #D4DFEC;width:100%}
+#gate .marcas img{height:34px;width:auto;object-fit:contain}
+#gate .marcas .wm{font-size:19px;font-weight:800;color:var(--azul);letter-spacing:.06em}
+#gate .marcas .sep{width:1px;height:26px;background:#C6D4E6;flex:none}
+#gate select{width:100%;background:#fff;border:1.5px solid #C6D4E6;color:var(--azul);
+  border-radius:13px;padding:14px;font-size:15.5px;font-weight:700;font-family:inherit}
+#gate select:focus{outline:none;border-color:var(--naranja);box-shadow:0 0 0 3px rgba(232,98,26,.16)}
+#gate .hallado{margin-top:11px;background:#E6F4EC;border:1.5px solid #A8D8BF;border-radius:12px;
+  padding:11px 15px;text-align:center;color:#0F6B4E;font-size:14px;font-weight:700;width:100%}
+#gate .hallado b{display:block;font-size:17px;color:#0B4A36;margin-top:1px}
+#gate .hallado small{display:block;font-size:11.5px;color:#4C8A70;font-weight:600;
+  text-transform:capitalize;margin-top:2px}
+#gate .volver{align-self:flex-start;width:100%;max-width:330px;font-size:12.5px;color:#5B7A9C;
+  font-weight:700;cursor:pointer;margin-bottom:12px}
+#gate h4{font-size:20px;font-weight:800;color:var(--azul);margin:4px 0 3px;letter-spacing:-.02em}
+#gate .sub2{font-size:12.5px;color:#6F84A0;margin-bottom:14px;text-align:center;max-width:320px;line-height:1.5}
+
+/* ---------- ESCOGER BASE ---------- */
+#bases{position:fixed;inset:0;background:var(--bg);z-index:90;overflow-y:auto;padding:24px 16px 40px}
+#bases h4{font-size:20px;font-weight:800;letter-spacing:-.02em;margin-bottom:3px}
+#bases .s{font-size:13px;color:var(--dim);margin-bottom:18px}
+.bcard{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:15px;
+  margin-bottom:10px;cursor:pointer}
+.bcard:active{filter:brightness(1.12)}
+.bcard .n{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.bcard .d{font-size:12px;color:var(--dim);margin-top:3px}
+.bcard .q{margin-top:9px;display:flex;justify-content:space-between;align-items:center}
+.bcard .q b{font-size:20px;font-weight:800;color:var(--naranja2)}
+.bcard .q span{font-size:11px;color:var(--faint)}
+
+/* ---------- CABECERA ---------- */
+header{background:linear-gradient(160deg,var(--azul),var(--azul2));padding:12px 15px 14px;
+  position:sticky;top:0;z-index:20;border-bottom:2px solid var(--naranja);
+  padding-top:calc(12px + env(safe-area-inset-top))}
+.hrow{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.brand{font-size:15px;font-weight:800;letter-spacing:-.02em}
+.brand .p{color:var(--naranja2)}
+.live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 1.7s infinite}
+.live.off i{background:var(--bad);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.28}}
+@media(prefers-reduced-motion:reduce){.live i{animation:none}}
+.yo{font-size:11.5px;color:#9DB7DA;background:rgba(255,255,255,.1);padding:3px 9px;border-radius:20px;cursor:pointer}
+.plata{text-align:center}
+.plata .lbl{font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.plata .val{font-size:40px;font-weight:800;letter-spacing:-.035em;line-height:1.05;margin:2px 0 3px;
+  color:#fff;transition:transform .18s}
+.plata .val.bump{transform:scale(1.09)}
+@media(prefers-reduced-motion:reduce){.plata .val{transition:none}}
+.pend{font-size:11px;color:var(--warn);margin-top:2px}
+.baseTag{font-size:11px;color:#9DB7DA;margin-top:7px;background:rgba(0,0,0,.22);
+  padding:4px 10px;border-radius:20px;display:inline-block;cursor:pointer}
+
+/* ---------- TARJETA ---------- */
+main{flex:1;padding:13px 15px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:19px;padding:19px 17px;text-align:center}
+.tags{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:11px}
+.tg{font-size:10.5px;padding:3px 10px;border-radius:12px;background:var(--card2);color:var(--dim);border:1px solid var(--line)}
+.tg.ciu{background:rgba(74,155,232,.15);color:#8FC4F5;border-color:rgba(74,155,232,.4)}
+.empw{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:5px;text-align:left}
+.empw .rat{width:56px;height:auto;flex:none;filter:drop-shadow(0 2px 6px rgba(0,0,0,.45))}
+.emp{font-size:21px;font-weight:800;line-height:1.2;letter-spacing:-.02em;min-width:0}
+@media(max-width:360px){.empw .rat{width:44px} .emp{font-size:19px}}
+.sub{color:var(--dim);font-size:13.5px;margin-bottom:2px}
+.cont{color:var(--naranja2);font-size:13.5px;font-weight:600}
+.num{font-size:28px;font-weight:800;letter-spacing:.5px;margin:13px 0 3px}
+.call{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--ok);color:#03291D;
+  text-decoration:none;font-size:20px;font-weight:800;padding:17px;border-radius:14px;margin:15px 0 4px}
+.call:active{filter:brightness(.9)}
+.res{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:13px}
+.res button{border:none;border-radius:11px;padding:14px 6px;font-size:13px;font-weight:700;cursor:pointer;
+  color:#fff;font-family:inherit;line-height:1.25;display:flex;flex-direction:column;gap:3px;align-items:center}
+.res button:active{filter:brightness(.88)}
+.res button small{font-size:10.5px;opacity:.82;font-weight:600}
+.res button[disabled]{opacity:.5}
+.b-Interesado{background:var(--ok);color:#03291D}
+.b-Competencia{background:#8B5CF6}
+.b-Nointeresado{background:#475C7A}
+.b-Nocontesta{background:#5A6E8C}
+.b-Equivocado{background:#6B7A94}
+.b-Nocontactar{background:#3D4E68}
+.nav{display:flex;gap:8px;margin-top:11px}
+.nav button{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--dim);border-radius:10px;
+  padding:11px;font-size:13px;cursor:pointer;font-family:inherit}
+.prog{text-align:center;font-size:11.5px;color:var(--faint);margin-top:10px}
+
+/* panel del interesado */
+#panel{margin-top:12px}
+.pan{background:var(--card2);border:1.5px solid var(--naranja);border-radius:13px;padding:14px;text-align:left}
+.pan h5{font-size:12.5px;color:var(--naranja2);margin-bottom:3px;font-weight:700}
+.pan .ps{font-size:11.5px;color:var(--dim);margin-bottom:10px;line-height:1.45}
+.pan .ps b{color:var(--tx)}
+.pan input{width:100%;background:var(--card);border:1px solid var(--line);color:var(--tx);
+  border-radius:9px;padding:11px;font-size:14px;font-family:inherit;margin-bottom:7px}
+.pan input:focus{outline:none;border-color:var(--naranja)}
+.pan .pb{display:flex;gap:7px;margin-top:4px}
+.pan .pb button{flex:1;border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:700;
+  cursor:pointer;font-family:inherit}
+.pan .pb .g{background:var(--ok);color:#03291D}
+.pan .pb .s{background:var(--card);color:var(--faint);border:1px solid var(--line)}
+
+/* ---------- RANKING ---------- */
+.rank{margin:18px 15px 0;background:var(--card);border:1px solid var(--line);border-radius:17px;overflow:hidden}
+.rank h3{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--naranja2);
+  padding:14px 16px 10px;font-weight:700;display:flex;align-items:center;gap:8px}
+.rank h3 span{margin-left:auto;color:var(--faint);letter-spacing:0;text-transform:none;font-size:11px;font-weight:500}
+.rw{display:grid;grid-template-columns:30px 1fr auto auto;gap:10px;align-items:center;
+  padding:11px 16px;border-top:1px solid var(--line)}
+.rw .pos{font-size:14px;font-weight:800;color:var(--faint);text-align:center}
+.rw:nth-child(2) .pos{color:#F5C542}
+.rw .nm{font-size:13.5px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rw .nm small{display:block;font-size:10.5px;color:var(--faint);font-weight:400}
+.rw .ll{font-size:11.5px;color:var(--dim);text-align:right}
+.rw .pl{font-size:14.5px;font-weight:800;text-align:right;color:var(--ok);min-width:74px}
+.rw.yo{background:linear-gradient(90deg,rgba(232,98,26,.16),transparent)}
+.rw.yo .nm{color:var(--naranja2)}
+.rank .foot{padding:11px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+
+.tarifas{margin:15px 15px 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 16px}
+.tarifas h4{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:9px;font-weight:700}
+.tarifas .t{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:var(--dim)}
+.tarifas .t b{color:var(--tx);font-weight:600}
+
+#toast{position:fixed;left:50%;transform:translateX(-50%) translateY(-140%);top:calc(12px + env(safe-area-inset-top));
+  background:var(--card2);border:1px solid var(--naranja);color:var(--tx);padding:11px 17px;border-radius:12px;
+  font-size:13px;z-index:60;box-shadow:0 8px 30px rgba(0,0,0,.5);transition:transform .3s ease;
+  max-width:88vw;text-align:center}
+#toast.on{transform:translateX(-50%) translateY(0)}
+#toast.mal{border-color:var(--bad)}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:center;font-size:11px;color:var(--faint);line-height:1.6}
+.vacio{text-align:center;color:var(--faint);font-size:13.5px;padding:40px 18px;line-height:1.65}
+</style>
+</head>
+<body>
+
+<div id="gate"><div id="gateBody"></div></div>
+<div id="bases" style="display:none"></div>
+
+<header id="hd" style="display:none">
+  <div class="hrow">
+    <div class="brand">Call<span class="p">Prospector</span></div>
+    <span class="yo" id="yo" onclick="salir()">—</span>
+    <div class="live" id="live"><i></i><span id="liveTx">en vivo</span></div>
+  </div>
+  <div class="plata">
+    <div class="lbl">Ganado hoy</div>
+    <div class="val mono" id="plata">$0</div>
+    <div class="pend" id="pend"></div>
+    <div><span class="baseTag" id="baseTag" onclick="volverBases()">—</span></div>
+  </div>
+</header>
+
+<main id="main" style="display:none"></main>
+<div class="rank" id="rank" style="display:none"><h3>🏆 Tablero <span id="rkInfo">—</span></h3><div id="rkBody"></div><div class="foot" id="rkTot">—</div></div>
+<div class="tarifas" id="tarifas" style="display:none"><h4>Lo que paga esta base</h4><div id="tarBody"></div></div>
+<footer id="ft" style="display:none">CallProspector · Negocios Cuánticos · Bogotá</footer>
+
+<div id="toast"></div>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co';
+const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+
+const $=s=>document.getElementById(s);
+/* TODO lo que venga de la base pasa por aquí antes de pintarse */
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cop=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+const num=n=>(+n||0).toLocaleString('es-CO');
+const soloNum=s=>String(s||'').replace(/\D/g,'');
+const SINTILDE=new RegExp('[\\u0300-\\u036f]','g');
+const norm=s=>String(s||'').trim().toLowerCase().normalize('NFD').replace(SINTILDE,'').replace(/\s+/g,' ');
+
+/* guarda el último código de respuesta para poder decir QUÉ falló, no un "sin conexión" genérico */
+
+/* El servidor NUNCA devuelve mas de 1000 filas aunque se le pida mas, y lo hace
+   en silencio. GETALL pide de a 1000 hasta agotar, para que ninguna pantalla
+   se quede corta cuando la tabla crece. */
+async function GETALL(p){
+  const base=String(p).replace(/[?&](limit|offset)=\d+/g,'');
+  const sep=base.includes('?')?'&':'?';
+  const out=[];
+  for(let i=0,off=0;i<60;i++,off+=1000){
+    let r; try{ r=await fetch(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H}); }catch(e){ break; }
+    if(!r.ok) break;
+    let b; try{ b=await r.json(); }catch(e){ break; }
+    if(!Array.isArray(b)||!b.length) break;
+    out.push(...b);
+    if(b.length<1000) break;
+  }
+  return out;
+}
+async function GET(p){
+  try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H});
+    GET.estado=r.status;
+    return r.ok?await r.json():null;
+  }catch(e){ GET.estado=0; return null; }
+}
+function porQueFallo(){
+  if(GET.estado===404||GET.estado===400) return 'La base de datos todavía no está creada. Avísale al administrador.';
+  if(GET.estado===0) return 'Sin señal. Revisa tu internet e intenta de nuevo.';
+  return 'No se pudo conectar (error '+GET.estado+'). Intenta de nuevo.';
+}
+
+let tt; function toast(m,mal){ const t=$('toast'); t.textContent=m;
+  t.classList.toggle('mal',!!mal); t.classList.add('on');
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),mal?3400:2200); }
+
+const NIVELES=['principiante','intermedio','avanzado','asesor'];
+const SEG=['cliente','marca','canal','sector','subsector','departamento','ciudad','barrio','ced'];
+const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫'};
+
+let YO=null, BASE=null, misBases=[], leads=[], idx=0, miPlata=0, pendientes=0;
+let PASO='inicio', ERR='', HALLADO=null, buscando=null;
+
+/* ==================== ENTRADA ==================== */
+function gate(p,e){ PASO=p; ERR=e||''; pintarGate(); }
+
+function pintarGate(){
+  if(PASO==='inicio'){
+    HALLADO=null;
+    $('gateBody').innerHTML=`
+      <div class="bien">Bienvenido a</div>
+      <div class="ced1">CED</div>
+      <div class="ced2">Red de Distribución</div>
+      <div class="marcas">
+        <img src="../assets/logo.png" alt="Feroz" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'wm',textContent:'FEROZ'}))">
+        <span class="sep"></span>
+        <span class="wm">ALPACA</span>
+      </div>
+      <label for="gCed">Tu centro</label>
+      <select id="gCed"><option value="">Cargando centros…</option></select>
+      <label for="gU" style="margin-top:11px">Usuario · tu celular</label>
+      <input id="gU" inputmode="numeric" placeholder="3001234567" autocomplete="username">
+      <label for="gP" style="margin-top:11px">Clave</label>
+      <input id="gP" type="password" placeholder="Tu clave" autocomplete="current-password">
+      <div id="gHallado"></div>
+      <button onclick="hacerEntrar()">Entrar</button>
+      <div class="link" onclick="gate('inscribir')">Quiero inscribirme</div>`;
+    cargarCeds();
+    ['gU','gP'].forEach(id=>{ const e=$(id); if(e)e.addEventListener('keydown',ev=>{ if(ev.key==='Enter')hacerEntrar(); }); });
+    if(ERR) $('gHallado').innerHTML=`<div class="err">${esc(ERR)}</div>`;
+  }
+  else if(PASO==='inscribir'){
+    $('gateBody').innerHTML=`
+      <div class="volver" onclick="gate('inicio')">‹ Volver</div>
+      <img class="lupe" src="raton.png" alt="Lupe" style="max-width:140px">
+      <h4>Quiero inscribirme</h4>
+      <div class="sub2">Quedas registrado. Después te contactamos para la capacitación y la prueba.</div>
+      <label for="iN">Tu nombre completo</label>
+      <input id="iN" placeholder="Nombre y apellido" autocapitalize="words">
+      <label for="iC" style="margin-top:11px">Tu celular · será tu clave</label>
+      <input id="iC" inputmode="numeric" placeholder="3001234567">
+      <label for="iQ" style="margin-top:11px">Tu Nequi</label>
+      <input id="iQ" inputmode="numeric" placeholder="Número de Nequi">
+      <button onclick="hacerInscribir()">Enviar inscripción</button>
+      ${ERR?`<div class="err">${esc(ERR)}</div>`:''}
+      <div class="hint">Te escribimos por WhatsApp.</div>`;
+    setTimeout(()=>{ const e=$('iN'); if(e)e.focus(); },60);
+  }
+  else if(PASO==='espera'){
+    $('gateBody').innerHTML=`
+      <img class="lupe" src="raton.png" alt="Lupe" style="max-width:180px">
+      <h4>¡Quedaste inscrito!</h4>
+      <div class="sub2">Te escribimos por WhatsApp para la capacitación y la prueba.
+        Cuando la pases, entras con tu nombre y tu celular.</div>
+      <button class="gh" onclick="gate('inicio')">Volver al inicio</button>`;
+  }
+}
+
+/* los centros salen de la base, no escritos a mano */
+async function cargarCeds(){
+  const s=$('gCed'); if(!s)return;
+  const cs=await GET('mkr_ceds?select=nombre,cliente,ciudad&activo=is.true&order=nombre&limit=200');
+  if(!Array.isArray(cs)||!cs.length){
+    s.innerHTML='<option value="todos">Todos los centros</option>'; return; }
+  s.innerHTML='<option value="todos">Todos los centros</option>'+
+    cs.map(c=>`<option value="${esc(c.nombre)}">${esc(c.nombre)}${c.ciudad?' · '+esc(c.ciudad):''}</option>`).join('');
+  const ult=localStorage.getItem('cp_ced'); if(ult) s.value=ult;
+}
+
+function errGate(m){ const h=$('gHallado'); if(h) h.innerHTML=`<div class="err">${esc(m)}</div>`; }
+
+async function hacerEntrar(){
+  const u=soloNum(($('gU')||{}).value||''), p=(($('gP')||{}).value||'').trim();
+  const ced=($('gCed')||{}).value||'todos';
+  if(u.length<7){ errGate('Escribe tu celular completo'); return; }
+  if(!p){ errGate('Escribe tu clave'); return; }
+
+  const ags=await GET('mkr_agentes?select=id,slug,nombre,celular,password,estado,rol,nivel,ced&limit=500');
+  if(!Array.isArray(ags)){ errGate(porQueFallo()); return; }
+
+  const a=ags.find(x=>soloNum(x.celular)===u);
+  if(!a){ errGate('Ese celular no está inscrito. Toca abajo para inscribirte.'); return; }
+  /* la clave arranca igual al celular; si nunca la cambió, ambas sirven */
+  const ok = a.password ? (p===String(a.password)) : (p===u);
+  if(!ok){ errGate('La clave no es correcta.'); return; }
+  if(a.estado==='anulado'){ errGate('Tu cuenta está anulada. Habla con el supervisor.'); return; }
+  if(a.estado==='restringido'){ errGate('Hola '+a.nombre+'. Todavía no estás habilitado: falta la capacitación y la prueba.'); return; }
+  if(ced!=='todos' && a.ced && a.ced!=='todos' && a.ced!==ced){
+    errGate('No perteneces a ese centro. El tuyo es '+a.ced+'.'); return; }
+
+  localStorage.setItem('cp_ced',ced);
+  YO=a; localStorage.setItem('cp_yo',JSON.stringify({id:a.id,slug:a.slug}));
+  await entrarApp();
+}
+
+async function hacerInscribir(){
+  const n=($('iN')||{}).value||'', c=soloNum(($('iC')||{}).value||''), q=soloNum(($('iQ')||{}).value||'');
+  if(norm(n).length<3){ gate('inscribir','Escribe tu nombre completo'); return; }
+  if(c.length<7){ gate('inscribir','Falta tu celular'); return; }
+  try{
+    const r=await fetch(SB+'/rest/v1/mkr_agentes',{method:'POST',headers:{...H,Prefer:'return=minimal'},
+      body:JSON.stringify({clave:norm(n),nombre:n.trim(),celular:c,rol:'telemercaderista',
+        nivel:'principiante',estado:'restringido',nota:q?('Nequi '+q):null})});
+    if(!r.ok){ const t=await r.text();
+      gate('inscribir',
+        /duplicate|unique/i.test(t) ? 'Ya hay alguien inscrito con ese nombre.'
+        : (r.status===404||r.status===400) ? 'La base de datos todavía no está creada. Avísale al administrador.'
+        : 'No se pudo enviar (error '+r.status+'). Intenta de nuevo.');
+      return; }
+  }catch(e){ gate('inscribir','Sin señal. Intenta de nuevo.'); return; }
+  gate('espera');
+}
+
+function salir(){ if(!confirm('¿Salir de tu cuenta?'))return;
+  localStorage.removeItem('cp_yo'); location.reload(); }
+
+/* ==================== ESCOGER BASE ==================== */
+async function entrarApp(){
+  $('gate').style.display='none';
+  $('bases').style.display='block';
+  $('bases').innerHTML='<div class="vacio">Buscando tus bases…</div>';
+
+  const [bases,asign]=await Promise.all([
+    GET('mkr_bases?select=*&activa=eq.true&order=nombre&limit=200'),
+    GET('mkr_asignaciones?select=base_id,agente_id&agente_id=eq.'+YO.id+'&limit=500')
+  ]);
+  if(!Array.isArray(bases)){ $('bases').innerHTML='<div class="vacio">'+esc(porQueFallo())+'</div>'; return; }
+
+  const mias=new Set((asign||[]).map(a=>a.base_id));
+  const miNivel=NIVELES.indexOf(YO.nivel||'principiante');
+  const miCed=YO.ced||'todos';
+  misBases=bases.filter(b=>{
+    /* el CED manda: si a la persona le asignaron un centro, solo ve las bases
+       de ese centro. Las bases abiertas a 'todos' las ve cualquiera. */
+    const bCed=b.ced||'todos';
+    if(miCed!=='todos' && bCed!=='todos' && bCed!==miCed) return false;
+    // después: si te la asignaron, es tuya. Si nadie asignó nada, se abre por nivel.
+    if(mias.size) return mias.has(b.id);
+    const req=(!b.nivel||b.nivel==='todos')?-1:NIVELES.indexOf(b.nivel);
+    return miNivel>=req;
+  });
+
+  if(!misBases.length){
+    $('bases').innerHTML=`<h4>Hola, ${esc(YO.nombre)}</h4>
+      <div class="s">Todavía no tienes ninguna base asignada.</div>
+      <div class="vacio">El supervisor te tiene que asignar una desde la<br>hoja de configuración de bases.</div>`;
+    return;
+  }
+  if(misBases.length===1){ abrirBase(misBases[0]); return; }
+
+  $('bases').innerHTML=`<h4>Hola, ${esc(YO.nombre)}</h4>
+    <div class="s">Escoge con cuál base vas a trabajar hoy.</div>
+    ${misBases.map((b,i)=>`<div class="bcard" onclick="abrirBase(misBases[${i}])">
+      <div class="n">${esc(b.nombre)}</div>
+      <div class="d">Los interesados van a ${esc(b.cliente||'—')}</div>
+      <div class="q"><span>${esc((b.tarifas&&b.tarifas.Interesado)?('Interesado paga '+cop(b.tarifas.Interesado)):'')}</span>
+        <b>Entrar ›</b></div>
+    </div>`).join('')}`;
+}
+function volverBases(){ if(misBases.length>1){ $('bases').style.display='block'; window.scrollTo(0,0); } }
+
+async function abrirBase(b){
+  BASE=b;
+  $('bases').innerHTML='<div class="vacio">Cargando prospectos…</div>';
+
+  // el filtro de la base, traducido a la consulta
+  let q='mkr_leads?select=id,nombre,contacto,cel,ciudad,departamento,barrio,sector&aplica=is.true';
+  SEG.forEach(k=>{ const v=b[k]; if(v&&v!=='todos') q+='&'+k+'=eq.'+encodeURIComponent(v); });
+  q+='&limit=20000';
+
+  const [ls,ya]=await Promise.all([
+    GET(q),
+    GETALL('mkr_llamadas?select=lead_id&base_id=eq.'+b.id+'&limit=20000')
+  ]);
+  if(!Array.isArray(ls)){ $('bases').innerHTML='<div class="vacio">No se pudieron cargar los prospectos.</div>'; return; }
+
+  // los ya marcados NO vuelven a salir, aunque se recargue la página
+  const hechos=new Set((ya||[]).map(x=>x.lead_id).filter(Boolean));
+  leads=ls.filter(l=>l.cel && !hechos.has(l.id));
+  idx=0;
+
+  $('bases').style.display='none';
+  ['hd','main','rank','tarifas','ft'].forEach(id=>$(id).style.display='');
+  $('yo').textContent=YO.nombre;
+  $('baseTag').textContent='📁 '+b.nombre+(misBases.length>1?' · cambiar':'');
+  pintarTarifas();
+  render();
+  sincronizar(); setInterval(sincronizar,4000);
+}
+
+function pintarTarifas(){
+  const t=BASE.tarifas||{};
+  $('tarBody').innerHTML=(BASE.botones||[]).map(k=>
+    `<div class="t"><span>${ICONO[k]||''} ${esc(k)}</span><b>${cop(t[k])}</b></div>`).join('');
+}
+
+/* ==================== MARCAR ==================== */
+function render(){
+  if(!leads.length){
+    $('main').innerHTML=`<div class="card"><div class="emp">No quedan prospectos</div>
+      <div class="sub" style="margin-top:8px">Ya trabajaste toda esta base.</div>
+      ${misBases.length>1?'<div class="nav"><button onclick="volverBases()">Escoger otra base</button></div>':''}</div>`;
+    return;
+  }
+  if(idx>=leads.length) idx=0;
+  if(idx<0) idx=leads.length-1;
+  const l=leads[idx], cel=soloNum(l.cel);
+  const t=BASE.tarifas||{};
+  const botones=(BASE.botones||[]).map(k=>
+    `<button class="b-${k.replace(/\s/g,'')}" onclick="marcar('${esc(k).replace(/'/g,'')}')">
+      ${ICONO[k]||''} ${esc(k)}<small>${cop(t[k])}</small></button>`).join('');
+
+  $('main').innerHTML=`<div class="card">
+    <div class="tags">
+      ${l.ciudad&&l.ciudad!=='todos'?`<span class="tg ciu">${esc(l.ciudad)}</span>`:''}
+      ${l.sector&&l.sector!=='todos'?`<span class="tg">${esc(l.sector)}</span>`:''}
+    </div>
+    <div class="empw"><img class="rat" src="raton-chico.png" alt=""><div class="emp">${esc(l.nombre||'Sin nombre')}</div></div>
+    ${l.departamento&&l.departamento!=='todos'?`<div class="sub">${esc(l.departamento)}</div>`:''}
+    ${l.contacto?`<div class="cont">${esc(l.contacto)}</div>`:''}
+    <div class="num mono">${esc(cel.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3'))}</div>
+    <a class="call" href="tel:+57${esc(cel)}">📞 LLAMAR</a>
+    <div class="res">${botones}</div>
+    <div id="panel"></div>
+    <div class="nav"><button onclick="mover(1)">Saltar sin marcar ⏭</button></div>
+    <div class="prog">${num(idx+1)} de ${num(leads.length)} por llamar</div>
+  </div>`;
+}
+function mover(d){ idx+=d; render(); window.scrollTo(0,0); }
+
+async function marcar(resultado){
+  const l=leads[idx]; if(!l||!BASE) return;
+  const tarifa=+(BASE.tarifas||{})[resultado]||0;
+  const esInteresado = resultado==='Interesado';
+
+  // El interesado NO paga hasta que tenga contacto. Lo demás paga de una.
+  const body={sala:BASE.cliente||'general', agente:YO.nombre, base_id:BASE.id, lead_id:l.id,
+    lead_fila:String(l.id), lead_nombre:l.nombre||null, lead_ciudad:l.ciudad||null,
+    resultado, valor: esInteresado?0:tarifa, datos:false,
+    validado: !esInteresado, estado_venta:'nuevo'};
+
+  // GUARDA PRIMERO. Si falla, no se toca el contador ni se pasa de prospecto.
+  let fila=null;
+  try{
+    const r=await fetch(SB+'/rest/v1/mkr_llamadas',{method:'POST',
+      headers:{...H,Prefer:'return=representation'},body:JSON.stringify(body)});
+    if(r.ok) fila=(await r.json())[0];
+  }catch(e){ fila=null; }
+
+  if(!fila){
+    toast('⚠️ No se guardó. Revisa la señal y vuelve a marcar.',true);
+    return;                                  // el prospecto se queda ahí
+  }
+
+  if(esInteresado){ abrirPanel(fila,l,tarifa); return; }
+  miPlata+=tarifa; pintarPlata(true);
+  leads.splice(idx,1); render(); window.scrollTo(0,0);
+}
+
+/* ---------- panel del interesado: aquí SÍ se guarda el contacto ---------- */
+function abrirPanel(fila,l,tarifa){
+  pendientes++; pintarPlata(false);
+  const c=$('panel'); if(!c) return;
+  c.innerHTML=`<div class="pan">
+    <h5>📋 Datos del interesado</h5>
+    <div class="ps">Sin contacto no se puede vender, y por eso <b>este resultado todavía no paga</b>.
+      Guarda los datos y se te abonan ${cop(tarifa)}.</div>
+    <input id="pC" placeholder="Nombre de quien contestó" value="${esc(l.contacto||'')}">
+    <input id="pW" inputmode="tel" placeholder="WhatsApp de compras">
+    <input id="pM" inputmode="email" placeholder="Correo">
+    <div class="pb">
+      <button class="g" onclick="guardarPanel(${fila.id},${tarifa})">Guardar y cobrar</button>
+      <button class="s" onclick="cerrarPanel()">No los dio</button>
+    </div></div>`;
+  setTimeout(()=>{ const w=$('pW'); if(w)w.focus(); },60);
+}
+
+async function guardarPanel(id,tarifa){
+  const c=($('pC')||{}).value||'', w=($('pW')||{}).value||'', m=($('pM')||{}).value||'';
+  if(!w.trim() && !m.trim()){ toast('Falta el WhatsApp o el correo',true); return; }
+  try{
+    const r=await fetch(SB+'/rest/v1/mkr_llamadas?id=eq.'+id,{method:'PATCH',
+      headers:{...H,Prefer:'return=minimal'},
+      body:JSON.stringify({contacto:c.trim()||null, whatsapp:soloNum(w)||null, correo:m.trim()||null,
+        datos:true, validado:true, valor:tarifa, actualizado:new Date().toISOString()})});
+    if(!r.ok){ toast('No se pudo guardar. Intenta otra vez.',true); return; }
+  }catch(e){ toast('Sin señal. Intenta otra vez.',true); return; }
+  pendientes=Math.max(0,pendientes-1);
+  miPlata+=tarifa; pintarPlata(true);
+  toast('✅ Contacto guardado · +'+cop(tarifa));
+  cerrarPanel();
+}
+function cerrarPanel(){
+  const c=$('panel'); if(c) c.innerHTML='';
+  leads.splice(idx,1); render(); window.scrollTo(0,0);
+}
+
+function pintarPlata(bump){
+  const e=$('plata'); e.textContent=cop(miPlata);
+  if(bump){ e.classList.add('bump'); setTimeout(()=>e.classList.remove('bump'),190); }
+  $('pend').textContent = pendientes ? ('⏳ '+pendientes+' interesado(s) sin datos — no pagan todavía') : '';
+}
+
+/* ==================== TABLERO REAL ==================== */
+async function sincronizar(){
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const filas=await GETALL('mkr_llamadas?select=agente,valor,validado,creado_en'+
+    '&creado_en=gte.'+hoy.toISOString()+'&order=creado_en.desc&limit=5000');
+  if(!Array.isArray(filas)){ $('live').classList.add('off'); $('liveTx').textContent='sin señal'; return; }
+  $('live').classList.remove('off'); $('liveTx').textContent='en vivo';
+
+  const real={};
+  filas.forEach(f=>{
+    const a=real[f.agente]=real[f.agente]||{agente:f.agente,llamadas:0,plata:0};
+    a.llamadas++; if(f.validado) a.plata+=(+f.valor||0);
+  });
+  if(real[YO.nombre]) miPlata=real[YO.nombre].plata;
+  pintarPlata(false);
+
+  const todos=Object.values(real).sort((a,b)=>b.plata-a.plata);
+  $('rkBody').innerHTML=todos.map((a,i)=>`<div class="rw ${a.agente===YO.nombre?'yo':''}">
+      <div class="pos">${i+1}</div>
+      <div class="nm">${esc(a.agente)}<small>${a.agente===YO.nombre?'tú':'en línea hoy'}</small></div>
+      <div class="ll">${num(a.llamadas)} ll.</div>
+      <div class="pl mono">${cop(a.plata)}</div>
+    </div>`).join('')||'<div class="vacio" style="padding:22px">Nadie ha marcado hoy.</div>';
+  $('rkInfo').textContent=todos.length+(todos.length===1?' persona hoy':' personas hoy');
+  $('rkTot').innerHTML='Solo cuenta lo validado · total del día <b style="color:var(--dim)">'+
+    cop(todos.reduce((s,a)=>s+a.plata,0))+'</b>';
+}
+
+/* ==================== ARRANQUE ==================== */
+(async()=>{
+  const g=localStorage.getItem('cp_yo');
+  if(g){
+    try{
+      const {id}=JSON.parse(g);
+      const ags=await GET('mkr_agentes?select=id,slug,nombre,celular,estado,rol,nivel,ced&id=eq.'+encodeURIComponent(id)+'&limit=1');
+      if(Array.isArray(ags)&&ags[0]&&ags[0].estado==='activo'){ YO=ags[0]; await entrarApp(); return; }
+    }catch(e){}
+    localStorage.removeItem('cp_yo');
+  }
+  pintarGate();
+})();
+</script>
+</body>
+</html>

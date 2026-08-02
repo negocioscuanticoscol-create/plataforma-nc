@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1B3A6B">
+<link rel="icon" href="raton-chico.png">
+<title>Administración · CED Red de Distribución</title>
+<style>
+:root{
+  --azul:#1B3A6B; --azul2:#142C52;
+  --naranja:#E8621A; --naranja2:#FF7A33;
+  --bg:#0B1830; --card:#14294A; --card2:#1B3559; --line:#2A4676;
+  --tx:#EAF1FB; --dim:#93AAC9; --faint:#6A83A6;
+  --ok:#25C08A; --warn:#F0A73C; --bad:#F0604D;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);
+  max-width:640px;margin:0 auto;min-height:100vh;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+/* candado */
+#lock{position:fixed;inset:0;background:radial-gradient(120% 85% at 50% 0%,#FFFFFF,#EDF2F9 62%,#DFE8F4);
+  z-index:100;display:flex;align-items:center;justify-content:center;padding:26px}
+#lockBody{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;max-width:330px}
+#lock .t{font-size:26px;font-weight:800;color:var(--azul);letter-spacing:-.03em}
+#lock .s{font-size:12.5px;color:#6F84A0;margin-bottom:16px;text-align:center}
+#lock label{display:block;width:100%;font-size:11px;letter-spacing:.09em;text-transform:uppercase;
+  color:#5B7A9C;margin-bottom:6px;font-weight:700}
+#lock input{width:100%;background:#fff;border:1.5px solid #C6D4E6;color:var(--azul);
+  border-radius:13px;padding:15px;font-size:16px;text-align:center;font-weight:700}
+#lock input:focus{outline:none;border-color:var(--naranja)}
+#lock button{width:100%;background:var(--naranja);color:#fff;border:none;border-radius:13px;
+  padding:16px;font-size:16px;font-weight:800;margin-top:13px;cursor:pointer;font-family:inherit}
+#lock .err{color:#C0362C;font-size:12.5px;margin-top:10px;text-align:center;font-weight:600}
+
+header{background:linear-gradient(160deg,var(--azul),var(--azul2));padding:12px 15px 14px;
+  position:sticky;top:0;z-index:20;border-bottom:2px solid var(--naranja);
+  padding-top:calc(12px + env(safe-area-inset-top))}
+.hrow{display:flex;align-items:center;gap:10px}
+.back{background:rgba(255,255,255,.12);color:#fff;text-decoration:none;font-size:12.5px;font-weight:700;
+  padding:6px 12px;border-radius:20px;white-space:nowrap}
+.tit{font-size:15.5px;font-weight:800;letter-spacing:-.02em}
+.tit small{display:block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.quien{margin-left:auto;font-size:11.5px;color:#9DB7DA;background:rgba(255,255,255,.1);
+  padding:4px 10px;border-radius:20px;cursor:pointer}
+
+nav{display:flex;gap:1px;background:var(--card);border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:19}
+nav button{flex:1;background:none;border:none;padding:13px 10px;font-size:13px;font-weight:700;
+  color:var(--faint);cursor:pointer;border-bottom:2.5px solid transparent;font-family:inherit}
+nav button.on{color:var(--tx);border-bottom-color:var(--naranja)}
+
+main{padding:15px}
+h2{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);
+  font-weight:700;margin:16px 0 9px}
+h2:first-child{margin-top:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:15px;margin-bottom:11px}
+.fila{cursor:pointer}
+.fila:active{filter:brightness(1.12)}
+.frow{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.fn{font-size:15.5px;font-weight:800;letter-spacing:-.01em}
+.fd{font-size:12px;color:var(--dim);margin-top:3px;line-height:1.5}
+.fd b{color:var(--tx);font-weight:600}
+.tag{font-size:10.5px;padding:3px 9px;border-radius:12px;background:var(--card2);
+  border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.tag.ok{background:rgba(37,192,138,.16);border-color:rgba(37,192,138,.45);color:#7FE3BE}
+.tag.no{background:rgba(240,96,77,.16);border-color:rgba(240,96,77,.42);color:#FF9A8B}
+.tag.rev{background:rgba(240,167,60,.16);border-color:rgba(240,167,60,.42);color:#FFD08A}
+.pills{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
+
+label{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+  font-weight:700;margin:12px 0 5px}
+input,select{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--tx);
+  border-radius:10px;padding:11px;font-size:14.5px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:var(--naranja)}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.seg{display:flex;gap:6px;margin-top:5px}
+.seg button{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--dim);
+  border-radius:9px;padding:10px 4px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit}
+.seg button.on{background:var(--naranja);border-color:var(--naranja);color:#fff}
+
+.cob{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;max-height:230px;overflow-y:auto;
+  background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.cob button{background:var(--bg);border:1px solid var(--line);color:var(--dim);border-radius:20px;
+  padding:5px 11px;font-size:11.5px;cursor:pointer;font-family:inherit}
+.cob button.on{background:var(--naranja);border-color:var(--naranja);color:#fff;font-weight:700}
+.cob .nada{color:var(--faint);font-size:12px;padding:6px}
+
+.btn{width:100%;border:none;border-radius:12px;padding:15px;font-size:15px;font-weight:800;
+  cursor:pointer;font-family:inherit;background:var(--naranja);color:#fff;margin-top:14px}
+.btn:active{filter:brightness(.88)}
+.btn.gh{background:transparent;border:1px solid var(--line);color:var(--dim);font-weight:700;
+  font-size:13.5px;padding:12px}
+.btn.r{background:transparent;border:1px solid rgba(240,96,77,.4);color:#FF9A8B;font-size:13.5px;padding:12px}
+
+.vacio{text-align:center;color:var(--faint);font-size:13.5px;padding:38px 20px;line-height:1.65}
+.aviso{background:rgba(240,96,77,.12);border:1px solid rgba(240,96,77,.4);border-radius:12px;
+  padding:13px 15px;font-size:13px;color:#FF9A8B;line-height:1.55;margin-bottom:12px}
+.aviso b{color:#fff}
+.nota{font-size:11.5px;color:var(--faint);line-height:1.5;margin-top:7px}
+#toast{position:fixed;left:50%;transform:translateX(-50%) translateY(-140%);top:14px;
+  background:var(--card2);border:1px solid var(--naranja);color:var(--tx);padding:11px 17px;
+  border-radius:12px;font-size:13px;z-index:120;transition:transform .3s ease;max-width:88vw;text-align:center}
+#toast.on{transform:translateX(-50%) translateY(0)}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+
+<div id="lock"><div id="lockBody"></div></div>
+
+<header id="hd" style="display:none">
+  <div class="hrow">
+    <a class="back" href="lupe.html">‹ Salir</a>
+    <div class="tit">Administración<small>CED Red de Distribución</small></div>
+    <span class="quien" id="quien" onclick="salir()">—</span>
+  </div>
+</header>
+<nav id="nav" style="display:none"></nav>
+<main id="main" style="display:none"></main>
+<div id="toast"></div>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co';
+const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+
+const $=s=>document.getElementById(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=n=>(+n||0).toLocaleString('es-CO');
+const soloNum=s=>String(s||'').replace(/\D/g,'');
+const SINTILDE=new RegExp('[\\u0300-\\u036f]','g');
+const norm=s=>String(s||'').trim().toLowerCase().normalize('NFD').replace(SINTILDE,'').replace(/\s+/g,' ');
+
+
+/* El servidor NUNCA devuelve mas de 1000 filas aunque se le pida mas, y lo hace
+   en silencio. GETALL pide de a 1000 hasta agotar. */
+async function GETALL(p){
+  const base=String(p).replace(/[?&](limit|offset)=\d+/g,'');
+  const sep=base.includes('?')?'&':'?';
+  const out=[];
+  for(let i=0,off=0;i<60;i++,off+=1000){
+    let r; try{ r=await fetch(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H}); }catch(e){ break; }
+    if(!r.ok) break;
+    let b; try{ b=await r.json(); }catch(e){ break; }
+    if(!Array.isArray(b)||!b.length) break;
+    out.push(...b); if(b.length<1000) break;
+  }
+  return out;
+}
+async function GET(p){ try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H}); GET.estado=r.status;
+  return r.ok?await r.json():null; }catch(e){ GET.estado=0; return null; } }
+async function POST(t,b){ try{ const r=await fetch(SB+'/rest/v1/'+t,{method:'POST',
+  headers:{...H,Prefer:'return=representation'},body:JSON.stringify(b)});
+  return r.ok?(await r.json())[0]:null; }catch(e){ return null; } }
+async function PATCH(t,b){ try{ const r=await fetch(SB+'/rest/v1/'+t,{method:'PATCH',
+  headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); return r.ok; }catch(e){ return false; } }
+async function DEL(t){ try{ const r=await fetch(SB+'/rest/v1/'+t,{method:'DELETE',headers:H}); return r.ok; }catch(e){ return false; } }
+let tt; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on');
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),2300); }
+
+const ROLES=['telemercaderista','capacitador','supervisor','admin'];
+const NIVELES=['principiante','intermedio','avanzado','asesor'];
+const ESTADOS=['activo','restringido','anulado'];
+const CUBRE=[['barrio','Por barrios'],['ciudad','Por ciudad'],['departamento','Por departamento']];
+
+const A={
+  yo:null, vista:'ceds', ceds:[], agentes:[], clientes:[], geo:{departamento:[],ciudad:[],barrio:[]},
+  ed:null, edTipo:null,
+
+  /* ---------- candado: solo admin ---------- */
+  lock(err){
+    $('lockBody').innerHTML=`
+      <div class="t">Administración</div>
+      <div class="s">Solo para administradores</div>
+      <label for="lU">Usuario · celular</label>
+      <input id="lU" inputmode="numeric" placeholder="3001234567">
+      <label for="lP" style="margin-top:11px">Clave</label>
+      <input id="lP" type="password" placeholder="Tu clave">
+      <button onclick="A.entrar()">Entrar</button>
+      ${err?`<div class="err">${esc(err)}</div>`:''}`;
+    setTimeout(()=>{const e=$('lU');if(e)e.focus();},60);
+    ['lU','lP'].forEach(id=>{const e=$(id);if(e)e.addEventListener('keydown',ev=>{if(ev.key==='Enter')A.entrar();});});
+  },
+  async entrar(){
+    const u=soloNum(($('lU')||{}).value||''), p=(($('lP')||{}).value||'').trim();
+    if(u.length<7||!p){ this.lock('Escribe tu celular y tu clave'); return; }
+    const ags=await GET('mkr_agentes?select=*&limit=500');
+    if(!Array.isArray(ags)){
+      this.lock(GET.estado===404||GET.estado===400
+        ?'La base de datos todavía no está creada. Corre el SQL primero.'
+        :'No se pudo conectar. Intenta de nuevo.'); return; }
+    const a=ags.find(x=>soloNum(x.celular)===u);
+    if(!a){ this.lock('Ese celular no está registrado.'); return; }
+    const ok=a.password?(p===String(a.password)):(p===u);
+    if(!ok){ this.lock('La clave no es correcta.'); return; }
+    if(a.rol!=='admin'&&a.rol!=='supervisor'){ this.lock('Tu usuario no es administrador.'); return; }
+    if(a.estado!=='activo'){ this.lock('Tu cuenta no está activa.'); return; }
+    this.yo=a; localStorage.setItem('cp_admin',String(a.id));
+    $('lock').style.display='none';
+    ['hd','nav','main'].forEach(i=>$(i).style.display='');
+    $('quien').textContent=a.nombre+' · '+a.rol;
+    await this.cargar();
+  },
+  salir(){ localStorage.removeItem('cp_admin'); location.reload(); },
+
+  async cargar(){
+    const [ceds,ags,cli,leads]=await Promise.all([
+      GET('mkr_ceds?select=*&order=nombre&limit=300'),
+      GET('mkr_agentes?select=*&order=nombre&limit=500'),
+      GETALL('nc_clientes?select=slug,nombre&order=nombre&limit=100'),
+      GETALL('mkr_leads?select=departamento,ciudad,barrio&limit=20000')
+    ]);
+    this.ceds=Array.isArray(ceds)?ceds:[];
+    this.agentes=Array.isArray(ags)?ags:[];
+    this.clientes=Array.isArray(cli)?cli:[];
+    // los territorios reales que hay en la base, para no escribirlos a mano
+    const g={departamento:{},ciudad:{},barrio:{}};
+    (Array.isArray(leads)?leads:[]).forEach(l=>{
+      ['departamento','ciudad','barrio'].forEach(k=>{
+        const v=l[k]; if(v&&v!=='todos') g[k][v]=(g[k][v]||0)+1; }); });
+    Object.keys(g).forEach(k=>{ this.geo[k]=Object.entries(g[k]).sort((a,b)=>b[1]-a[1]); });
+    this.pintar();
+  },
+
+  pintar(){
+    $('nav').innerHTML=[['ceds','🏭 Centros'],['usuarios','👥 Usuarios']]
+      .map(([v,t])=>`<button class="${v===this.vista?'on':''}" onclick="A.ir('${v}')">${t}</button>`).join('');
+    if(this.ed) return this.edTipo==='ced'?this.formCed():this.formUsuario();
+    return this.vista==='ceds'?this.listaCeds():this.listaUsuarios();
+  },
+  ir(v){ this.vista=v; this.ed=null; this.pintar(); window.scrollTo(0,0); },
+
+  /* ---------- CENTROS ---------- */
+  listaCeds(){
+    $('main').innerHTML=`<h2>Centros de distribución</h2>
+      ${this.ceds.map(c=>{
+        const n=this.agentes.filter(a=>a.ced===c.nombre).length;
+        const cob=Array.isArray(c.cobertura)?c.cobertura:[];
+        return `<div class="card fila" onclick="A.abrirCed(${c.id})">
+          <div class="frow">
+            <div style="min-width:0">
+              <div class="fn">${esc(c.nombre)}</div>
+              <div class="fd">${esc(c.cliente||'todos')}${c.ciudad?' · '+esc(c.ciudad):''}
+                ${c.direccion?'<br>📍 '+esc(c.direccion):''}
+                ${c.responsable?'<br>👤 '+esc(c.responsable)+(c.telefono?' · '+esc(c.telefono):''):''}
+                <br>${n} ${n===1?'persona':'personas'}</div>
+            </div>
+            <span class="tag ${c.activo?'ok':'no'}">${c.activo?'activo':'apagado'}</span>
+          </div>
+          <div class="pills"><span class="tag">${esc((CUBRE.find(x=>x[0]===c.cubre_por)||['','por ciudad'])[1])}</span>
+            ${cob.slice(0,4).map(x=>`<span class="tag">${esc(x)}</span>`).join('')}
+            ${cob.length>4?`<span class="tag">+${cob.length-4}</span>`:''}</div>
+        </div>`;}).join('')||'<div class="vacio">Todavía no hay centros.<br>Crea el primero para poder asignar gente.</div>'}
+      <button class="btn" onclick="A.nuevoCed()">＋ Nuevo centro</button>`;
+  },
+  nuevoCed(){ this.ed={nombre:'',cliente:'todos',direccion:'',ciudad:'',cubre_por:'ciudad',
+    cobertura:[],responsable:'',telefono:'',activo:true}; this.edTipo='ced'; this.pintar(); window.scrollTo(0,0); },
+  abrirCed(id){ const c=this.ceds.find(x=>x.id===id); if(!c)return;
+    this.ed={...c,cobertura:Array.isArray(c.cobertura)?[...c.cobertura]:[]};
+    this.edTipo='ced'; this.pintar(); window.scrollTo(0,0); },
+
+  setCed(k,v){ this.ed[k]=v; this.pintar(); },
+  togCob(v){ const s=new Set(this.ed.cobertura||[]); s.has(v)?s.delete(v):s.add(v);
+    this.ed.cobertura=[...s]; this.pintar(); },
+
+  formCed(){
+    const f=this.ed, nuevo=!f.id;
+    const opciones=this.geo[f.cubre_por]||[];
+    $('main').innerHTML=`
+      <h2>${nuevo?'Nuevo centro':'Editar centro'}</h2>
+      <div class="card">
+        <label>Nombre del centro</label>
+        <input placeholder="Ej: CED Medellín Sur" value="${esc(f.nombre)}" oninput="A.ed.nombre=this.value">
+        <label>Cliente al que pertenece</label>
+        <select onchange="A.ed.cliente=this.value">
+          <option value="todos"${f.cliente==='todos'?' selected':''}>Todos los clientes</option>
+          ${this.clientes.map(c=>`<option value="${esc(c.slug)}"${f.cliente===c.slug?' selected':''}>${esc(c.nombre)}</option>`).join('')}
+        </select>
+        <div class="g2">
+          <div><label>Ciudad</label><input placeholder="Medellín" value="${esc(f.ciudad||'')}" oninput="A.ed.ciudad=this.value"></div>
+          <div><label>Dirección</label><input placeholder="Cll 30 #45-12" value="${esc(f.direccion||'')}" oninput="A.ed.direccion=this.value"></div>
+        </div>
+      </div>
+
+      <h2>Territorio que cubre</h2>
+      <div class="card">
+        <label>Se segmenta por</label>
+        <div class="seg">${CUBRE.map(([k,t])=>
+          `<button class="${f.cubre_por===k?'on':''}" onclick="A.setCed('cubre_por','${k}')">${t}</button>`).join('')}</div>
+        <label style="margin-top:12px">Marca lo que cubre · ${f.cobertura.length} escogido(s)</label>
+        <div class="cob">
+          ${opciones.length?opciones.map(([v,n])=>
+            `<button class="${f.cobertura.includes(v)?'on':''}" onclick="A.togCob('${esc(v).replace(/'/g,'')}')">${esc(v)} <span style="opacity:.6">${num(n)}</span></button>`).join('')
+           :'<div class="nada">No hay datos de '+f.cubre_por+' en los prospectos todavía.</div>'}
+        </div>
+        <div class="nota">Los territorios salen de los prospectos que ya están cargados. El número es cuántas empresas hay en cada uno.</div>
+      </div>
+
+      <h2>Quién responde</h2>
+      <div class="card">
+        <div class="g2">
+          <div><label>Responsable</label><input placeholder="Nombre" value="${esc(f.responsable||'')}" oninput="A.ed.responsable=this.value"></div>
+          <div><label>Teléfono</label><input inputmode="numeric" placeholder="3001234567" value="${esc(f.telefono||'')}" oninput="A.ed.telefono=this.value"></div>
+        </div>
+        <label>Estado</label>
+        <div class="seg">
+          <button class="${f.activo?'on':''}" onclick="A.setCed('activo',true)">Activo</button>
+          <button class="${f.activo?'':'on'}" onclick="A.setCed('activo',false)">Apagado</button>
+        </div>
+      </div>
+
+      <button class="btn" onclick="A.guardarCed()">${nuevo?'Crear centro':'Guardar cambios'}</button>
+      <button class="btn gh" onclick="A.ed=null;A.pintar()">Cancelar</button>
+      ${nuevo?'':'<button class="btn r" onclick="A.borrarCed()">Eliminar centro</button>'}
+      <div style="height:18px"></div>`;
+  },
+
+  async guardarCed(){
+    const f=this.ed;
+    if(!String(f.nombre||'').trim()){ toast('Ponle nombre al centro'); return; }
+    const b={nombre:f.nombre.trim(),cliente:f.cliente||'todos',direccion:f.direccion||null,
+      ciudad:f.ciudad||null,cubre_por:f.cubre_por,cobertura:f.cobertura||[],
+      responsable:f.responsable||null,telefono:f.telefono||null,activo:f.activo!==false};
+    const ok=f.id ? await PATCH('mkr_ceds?id=eq.'+f.id,b) : !!(await POST('mkr_ceds',b));
+    if(!ok){ toast('No se pudo guardar'); return; }
+    toast('Centro guardado'); this.ed=null; await this.cargar();
+  },
+  async borrarCed(){
+    const n=this.agentes.filter(a=>a.ced===this.ed.nombre).length;
+    if(n){ alert('No se puede: hay '+n+' persona(s) asignada(s) a este centro.\nCámbialas primero.'); return; }
+    if(!confirm('¿Eliminar el centro "'+this.ed.nombre+'"?'))return;
+    if(!await DEL('mkr_ceds?id=eq.'+this.ed.id)){ toast('No se pudo eliminar'); return; }
+    toast('Centro eliminado'); this.ed=null; await this.cargar();
+  },
+
+  /* ---------- USUARIOS ---------- */
+  listaUsuarios(){
+    const g={}; this.agentes.forEach(a=>{ (g[a.rol||'telemercaderista']=g[a.rol||'telemercaderista']||[]).push(a); });
+    /* una tarjeta por persona — sin plantillas anidadas, que son las que rompen */
+    const tarjeta=a=>`<div class="card fila" onclick="A.abrirUsuario(${a.id})">
+        <div class="frow">
+          <div style="min-width:0">
+            <div class="fn">${esc(a.nombre)}</div>
+            <div class="fd">📱 ${esc(a.celular||'sin celular')} · ${esc(a.nivel||'')}
+              <br>🏭 ${esc(a.ced||'todos')}</div>
+          </div>
+          <span class="tag ${a.estado==='activo'?'ok':(a.estado==='restringido'?'rev':'no')}">${esc(a.estado)}</span>
+        </div>
+      </div>`;
+    const bloque=r=>`<h2>${r}${g[r].length>1?'s':''} · ${g[r].length}</h2>`+g[r].map(tarjeta).join('');
+    $('main').innerHTML=
+      ROLES.filter(r=>g[r]&&g[r].length).map(bloque).join('')
+      +`<button class="btn" onclick="A.nuevoUsuario()">＋ Nuevo usuario</button>`
+      +(this.agentes.length?'':'<div class="vacio">Todavía no hay usuarios.</div>');
+  },
+  nuevoUsuario(){ this.ed={nombre:'',celular:'',password:'',rol:'telemercaderista',
+    nivel:'principiante',ced:'todos',estado:'activo'}; this.edTipo='usuario'; this.pintar(); window.scrollTo(0,0); },
+  abrirUsuario(id){ const a=this.agentes.find(x=>x.id===id); if(!a)return;
+    this.ed={...a}; this.edTipo='usuario'; this.pintar(); window.scrollTo(0,0); },
+  setU(k,v){ this.ed[k]=v; this.pintar(); },
+
+  formUsuario(){
+    const f=this.ed, nuevo=!f.id;
+    /* el nivel solo aplica a telemercaderistas — se arma aparte para no anidar plantillas */
+    const nivelHTML = f.rol==='telemercaderista'
+      ? '<label>Nivel</label><div class="seg">'+NIVELES.map(n=>
+          '<button class="'+(f.nivel===n?'on':'')+'" onclick="A.setU(\'nivel\',\''+n+'\')" style="font-size:11px">'+
+          n.slice(0,5)+'</button>').join('')+'</div>'
+      : '';
+    $('main').innerHTML=`
+      <h2>${nuevo?'Nuevo usuario':'Editar usuario'}</h2>
+      <div class="card">
+        <label>Nombre completo</label>
+        <input placeholder="Nombre y apellido" value="${esc(f.nombre||'')}" oninput="A.ed.nombre=this.value">
+        <div class="g2">
+          <div><label>Usuario · celular</label>
+            <input inputmode="numeric" placeholder="3001234567" value="${esc(f.celular||'')}" oninput="A.ed.celular=this.value"></div>
+          <div><label>Clave</label>
+            <input placeholder="${nuevo?'igual al celular':'dejar igual'}" value="${esc(f.password||'')}" oninput="A.ed.password=this.value"></div>
+        </div>
+        <div class="nota">Si dejas la clave vacía, queda igual al celular y la persona la cambia después.</div>
+      </div>
+
+      <h2>Cargo y permisos</h2>
+      <div class="card">
+        <label>Cargo</label>
+        <select onchange="A.setU('rol',this.value)">
+          ${ROLES.map(r=>`<option value="${r}"${f.rol===r?' selected':''}>${r}</option>`).join('')}
+        </select>
+        ${nivelHTML}
+        <label>Centro (CED)</label>
+        <select onchange="A.ed.ced=this.value">
+          <option value="todos"${f.ced==='todos'?' selected':''}>Todos los centros</option>
+          ${this.ceds.map(c=>`<option value="${esc(c.nombre)}"${f.ced===c.nombre?' selected':''}>${esc(c.nombre)}</option>`).join('')}
+        </select>
+        <label>Estado</label>
+        <div class="seg">${ESTADOS.map(e=>
+          `<button class="${f.estado===e?'on':''}" onclick="A.setU('estado','${e}')">${e}</button>`).join('')}</div>
+      </div>
+
+      <button class="btn" onclick="A.guardarUsuario()">${nuevo?'Crear usuario':'Guardar cambios'}</button>
+      <button class="btn gh" onclick="A.ed=null;A.pintar()">Cancelar</button>
+      <div style="height:18px"></div>`;
+  },
+
+  async guardarUsuario(){
+    const f=this.ed;
+    if(norm(f.nombre).length<3){ toast('Escribe el nombre completo'); return; }
+    const cel=soloNum(f.celular);
+    if(cel.length<7){ toast('Falta el celular'); return; }
+    const repe=this.agentes.find(a=>soloNum(a.celular)===cel && a.id!==f.id);
+    if(repe){ toast('Ese celular ya es de '+repe.nombre); return; }
+    const b={slug:norm(f.nombre), nombre:f.nombre.trim(), celular:cel,
+      password:(f.password||'').trim()||cel, rol:f.rol, nivel:f.nivel||'principiante',
+      ced:f.ced||'todos', estado:f.estado||'activo'};
+    const ok=f.id ? await PATCH('mkr_agentes?id=eq.'+f.id,b) : !!(await POST('mkr_agentes',b));
+    if(!ok){ toast('No se pudo guardar · ¿nombre repetido?'); return; }
+    toast('Usuario guardado'); this.ed=null; await this.cargar();
+  }
+};
+function salir(){ A.salir(); }
+
+/* si ya entró antes, no vuelve a pedir clave */
+(async()=>{
+  const id=localStorage.getItem('cp_admin');
+  if(id){
+    const ags=await GET('mkr_agentes?select=*&id=eq.'+encodeURIComponent(id)+'&limit=1');
+    const a=Array.isArray(ags)&&ags[0];
+    if(a&&(a.rol==='admin'||a.rol==='supervisor')&&a.estado==='activo'){
+      A.yo=a; $('lock').style.display='none';
+      ['hd','nav','main'].forEach(i=>$(i).style.display='');
+      $('quien').textContent=a.nombre+' · '+a.rol;
+      await A.cargar(); return;
+    }
+    localStorage.removeItem('cp_admin');
+  }
+  A.lock();
+})();
+</script>
+</body>
+</html>

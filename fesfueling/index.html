@@ -83,6 +83,24 @@ const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const fecha=d=>d?String(d).slice(0,10):'';
 const hoy=()=>new Date().toISOString().slice(0,10);
 const mesAct=()=>hoy().slice(0,7);
+
+/* El servidor NUNCA devuelve mas de 1000 filas aunque se le pida mas, y lo hace
+   en silencio. GETALL pide de a 1000 hasta agotar, para que ninguna pantalla
+   se quede corta cuando la tabla crece. */
+async function GETALL(p){
+  const base=String(p).replace(/[?&](limit|offset)=\d+/g,'');
+  const sep=base.includes('?')?'&':'?';
+  const out=[];
+  for(let i=0,off=0;i<60;i++,off+=1000){
+    let r; try{ r=await fetch(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H}); }catch(e){ break; }
+    if(!r.ok) break;
+    let b; try{ b=await r.json(); }catch(e){ break; }
+    if(!Array.isArray(b)||!b.length) break;
+    out.push(...b);
+    if(b.length<1000) break;
+  }
+  return out;
+}
 async function api(p,o={}){ try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H,...o}); const t=await r.text();
   if(!r.ok){ console.warn('API',p,t.slice(0,150)); return o.method?null:[]; }
   const d=t?JSON.parse(t):(o.method?{}:[]); return d; }catch(e){ console.warn(e); return o.method?null:[]; } }
@@ -104,16 +122,16 @@ go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargand
 set(h){ $('main').innerHTML=h; window.scrollTo(0,0); },
 
 /* ---------- datos base cacheados por vista ---------- */
-async refs(){ this._refs=await api('ff_referencias?order=codigo&limit=3000'); return this._refs; },
-async clientes(){ this._cli=await api('ff_clientes?order=empresa&limit=2000'); return this._cli; },
-async provs(){ this._prov=await api('ff_proveedores?order=razon_social&limit=2000'); return this._prov; },
-async docs(){ this._docs=await api('ff_documentos?order=creado_en.desc&limit=4000'); return this._docs; },
-async abonos(){ this._abo=await api('ff_abonos?order=fecha.desc&limit=6000'); return this._abo; },
+async refs(){ this._refs=await GETALL('ff_referencias?order=codigo&limit=3000'); return this._refs; },
+async clientes(){ this._cli=await GETALL('ff_clientes?order=empresa&limit=2000'); return this._cli; },
+async provs(){ this._prov=await GETALL('ff_proveedores?order=razon_social&limit=2000'); return this._prov; },
+async docs(){ this._docs=await GETALL('ff_documentos?order=creado_en.desc&limit=4000'); return this._docs; },
+async abonos(){ this._abo=await GETALL('ff_abonos?order=fecha.desc&limit=6000'); return this._abo; },
 cliNom(id){ const c=(this._cli||[]).find(x=>x.id===id); return c?c.empresa:'—'; },
 
 /* ================= INICIO ================= */
 vInicio: safe(async function(){
-  const [refs,docs,abonos,compras]=await Promise.all([this.refs(),this.docs(),this.abonos(),api('ff_compras?limit=2000')]);
+  const [refs,docs,abonos,compras]=await Promise.all([this.refs(),this.docs(),this.abonos(),GETALL('ff_compras?limit=2000')]);
   await this.clientes();
   const fact=docs.filter(d=>d.tipo==='factura'&&d.estado!=='anulada');
   const abPorDoc={}; abonos.forEach(a=>abPorDoc[a.documento_id]=(abPorDoc[a.documento_id]||0)+(+a.valor||0));
@@ -671,7 +689,7 @@ async provGuardar(id){
 
 /* ================= REPORTES ================= */
 vReportes: safe(async function(){
-  const [refs,docs,compras]=await Promise.all([this.refs(),this.docs(),api('ff_compras?limit=2000')]);
+  const [refs,docs,compras]=await Promise.all([this.refs(),this.docs(),GETALL('ff_compras?limit=2000')]);
   await Promise.all([this.clientes(),this.provs(),this.abonos()]);
   const fact=docs.filter(d=>d.tipo==='factura'&&d.estado!=='anulada');
   // ventas por mes (últimos 6)

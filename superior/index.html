@@ -123,6 +123,24 @@ const App={
   TAMANOS:['Sencilla 100x190','Semidoble 120x190','Doble 140x190','Queen 160x190','King 200x200','Especial (a medida)'],
   TIPOCOL:['Resortado','Espuma','Híbrido','Ortopédico','Pillow top'],
   FIRMEZA:['Suave','Medio','Firme','Extra firme'],
+  /* Variables que se usan de verdad en la programación (del Excel y del grupo de WhatsApp) */
+  ACOLCHADO:['Sencillo','Doble','Triple acolchado'],
+  PRIORIDAD:['Alta','Media','Baja'],
+  TALLERES:['—','El Rey','Nuevo Amanecer','Cerradora','Leidy Flex','Zamir'],
+  TIPOPROD:['Especial','Stop'],
+  /* De dónde llegó el cliente. El CRM agrupa por esto para ver qué canal trae más. */
+  ORIGEN:['Local','Digital','Página web','Orgánico'],
+  _telKey(t){ const d=String(t||'').replace(/\D/g,''); return d.length>10?d.slice(-10):d; },
+  /* al escribir el teléfono se busca en el directorio y se rellena lo que ya exista */
+  pedTelLookup(v){ const k=this._telKey(v), e=$('p_found');
+    const c=k.length>=7?(this._cli||[]).find(x=>this._telKey(x.telefono)===k):null;
+    if(!c){ if(e){ e.style.display=k.length>=7?'block':'none'; e.textContent='＋ No está en el directorio — se registra al guardar'; e.style.color='var(--gold)'; } return; }
+    this._pedCliId=c.id;
+    const set=(id,val)=>{ const x=$(id); if(x)x.value=val||''; };
+    set('p_nom',c.nombre); set('p_dir',c.direccion); set('p_ciu',c.ciudad);
+    if($('p_tcli')&&c.tipo)$('p_tcli').value=c.tipo;
+    if($('p_org')&&c.origen)$('p_org').value=c.origen;
+    if(e){ e.style.display='block'; e.textContent='✓ '+(c.nombre||'')+' — ya está en el directorio'; e.style.color='var(--ok)'; } },
   ESTPROG:['pendiente','en proceso','terminado','entregado'],
   rol:'', view:'dash',
   _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],_lin:[],_loc:[],_vend:[],
@@ -131,8 +149,25 @@ const App={
   _loadLocal(k){ try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return [];} },
   _saveLocal(k,a){ try{localStorage.setItem(k,JSON.stringify(a));}catch(e){} },
   async _fetch(t){
-    try{ const r=await fetch(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc&limit=8000',{headers:this._H()});
-      if(r.ok){ this._onl[t]=true; return await this._recon(t, await r.json()); } }catch(e){}
+    try{ 
+/* El servidor NUNCA devuelve mas de 1000 filas, aunque se le pida mas, y lo hace
+   en silencio. Esta funcion pide de a 1000 hasta agotar. */
+async function _paginar(url, headers){
+  const base = url.replace(/[?&](limit|offset)=\d+/g,'');
+  const sep = base.includes('?') ? '&' : '?';
+  const out = []; 
+  for(let i=0, off=0; i<60; i++, off+=1000){
+    let r; try{ r = await fetch(base+sep+'limit=1000&offset='+off, {headers}); }catch(e){ break; }
+    if(!r.ok) break;
+    let b; try{ b = await r.json(); }catch(e){ break; }
+    if(!Array.isArray(b) || !b.length) break;
+    out.push(...b);
+    if(b.length < 1000) break;
+  }
+  return out;
+}
+const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',this._H());
+      if(d && d.length!==undefined){ this._onl[t]=true; return await this._recon(t, d); } }catch(e){}
     this._onl[t]=false; return this._loadLocal(t);
   },
   async _recon(t,cloud){ const local=this._loadLocal(t); const ids=new Set(cloud.map(x=>x&&x.id)); const miss=local.filter(x=>x&&x.id&&!ids.has(x.id));
@@ -290,21 +325,39 @@ const App={
     await this._put('superior_lineas',l,this._lin); cerrar(); this.toast('Ficha guardada'); this.vCat(); },
 
   /* ---------- CLIENTE (ficha técnica) ---------- */
-  vCli(){ const arr=this._cli;
-    this.set(`<h1>Cliente</h1><div class="sub">Ficha técnica · ${arr.length} cliente(s)</div>
-      <button class="btn gold" onclick="App.cliModal()">＋ Nuevo cliente</button>
-      <div style="margin-top:12px">${arr.length?arr.map(c=>`<div class="item"><div class="top"><div>
-        <div class="nm">${this.esc(c.nombre||'—')} <span class="chip tipo">${this.esc(c.tipo||'—')}</span></div>
-        <div class="mt">${c.local_num?'🏬 Local '+this.esc(c.local_num)+' · ':''}${c.telefono?'📞 '+this.esc(c.telefono):''}${c.ciudad?' · '+this.esc(c.ciudad):''}</div>
+  /* Directorio de clientes. Los clientes NO se registran acá: entran solos al tomar
+     el pedido. El botón queda para cargar clientes objetivo (los que aún no compran). */
+  ORIGICO:{'Local':'🏪','Digital':'📱','Página web':'🌐','Orgánico':'🌱'},
+  vCli(){ const arr=this._cli||[], f=this._cliOrg||'todos';
+    const porOrg={}; arr.forEach(c=>{ const o=c.origen||'Sin origen'; porOrg[o]=(porOrg[o]||0)+1; });
+    const lista=f==='todos'?arr:arr.filter(c=>(c.origen||'Sin origen')===f);
+    const q=this._cliQ||'', qn=q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''), qd=q.replace(/\D/g,'');
+    const vis=!q?lista:lista.filter(c=>((c.nombre||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').includes(qn))
+      ||(qd&&(c.telefono||'').replace(/\D/g,'').includes(qd)));
+    const cajones=['todos'].concat(Object.keys(this.ORIGICO)).concat(porOrg['Sin origen']?['Sin origen']:[]);
+    this.set(`<h1>Clientes</h1><div class="sub">Directorio · de dónde llega cada cliente. Se registran solos al tomar el pedido.</div>
+      <input id="cli_q" placeholder="🔍 Buscar por nombre o teléfono" value="${this.esc(q)}" oninput="App.cliBuscar(this.value)" style="margin-bottom:10px">
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">${cajones.map(o=>{
+        const n=o==='todos'?arr.length:(porOrg[o]||0);
+        return `<span class="et ${f===o?'on':''}" onclick="App._cliOrg='${o}';App.vCli()">${o==='todos'?'Todos':((this.ORIGICO[o]||'❔')+' '+o)} (${n})</span>`;}).join('')}</div>
+      <button class="btn gold" onclick="App.cliModal()">＋ Cliente objetivo</button>
+      <div class="hint" style="margin-top:4px">Este botón es para cargar clientes a los que les quieres vender. Los que ya compraron entran solos desde Pedidos.</div>
+      <div style="margin-top:12px">${vis.length?vis.map(c=>{const t=(c.telefono||'').replace(/\D/g,'');return `<div class="item"><div class="top"><div>
+        <div class="nm">${this.esc(c.nombre||'—')} <span class="chip tipo">${this.esc(c.tipo||'—')}</span>${c.origen?`<span class="chip">${this.ORIGICO[c.origen]||'❔'} ${this.esc(c.origen)}</span>`:'<span class="chip">❔ sin origen</span>'}</div>
+        <div class="mt">${c.local_num?'🏬 Local '+this.esc(c.local_num)+' · ':''}${t?`📞 <a href="https://wa.me/57${t}" target="_blank" style="color:#16734a;font-weight:700">${this.esc(c.telefono)}</a>`:'sin teléfono'}${c.ciudad?' · '+this.esc(c.ciudad):''}</div>
+        ${c.direccion?`<div class="mt">📍 ${this.esc(c.direccion)}</div>`:''}
         ${c.nit||c.contacto?`<div class="mt">${c.nit?'NIT '+this.esc(c.nit):''}${c.contacto?' · '+this.esc(c.contacto):''}</div>`:''}</div>
-        <div class="row" style="gap:6px"><a onclick="App.cliModal('${c.id}')" style="cursor:pointer;color:var(--mut)">✎</a><a onclick="App.cliDel('${c.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div></div>`).join(''):'<div class="empty">Sin clientes. Crea la ficha del primero.</div>'}</div>`);
+        <div class="row" style="gap:6px"><a onclick="App.cliModal('${c.id}')" style="cursor:pointer;color:var(--mut)">✎</a><a onclick="App.cliDel('${c.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div></div>`;}).join('')
+        :`<div class="empty">${q?'Ningún cliente con "'+this.esc(q)+'".':'Sin clientes en este origen.'}</div>`}</div>`);
   },
+  cliBuscar(v){ this._cliQ=v; this.vCli(); const i=$('cli_q'); if(i){ i.focus(); i.setSelectionRange(v.length,v.length); } },
   cliModal(id){ const c=this._cli.find(x=>x.id===id)||{};
     modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Nuevo'} cliente</h3>
       <div class="g2"><div><label>Nombre / Razón social</label><input id="c_nom" value="${this.esc(c.nombre||'')}"></div>
       <div><label>Tipo</label><select id="c_tipo">${this.TIPOS.map(t=>`<option ${c.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
       <div class="g2"><div><label>N° de local</label><input id="c_loc" value="${this.esc(c.local_num||'')}" placeholder="Solo si es local"></div>
       <div><label>Teléfono</label><input id="c_tel" value="${this.esc(c.telefono||'')}"></div></div>
+      <label>¿De dónde llegó?</label><select id="c_org">${this.ORIGEN.map(t=>`<option ${c.origen===t?'selected':''}>${t}</option>`).join('')}</select>
       <label>Dirección</label><input id="c_dir" value="${this.esc(c.direccion||'')}">
       <div class="g2"><div><label>Ciudad</label><input id="c_ciu" value="${this.esc(c.ciudad||'')}"></div>
       <div><label>NIT / Cédula</label><input id="c_nit" value="${this.esc(c.nit||'')}"></div></div>
@@ -313,7 +366,7 @@ const App={
       <label>Notas</label><textarea id="c_not">${this.esc(c.notas||'')}</textarea>
       <button class="btn gold full" onclick="App.cliSave('${id||''}')">Guardar</button>`); },
   async cliSave(id){ const g=x=>($(x).value||'').trim();
-    const row={id:id||('c'+Date.now()),nombre:g('c_nom'),tipo:$('c_tipo').value,local_num:g('c_loc'),telefono:g('c_tel'),direccion:g('c_dir'),ciudad:g('c_ciu'),nit:g('c_nit'),contacto:g('c_con'),email:g('c_email'),notas:g('c_not'),creado_en:(this._cli.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    const row={id:id||('c'+Date.now()),nombre:g('c_nom'),tipo:$('c_tipo').value,local_num:g('c_loc'),telefono:g('c_tel'),direccion:g('c_dir'),ciudad:g('c_ciu'),nit:g('c_nit'),contacto:g('c_con'),email:g('c_email'),notas:g('c_not'),origen:($('c_org')||{}).value||'',creado_en:(this._cli.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     if(!row.nombre){alert('Nombre');return;}
     const i=this._cli.findIndex(x=>x.id===row.id); if(i>=0)this._cli[i]=row; else this._cli.unshift(row);
     await this._put('superior_clientes',row,this._cli); cerrar(); this.toast('Guardado'); this.vCli(); },
@@ -399,6 +452,7 @@ const App={
         <div class="row" style="gap:6px;margin-top:4px"><a onclick="App.pedProgramar('${p.id}')" style="cursor:pointer;color:var(--gold);font-weight:700;font-size:12px">→ programar</a><a onclick="App.pedDel('${p.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div></div></div>`).join(''):'<div class="empty">Sin pedidos.</div>'}</div>`);
   },
   pedModal(id){ const p=this._ped.find(x=>x.id===id)||{};
+    const cAct=(this._cli||[]).find(x=>x.id===p.cliente_id)||{};   // datos del cliente del pedido
     modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Tomar'} pedido</h3>
       <label>Referencia</label>
       <select id="p_ref" onchange="App.pedRefPick()"><option value="">— seleccionar referencia —</option><option value="__medida__" ${p.referencia==='A la medida'?'selected':''}>📐 A la medida (personalizado)</option>${this._inv.map(it=>{const lab=(it.referencia||it.nombre||'')+(it.tamano?' · '+it.tamano:'');return `<option value="${it.id}" data-lab="${this.esc(lab)}" data-pre="${+it.precio||0}" data-tam="${this.esc(it.tamano||'')}" data-mat="${this.esc(it.material||'')}" ${p.referencia===lab?'selected':''}>${this.esc(lab)}</option>`;}).join('')}</select>
@@ -406,14 +460,40 @@ const App={
       <div id="pd_medida" style="display:${p.referencia==='A la medida'?'block':'none'};border:1px dashed var(--gold);border-radius:10px;padding:10px;margin-top:8px;background:var(--goldsoft)">
         <div style="font-weight:700;color:var(--warn);font-size:12px;margin-bottom:6px">📐 Variables de programación (a la medida)</div>
         <div class="g2"><div><label>Tamaño</label><select id="pd_tam">${this.TAMANOS.map(t=>`<option>${t}</option>`).join('')}</select></div>
-        <div><label>Alto (cm)</label><input id="pd_alto"></div></div>
+        <div><label>Medida exacta</label><input id="pd_med" placeholder="120*165*15"></div></div>
         <div class="g2"><div><label>Tipo</label><select id="pd_tipo">${this.TIPOCOL.map(t=>`<option>${t}</option>`).join('')}</select></div>
         <div><label>Firmeza</label><select id="pd_fir">${this.FIRMEZA.map(t=>`<option>${t}</option>`).join('')}</select></div></div>
-        <div class="g3"><div><label>Tela</label><input id="pd_tela"></div><div><label>Color</label><input id="pd_color"></div>
+        <div style="font-weight:700;color:var(--warn);font-size:11px;margin:9px 0 4px">Estructura</div>
+        <div class="g3"><div><label>Cassata (cm)</label><input id="pd_cas" placeholder="12"></div>
+        <div><label>Espuma fuelles (cm)</label><input id="pd_esp" placeholder="5.5"></div>
+        <div><label>Altura total (cm)</label><input id="pd_alto" placeholder="38"></div></div>
+        <div class="g3"><div><label>Tela</label><input id="pd_tela" placeholder="Jacquard importado"></div>
+        <div><label>Color</label><input id="pd_color" placeholder="Gris"></div>
+        <div><label>Acolchado</label><select id="pd_aco">${this.ACOLCHADO.map(t=>`<option>${t}</option>`).join('')}</select></div></div>
+        <div style="font-weight:700;color:var(--warn);font-size:11px;margin:9px 0 4px">Terminados</div>
+        <div class="g2"><div><label>Banda</label><input id="pd_ban" placeholder="Blanca"></div>
+        <div><label>Cinta</label><input id="pd_cin" placeholder="Negra"></div></div>
+        <div class="g3"><div><label>Tapas</label><input id="pd_tap" placeholder="Grises"></div>
+        <div><label>Tiras</label><input id="pd_tir" placeholder="Blancas"></div>
         <div><label>Pillow</label><select id="pd_pil"><option>No</option><option>Sí</option></select></div></div>
-        <label>Observaciones</label><textarea id="pd_obs"></textarea>
+        <div style="font-weight:700;color:var(--warn);font-size:11px;margin:9px 0 4px">Programación</div>
+        <div class="g3"><div><label>Prioridad</label><select id="pd_pri">${this.PRIORIDAD.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div><label>Despachado a</label><select id="pd_tal">${this.TALLERES.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div><label>Tipo producción</label><select id="pd_tpr">${this.TIPOPROD.map(t=>`<option>${t}</option>`).join('')}</select></div></div>
+        <label>Observaciones</label><textarea id="pd_obs" placeholder="Igual a la foto · revisar costuras, van para lejos"></textarea>
       </div>
-      <label>Cliente</label><select id="p_cli">${this._cli.length?this._cli.map(c=>`<option value="${c.id}" ${p.cliente_id===c.id?'selected':''}>${this.esc(c.nombre)}${c.local_num?' (Local '+this.esc(c.local_num)+')':''}</option>`).join(''):'<option value="">— crea clientes primero —</option>'}</select>
+      <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px">
+        <div style="font-weight:700;font-size:12px;margin-bottom:6px">👤 Cliente</div>
+        <label>Teléfono — se busca solo</label>
+        <input id="p_tel" inputmode="numeric" placeholder="3001234567" oninput="App.pedTelLookup(this.value)" value="${this.esc(cAct.telefono||'')}">
+        <div id="p_found" style="font-size:11px;font-weight:700;margin:4px 0 2px;display:none"></div>
+        <label>Nombre / Razón social</label><input id="p_nom" value="${this.esc(p.cliente||cAct.nombre||'')}">
+        <div class="g2"><div><label>Dirección</label><input id="p_dir" value="${this.esc(cAct.direccion||'')}"></div>
+        <div><label>Ciudad</label><input id="p_ciu" value="${this.esc(cAct.ciudad||'')}"></div></div>
+        <div class="g2"><div><label>Tipo</label><select id="p_tcli">${this.TIPOS.map(t=>`<option ${cAct.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div><label>¿De dónde llegó?</label><select id="p_org">${this.ORIGEN.map(t=>`<option ${cAct.origen===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
+        <div class="hint">Con el teléfono se busca en el directorio. Si no está, se registra solo al guardar el pedido.</div>
+      </div>
       <label>Vendedor</label><select id="p_vend"><option value="">— sin vendedor —</option>${this._vend.map(v=>`<option value="${v.id}" ${p.vendedor_id===v.id?'selected':''}>${this.esc(v.nombre)}${v.local_nombre?' · '+this.esc(v.local_nombre):''}</option>`).join('')}</select>
       <div class="g2"><div><label>Tipo de transporte</label><select id="p_tra">${this.TRANSPORTE.map(t=>`<option ${p.tipo_transporte===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><label>Forma de pago</label><select id="p_pag">${this.PAGO.map(t=>`<option ${p.forma_pago===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
@@ -421,7 +501,26 @@ const App={
   pedRefPick(){ const s=$('p_ref'),o=s.options[s.selectedIndex]; const med=s.value==='__medida__';
     if($('pd_medida'))$('pd_medida').style.display=med?'block':'none';
     if(!med && o && o.value && $('p_tot') && +(o.dataset.pre)>0)$('p_tot').value=o.dataset.pre; },
-  async pedSave(id){ const cliId=$('p_cli').value; const cliObj=this._cli.find(x=>x.id===cliId)||{}; const cliNom=cliObj.nombre||'';
+  /* El cliente se graba desde el pedido, en un solo paso: si el teléfono ya está
+     en el directorio se actualiza lo que cambió; si no, se crea. Así no hay que
+     registrarlo aparte antes de tomar el pedido. */
+  async _cliDesdePedido(){
+    const g=x=>($(x)?$(x).value:'').trim();
+    const nom=g('p_nom'), tel=g('p_tel'), k=this._telKey(tel);
+    if(!nom){ alert('Falta el nombre del cliente'); return null; }
+    const dir=g('p_dir'), ciu=g('p_ciu'), tipo=($('p_tcli')||{}).value||'Cliente final', org=($('p_org')||{}).value||'';
+    let c=k.length>=7?(this._cli||[]).find(x=>this._telKey(x.telefono)===k):null;
+    if(c){ const b={}; if(nom&&nom!==c.nombre)b.nombre=nom; if(dir&&dir!==c.direccion)b.direccion=dir;
+      if(ciu&&ciu!==c.ciudad)b.ciudad=ciu; if(tipo!==c.tipo)b.tipo=tipo; if(org&&org!==c.origen)b.origen=org;
+      if(Object.keys(b).length){ Object.assign(c,b); await this._put('superior_clientes',c,this._cli); }
+      return c; }
+    c={id:'c'+Date.now(),nombre:nom,tipo:tipo,local_num:'',telefono:tel,direccion:dir,ciudad:ciu,
+       nit:'',contacto:'',email:'',notas:'',origen:org,creado_en:new Date().toISOString()};
+    this._cli.unshift(c); await this._put('superior_clientes',c,this._cli);
+    this.toast('👤 '+nom+' quedó en el directorio');
+    return c; },
+  async pedSave(id){ const cliObj=await this._cliDesdePedido(); if(!cliObj)return;
+    const cliId=cliObj.id, cliNom=cliObj.nombre||'';
     const vId=$('p_vend')?$('p_vend').value:''; const vObj=this._vend.find(x=>x.id===vId)||{};
     const rs=$('p_ref'),ro=rs.options[rs.selectedIndex]; const medida=rs.value==='__medida__';
     let refLab=''; if(medida)refLab='A la medida'; else if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
@@ -430,11 +529,17 @@ const App={
     const i=this._ped.findIndex(x=>x.id===row.id); if(i>=0)this._ped[i]=row; else this._ped.unshift(row);
     await this._put('superior_pedidos',row,this._ped);
     // Nuevo pedido -> crear programación automática (a la medida con variables, o desde la referencia)
-    if(!id){ const inv=medida?null:this._inv.find(x=>x.id===rs.value); const g=x=>($(x)?$(x).value:'').trim(); const ahora=new Date().toISOString();
+    if(!id){ const inv=medida?null:this._inv.find(x=>x.id===rs.value); const g=x=>($(x)?$(x).value:'').trim();
+      const s=x=>($(x)?$(x).value:''); const ahora=new Date().toISOString();
       const prog={id:'pg'+Date.now(),pedido_id:row.id,cliente:cliNom,local_num:cliObj.local_num||'',vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',referencia:refLab,cantidad:1,
         tamano:medida?$('pd_tam').value:(inv?inv.tamano:''), alto:medida?g('pd_alto'):'',
         tipo:medida?$('pd_tipo').value:(inv?(inv.material||''):''), firmeza:medida?$('pd_fir').value:'',
         tela:medida?g('pd_tela'):'', color:medida?g('pd_color'):'', pillow:medida?$('pd_pil').value:'No',
+        // variables de la programación real (Excel + WhatsApp de PRODUCCIÓN DÍA)
+        medida:medida?g('pd_med'):'', cassata_cm:medida?g('pd_cas'):'', espuma_cm:medida?g('pd_esp'):'',
+        acolchado:medida?s('pd_aco'):'', banda:medida?g('pd_ban'):'', cinta:medida?g('pd_cin'):'',
+        tapas:medida?g('pd_tap'):'', tiras:medida?g('pd_tir'):'',
+        prioridad:medida?s('pd_pri'):'Media', taller:medida?s('pd_tal'):'', tipo_produccion:medida?s('pd_tpr'):'Stop',
         observaciones:medida?g('pd_obs'):'', estado:'pendiente', historial:[{estado:'pendiente',ts:ahora}], creado_en:ahora};
       this._prog.unshift(prog); await this._put('superior_programacion',prog,this._prog);
     }
@@ -454,10 +559,13 @@ const App={
         <div class="et ${tab==='traza'?'on':''}" onclick="App._progTab='traza';App.vProg()">📊 Trazabilidad</div></div>
       <button class="btn gold" onclick="App.progModal()">＋ Programar colchón</button>
       <div style="margin-top:12px">${arr.length?arr.map(p=>`<div class="item"><div class="top"><div>
-        <div class="nm">${this.esc(p.referencia||p.tamano||'Colchón')} <span class="chip ${p.estado==='entregado'?'ok':(p.estado==='terminado'?'ok':'')}">${this.esc(p.estado||'pendiente')}</span></div>
+        <div class="nm">${this.esc(p.referencia||p.tamano||'Colchón')} <span class="chip ${p.estado==='entregado'?'ok':(p.estado==='terminado'?'ok':'')}">${this.esc(p.estado||'pendiente')}</span>${p.prioridad?`<span class="chip" style="background:${p.prioridad==='Alta'?'#fde2e0;color:#a8392c':(p.prioridad==='Media'?'#fdf0d8;color:#8a6100':'#e9edf2;color:#5a6b7d')}">${this.esc(p.prioridad)}</span>`:''}${p.tipo_produccion==='Especial'?'<span class="chip" style="background:#fde2e0;color:#a8392c">especial</span>':''}${p.taller&&p.taller!=='—'?`<span class="chip">🏭 ${this.esc(p.taller)}</span>`:''}</div>
         <div class="mt">👤 ${this.esc(p.cliente||'—')}${p.local_num?' · 🏬 Local '+this.esc(p.local_num):''}${p.vendedor?' · 🧑‍💼 '+this.esc(p.vendedor):''}</div>
         <div class="mt">🕐 Llegó ${this._fmtDT(p.creado_en)} · ${this._durProd(p)}</div>
-        <div class="mt">${this.esc(p.tamano||'')}${p.alto?' · '+this.esc(p.alto)+'cm':''}${p.tipo?' · '+this.esc(p.tipo):''}${p.firmeza?' · '+this.esc(p.firmeza):''}${p.pillow==='Sí'?' · pillow':''}${p.color?' · '+this.esc(p.color):''} · x${this.num(p.cantidad||1)}</div>
+        <div class="mt">${this.esc(p.medida||p.tamano||'')}${p.alto?' · alto '+this.esc(p.alto)+'cm':''}${p.tipo?' · '+this.esc(p.tipo):''}${p.firmeza?' · '+this.esc(p.firmeza):''}${p.pillow==='Sí'?' · pillow':''} · x${this.num(p.cantidad||1)}</div>
+        ${(p.cassata_cm||p.espuma_cm)?`<div class="mt">🧱 ${p.cassata_cm?'cassata '+this.esc(p.cassata_cm)+'cm':''}${(p.cassata_cm&&p.espuma_cm)?' · ':''}${p.espuma_cm?'espuma fuelles '+this.esc(p.espuma_cm)+'cm':''}</div>`:''}
+        ${(p.tela||p.color||p.acolchado)?`<div class="mt">🧵 ${[p.tela,p.color,p.acolchado].filter(Boolean).map(x=>this.esc(x)).join(' · ')}</div>`:''}
+        ${(p.banda||p.cinta||p.tapas||p.tiras)?`<div class="mt">🎗️ ${[p.banda?'banda '+p.banda:'',p.cinta?'cinta '+p.cinta:'',p.tapas?'tapas '+p.tapas:'',p.tiras?'tiras '+p.tiras:''].filter(Boolean).map(x=>this.esc(x)).join(' · ')}</div>`:''}
         ${p.observaciones?`<div class="mt">📝 ${this.esc(p.observaciones)}</div>`:''}</div>
         <div class="row" style="gap:6px"><a onclick="App.progModal('${p.id}')" style="cursor:pointer;color:var(--mut)">✎</a><a onclick="App.progDel('${p.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div>
         <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${this.ESTPROG.map(e=>`<span class="et ${p.estado===e?'on':''}" onclick="App.progEstado('${p.id}','${e}')">${e}</span>`).join('')}</div>

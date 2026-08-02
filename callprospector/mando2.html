@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-store">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1B3A6B">
+<link rel="icon" href="raton-chico.png">
+<title>Centro de Mando · CallProspector</title>
+<style>
+:root{
+  --azul:#1B3A6B; --azul2:#142C52;
+  --naranja:#E8621A; --naranja2:#FF7A33;
+  --bg:#0B1830; --card:#14294A; --card2:#1B3559; --line:#2A4676;
+  --tx:#EAF1FB; --dim:#93AAC9; --faint:#6A83A6;
+  --ok:#25C08A; --warn:#F0A73C; --bad:#F0604D; --azulc:#4A9BE8;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx);
+  max-width:620px;margin:0 auto;min-height:100vh;-webkit-font-smoothing:antialiased}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+
+header{background:linear-gradient(160deg,var(--azul),var(--azul2));padding:12px 15px 14px;
+  position:sticky;top:0;z-index:20;border-bottom:2px solid var(--naranja);
+  padding-top:calc(12px + env(safe-area-inset-top))}
+.hrow{display:flex;align-items:center;gap:10px}
+.back{background:rgba(255,255,255,.12);color:#fff;text-decoration:none;font-size:12.5px;font-weight:700;
+  padding:6px 12px;border-radius:20px;white-space:nowrap}
+.tit{font-size:15.5px;font-weight:800;letter-spacing:-.02em}
+.tit small{display:block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.live{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 1.7s infinite}
+.live.off i{background:var(--bad);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.28}}
+@media(prefers-reduced-motion:reduce){.live i{animation:none}}
+.res3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:13px}
+.res3 div{background:rgba(0,0,0,.24);border-radius:11px;padding:9px 7px;text-align:center}
+.res3 b{display:block;font-size:19px;font-weight:800;letter-spacing:-.03em;line-height:1.15}
+.res3 span{font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:#9DB7DA;font-weight:600}
+.res3 .v b{color:var(--ok)} .res3 .d b{color:var(--bad)}
+.filtro{margin-top:11px}
+.filtro select{width:100%;background:rgba(0,0,0,.24);color:var(--tx);border:1px solid rgba(255,255,255,.13);
+  border-radius:9px;padding:9px 11px;font-size:13px;font-family:inherit}
+
+nav{display:flex;gap:1px;background:var(--card);border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:19;overflow-x:auto}
+nav button{flex:1;background:none;border:none;padding:13px 10px;font-size:12.5px;font-weight:700;
+  color:var(--faint);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap;font-family:inherit}
+nav button.on{color:var(--tx);border-bottom-color:var(--naranja)}
+
+section{padding:15px}
+h2{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:10px}
+
+.nf{background:var(--card);border:1px solid var(--line);border-left-width:4px;border-radius:14px;
+  padding:14px 15px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start}
+.nf.rojo{border-left-color:var(--bad)} .nf.ambar{border-left-color:var(--warn)}
+.nf.speedy{border-left-color:var(--naranja)} .nf.limpio{border-left-color:var(--ok)}
+.nf .ico{font-size:25px;line-height:1.1;flex:none}
+.nf h3{font-size:14px;font-weight:800;margin-bottom:4px}
+.nf.rojo h3{color:#FF9A8B} .nf.ambar h3{color:#FFD08A}
+.nf.speedy h3{color:var(--naranja2)} .nf.limpio h3{color:#7FE3BE}
+.nf p{font-size:12.5px;color:var(--dim);line-height:1.5}
+.nf p b{color:var(--tx);font-weight:700}
+.nf .quien{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px}
+.nf .quien span{font-size:11px;background:var(--card2);border:1px solid var(--line);color:var(--tx);
+  padding:3px 9px;border-radius:20px;font-weight:600}
+
+.ag{background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px 15px;margin-bottom:10px}
+.agh{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.agh .n{font-size:15px;font-weight:800}
+.agh .n small{display:block;font-size:11px;color:var(--faint);font-weight:400}
+.agh .est{margin-left:auto;font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:4px 10px;border-radius:20px;white-space:nowrap}
+.est.ok{background:rgba(37,192,138,.18);color:#7FE3BE;border:1px solid rgba(37,192,138,.45)}
+.est.rev{background:rgba(240,167,60,.16);color:#FFD08A;border:1px solid rgba(240,167,60,.42)}
+.est.no{background:rgba(240,96,77,.16);color:#FF9A8B;border:1px solid rgba(240,96,77,.42)}
+.plt{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
+.plt .val{font-size:26px;font-weight:800;letter-spacing:-.035em;color:var(--ok)}
+.plt .val.cero{color:var(--faint)}
+.plt .tach{font-size:13px;color:var(--faint);text-decoration:line-through}
+.plt .lbl{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);
+  font-weight:700;margin-left:auto;text-align:right;line-height:1.4}
+.mets{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mets div{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center}
+.mets b{display:block;font-size:15px;font-weight:800}
+.mets span{font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--faint);font-weight:600}
+.mets .mal b{color:var(--bad)} .mets .bien b{color:var(--ok)} .mets .med b{color:var(--warn)}
+.flags{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.flags i{font-style:normal;font-size:11.5px;color:var(--dim);line-height:1.45;display:flex;gap:6px}
+.flags i b{color:#FF9A8B;font-weight:700}
+.acc{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+.acc button{flex:1;min-width:88px;border:1px solid var(--line);background:var(--card2);color:var(--dim);
+  border-radius:9px;padding:9px 6px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.acc button.r{border-color:rgba(240,96,77,.42);color:#FF9A8B}
+.acc button.g{border-color:rgba(37,192,138,.45);color:#7FE3BE}
+.acc button:active{filter:brightness(1.25)}
+
+/* embudo */
+.emb{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.est5{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;
+  background:var(--card);border:1px solid var(--line);border-radius:11px;padding:11px 14px}
+.est5 .l{font-size:13.5px;font-weight:600}
+.est5 .l small{display:block;font-size:11px;color:var(--faint);font-weight:400}
+.est5 .v{font-size:18px;font-weight:800;text-align:right}
+.est5.compro{border-color:rgba(37,192,138,.45)} .est5.compro .v{color:var(--ok)}
+
+.int{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:13px 14px;margin-bottom:9px}
+.int .n{font-size:14.5px;font-weight:700}
+.int .d{font-size:12px;color:var(--dim);margin-top:3px;line-height:1.5}
+.int .d a{color:var(--ok);text-decoration:none;font-weight:600}
+.int .sel{display:flex;gap:5px;margin-top:10px;flex-wrap:wrap}
+.int .sel button{flex:1;min-width:74px;border:1px solid var(--line);background:var(--card2);color:var(--faint);
+  border-radius:8px;padding:8px 5px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+.int .sel button.on{background:var(--naranja);border-color:var(--naranja);color:#fff}
+.int.sinDatos{border-color:rgba(240,167,60,.4)}
+
+.vacio{text-align:center;color:var(--faint);font-size:13.5px;padding:44px 20px;line-height:1.65}
+.aviso{background:rgba(240,96,77,.12);border:1px solid rgba(240,96,77,.4);border-radius:12px;
+  padding:14px 16px;font-size:13px;color:#FF9A8B;line-height:1.55;margin:15px}
+.aviso b{color:#fff}
+footer{padding:20px 15px calc(24px + env(safe-area-inset-bottom));text-align:center;font-size:11px;
+  color:var(--faint);line-height:1.65}
+footer b{color:var(--dim)}
+#toast{position:fixed;left:50%;transform:translateX(-50%) translateY(-140%);top:14px;
+  background:var(--card2);border:1px solid var(--naranja);color:var(--tx);padding:11px 17px;border-radius:12px;
+  font-size:13px;z-index:60;transition:transform .3s ease;max-width:88vw;text-align:center}
+#toast.on{transform:translateX(-50%) translateY(0)}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hrow">
+    <a class="back" href="lupe.html">‹ Marcador</a>
+    <div class="tit">Centro de Mando<small>Control de calidad</small></div>
+    <div class="live" id="live"><i></i><span id="liveTx">en vivo</span></div>
+  </div>
+  <div class="res3">
+    <div><b id="tLl" class="mono">0</b><span>Llamadas</span></div>
+    <div class="v"><b id="tVal" class="mono">$0</b><span>Validado</span></div>
+    <div class="d"><b id="tDud" class="mono">$0</b><span>En duda</span></div>
+  </div>
+  <div class="filtro"><select id="fBase" onchange="M.base=this.value;M.pintar()"><option value="">Todas las bases</option></select></div>
+</header>
+
+<nav id="nav"></nav>
+<div id="main"><div class="vacio">Cargando…</div></div>
+<footer>
+  <b>Regla:</b> una llamada real no baja de <b>25 segundos</b>.<br>
+  Un <b>Interesado</b> sin WhatsApp ni correo no se paga.<br>
+  Meta mínima de conversión: <b>8%</b>.
+</footer>
+<div id="toast"></div>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co';
+const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+
+const $=s=>document.getElementById(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cop=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+const num=n=>(+n||0).toLocaleString('es-CO');
+
+
+/* El servidor NUNCA devuelve mas de 1000 filas aunque se le pida mas, y lo hace
+   en silencio. GETALL pide de a 1000 hasta agotar. */
+async function GETALL(p){
+  const base=String(p).replace(/[?&](limit|offset)=\d+/g,'');
+  const sep=base.includes('?')?'&':'?';
+  const out=[];
+  for(let i=0,off=0;i<60;i++,off+=1000){
+    let r; try{ r=await fetch(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H}); }catch(e){ break; }
+    if(!r.ok) break;
+    let b; try{ b=await r.json(); }catch(e){ break; }
+    if(!Array.isArray(b)||!b.length) break;
+    out.push(...b); if(b.length<1000) break;
+  }
+  return out;
+}
+async function GET(p){ try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H}); return r.ok?await r.json():null; }catch(e){ return null; } }
+async function PATCH(t,b){ try{ const r=await fetch(SB+'/rest/v1/'+t,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); return r.ok; }catch(e){ return false; } }
+let tt; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on');
+  clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),2200); }
+
+const MIN_SEG=25, META_INT=8;
+const VENTA=[['nuevo','Nuevo'],['contactado','Contactado'],['cotizo','Cotizó'],['compro','Compró'],['perdido','Perdido']];
+const NIVELES=['principiante','intermedio','avanzado','asesor'];
+
+const M={
+  vista:'calidad', base:'', filas:[], agentes:[], bases:[],
+
+  async cargar(){
+    const [f,a,b]=await Promise.all([
+      GETALL('mkr_llamadas?select=id,agente,resultado,valor,datos,validado,estado_venta,base_id,lead_nombre,contacto,whatsapp,correo,creado_en&order=creado_en.asc&limit=8000'),
+      GET('mkr_agentes?select=*&order=nombre&limit=300'),
+      GET('mkr_bases?select=id,nombre,cliente&order=nombre&limit=200')
+    ]);
+    if(!Array.isArray(f)){ $('live').classList.add('off'); $('liveTx').textContent='sin señal';
+      $('main').innerHTML='<div class="aviso"><b>Faltan las tablas.</b><br>Todavía no se ha corrido el SQL. Esta pantalla funciona apenas exista <b>mkr_llamadas</b> con sus columnas nuevas.</div>'; return; }
+    $('live').classList.remove('off'); $('liveTx').textContent='en vivo';
+    this.filas=f; this.agentes=Array.isArray(a)?a:[]; this.bases=Array.isArray(b)?b:[];
+    const s=$('fBase');
+    if(s.options.length<=1) this.bases.forEach(x=>s.insertAdjacentHTML('beforeend',
+      `<option value="${x.id}">${esc(x.nombre)}</option>`));
+    this.pintar();
+  },
+
+  datos(){ return this.base ? this.filas.filter(f=>String(f.base_id)===String(this.base)) : this.filas; },
+
+  /* mide a cada persona: ritmo, dudosas, conversión y plata que de verdad se paga */
+  medir(){
+    const por={};
+    this.datos().forEach(f=>{ (por[f.agente]=por[f.agente]||[]).push({
+      t:new Date(f.creado_en).getTime(), r:f.resultado, v:+f.valor||0, ok:!!f.validado, d:!!f.datos }); });
+    return Object.entries(por).map(([n,ll])=>{
+      ll.sort((x,y)=>x.t-y.t);
+      let rapidas=0, gaps=[];
+      for(let i=1;i<ll.length;i++){ const g=(ll[i].t-ll[i-1].t)/1000;
+        if(g<600) gaps.push(g); if(g<MIN_SEG) rapidas++; }
+      const total=ll.length;
+      const ritmo=gaps.length?Math.round(gaps.reduce((s,g)=>s+g,0)/gaps.length):null;
+      const ints=ll.filter(x=>x.r==='Interesado');
+      const sinDatos=ints.filter(x=>!x.d).length;
+      const pctInt=total?+(ints.length/total*100).toFixed(1):0;
+      const cruda=ll.reduce((s,x)=>s+x.v,0);
+      // validado = lo que la app ya marcó como bueno, menos lo marcado demasiado rápido
+      let validado=0;
+      for(let i=0;i<ll.length;i++){ const x=ll[i];
+        const g=i?(x.t-ll[i-1].t)/1000:9999;
+        if(g<MIN_SEG) continue;
+        if(!x.ok) continue;
+        validado+=x.v; }
+      const pctRap=total>1?Math.round(rapidas/(total-1)*100):0;
+      let est='ok';
+      if(pctRap>=50||(ints.length&&sinDatos===ints.length)) est='no';
+      else if(pctRap>=15||sinDatos>0||pctInt<META_INT) est='rev';
+      const ficha=this.agentes.find(a=>a.nombre===n)||{};
+      return {n,total,rapidas,pctRap,ritmo,ints:ints.length,sinDatos,pctInt,cruda,validado,est,ficha};
+    }).sort((x,y)=>y.validado-x.validado||y.total-x.total);
+  },
+
+  pintar(){
+    const ag=this.medir(), d=this.datos();
+    $('tLl').textContent=num(d.length);
+    const tVal=ag.reduce((s,a)=>s+a.validado,0), tCru=ag.reduce((s,a)=>s+a.cruda,0);
+    $('tVal').textContent=cop(tVal); $('tDud').textContent=cop(tCru-tVal);
+
+    $('nav').innerHTML=[['calidad','⚡ Calidad'],['personas','👥 Personas'],['interesados','🔥 Interesados']]
+      .map(([v,t])=>`<button class="${v===this.vista?'on':''}" onclick="M.vista='${v}';M.pintar()">${t}</button>`).join('');
+
+    if(!d.length){ $('main').innerHTML='<div class="vacio">Todavía nadie ha marcado en esta base.</div>'; return; }
+    if(this.vista==='calidad')    return this.vCalidad(ag);
+    if(this.vista==='personas')   return this.vPersonas(ag);
+    if(this.vista==='interesados')return this.vInteresados();
+  },
+
+  vCalidad(ag){
+    const N=[];
+    const veloz=ag.filter(a=>a.rapidas>0).sort((x,y)=>y.rapidas-x.rapidas);
+    if(veloz.length){ const tot=veloz.reduce((s,a)=>s+a.rapidas,0);
+      N.push({c:'rojo',i:'⚡',h:'Velocidad imposible: no alcanzó a llamar',
+        p:`<b>${tot}</b> marcaciones se registraron a menos de <b>${MIN_SEG} segundos</b> una de otra. Una llamada de prospección no cabe en ese tiempo.`,
+        q:veloz.map(a=>`${a.n} · ${a.rapidas}${a.ritmo!==null?' · '+a.ritmo+'s prom.':''}`)}); }
+
+    const sd=ag.filter(a=>a.sinDatos>0).sort((x,y)=>y.sinDatos-x.sinDatos);
+    if(sd.length){ const tot=sd.reduce((s,a)=>s+a.sinDatos,0);
+      N.push({c:'ambar',i:'📋',h:'"Interesado" sin datos de contacto',
+        p:`<b>${tot} interesados</b> quedaron sin WhatsApp ni correo. Esos no se pagan y no le sirven a nadie.`,
+        q:sd.map(a=>`${a.n} · ${a.sinDatos} de ${a.ints}`)}); }
+
+    const flojos=ag.filter(a=>a.total>=5&&a.pctInt<META_INT).sort((x,y)=>x.pctInt-y.pctInt);
+    if(flojos.length){
+      N.push({c:'speedy',i:'🐭',h:'A Lupe no le sirven estos resultados 💨',
+        p:`La meta es <b>${META_INT}% de interesados</b>. Estas personas están por debajo: mucho botón, poca venta.`,
+        q:flojos.map(a=>`${a.n} · ${a.pctInt}%`)}); }
+
+    if(!N.length) N.push({c:'limpio',i:'✅',h:'Sin alertas',
+      p:'Los tiempos son realistas, los interesados traen contacto y la conversión va sobre la meta. Trabajo limpio.',q:[]});
+
+    $('main').innerHTML='<section><h2>Notificaciones</h2>'+N.map(n=>`<div class="nf ${n.c}">
+      <div class="ico">${n.i}</div><div style="flex:1;min-width:0"><h3>${n.h}</h3><p>${n.p}</p>
+      ${n.q.length?`<div class="quien">${n.q.map(x=>`<span>${esc(x)}</span>`).join('')}</div>`:''}</div></div>`).join('')+'</section>';
+  },
+
+  vPersonas(ag){
+    const ESTX={ok:'Confiable',rev:'Revisar',no:'No validado'};
+    $('main').innerHTML='<section><h2>Rendimiento por persona</h2>'+ag.map(a=>{
+      const fl=[];
+      if(a.rapidas) fl.push(`<b>${a.rapidas}</b> marcaciones bajo ${MIN_SEG}s`);
+      if(a.sinDatos) fl.push(`<b>${a.sinDatos}</b> interesados sin contacto`);
+      if(a.total>=5&&a.pctInt<META_INT) fl.push(`conversión <b>${a.pctInt}%</b> · bajo la meta`);
+      const cInt=a.pctInt>=META_INT?'bien':(a.pctInt>0?'med':'mal');
+      const cRit=a.ritmo===null?'':(a.ritmo>=MIN_SEG?'bien':'mal');
+      const cRap=a.pctRap===0?'bien':(a.pctRap<15?'med':'mal');
+      const f=a.ficha, id=f.id;
+      return `<div class="ag">
+        <div class="agh"><div class="n">${esc(a.n)}<small>${esc(f.nivel||'—')}${f.estado&&f.estado!=='activo'?' · '+esc(f.estado):''}</small></div>
+          <div class="est ${a.est}">${ESTX[a.est]}</div></div>
+        <div class="plt"><div class="val mono ${a.validado?'':'cero'}">${cop(a.validado)}</div>
+          ${a.cruda!==a.validado?`<div class="tach mono">${cop(a.cruda)}</div>`:''}
+          <div class="lbl">Plata<br>validada</div></div>
+        <div class="mets">
+          <div><b class="mono">${num(a.total)}</b><span>Llamadas</span></div>
+          <div class="${cRit}"><b class="mono">${a.ritmo===null?'—':a.ritmo+'s'}</b><span>Ritmo</span></div>
+          <div class="${cInt}"><b class="mono">${a.pctInt}%</b><span>Interesado</span></div>
+          <div class="${cRap}"><b class="mono">${a.pctRap}%</b><span>Dudosas</span></div>
+        </div>
+        ${fl.length?`<div class="flags">${fl.map(x=>`<i>⚠️ <span>${x}</span></i>`).join('')}</div>`:''}
+        ${id?`<div class="acc">
+          ${f.estado==='activo'
+            ?`<button class="r" onclick="M.estado(${id},'restringido')">Restringir</button>
+              <button class="r" onclick="M.estado(${id},'anulado')">Anular</button>`
+            :`<button class="g" onclick="M.estado(${id},'activo')">Habilitar</button>`}
+          <button onclick="M.subir(${id})">Subir nivel</button>
+        </div>`:'<div class="flags"><i>Sin ficha en mkr_agentes</i></div>'}
+      </div>`;}).join('')+'</section>';
+  },
+
+  vInteresados(){
+    const ints=this.datos().filter(f=>f.resultado==='Interesado')
+      .sort((a,b)=>String(b.creado_en).localeCompare(String(a.creado_en)));
+    const c={}; VENTA.forEach(([k])=>c[k]=0);
+    ints.forEach(i=>{ const k=i.estado_venta||'nuevo'; if(c[k]!=null)c[k]++; });
+    const emb=`<div class="emb">
+      <div class="est5"><div class="l">🔥 Interesados<small>dijeron que sí</small></div><div class="v mono">${num(ints.length)}</div></div>
+      <div class="est5"><div class="l">📞 Contactados<small>los llamó el vendedor</small></div><div class="v mono">${num(c.contactado+c.cotizo+c.compro)}</div></div>
+      <div class="est5"><div class="l">📄 Cotizaron<small>pidieron precio</small></div><div class="v mono">${num(c.cotizo+c.compro)}</div></div>
+      <div class="est5 compro"><div class="l">💰 Compraron<small>cerró la venta</small></div><div class="v mono">${num(c.compro)}</div></div>
+    </div>`;
+    const conv=ints.length?(c.compro/ints.length*100).toFixed(1):0;
+
+    $('main').innerHTML=`<section>
+      <h2>El embudo · ${conv}% termina en venta</h2>
+      ${emb}
+      <h2>Contactos capturados</h2>
+      ${ints.map(i=>{
+        const sinD=!i.whatsapp&&!i.correo;
+        const w=String(i.whatsapp||'').replace(/\D/g,'');
+        return `<div class="int ${sinD?'sinDatos':''}">
+          <div class="n">${esc(i.lead_nombre||'—')}</div>
+          <div class="d">${i.contacto?esc(i.contacto)+' · ':''}
+            ${w?`<a href="https://wa.me/57${esc(w)}" target="_blank">📲 ${esc(i.whatsapp)}</a>`:''}
+            ${i.correo?' · '+esc(i.correo):''}
+            ${sinD?'<b style="color:var(--warn)">⚠️ sin contacto — no se paga</b>':''}
+            <br><span style="color:var(--faint)">${esc(i.agente)} · ${String(i.creado_en).slice(0,10)}</span></div>
+          ${sinD?'':`<div class="sel">${VENTA.map(([k,t])=>
+            `<button class="${(i.estado_venta||'nuevo')===k?'on':''}" onclick="M.venta(${i.id},'${k}')">${t}</button>`).join('')}</div>`}
+        </div>`;}).join('')||'<div class="vacio">Todavía no hay interesados.</div>'}
+    </section>`;
+  },
+
+  async venta(id,k){
+    if(!await PATCH('mkr_llamadas?id=eq.'+id,{estado_venta:k,actualizado:new Date().toISOString()})){
+      toast('No se pudo guardar'); return; }
+    const f=this.filas.find(x=>x.id===id); if(f)f.estado_venta=k;
+    toast('Marcado como '+k); this.pintar();
+  },
+  async estado(id,e){
+    const txt={restringido:'restringir',anulado:'anular',activo:'habilitar'}[e];
+    if(!confirm('¿Seguro que quieres '+txt+' a esta persona?'))return;
+    if(!await PATCH('mkr_agentes?id=eq.'+id,{estado:e})){ toast('No se pudo'); return; }
+    const a=this.agentes.find(x=>x.id===id); if(a)a.estado=e;
+    toast('Quedó '+e); this.pintar();
+  },
+  async subir(id){
+    const a=this.agentes.find(x=>x.id===id); if(!a)return;
+    const i=NIVELES.indexOf(a.nivel||'principiante');
+    if(i>=NIVELES.length-1){ toast('Ya está en el nivel más alto'); return; }
+    const n=NIVELES[i+1];
+    if(!confirm('¿Subir a '+a.nombre+' a nivel '+n+'?'))return;
+    if(!await PATCH('mkr_agentes?id=eq.'+id,{nivel:n})){ toast('No se pudo'); return; }
+    a.nivel=n; toast(a.nombre+' ahora es '+n); this.pintar();
+  }
+};
+M.cargar(); setInterval(()=>M.cargar(),8000);
+</script>
+</body>
+</html>
