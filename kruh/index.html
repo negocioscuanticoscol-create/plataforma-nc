@@ -418,9 +418,10 @@ const App={
           ${ab==='rec'?(sinRec.length?chips(sinRec):'<div class="hint">Ninguno, todos tienen ingredientes.</div>'):''}
           <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid var(--line2);cursor:pointer"
                onclick="App._recAviso=App._recAviso==='pre'?'':'pre';App.vRecetas()">
-            <span style="font-size:13.5px">${ab==='pre'?'▾':'▸'} Productos con <b>precio viejo</b> <span class="dim">(la materia prima cambió de valor)</span></span>
+            <span style="font-size:13.5px">${ab==='pre'?'▾':'▸'} Productos <b>descuadrados</b> <span class="dim">(no coinciden con Compras)</span></span>
             <b style="font-size:19px;color:${prodsDesact.length?'var(--bad)':'var(--ok)'}">${prodsDesact.length}</b></div>
-          ${ab==='pre'?(prodsDesact.length?chips(prodsDesact)+`<div style="margin-top:8px"><button class="btn gh sm" onclick="App.recSyncTodo()">↻ Actualizar todos con el precio de Compras</button></div>`:'<div class="hint">Ninguno, todos están al precio de hoy.</div>'):''}
+          ${ab==='pre'?(prodsDesact.length?chips(prodsDesact)+`<div style="margin-top:8px"><button class="btn gh sm" onclick="App.recSyncTodo()">↻ Ponerlos al precio de Compras</button></div>
+            <div class="hint" style="margin-top:6px">Normalmente esto va en cero: al registrar una compra el precio baja solo a las recetas. Si aparece alguno, suele ser porque le cambiaron el nombre al insumo.</div>`:'<div class="hint">Ninguno. El precio de la última compra ya está en todas las recetas.</div>'):''}
           <div class="hint" style="margin-top:8px">De ${prods.length} productos. Toca un número para ver cuáles, y el nombre para abrirlo.</div>`
         :`<div class="row" style="justify-content:space-between;align-items:center">
             <div><div style="font-family:Fraunces,serif;font-size:16px;color:var(--ok)">✓ Todo al día</div>
@@ -448,11 +449,12 @@ const App={
                     <span style="color:var(--mut);white-space:nowrap;margin-right:8px">${num(cant)} ${u} × ${money(cu)}/${u||'u'}</span>
                     <b style="white-space:nowrap">${money(cant*cu)}</b>
                     <span style="flex:none;white-space:nowrap;margin-left:6px"><a onclick="App.recModal('${p.id}','${r.id}')" style="color:var(--acc);cursor:pointer">✎</a> <a onclick="App.recDel('${r.id}')" style="color:var(--bad);cursor:pointer;margin-left:2px">✕</a></span></div>
-                  ${v?`<div style="font-size:11.5px;color:var(--warn);padding:1px 0 2px">⚠️ En Compras hoy vale <b>${money(v.cu)}/${esc(v.uni||u||'u')}</b> · quedaría en <b>${money(cant*v.cu)}</b>
-                    <a onclick="App.recSyncUno('${r.id}',${v.cu})" style="color:var(--acc);cursor:pointer;font-weight:700;margin-left:4px">actualizar</a></div>`:''}
+                  ${v?`<div style="font-size:11.5px;color:var(--warn);padding:1px 0 2px">⚠️ La última compra quedó en <b>${money(v.cu)}/${esc(v.uni||u||'u')}</b> · costaría <b>${money(cant*v.cu)}</b>
+                    <a onclick="App.recSyncUno('${r.id}',${v.cu})" style="color:var(--acc);cursor:pointer;font-weight:700;margin-left:4px">poner ese precio</a></div>`:''}
                 </div>`;}).join(''):'<div class="hint">Sin ingredientes.</div>'}
               <button class="btn gh sm full" onclick="App.recModal('${p.id}')">＋ Adicionar ingrediente</button>
-              ${rr.some(viejo)?`<button class="btn gh sm full" onclick="App.recSync('${p.id}')" style="color:var(--warn)">↻ Actualizar todos con el precio de Compras</button>`:''}</div>
+              ${rr.some(viejo)?`<button class="btn gh sm full" onclick="App.recSync('${p.id}')" style="color:var(--warn)">↻ Ponerlos todos al precio de Compras</button>`:''}
+              <div class="hint" style="margin-top:5px">El precio de cada insumo es el de su última compra y no se mueve hasta que registres una nueva.</div></div>
             <div style="margin-top:10px;background:var(--paper);border-radius:9px;padding:9px 11px;font-size:12.5px">
               <div class="row" style="justify-content:space-between"><span class="dim">Costo ingredientes</span><b>${money(costo)}</b></div>
               <div class="row" style="justify-content:space-between"><span class="dim">Precio venta</span><b>${money(precio)}</b></div>
@@ -1336,7 +1338,8 @@ const App={
         <div class="g2"><div><label>Cantidad</label><input id="cp_cant" type="number"></div>
         <div><label>Precio x unidad</label><input id="cp_precio" type="number"></div></div>
         <button class="btn acc full" onclick="App.cpSave()">Registrar compra → materia prima</button></div></div>
-      <div class="hint">La compra suma al stock de materia prima y actualiza su costo, que alimenta las recetas.</div>`;
+      <div class="hint">La compra suma al stock y deja ese precio como el costo del insumo. Desde ahí,
+        todas las recetas que lo usan quedan costeadas a ese valor, hasta la próxima compra.</div>`;
   },
   cpProds(){ const pid=$('cp_prov').value, prods=(this._pp||[]).filter(x=>x.proveedor_id===pid), w=$('cp_wrap'); if(!pid){w.style.display='none';return;} w.style.display='block';
     $('cp_prod').innerHTML=prods.length?prods.map(x=>`<option value="${x.id}" data-n="${esc(x.nombre)}" data-uni="${esc(x.unidad||'kg')}" data-val="${x.valor||0}">${esc(x.nombre)} · ${money(x.valor)}/${esc(x.unidad||'kg')}</option>`).join(''):'<option value="">— sin productos; agrégalos en el directorio del proveedor —</option>'; this.cpPre(); },
@@ -1344,10 +1347,24 @@ const App={
   async cpSave(){ const s=$('cp_prod'), o=s.options[s.selectedIndex]; if(!o||!o.value){alert('Escoge un producto');return;}
     const cant=+$('cp_cant').value||0, precio=+$('cp_precio').value||0; if(cant<=0){alert('Pon la cantidad');return;}
     const pid=$('cp_prov').value, provNom=((this._provs||[]).find(x=>x.id===pid)||{}).nombre||'';
-    const ex=(await GET('kruh_materiaprima?prov_producto_id=eq.'+o.value+'&select=id,existencias'))[0];
-    if(ex) await PATCH('kruh_materiaprima?id=eq.'+ex.id,{existencias:(+ex.existencias||0)+cant,costo_unit:precio,proveedor:provNom});
-    else await POST('kruh_materiaprima',{nombre:o.dataset.n,unidad:o.dataset.uni,existencias:cant,costo_unit:precio,proveedor_id:pid,proveedor:provNom,prov_producto_id:o.value});
-    toast('Compra registrada · materia prima actualizada'); this.go('materiaprima'); },
+    const ex=(await GET('kruh_materiaprima?prov_producto_id=eq.'+o.value+'&select=id,existencias,nombre'))[0];
+    let nom=o.dataset.n;
+    if(ex){ nom=ex.nombre||nom; await PATCH('kruh_materiaprima?id=eq.'+ex.id,{existencias:(+ex.existencias||0)+cant,costo_unit:precio,proveedor:provNom}); }
+    else await POST('kruh_materiaprima',{nombre:nom,unidad:o.dataset.uni,existencias:cant,costo_unit:precio,proveedor_id:pid,proveedor:provNom,prov_producto_id:o.value});
+    /* el precio de la compra manda de aquí en adelante: baja solo a todas las
+       recetas que usan este insumo, para no costear con precios viejos */
+    const n=await this._propagarPrecio(nom,precio);
+    toast('Compra registrada'+(n?' · '+n+(n===1?' receta recosteada':' recetas recosteadas'):' · materia prima actualizada')); this.go('materiaprima'); },
+  /* Deja el precio del insumo hasta que llegue una compra nueva. Cuando llega,
+     ese valor pasa a ser el costo en TODAS las recetas que lo usan. */
+  async _propagarPrecio(nombre,cu){
+    const k=String(nombre||'').trim().toLowerCase(); if(!k) return 0;
+    const rs=await GET('kruh_recetas?select=id,ingrediente,costo_unit&limit=5000');
+    const pend=(rs||[]).filter(r=>String(r.ingrediente||'').trim().toLowerCase()===k
+      && Math.abs((+r.costo_unit||0)-(+cu||0))>0.009);
+    if(!pend.length) return 0;
+    await PATCH('kruh_recetas?id=in.('+pend.map(r=>r.id).join(',')+')',{costo_unit:+cu||0});
+    return pend.length; },
   provProdModal(provId,id){ const x=(this._pp||[]).find(y=>y.id===id)||{};
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar':'Agregar'} producto del proveedor</h3>
       <label>Producto</label><input id="pp_nom" value="${esc(x.nombre||'')}" placeholder="Harina de trigo…">
@@ -1424,7 +1441,9 @@ const App={
       <button class="btn acc full" onclick="App.mpSave('${id||''}')">Guardar</button>
       ${id?`<button class="btn gh full" style="color:var(--bad)" onclick="App.mpDel('${id}')">Eliminar</button>`:''}`); },
   async mpSave(id){ const s=$('mp_prov'), o=s.options[s.selectedIndex], b={nombre:$('mp_nom').value.trim(),categoria:$('mp_cat').value.trim(),unidad:$('mp_uni').value.trim()||'kg',costo_unit:+$('mp_cu').value||0,stock_min:+$('mp_min').value||0,proveedor_id:s.value||null,proveedor:s.value?o.dataset.n:null};
-    if(!b.nombre){alert('Nombre');return;} if(id)await PATCH('kruh_materiaprima?id=eq.'+id,b); else await POST('kruh_materiaprima',b); cerrar(); toast('Guardado'); this._mpTab='lista'; this.vMateriaPrima(); },
+    if(!b.nombre){alert('Nombre');return;} if(id)await PATCH('kruh_materiaprima?id=eq.'+id,b); else await POST('kruh_materiaprima',b);
+    const n=await this._propagarPrecio(b.nombre,b.costo_unit);
+    cerrar(); toast('Guardado'+(n?' · '+n+(n===1?' receta recosteada':' recetas recosteadas'):'')); this._mpTab='lista'; this.vMateriaPrima(); },
   async mpDel(id){ if(!this._okBorrar())return; await DEL('kruh_materiaprima?id=eq.'+id); cerrar(); this.vMateriaPrima(); },
   mpMov(id,tipo){ const m=(this._mp||[]).find(x=>x.id===id)||{}; const v=prompt((tipo==='entrada'?'Cantidad que ENTRA':'Cantidad que se CONSUME')+' ('+(m.unidad||'kg')+'):'); if(v===null)return; const q=+v||0; if(q<=0)return;
     const nueva=(+m.existencias||0)+(tipo==='entrada'?q:-q); PATCH('kruh_materiaprima?id=eq.'+id,{existencias:nueva}).then(()=>{toast('Stock actualizado');this.vMateriaPrima();}); },
