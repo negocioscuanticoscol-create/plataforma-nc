@@ -1641,22 +1641,62 @@ const App={
     return R;
   },
   /* descuentos dados en los pedidos del periodo: n = cuantos pedidos, v = cuanta plata */
-  _descAgrupa(peds,filtro){ const R={n:0,v:0};
+  _descAgrupa(peds,filtro){ const R={n:0,v:0,lista:[]};
     (peds||[]).forEach(p=>{ const k=this._diaKey(p.creado_en); if(!k||!filtro(k))return;
-      const dd=+p.descuento||0; if(dd>0){ R.n++; R.v+=dd; } });
+      const dd=+p.descuento||0; if(dd>0){ R.n++; R.v+=dd;
+        R.lista.push({cliente:p.cliente||'Mostrador', dia:k, total:+p.total||0, desc:dd}); } });
+    R.lista.sort((a,b)=>b.desc-a.desc);
     return R; },
+
+  /* Al tocar cualquiera de las tres cifras se abre el detalle de qué la compone.
+     Los datos ya estaban calculados; antes solo no se mostraban. */
+  mmDetalle(cla,per){
+    const P={dia:'hoy',mes:'este mes',ano:'este año'}[per]||per;
+    const R=(this._mm||{})[per]; if(!R){ toast('Vuelve a abrir Ventas'); return; }
+    const fila=(a,b,c,d)=>`<div class="row" style="justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line2);gap:8px">
+      <div style="min-width:0"><div style="font-weight:600;font-size:13px">${esc(a)}</div>
+      ${b?`<small class="dim" style="font-size:11px">${esc(b)}</small>`:''}</div>
+      <div style="text-align:right;white-space:nowrap"><b style="font-size:13px">${c}</b>
+      ${d?`<div style="font-size:11px;color:var(--mut)">${d}</div>`:''}</div></div>`;
+
+    if(cla==='desc'){
+      const L=R.desc&&R.desc.lista||[];
+      modal(`<h3 style="font-family:Fraunces,serif">💸 Descuentos · ${P}</h3>
+        <div class="sub">${L.length} pedido(s) · ${money(R.desc.v)} que se dejó de cobrar</div>
+        ${L.length?L.map(x=>fila(x.cliente, x.dia+' · pedido de '+money(x.total), '−'+money(x.desc),
+            x.total>0?((x.desc*100/(x.total+x.desc)).toFixed(1)+'% del pedido'):'')).join('')
+          :'<div class="empty">Sin descuentos en este periodo.</div>'}
+        <button class="btn gh full" style="margin-top:12px" onclick="cerrar()">Cerrar</button>`);
+      return;
+    }
+
+    const esMus=cla==='mus';
+    const items=Object.values(R.prod||{})
+      .map(o=>({nom:o.nom, q:esMus?o.mus:o.per, v:esMus?o.musV:o.perV}))
+      .filter(o=>o.q>0).sort((a,b)=>b.v-a.v);
+    const tot=items.reduce((s,o)=>s+o.v,0);
+    modal(`<h3 style="font-family:Fraunces,serif">${esMus?'🎁 Muestras regaladas':'❌ Ventas perdidas'} · ${P}</h3>
+      <div class="sub">${items.reduce((s,o)=>s+o.q,0)} unidad(es) · ${money(tot)} valorado al precio de lista</div>
+      ${items.length?items.map(o=>fila(o.nom, o.q+' und × '+money(o.q?o.v/o.q:0), money(o.v),
+          tot>0?((o.v*100/tot).toFixed(0)+'% del total'):'')).join('')
+        :'<div class="empty">Sin registros en este periodo.</div>'}
+      ${items.length?`<div class="hint" style="margin-top:9px">Se valora al <b>precio de venta</b>, no al costo. Es lo que se dejó de facturar, no lo que costó producirlo.</div>`:''}
+      <button class="btn gh full" style="margin-top:12px" onclick="cerrar()">Cerrar</button>`);
+  },
   _mmCard(movs,prods,peds){
     const hoyK=this._diaKey(new Date()), mesK=hoyK.slice(0,7), anoK=hoyK.slice(0,4);
     const F={dia:k=>k===hoyK, mes:k=>k.slice(0,7)===mesK, ano:k=>k.slice(0,4)===anoK};
     const d=this._mmAgrupa(movs,prods,F.dia), m=this._mmAgrupa(movs,prods,F.mes), a=this._mmAgrupa(movs,prods,F.ano);
     d.desc=this._descAgrupa(peds,F.dia); m.desc=this._descAgrupa(peds,F.mes); a.desc=this._descAgrupa(peds,F.ano);
-    const cel=(t,o,col)=>`<div style="flex:1;text-align:center;padding:5px 3px">
+    this._mm={dia:d,mes:m,ano:a};
+    const cel=(t,o,col,cla,per)=>`<div onclick="App.mmDetalle('${cla}','${per}')" title="Ver de qué está compuesto"
+      style="flex:1;text-align:center;padding:5px 3px;cursor:pointer;border-radius:8px">
       <b style="display:block;font-family:Fraunces,serif;font-size:23px;color:${col};line-height:1.1">${num(o.n)}</b>
       <span style="font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em">${t}</span>
       <div style="font-size:11px;color:${col};font-weight:700;margin-top:2px">${money(o.v)}</div></div>`;
     const bloque=(tit,cla,col,bg,brd)=>`<div style="flex:1;min-width:225px;border:1.5px solid ${brd};background:${bg};border-radius:11px;padding:8px 9px">
-      <div style="font-family:Fraunces,serif;font-size:15px;color:${col};margin-bottom:3px">${tit}</div>
-      <div class="row" style="gap:3px">${cel('Hoy',d[cla],col)}${cel('Mes',m[cla],col)}${cel('Año',a[cla],col)}</div></div>`;
+      <div style="font-family:Fraunces,serif;font-size:15px;color:${col};margin-bottom:3px">${tit} <small style="font-size:10px;color:var(--mut);font-family:inherit">toca para ver el detalle</small></div>
+      <div class="row" style="gap:3px">${cel('Hoy',d[cla],col,cla,'dia')}${cel('Mes',m[cla],col,cla,'mes')}${cel('Año',a[cla],col,cla,'ano')}</div></div>`;
     return `<div class="card">
       <div class="row" style="gap:9px;flex-wrap:wrap;align-items:stretch">
         ${bloque('🎁 Muestras regaladas','mus','var(--ok)','var(--okbg)','var(--ok)')}
