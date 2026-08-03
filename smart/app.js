@@ -126,6 +126,7 @@ const App = {
     const ROW1=[
       {v:'panel', ic:'📈', t:'Panel'},
       {v:'crm', ic:'📇', t:'CRM'},
+      {v:'chats', ic:'💬', t:'Chats'},
       {v:'cotizaciones', ic:'📝', t:'Cotizar'},
       {v:'pedidos', ic:'📦', t:'Pedidos'},
       {v:'despachos', ic:'🚚', t:'Despachos'},
@@ -140,9 +141,9 @@ const App = {
       {v:'admin', ic:'⚙️', t:'Equipo'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones'],
-      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones'],
+    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats','datos','admin','permisos'];
+    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats'],
+      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
       facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
@@ -175,6 +176,7 @@ const App = {
     // Multi-empresa: módulos de Feroz que aún no tienen versión propia para otra empresa
     if(view==='cotizaciones' && window.NC_EMPRESA==='smart') return this.vCotLanding();   // Smart: landing nc_cotizaciones · Feroz cae a vCotizaciones (tabla 'cotizaciones')
     if(view==='datos') return this.vDatos();   // visor de la superdata (leer Supabase como el Sheet)
+    if(view==='chats') return this.vChats();   // conversaciones del agente (nc_agente_mem)
     if(window.NC_EMPRESA==='smart' && view==='crm') return this.vCrmSmart();
     if(window.NC_EMPRESA==='smart' && view==='planta') return this.vPlantaSmart();
     if(window.NC_EMPRESA==='smart' && view==='clientes') return this.vClientesSmart();
@@ -194,6 +196,108 @@ const App = {
       pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos}[view] || this.vDashboard).call(this);
   },
   set(html){ $('main').innerHTML = this._subnav() + html; },
+
+  /* ================= CHATS DEL AGENTE =================
+     Lo que Valentina (y Sofía) hablan con la gente. Vive en nc_agente_mem y
+     hasta hoy no se veía en ninguna parte: por eso estuvo 13 días muda sin que
+     nadie se enterara. */
+  RELLENO:'dame un segundo',
+  async vChats(){
+    this.set('<h1>Chats</h1><div class="sub">Cargando conversaciones…</div>');
+    const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
+    let msgs=[], leads=[];
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_agente_mem?order=creado_en.desc&limit=4000',{headers:H});
+      const j=await r.json(); msgs=Array.isArray(j)?j:[]; }catch(e){}
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads?select=telefono,nombre,ciudad,etiqueta,interes&limit=3000',{headers:H});
+      const j=await r.json(); leads=Array.isArray(j)?j:[]; }catch(e){}
+    if(!msgs.length){ this.set('<h1>Chats</h1><div class="card">No se pudieron leer las conversaciones.</div>'); return; }
+    const byTel={}; leads.forEach(l=>{ const k=String(l.telefono||'').replace(/\D/g,'').slice(-10); if(k) byTel[k]=l; });
+    this._chatLeads=byTel; this._chatMsgs=msgs;
+    this._chatsPaint();
+  },
+  _tel10(t){ return String(t||'').replace(/\D/g,'').slice(-10); },
+  _chatsPaint(){
+    const msgs=this._chatMsgs||[], leads=this._chatLeads||{};
+    const emp=this._chatEmp||'', q=(this._chatQ||'').trim().toLowerCase();
+    /* se agrupa por teléfono: una fila por persona, con su último mensaje */
+    const conv={};
+    msgs.forEach(m=>{ const k=this._tel10(m.telefono); if(!k) return;
+      if(emp && m.empresa!==emp) return;
+      const c=conv[k]=conv[k]||{tel:k,empresa:m.empresa,msgs:[],ult:null,nCli:0};
+      c.msgs.push(m);
+      if(!c.ult || String(m.creado_en)>String(c.ult.creado_en)) c.ult=m;
+      if(m.rol==='user') c.nCli++; });
+    let lista=Object.values(conv).sort((a,b)=>String(b.ult.creado_en).localeCompare(String(a.ult.creado_en)));
+    if(q) lista=lista.filter(c=>{ const l=leads[c.tel]||{};
+      return c.tel.includes(q) || String(l.nombre||'').toLowerCase().includes(q); });
+    /* atascada = la última respuesta del agente fue el relleno */
+    const atascada=c=>{ const asis=c.msgs.filter(m=>m.rol==='assistant')
+        .sort((a,b)=>String(b.creado_en).localeCompare(String(a.creado_en)))[0];
+      return asis && String(asis.contenido||'').includes(this.RELLENO); };
+    const ahora=Date.now();
+    const esperando=c=>c.ult.rol==='user' && (ahora-new Date(c.ult.creado_en))<24*3600e3;
+    const nAt=lista.filter(atascada).length, nEsp=lista.filter(esperando).length;
+    const abierta=this._chatOpen;
+    if(abierta && conv[abierta]) return this._chatHilo(conv[abierta]);
+    this.set(`<h1>Chats</h1>
+      <div class="sub">Lo que el agente habla con la gente. Toca una conversación para leerla completa.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <select onchange="App._chatEmp=this.value;App._chatsPaint()" style="width:auto;padding:9px;border:1.5px solid var(--linea);border-radius:9px">
+          <option value="" ${emp?'':'selected'}>Todas</option>
+          <option value="smart" ${emp==='smart'?'selected':''}>Smart</option>
+          <option value="feroz" ${emp==='feroz'?'selected':''}>Feroz</option></select>
+        <input placeholder="Buscar nombre o celular…" value="${esc(this._chatQ||'')}"
+          oninput="App._chatQ=this.value;clearTimeout(App._chatT);App._chatT=setTimeout(()=>App._chatsPaint(),300)"
+          style="flex:1;min-width:150px;padding:10px;border:1.5px solid var(--linea);border-radius:9px">
+        <button class="btn-sm" style="background:#eef1f5" onclick="App.vChats()">↻</button></div>
+      ${(nAt||nEsp)?`<div class="card" style="border-left:4px solid ${nAt?'#c0392b':'var(--naranja)'};padding:11px 14px">
+        ${nAt?`<div style="font-weight:700;color:#c0392b">⚠️ ${nAt} conversación${nAt===1?'':'es'} atascada${nAt===1?'':'s'}</div>
+          <div style="font-size:12.5px;margin-top:3px">La última respuesta fue «Disculpa, dame un segundo». El cliente quedó sin respuesta real.</div>`:''}
+        ${nEsp?`<div style="font-size:12.5px;margin-top:${nAt?'7px':'0'}"><b>${nEsp}</b> esperando respuesta con la ventana de 24h abierta — a esas se les puede escribir libre.</div>`:''}
+      </div>`:''}
+      <div class="sub" style="margin:10px 0 6px">${lista.length} conversación${lista.length===1?'':'es'}</div>
+      ${lista.slice(0,120).map(c=>{
+        const l=leads[c.tel]||{}, at=atascada(c), esp=esperando(c);
+        const t=new Date(c.ult.creado_en);
+        const hoy=new Date().toDateString()===t.toDateString();
+        const cuando=hoy?('hoy '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0'))
+          :(String(t.getDate()).padStart(2,'0')+'/'+String(t.getMonth()+1).padStart(2,'0'));
+        return `<div class="item" style="cursor:pointer;${at?'border-left:3px solid #c0392b':''}" onclick="App._chatOpen='${c.tel}';App._chatsPaint()">
+          <div class="top">
+            <div style="min-width:0;flex:1">
+              <div class="nom">${esc(l.nombre||'Sin nombre')}
+                ${at?'<span style="font-size:10px;background:#fdecec;color:#c0392b;padding:2px 7px;border-radius:10px;font-weight:700">atascada</span>':''}
+                ${esp&&!at?'<span style="font-size:10px;background:#fff4e5;color:#8a5300;padding:2px 7px;border-radius:10px;font-weight:700">esperando</span>':''}</div>
+              <div class="meta">${esc(c.tel)}${l.ciudad?' · '+esc(l.ciudad):''} · ${c.empresa} · ${c.nCli} mensaje${c.nCli===1?'':'s'}</div>
+              <div style="font-size:12px;color:#6b7280;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                ${c.ult.rol==='user'?'👤 ':'🤖 '}${esc(String(c.ult.contenido||'').slice(0,70))}</div></div>
+            <div style="text-align:right;flex:none;font-size:11.5px;color:#8a93a6">${cuando}</div></div></div>`;}).join('')}
+      ${lista.length>120?`<div class="sub">Se muestran las 120 más recientes de ${lista.length}.</div>`:''}`);
+  },
+  _chatHilo(c){
+    const l=(this._chatLeads||{})[c.tel]||{};
+    const ord=c.msgs.slice().sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
+    const wa='https://wa.me/57'+c.tel;
+    this.set(`<div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+        <button class="btn-sm" style="background:#eef1f5" onclick="App._chatOpen=null;App._chatsPaint()">← Volver</button>
+        <a class="btn-sm" style="background:#25D366;color:#fff;text-decoration:none" href="${wa}" target="_blank">💬 Abrir WhatsApp</a></div>
+      <h1>${esc(l.nombre||'Sin nombre')}</h1>
+      <div class="sub">${esc(c.tel)}${l.ciudad?' · '+esc(l.ciudad):''} · ${c.empresa}${l.etiqueta?' · '+esc(l.etiqueta):''}${l.interes?' · '+esc(l.interes):''}</div>
+      <div class="card" style="padding:12px">
+      ${ord.map(m=>{
+        const yo=m.rol!=='user', rell=String(m.contenido||'').includes(this.RELLENO);
+        const mat=m.rol==='material';
+        const t=new Date(m.creado_en);
+        const hh=String(t.getDate()).padStart(2,'0')+'/'+String(t.getMonth()+1).padStart(2,'0')+' '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+        if(mat) return `<div style="text-align:center;font-size:11px;color:#8a93a6;padding:5px 0">📎 ${esc(String(m.contenido||'').slice(0,80))} · ${hh}</div>`;
+        return `<div style="display:flex;justify-content:${yo?'flex-end':'flex-start'};margin:5px 0">
+          <div style="max-width:78%;padding:8px 11px;border-radius:12px;font-size:13px;line-height:1.45;
+               background:${yo?(rell?'#fdecec':'#e7f0ff'):'#f2f3f5'};${rell?'border:1px solid #f0c4c4':''}">
+            ${esc(m.contenido||'').replace(/\n/g,'<br>')}
+            <div style="font-size:10px;color:#8a93a6;margin-top:3px">${hh}${rell?' · ⚠️ sin respuesta real':''}</div></div></div>`;}).join('')}
+      </div>`);
+    window.scrollTo(0,document.body.scrollHeight);
+  },
   enConstruccion(view){
     const N={cotizaciones:'Cotizador',cotizacionNueva:'Cotizador',pedidos:'Validación de pedidos',despachos:'Despachos',ventas:'Ventas',clientes:'Clientes',crm:'CRM',cobertura:'Cobertura',planta:'Planta'}[view]||view;
     this.set(`<h1>${N}</h1>
