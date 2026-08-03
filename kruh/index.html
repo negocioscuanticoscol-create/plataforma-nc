@@ -583,7 +583,7 @@ const App={
         <div style="flex:0 0 228px;position:sticky;top:58px" class="card">
           <div style="font-family:Fraunces,serif;font-size:17px;margin-bottom:8px">La cuenta</div>
           <input id="pd_tel" type="tel" inputmode="numeric" maxlength="14" placeholder="Celular — 10 dígitos" value="${esc(this._cartTel||'')}" oninput="App.pedTelLookup(this.value)">
-          <div id="pd_found" style="font-size:11px;font-weight:700;margin:4px 0 2px;${this._cartHallado?'':'display:none'}">${this._cartHallado||''}</div>
+          <div id="pd_found" style="font-size:11.5px;font-weight:600;line-height:1.45;margin:5px 0 2px;display:none"></div>
           <input id="pd_cli" placeholder="Cliente — también se busca solo" style="margin-bottom:6px" value="${esc(this._cartCli||'')}" oninput="App.pedNomLookup(this.value)">
           <input id="pd_dir" placeholder="Dirección" style="margin-bottom:6px" value="${esc(this._cartDir||'')}" oninput="App._cartDir=this.value">
           <label class="row" style="gap:6px;align-items:center;font-size:12.5px;margin-bottom:6px;cursor:pointer">
@@ -612,6 +612,7 @@ const App={
         </div>
       </div>
       `);
+    this._pintaHallado();   // el semáforo del teléfono sobrevive al repintado
   },
   /* Vaciar deja la cuenta como recien abierta: productos, totales y datos del cliente */
   vaciarCuenta(){ this._cart={}; this._cartDom=0; this._cartDesc=0;
@@ -622,9 +623,8 @@ const App={
   pedTelLookup(v){ this._cartTel=v;
     const t=this._telKey(v), l=t.length>=10?(this._telMap||{})[t]:null;
     if(!l){ // no está en el CRM: con el teléfono ya completo se marca solo como cliente nuevo
-      if(t.length>=10){ this._cartTipo='nuevo'; if($('pd_tipo'))$('pd_tipo').value='nuevo';
-        this._cartHallado='＋ No está en el CRM — se registra como cliente nuevo'; }
-      else this._cartHallado='';
+      if(t.length>=10){ this._cartTipo='nuevo'; if($('pd_tipo'))$('pd_tipo').value='nuevo'; }
+      this._cartHallado='';
       this._pintaHallado(); return; }
     this._cartCli=l.nombre||''; this._cartDir=l.direccion||'';
     this._cartPromo=!!l.infopromos; this._cartTipo=l.tipo||'comunidad';
@@ -632,8 +632,7 @@ const App={
     if($('pd_dir'))$('pd_dir').value=this._cartDir;
     if($('pd_promo'))$('pd_promo').checked=this._cartPromo;
     if($('pd_tipo'))$('pd_tipo').value=this._cartTipo;
-    this._cartHallado=(l._dup>1?'⚠️ '+l._dup+' contactos tienen este mismo teléfono · se cargó '+l.nombre
-                              :'✓ '+l.nombre+' — ya está en el CRM');
+    this._cartHallado='';
     this._pintaHallado(); },
   /* normaliza un nombre: sin tildes, sin mayusculas, sin espacios de sobra */
   _nomKey(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -661,13 +660,45 @@ const App={
     if($('pd_tipo'))$('pd_tipo').value=this._cartTipo;
     this._cartHallado='✓ '+l.nombre+' — ya está en el CRM';
     this._pintaHallado(); },
+  /* Semáforo del teléfono. La idea es que la cajera sepa SIEMPRE en qué va:
+     cuántos dígitos faltan, si el cliente ya existe, y qué le falta a su ficha.
+     Si se toma 20 segundos ahora, el dato queda bien para siempre; si no, se
+     repite el cliente o queda sin dirección y toca perseguirlo después. */
   _pintaHallado(){ const e=$('pd_found'); if(!e)return;
-    /* si todavia no son 10 digitos se avisa ahi mismo: un celular colombiano
-       tiene 10, y sin eso el cliente NO se puede registrar en el CRM. */
-    let h=this._cartHallado||'';
-    if(!h){ const d=this._telKey(this._cartTel||'');
-      if(d.length>0 && d.length<10) h='⚠️ Faltan '+(10-d.length)+' dígito(s) — un celular tiene 10'; }
-    e.textContent=h; e.style.display=h?'block':'none';
+    /* OJO: _telKey se queda con los ÚLTIMOS 10 dígitos, así que para saber si
+       sobran hay que contar los crudos. Con los de _telKey nunca daría >10. */
+    const raw=this._cartTel||'', crudo=String(raw).replace(/\D/g,''), d=this._telKey(raw);
+    let html='', col='';
+    if(this._cartHallado){ html=esc(this._cartHallado); col='var(--acc)'; }
+    else if(!crudo.length){ html=''; }
+    else if(crudo===this.TEL_ANONIMO){
+      html='🕶️ <b>Cliente anónimo</b> — no se guarda ficha. Solo para quien no quiere dejar datos.'; col='var(--mut)'; }
+    else if(crudo.length>10){
+      html='⚠️ Escribiste <b>'+crudo.length+' dígitos</b> y un celular tiene 10 · te '
+        +(crudo.length-10===1?'sobra 1':'sobran '+(crudo.length-10))+'. Bórralo y revisa el número.'; col='var(--bad)'; }
+    else if(crudo.length<10){
+      const f=10-crudo.length;
+      html='⌛ Van <b>'+crudo.length+' de 10</b> · falta'+(f===1?' 1 dígito':'n '+f+' dígitos'); col='var(--warn)'; }
+    else if(d[0]!=='3'){
+      html='⚠️ Los celulares en Colombia empiezan por <b>3</b>. ¿Es un fijo o está mal escrito?'; col='var(--bad)'; }
+    else {
+      const l=(this._telMap||{})[d];
+      if(l){
+        const falta=[];
+        if(!String(l.direccion||'').trim()) falta.push('la dirección');
+        if(!String(l.nombre||'').trim())    falta.push('el nombre');
+        html='✅ <b>'+esc(l.nombre||'(sin nombre)')+'</b> — ya está en el CRM'
+          + (l._dup>1?' · <span style="color:var(--bad)">⚠️ '+l._dup+' fichas con este mismo celular</span>':'')
+          + (falta.length?'<br><span style="color:var(--warn)">Le falta '+falta.join(' y ')
+              +'. Apróvechalo y pídesela: queda guardada para siempre.</span>':'');
+        col='var(--ok)';
+      } else {
+        html='➕ <b>No está en el CRM</b> — se va a crear con este pedido.'
+          +'<br><span style="color:var(--ink2)">Tómate 20 segundos: nombre completo y dirección. Queda para siempre y no vuelve a preguntarse.</span>';
+        col='var(--acc)';
+      }
+    }
+    e.innerHTML=html; e.style.color=col; e.style.display=html?'block':'none';
     e.style.color=/^⚠️/.test(h)?'var(--warn)':(/^✓/.test(h)?'var(--ok)':'var(--acc)'); },
   /* El 123 es el celular del cliente que no quiere dejar datos. No identifica a
      nadie, as\u00ed que nunca se usa para buscar ni para registrar. */
