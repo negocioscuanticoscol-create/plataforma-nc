@@ -2478,7 +2478,9 @@ const App = {
           <option value="">— Selecciona —</option>
           ${cli.map(c=>`<option value="${c.id}" data-con="${esc(c.contacto1||'')}" data-tel="${esc(c.tel||'')}">${esc(c.nombre)} (${esc(c.nit||'')})</option>`).join('')}
         </select>
-        <button class="btn-sm" style="background:var(--negro);color:#fff;margin-top:8px" onclick="App.nuevoClienteDesdeCot()">+ Cliente nuevo</button>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn-sm" style="background:var(--negro);color:#fff" onclick="App.nuevoClienteDesdeCot()">+ Cliente nuevo</button>
+          <button class="btn-sm" style="background:#eef1f5" onclick="App.editarClienteDesdeCot()">✎ Corregir datos de la empresa</button></div>
         <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:9px;margin-top:10px">
           <div><label style="margin-top:0">Persona de contacto</label>
             <input class="field" id="co_contacto" placeholder="A quién se le envía"></div>
@@ -2564,6 +2566,27 @@ const App = {
       const o=document.createElement('option'); o.value=c.id; o.textContent=`${c.nombre} (${c.nit||''})`;
       o.dataset.con=c.contacto1||''; o.dataset.tel=c.tel||'';
       o.selected=true; s.appendChild(o); this.cotContactoAuto(); });
+  },
+  /* Corregir la empresa sin salirse de la cotización. Al guardar, guardarCliente
+     ya propaga el cambio a las cotizaciones y pedidos que tengan su foto, así que
+     acá solo hay que refrescar lo que se ve en pantalla y no perder la selección. */
+  editarClienteDesdeCot(){
+    const s=$('co_cliente'), id=s&&s.value;
+    if(!id) return alert('Primero escoge la empresa que quieres corregir.');
+    const c=(this._clientes||[]).find(x=>String(x.id)===String(id));
+    if(!c) return alert('No encontré esa empresa en la lista.');
+    this.modalCliente(async ()=>{
+      const { data } = await this.sb.from('clientes')
+        .select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1')
+        .eq('id',id).single();
+      if(!data) return;
+      const i=(this._clientes||[]).findIndex(x=>String(x.id)===String(id));
+      if(i>=0) this._clientes[i]=Object.assign({},this._clientes[i],data);
+      const o=[...s.options].find(x=>String(x.value)===String(id));
+      if(o){ o.textContent=`${data.nombre} (${data.nit||''})`;
+             o.dataset.con=data.contacto1||''; o.dataset.tel=data.tel||''; }
+      s.value=id;
+    }, c);
   },
   curva(){
     let pares=0; const t={};
