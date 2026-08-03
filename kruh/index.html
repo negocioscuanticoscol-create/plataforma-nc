@@ -670,37 +670,52 @@ const App={
     e.textContent=h; e.style.display=h?'block':'none';
     e.style.color=/^⚠️/.test(h)?'var(--warn)':(/^✓/.test(h)?'var(--ok)':'var(--acc)'); },
   _normLeadName(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); },
+  /* Identificar al cliente. Regla de oro: ante la duda NO se adivina, porque
+     equivocarse no solo muestra mal — le graba la dirección de uno al otro.
+     Deja en _matchPor cómo lo encontró ('tel' o 'nombre'), que se usa para
+     decidir si es seguro tocarle los datos. */
   _findLeadMatch(tel,nom,excludeId){
+    this._matchPor='';
     const phone=this._telKey(String(tel||''));
     const q=this._normLeadName(nom||'');
-    const source=this._leads||[];
-    const cand=source.filter(l=>!excludeId || l.id!==excludeId);
+    const cand=(this._leads||[]).filter(l=>!excludeId || l.id!==excludeId);
+    const idem=l=>this._normLeadName(l.nombre||'')===q;
+    /* 1) El celular de 10 dígitos ES la identidad. Si viene celular, manda él:
+       no se cae al nombre, porque ahí es donde se cruzaban las personas. */
     if(phone.length>=10){
       const byPhone=cand.filter(l=>this._telKey(l.telefono)===phone);
-      if(byPhone.length){
-        const exact=byPhone.find(l=>this._normLeadName(l.nombre||'')===q);
-        return exact||byPhone[0];
+      if(byPhone.length===1){ this._matchPor='tel'; return byPhone[0]; }
+      if(byPhone.length>1){                       // varias fichas con el mismo celular
+        const ex=byPhone.filter(idem);
+        if(ex.length===1){ this._matchPor='tel'; return ex[0]; }
+        return null;                              // duplicados: no se adivina
       }
+      /* Nadie tiene ese celular. Solo se acepta una ficha con el nombre idéntico
+         Y sin celular guardado (es la misma persona, a la que le faltaba el dato). */
+      const sinTel=cand.filter(l=>!this._telKey(l.telefono)&&idem(l));
+      if(sinTel.length===1){ this._matchPor='nombre'; return sinTel[0]; }
+      return null;                                // celular nuevo = persona nueva
     }
-    if(q){
-      const byName=cand.filter(l=>this._normLeadName(l.nombre||'')===q);
-      if(byName.length) return byName[0];
-      /* Antes bastaba con que un nombre contuviera al otro, así que escribir "ana"
-         traía a Mariana, Juliana o Susana, y se quedaba con la primera de la lista.
-         Por eso al buscar salían clientes que no eran. Ahora tienen que coincidir
-         al menos DOS palabras completas de 3 letras o más, y gana la que más
-         comparta. Con una sola palabra no se adivina: mejor no proponer nada. */
-      const pal=s=>String(s||'').split(/\s+/).filter(w=>w.length>=3);
-      const qp=pal(q);
-      if(qp.length<2) return null;
-      const rank=cand.map(l=>{
-        const np=pal(this._normLeadName(l.nombre||''));
-        if(!np.length) return null;
-        const comunes=qp.filter(w=>np.includes(w)).length;
-        return comunes>=2 ? {l,comunes} : null;
-      }).filter(Boolean).sort((a,b)=>b.comunes-a.comunes);
-      if(rank.length) return rank[0].l;
-    }
+    if(!q) return null;
+    /* 2) Nombre idéntico, y que sea uno solo. */
+    const exactos=cand.filter(idem);
+    if(exactos.length===1){ this._matchPor='nombre'; return exactos[0]; }
+    if(exactos.length>1) return null;
+    /* 3) Nombre parcial. Antes bastaba con DOS palabras en común y eso cruzaba
+       personas distintas: en Colombia "Ana María", "Claudia Patricia" o "Julián
+       Andrés" los comparten decenas. Ahora el nombre corto tiene que estar
+       COMPLETO dentro del largo ("Laura Camila Duran" ⊂ "Laura Camila Duran
+       Robayo" sí; "Ana Maria Baena" vs "Ana Maria Samper" no), y si quedan dos
+       candidatos no se propone ninguno. */
+    const pal=s=>String(s||'').split(/\s+/).filter(w=>w.length>=3);
+    const qp=pal(q); if(qp.length<2) return null;
+    const hits=cand.filter(l=>{
+      const np=pal(this._normLeadName(l.nombre||''));
+      if(np.length<2) return false;
+      const [cortas,largas]=qp.length<=np.length?[qp,np]:[np,qp];
+      return cortas.every(w=>largas.includes(w));
+    });
+    if(hits.length===1){ this._matchPor='nombre'; return hits[0]; }
     return null;
   },
   /* guarda en memoria lo que este escrito, para que no se pierda al repintar la cuenta */
@@ -784,7 +799,12 @@ const App={
     const dir=(this._cartDir||'').trim(), promo=!!this._cartPromo, tipo=this._cartTipo||'comunidad';
     const ex=this._findLeadMatch(tel,cli);
     if(ex){ // ya está en el CRM: solo se actualiza lo que cambió
-      const b={}; if(dir&&dir!==ex.direccion)b.direccion=dir;
+      const b={};
+      /* La dirección solo se toca si la ficha no tenía, o si al cliente lo
+         identificamos por el CELULAR (ahí sí sabemos que es él). Pisarla desde
+         un match por nombre es lo que le metía la dirección de uno a otro. */
+      const dirVieja=String(ex.direccion||'').trim();
+      if(dir && this._matchPor==='tel' && dir!==dirVieja) b.direccion=dir;
       if(promo!==!!ex.infopromos)b.infopromos=promo;
       if(tipo!==ex.tipo)b.tipo=tipo;
       if(!this._telKey(ex.telefono)&&k.length>=10) b.telefono=String(tel||'').trim();
