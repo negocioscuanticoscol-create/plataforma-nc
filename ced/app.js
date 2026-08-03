@@ -2270,7 +2270,9 @@ const App = {
         <div style="display:flex;gap:6px"><input class="field" id="cl_busca" placeholder="Nombre o celular…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();App.buscarEnBasesCliente();}"><button class="btn-sm" style="background:var(--negro);color:#fff;white-space:nowrap" onclick="App.buscarEnBasesCliente()">Buscar</button></div>
         <div id="cl_busres"></div>
       </div>`}
-      <label>Nombre / Empresa *</label><input class="field" id="cl_nombre" value="${v(e.nombre)}">
+      <label>Empresa · razón social *</label><input class="field" id="cl_nombre" value="${v(e.nombre)}" placeholder="Como aparece en el RUT">
+      <label>Nombre comercial</label><input class="field" id="cl_comercial" value="${v(e.nombre_comercial)}" placeholder="Con el que se conoce el negocio">
+      <div class="hint">La razón social es la que va en la factura. El nombre comercial es con el que la gente lo llama — si son iguales, deja el segundo vacío.</div>
       <div class="row2"><div><label>NIT / Cédula <span style="color:#9aa3b0;font-weight:400">(opcional · después)</span></label><input class="field" id="cl_nit" value="${v(e.nit)}"></div>
         <div><label>Celular 1 *</label><input class="field" id="cl_tel" inputmode="tel" value="${v(e.tel)}"></div></div>
       <div class="row2">
@@ -2318,7 +2320,9 @@ const App = {
     if(falta.length){ const el=$(!nombre?'cl_nombre':'cl_tel'); if(el){el.style.borderColor='var(--rojo)';el.scrollIntoView({block:'center'});el.focus();}
       alert('⚠️ Falta llenar: '+falta.join(' y ')+'.\n(El NIT es opcional — lo agregas después.)'); return; }
     const numOr=(id)=>{ const el=$(id); if(!el||!el.value) return null; const n=+String(el.value).replace(/[^\d]/g,''); return isNaN(n)?null:n; };
-    const base={nombre,nit,tel,tipo_pago:$('cl_tipo').value,clase:($('cl_clase')?$('cl_clase').value:'empresa'),
+    const base={nombre,nit,tel,
+      nombre_comercial:($('cl_comercial')?$('cl_comercial').value.trim():''),
+      tipo_pago:$('cl_tipo').value,clase:($('cl_clase')?$('cl_clase').value:'empresa'),
       depto:$('cl_depto').value.trim(),ciudad:$('cl_ciudad').value.trim(),barrio:$('cl_barrio').value.trim(),
       direccion:$('cl_dir').value.trim(),localidad:($('cl_localidad')?$('cl_localidad').value.trim():''),
       correo:$('cl_correo').value.trim(),
@@ -2469,14 +2473,14 @@ const App = {
   async vCotizacionNueva(editId){
     this.loading();
     this._editCotId = editId||null;
-    const { data:cli=[] } = await this.sb.from('clientes').select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1').order('nombre');
+    const { data:cli=[] } = await this.sb.from('clientes').select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1,nombre_comercial').order('nombre');
     this.set(`
       <h1>${editId?'✏️ Editar':'Nueva'} cotización</h1><div class="sub">Bota Ref. 701 · ${money(C.PRECIO_PAR)}/par + IVA</div>
       <div class="card">
         <label>Empresa *</label>
         <select class="field" id="co_cliente" onchange="App.cotContactoAuto()">
           <option value="">— Selecciona —</option>
-          ${cli.map(c=>`<option value="${c.id}" data-con="${esc(c.contacto1||'')}" data-tel="${esc(c.tel||'')}">${esc(c.nombre)} (${esc(c.nit||'')})</option>`).join('')}
+          ${cli.map(c=>`<option value="${c.id}" data-con="${esc(c.contacto1||'')}" data-tel="${esc(c.tel||'')}">${esc(c.nombre)}${c.nombre_comercial?' · '+esc(c.nombre_comercial):''} (${esc(c.nit||'')})</option>`).join('')}
         </select>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button class="btn-sm" style="background:var(--negro);color:#fff" onclick="App.nuevoClienteDesdeCot()">+ Cliente nuevo</button>
@@ -2581,7 +2585,7 @@ const App = {
     if(error || !c) return alert('No se pudo abrir la ficha: '+((error&&error.message)||'no encontrada'));
     this.modalCliente(async ()=>{
       const { data } = await this.sb.from('clientes')
-        .select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1')
+        .select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1,nombre_comercial')
         .eq('id',id).single();
       if(!data) return;
       const i=(this._clientes||[]).findIndex(x=>String(x.id)===String(id));
