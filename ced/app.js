@@ -191,21 +191,24 @@ const App = {
   pintarNav(){
     const r=this.rol();
     // Hilera 1 (arriba) y Hilera 2 (abajo) — layout pedido por José
+    /* Tres hileras, en el orden que pidió José:
+       1 · lo comercial del día  2 · plata y operación  3 · plataforma */
     const ROW1=[
-      {v:'panel', ic:'📈', t:'Panel'},
       {v:'crm', ic:'📇', t:'CRM'},
       {v:'cotizaciones', ic:'📝', t:'Cotizar'},
       {v:'pedidos', ic:'📦', t:'Pedidos'},
-      {v:'inventario', ic:'🗃️', t:'Inventario'},
       {v:'despachos', ic:'🚚', t:'Despachos'},
-      {v:'cartera', ic:'💳', t:'Cartera'},
-      {v:'planta', ic:'🏭', t:'Planta'},
-      {v:'clientes', ic:'👥', t:'Clientes'},
-      {v:'comisiones', ic:'🧾', t:'Comisiones'},
-      {v:'gastos', ic:'💸', t:'Gastos'},
     ];
-    // hilera 2 = base de plataforma (solo admin la tiene en permitidos → solo a él le aparece)
     const ROW2=[
+      {v:'gastos', ic:'💸', t:'Gastos'},
+      {v:'inventario', ic:'🗃️', t:'Inventario'},
+      {v:'cartera', ic:'💳', t:'Cartera'},
+      {v:'comisiones', ic:'🧾', t:'Comisiones'},
+      {v:'planta', ic:'🏭', t:'Planta'},
+    ];
+    // hilera 3 = base de plataforma (solo admin la tiene en permitidos → solo a él le aparece)
+    const ROW3=[
+      {v:'panel', ic:'📈', t:'Panel'},
       {v:'datos', ic:'🗄️', t:'Datos'},
       {v:'admin', ic:'👤', t:'Usuarios'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
@@ -221,7 +224,10 @@ const App = {
     const btn=i=>`<button data-v="${i.v}" onclick="App.go('${i.v}')"><span class="ic">${i.ic}</span>${i.t}</button>`;
     const f1=ROW1.filter(i=>permitidos.includes(i.v)).map(btn).join('');
     const f2=ROW2.filter(i=>permitidos.includes(i.v)).map(btn).join('');
-    $('nav').innerHTML = `<div class="nav-row">${f1}</div>${f2?`<div class="nav-row nav-row2">${f2}</div>`:''}`;
+    const f3=ROW3.filter(i=>permitidos.includes(i.v)).map(btn).join('');
+    $('nav').innerHTML = `${f1?`<div class="nav-row">${f1}</div>`:''}`
+      + `${f2?`<div class="nav-row nav-row2">${f2}</div>`:''}`
+      + `${f3?`<div class="nav-row nav-row2">${f3}</div>`:''}`;
   },
   // sub-barra (pastillas) de la pestaña actual → integra los secundarios DENTRO de su pestaña
   _subnav(){
@@ -230,9 +236,13 @@ const App = {
     if(items.length<2) return '';
     return `<div style="display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;-webkit-overflow-scrolling:touch">${items.map(([v,ic,t])=>`<button onclick="App.go('${v}')" style="flex:0 0 auto;padding:7px 13px;border-radius:18px;border:none;font-weight:700;font-size:12.5px;cursor:pointer;background:${v===this.view?'var(--naranja);color:#fff':'#eef1f5;color:#555'}">${ic} ${t}</button>`).join('')}</div>`;
   },
+  /* Sub-barra de pastillas dentro de una pestaña. Clientes, Cobertura, Ventas y
+     Autopedido ya no tienen botón propio en las tres hileras, así que cuelgan de
+     CRM para que se sigan pudiendo abrir. Si José los quiere en otra hilera, se
+     sacan de acá y se suben a ROW1/2/3. */
   _GRUPOS:{
     panel:[['panel','📈','Panel'],['dashboard','📊','Resultados']],
-    clientes:[['clientes','👥','Clientes'],['cobertura','🗺️','Cobertura'],['ventas','💰','Ventas'],['autopedido','🛒','Autopedido']],
+    crm:[['crm','📇','CRM'],['clientes','👥','Clientes'],['cobertura','🗺️','Cobertura'],['ventas','💰','Ventas'],['autopedido','🛒','Autopedido']],
   },
   _grupoDe(view){ for(const g in this._GRUPOS){ if(this._GRUPOS[g].some(i=>i[0]===view)) return g; } return null; },
 

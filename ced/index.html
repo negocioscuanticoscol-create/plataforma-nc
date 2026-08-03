@@ -57,7 +57,8 @@
     background:#fff;color:var(--naranja);font-weight:800;font-size:15px;cursor:pointer;line-height:1}
   .ayuda:active{background:var(--gris)}
 
-  #main{flex:1;padding:14px 14px 120px}
+  /* el padding de abajo deja libre la barra: con TRES hileras es más alta */
+  #main{flex:1;padding:14px 14px 190px}
   h1{font-size:19px;margin-bottom:4px}
   .sub{color:var(--suave);font-size:13px;margin-bottom:14px}
 
@@ -211,7 +212,7 @@
 <script>
   // Versión fija → el navegador CACHEA los archivos (carga 1 vez y luego instantáneo).
   // Cuando se cambie el código, subir este número (NCVER) y el usuario hace Ctrl+Shift+R una vez.
-  var NCVER='20260803-ced14';
+  var NCVER='20260803-ced15';
   ['config.js','geo-co.js','app.js'].forEach(function(s){
     document.write('<scr'+'ipt src="'+s+'?v='+NCVER+'"><\/scr'+'ipt>');
   });
