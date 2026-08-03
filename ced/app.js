@@ -2473,12 +2473,19 @@ const App = {
     this.set(`
       <h1>${editId?'✏️ Editar':'Nueva'} cotización</h1><div class="sub">Bota Ref. 701 · ${money(C.PRECIO_PAR)}/par + IVA</div>
       <div class="card">
-        <label>Cliente *</label>
-        <select class="field" id="co_cliente">
+        <label>Empresa *</label>
+        <select class="field" id="co_cliente" onchange="App.cotContactoAuto()">
           <option value="">— Selecciona —</option>
-          ${cli.map(c=>`<option value="${c.id}">${esc(c.nombre)} (${esc(c.nit||'')})</option>`).join('')}
+          ${cli.map(c=>`<option value="${c.id}" data-con="${esc(c.contacto1||'')}" data-tel="${esc(c.tel||'')}">${esc(c.nombre)} (${esc(c.nit||'')})</option>`).join('')}
         </select>
         <button class="btn-sm" style="background:var(--negro);color:#fff;margin-top:8px" onclick="App.nuevoClienteDesdeCot()">+ Cliente nuevo</button>
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:9px;margin-top:10px">
+          <div><label style="margin-top:0">Persona de contacto</label>
+            <input class="field" id="co_contacto" placeholder="A quién se le envía"></div>
+          <div><label style="margin-top:0">Celular</label>
+            <input class="field" id="co_contacto_tel" placeholder="Del contacto"></div></div>
+        <div class="hint">Se llena solo con el contacto que tenga la empresa. Se puede cambiar: queda guardado
+          en esta cotización sin tocar la ficha del cliente.</div>
       </div>
       <div class="card" style="border:1.5px dashed var(--naranja)">
         <label style="margin:0"><b>🎁 ¿Cotizar una muestra?</b></label>
@@ -2534,6 +2541,8 @@ const App = {
       const { data:ec } = await this.sb.from('cotizaciones').select('*').eq('id',editId).single();
       if(ec){ this._editCot=ec;
         const s=$('co_cliente'); if(s) s.value=ec.cliente_id;
+        const cc=$('co_contacto');     if(cc) cc.value=ec.contacto||'';
+        const ct=$('co_contacto_tel'); if(ct) ct.value=ec.contacto_tel||'';
         const mt=$('co_muestra_tipo'); if(mt) mt.value=ec.es_muestra?(ec.muestra_tipo==='pie'?'pie':(ec.muestra_tipo==='nono'?'svc':'par')):'';
         const ci=$('co_iva'); if(ci) ci.checked=(+ec.iva>0);
         const cv=ec.curva||{}; document.querySelectorAll('#co_grid input').forEach(i=>{ const t=i.dataset.talla; if(cv[t]!=null) i.value=cv[t]; });
@@ -2543,12 +2552,18 @@ const App = {
     }
   },
   async _saveCot(reg){
+    /* la persona de contacto se agrega acá y no en cada reg, para que quede
+       igual en la cotización normal y en la de muestra */
+    reg.contacto     = (($('co_contacto')||{}).value||'').trim() || null;
+    reg.contacto_tel = (($('co_contacto_tel')||{}).value||'').trim() || null;
     if(this._editCotId){ const { error } = await this.sb.from('cotizaciones').update(reg).eq('id',this._editCotId); return error; }
     const { error } = await this.sb.from('cotizaciones').insert(reg); return error;
   },
   nuevoClienteDesdeCot(){
     this.modalCliente(c=>{ this._clientes.push(c); const s=$('co_cliente');
-      const o=document.createElement('option'); o.value=c.id; o.textContent=`${c.nombre} (${c.nit||''})`; o.selected=true; s.appendChild(o); });
+      const o=document.createElement('option'); o.value=c.id; o.textContent=`${c.nombre} (${c.nit||''})`;
+      o.dataset.con=c.contacto1||''; o.dataset.tel=c.tel||'';
+      o.selected=true; s.appendChild(o); this.cotContactoAuto(); });
   },
   curva(){
     let pares=0; const t={};
@@ -2572,6 +2587,13 @@ const App = {
     const fw=$('co_mflete_wrap'); if(fw) fw.style.display=(v==='par')?'block':'none';
     const lbl=document.querySelector('#co_curva_card label'); if(lbl) lbl.textContent = v ? 'Tallas de la muestra — pares por talla' : 'Arma la curva — pares por talla';
     const h=$('co_muestra_hint'); if(h){ h.style.display = (v && !esPie) ? 'block' : 'none'; } },
+  /* Al escoger la empresa se trae su contacto, pero solo si el campo está vacío:
+     si el vendedor ya escribió otro nombre no se le borra. */
+  cotContactoAuto(){
+    const s=$('co_cliente'), o=s&&s.options[s.selectedIndex]; if(!o||!o.dataset) return;
+    const c=$('co_contacto'), t=$('co_contacto_tel');
+    if(c && !c.value.trim()) c.value=o.dataset.con||'';
+    if(t && !t.value.trim()) t.value=o.dataset.tel||''; },
   async guardarCotizacion(){
     const cid=$('co_cliente').value;
     const tipoMv=$('co_muestra_tipo')?$('co_muestra_tipo').value:'';
@@ -3135,8 +3157,10 @@ const App = {
     const PUERTAS=[['prospectos','🎯 Prospectos'],['marcador','☎️ Marcador'],['digital','💬 Digital'],['organico','🌱 Orgánico']];
     const CAJ={prospectos:[['inter',`🔥 Interesados ${intRaw.length}`],['nc',`👤 NC ${nc.length}`],['gpjr',`⭐ GPJR ${gpjr.length}`],['esp',`⭐⭐ Especiales ${esp.length}`]],
       marcador:[['emp',`🏭 Empresas ${nEmp.toLocaleString('es-CO')}`],['dist',`🏪 Distribuidores ${nDist.toLocaleString('es-CO')}`]],
-      digital:[['curioso',`👀 Curiosos ${dCnt.curioso}`],['interesado',`🔥 Interesados ${dCnt.interesado}`],['distribuidor',`🏪 Distribuidores ${dCnt.distribuidor}`]],
-      organico:[['curioso',`👀 Curiosos ${oCnt.curioso}`],['interesado',`🔥 Interesados ${oCnt.interesado}`],['cotiz',`📝 Cotización ${oCnt.cotiz}`]]};
+      /* 'curioso' es la llave interna con la que ya está clasificado todo el
+         histórico: NO se cambia. Solo se cambia lo que se lee en pantalla. */
+      digital:[['curioso',`🎯 Cliente objetivo ${dCnt.curioso}`],['interesado',`🔥 Interesados ${dCnt.interesado}`],['distribuidor',`🏪 Distribuidores ${dCnt.distribuidor}`]],
+      organico:[['curioso',`🎯 Cliente objetivo ${oCnt.curioso}`],['interesado',`🔥 Interesados ${oCnt.interesado}`],['cotiz',`📝 Cotización ${oCnt.cotiz}`]]};
     const canal=this._crmFCanal||'prospectos'; this._crmFCanal=canal;
     const cajones=CAJ[canal]; let cajon=this._crmFCajon; if(!cajones.find(c=>c[0]===cajon)) cajon=cajones[0][0]; this._crmFCajon=cajon;
     this.set(`<h1>📇 CRM · Feroz</h1><div class="sub">4 puertas → cajones (bases de Feroz)</div>
@@ -3270,9 +3294,9 @@ const App = {
     if(canal==='digital'){
       const etOf=b=>{ const v=(b.etiqueta||'').toLowerCase(); return /distribu/.test(v)?'distribuidor':/interes/.test(v)?'interesado':'curioso'; };
       const arr=(bot||[]).filter(b=>etOf(b)===cajon); this._crmFLeadShown=arr;
-      const nom={curioso:'Curiosos',interesado:'Interesados',distribuidor:'Distribuidores'}[cajon]||'Digital';
+      const nom={curioso:'Clientes objetivo',interesado:'Interesados',distribuidor:'Distribuidores'}[cajon]||'Digital';
       const cur=(bot||[]).filter(b=>/curios/i.test(b.etiqueta||'')).length, intr=(bot||[]).filter(b=>/interes|distribu/i.test(b.etiqueta||'')).length;
-      const head=`<div class="card" style="border-left:4px solid var(--naranja)"><div style="font-size:12px;color:#667">💬 WhatsApp Feroz (Sofía) · <b>${nom}</b></div><div class="kpis" style="margin-top:6px"><div class="kpi"><b>${(bot||[]).length}</b><span>Leads totales</span></div><div class="kpi"><b>${cur}</b><span>👀 Curiosos</span></div><div class="kpi naranja"><b>${intr}</b><span>🔥 Calientes</span></div></div></div>`;
+      const head=`<div class="card" style="border-left:4px solid var(--naranja)"><div style="font-size:12px;color:#667">💬 WhatsApp Feroz (Sofía) · <b>${nom}</b></div><div class="kpis" style="margin-top:6px"><div class="kpi"><b>${(bot||[]).length}</b><span>Leads totales</span></div><div class="kpi"><b>${cur}</b><span>🎯 Cliente objetivo</span></div><div class="kpi naranja"><b>${intr}</b><span>🔥 Calientes</span></div></div></div>`;
       if(!arr.length) return head+'<div class="empty">Aún sin leads en este estado. Los llena Sofía (el bot de Feroz) en tiempo real.</div>';
       return head+arr.map((b,i)=>this._cardLead(b,i,'digital',cajon)).join('');
     }
