@@ -784,6 +784,8 @@ const App={
       toast('Pedido generado'); await this.vPedidos();
       modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:4px">✓ Pedido generado</h3>
         ${nuevoCli?`<div style="border:1.5px solid var(--ok);background:var(--okbg);border-radius:9px;padding:8px 11px;margin-bottom:9px;font-size:13px">👤 <b style="color:var(--ok)">${esc(nuevoCli)}</b> quedó registrado en el CRM</div>`:''}
+        ${resCli.ojo?`<div style="border:1.5px solid var(--warn);background:#fff6ec;border-radius:9px;padding:9px 11px;margin-bottom:9px;font-size:12.5px">
+          ⚠️ <b style="color:var(--warn)">Ojo, puede quedar repetido</b><br>${esc(resCli.ojo)}</div>`:''}
         ${resCli.falta?`<div style="border:1.5px solid var(--warn);background:var(--badbg);border-radius:9px;padding:9px 11px;margin-bottom:9px;font-size:13px">
           ⚠️ <b style="color:var(--warn)">Este cliente NO quedó en el CRM</b><br>
           <span style="font-size:12.5px">Falta ${esc(resCli.falta)}. La venta sí quedó registrada, pero no vas a poder buscarlo después ni enviarle promociones.</span></div>`:''}
@@ -820,10 +822,19 @@ const App={
       return {};
     }
     if(k.length<10) return {falta: k.length? 'el celular completo (van '+k.length+' de 10 dígitos)' : 'el celular'};
+    /* Antes de abrir ficha nueva: ¿ya hay alguien que se llama igual con OTRO
+       celular? Casi siempre es un dígito mal escrito, y así fue como se llenó
+       de duplicados. No se bloquea (puede haber dos personas con el mismo
+       nombre), pero queda avisado. */
+    const igual=(this._leads||[]).filter(l=>this._normLeadName(l.nombre||'')===this._normLeadName(nom)
+      && this._telKey(l.telefono) && this._telKey(l.telefono)!==k);
     const b={nombre:nom,telefono:String(tel||'').trim(),direccion:dir,infopromos:promo,
       etapa:'contactado',tipo:tipo,canal:'local',interes:'Registrado desde un pedido'};
     const r=await POST('kruh_leads',b);
     if(!r) return {falta:'no se pudo guardar en el CRM'};
+    if(igual.length){ this._telMap=this._telMap||{};
+      return {nuevo:nom, ojo:'Ya existe otro «'+nom+'» con el celular '+this._telKey(igual[0].telefono)
+        +'. Si es la misma persona, se escribió mal un dígito: revísalo en CRM para no dejar la ficha repetida.'}; }
     this._telMap=this._telMap||{}; this._telMap[k]={id:r.id,nombre:nom,direccion:dir,tipo:tipo,infopromos:promo};
     if(this._leads) this._leads.push({id:r.id,...b});
     return {nuevo:nom}; },
