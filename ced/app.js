@@ -4085,22 +4085,162 @@ const App = {
 
   async vAdmin(){
     this.loading();
-    const [ru,rc] = await Promise.all([
+    const [ru,rc,ra] = await Promise.all([
       this.sb.from('ced_usuarios').select('*').order('nombre'),
-      this.sb.from('ced').select('nombre,ciudad,principal').eq('activo',true).order('principal',{ascending:false})
+      this.sb.from('ced').select('nombre,ciudad,principal').eq('activo',true).order('principal',{ascending:false}),
+      this.sb.from('ced_asesorias').select('*').order('inicio',{ascending:false}).limit(2000)
     ]);
     const us=ru.data||[], ceds=rc.data||[];
-    this._us=us;
+    this._us=us; this._ase=ra.error?null:(ra.data||[]);
     this._ceds=ceds.length?ceds:[{nombre:'Principal',principal:true}];
     if(this._cedSel && !this._ceds.some(c=>c.nombre===this._cedSel)) this._cedSel=null;
     this._cedSel ? this._vUsuariosDe(this._cedSel) : this._vCeds();
   },
+
+  /* ============ HORAS DE ASESORÍA ============
+     Las VIRTUALES son las que se trabajan directamente con Claude y se cargan
+     desde el chat; las PRESENCIALES se cronometran acá. Lo que importa es que
+     ninguna hora se pierda, no quién la digitó. */
+  ASETIPO:['Presencial','Virtual'],
+  _aseMin(a){ if(!a||!a.inicio) return 0;
+    const f=a.fin?new Date(a.fin):new Date(); const d=(f-new Date(a.inicio))/60000; return d>0?d:0; },
+  _hhmm(min){ const h=Math.floor(min/60), m=Math.floor(min%60); return h+'h '+String(m).padStart(2,'0')+'m'; },
+  _hora(t){ if(!t) return '—'; const d=new Date(t);
+    return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); },
+  _diaK(t){ const d=new Date(t); return isNaN(d)?'':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); },
+  _aseReloj(a){ if(this._aseTick) clearInterval(this._aseTick);
+    const pinta=()=>{ const e=$('ase_reloj'); if(!e){clearInterval(this._aseTick); this._aseTick=null; return;}
+      e.textContent=this._hhmm(this._aseMin(a)); };
+    pinta(); this._aseTick=setInterval(pinta,1000); },
+
+  _aseBloque(){
+    const ase=this._ase;
+    if(ase===null) return `<div class="card" style="border-color:#f0c4c4;background:#fdecec">
+      <b>Falta la tabla de asesorías.</b>
+      <div style="font-size:13.5px;margin-top:5px">Se corre <b>ced_asesorias</b> una sola vez y esta sección arranca.</div></div>`;
+    const cerradas=ase.filter(a=>a.fin), abierta=ase.find(a=>a.inicio&&!a.fin);
+    const hoyK=this._diaK(new Date()), mesK=hoyK.slice(0,7);
+    const min=l=>l.reduce((t,a)=>t+this._aseMin(a),0);
+    const delDia=cerradas.filter(a=>this._diaK(a.inicio)===hoyK);
+    const delMes=cerradas.filter(a=>this._diaK(a.inicio).slice(0,7)===mesK);
+    const pres=min(cerradas.filter(a=>a.tipo!=='Virtual')), virt=min(cerradas.filter(a=>a.tipo==='Virtual'));
+    const porDia={}; cerradas.forEach(a=>{const k=this._diaK(a.inicio); (porDia[k]=porDia[k]||[]).push(a);});
+    const dias=Object.keys(porDia).sort().reverse().slice(0,15);
+    const DOW=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    const MES=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    return `<h2 style="font-size:18px;margin:6px 0 4px">⏱️ Horas de asesoría</h2>
+      <div class="sub">Le das iniciar cuando empiezas y terminar cuando paras · cada tramo queda como una sesión</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px">
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">Hoy</div>
+          <b style="font-size:20px">${this._hhmm(min(delDia))}</b><div style="font-size:11.5px;color:#8a93a6">${delDia.length} sesión(es)</div></div>
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">Este mes</div>
+          <b style="font-size:20px">${this._hhmm(min(delMes))}</b></div>
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">Acumulado</div>
+          <b style="font-size:20px;color:var(--naranja)">${this._hhmm(min(cerradas))}</b></div>
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">Presencial / Virtual</div>
+          <b style="font-size:14px">🏠 ${this._hhmm(pres)}<br>💻 ${this._hhmm(virt)}</b></div>
+      </div>
+      ${abierta?`<div class="card" style="border:2px solid #2e9e4f;background:#eefaf1">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div><div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#2e9e4f">● Sesión en curso · ${esc(abierta.tipo||'Presencial')}</div>
+            <div style="font-size:32px;font-weight:800;line-height:1.15" id="ase_reloj">0h 00m</div>
+            <div style="font-size:12px;color:#8a93a6">${esc(abierta.tema||'Sin tema')} · empezó ${esc(this._hora(abierta.inicio))}</div></div>
+          <button class="btn" style="background:#c0392b;color:#fff;font-size:15px;padding:13px 20px" onclick="App.aseTerminar('${abierta.id}')">⏹ Terminar</button></div></div>`
+      :`<div class="card">
+        <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:9px;align-items:end">
+          <div><label>Tema</label><input id="ase_tema" placeholder="Qué se trabajó"></div>
+          <div><label>Tipo</label><select id="ase_tipo">${this.ASETIPO.map(t=>`<option>${t}</option>`).join('')}</select></div>
+          <button class="btn btn-main" style="padding:11px 16px" onclick="App.aseIniciar()">▶ Iniciar</button></div>
+        <div style="font-size:12px;color:#8a93a6;margin-top:8px">¿Se te olvidó cronometrar?
+          <a onclick="App.aseManual()" style="color:var(--naranja);cursor:pointer;font-weight:700">Registrar una sesión a mano</a></div></div>`}
+      ${dias.length?dias.map(k=>{
+        const l=porDia[k].slice().sort((a,b)=>String(a.inicio).localeCompare(String(b.inicio)));
+        const d=new Date(k+'T12:00:00');
+        return `<div class="card" style="padding:11px 13px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <div><b style="font-size:14px">${DOW[d.getDay()]} ${d.getDate()} de ${MES[d.getMonth()+1]}</b>
+              <div style="font-size:11.5px;color:#8a93a6">${l.length} sesión(es)</div></div>
+            <b style="color:var(--naranja);font-size:15px">${this._hhmm(min(l))}</b></div>
+          ${l.map((a,i)=>`<div style="display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0;border-top:1px solid #f0f1f4">
+            <span style="min-width:0">${i+1}ª · ${a.tipo==='Virtual'?'💻':'🏠'} ${esc(a.tema||'—')}
+              <span style="color:#8a93a6">${esc(this._hora(a.inicio))} → ${esc(this._hora(a.fin))}</span>
+              ${a.nota?`<span style="color:#8a93a6"> · ${esc(a.nota)}</span>`:''}</span>
+            <span style="white-space:nowrap;font-weight:700">${this._hhmm(this._aseMin(a))}
+              <a onclick="App.aseDel('${a.id}')" style="color:#d22;cursor:pointer;font-weight:400;margin-left:6px">✕</a></span>
+          </div>`).join('')}</div>`;}).join('')
+      :'<div class="card" style="text-align:center;padding:22px;color:#8a93a6">Todavía no hay asesorías registradas.</div>'}`;
+  },
+
+  async aseIniciar(){
+    const tema=(($('ase_tema')||{}).value||'').trim();
+    const tipo=($('ase_tipo')||{}).value||'Presencial';
+    const b={tipo,tema,inicio:new Date().toISOString(),
+      ced:(this.cedUser&&this.cedUser.ced)||'Principal',
+      creado_por:(this.cedUser&&this.cedUser.usuario)||''};
+    const { error }=await this.sb.from('ced_asesorias').insert(b);
+    if(error) return alert('No se pudo iniciar: '+error.message);
+    this.toast('Asesoría iniciada ⏱️'); this.vAdmin(); },
+
+  async aseTerminar(id){
+    const { error }=await this.sb.from('ced_asesorias').update({fin:new Date().toISOString()}).eq('id',id);
+    if(error) return alert('No se pudo cerrar: '+error.message);
+    if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
+    this.toast('Sesión cerrada ✅'); this.vAdmin(); },
+
+  /* Para las que se dictaron sin cronómetro. Se pide la hora real, no se
+     inventa: si se pone mal, el acumulado que se cobra queda mal. */
+  aseManual(){
+    const hoy=new Date().toISOString().slice(0,10);
+    this.modal(`<h3 style="margin-bottom:10px">Registrar una sesión a mano</h3>
+      <label>Tema</label><input id="am_tema" placeholder="Qué se trabajó">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Fecha</label><input id="am_fec" type="date" value="${hoy}"></div>
+        <div><label>Tipo</label><select id="am_tipo">${this.ASETIPO.map(t=>`<option>${t}</option>`).join('')}</select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Desde</label><input id="am_ini" type="time" value="08:00" oninput="App.amDur()"></div>
+        <div><label>Hasta</label><input id="am_fin" type="time" value="09:00" oninput="App.amDur()"></div>
+      </div>
+      <div id="am_dur" style="font-size:12.5px;color:#8a93a6;margin-top:5px"></div>
+      <label>Nota</label><input id="am_nota" value="Cargada a mano" placeholder="Para distinguirla de las cronometradas">
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-main" style="flex:1" onclick="App.aseManualSave()">Guardar</button>
+        <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
+    this.amDur(); },
+  amDur(){ const d=$('am_dur'); if(!d) return;
+    const a=($('am_ini')||{}).value, b=($('am_fin')||{}).value;
+    if(!a||!b){ d.textContent=''; return; }
+    const m=(new Date('2000-01-01T'+b)-new Date('2000-01-01T'+a))/60000;
+    d.innerHTML = m>0 ? 'Duración: <b>'+this._hhmm(m)+'</b>' : '<span style="color:#c0392b">La hora de fin tiene que ser posterior a la de inicio</span>'; },
+
+  async aseManualSave(){
+    const fec=$('am_fec').value, ini=$('am_ini').value, fin=$('am_fin').value;
+    if(!fec||!ini||!fin) return alert('Faltan la fecha o las horas');
+    const dIni=new Date(fec+'T'+ini), dFin=new Date(fec+'T'+fin);
+    if(!(dFin>dIni)) return alert('La hora de fin tiene que ser posterior a la de inicio');
+    const b={tipo:$('am_tipo').value, tema:($('am_tema').value||'').trim(),
+      inicio:dIni.toISOString(), fin:dFin.toISOString(),
+      nota:($('am_nota').value||'').trim(),
+      ced:(this.cedUser&&this.cedUser.ced)||'Principal',
+      creado_por:(this.cedUser&&this.cedUser.usuario)||''};
+    const { error }=await this.sb.from('ced_asesorias').insert(b);
+    if(error) return alert('No se pudo guardar: '+error.message);
+    this.cerrarModal(); this.toast('Sesión registrada ✅'); this.vAdmin(); },
+
+  async aseDel(id){
+    const a=(this._ase||[]).find(x=>String(x.id)===String(id))||{};
+    if(!confirm('¿Borrar esta sesión de '+this._hhmm(this._aseMin(a))+'?')) return;
+    const { error }=await this.sb.from('ced_asesorias').delete().eq('id',id);
+    if(error) return alert('No se pudo borrar: '+error.message);
+    this.toast('Sesión borrada'); this.vAdmin(); },
 
   /* paso 1 · escoger el CED */
   _vCeds(){
     const us=this._us||[];
     this.set(`
       <h1>Usuarios</h1><div class="sub">Entra a un CED para ver y crear su gente</div>
+      ${this._aseBloque()}
+      <h2 style="font-size:18px;margin:22px 0 8px">Sucursales</h2>
       ${this._ceds.map(c=>{
         const n=us.filter(u=>u.ced===c.nombre).length;
         return `<div class="item" style="cursor:pointer" onclick="App.cedAbrir('${esc(c.nombre)}')">
@@ -4121,6 +4261,8 @@ const App = {
         <div style="font-size:12.5px;color:#7f1d1d;margin:5px 0 9px">¿Dejaste la app abierta en un computador ajeno? Esto cierra todas las sesiones. Tú solo vuelves a entrar.</div>
         <button class="btn" style="background:#dc2626;color:#fff;width:100%;font-weight:800" onclick="App.cerrarTodasSesiones()">🔒 Cerrar todas las sesiones ahora</button>
       </div>`);
+    const ab=(this._ase||[]).find(a=>a.inicio&&!a.fin);
+    if(ab) this._aseReloj(ab);
   },
 
   cedAbrir(nombre){ this._cedSel=nombre; this._vUsuariosDe(nombre); },
