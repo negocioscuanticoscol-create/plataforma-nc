@@ -202,6 +202,7 @@ const App = {
       {v:'planta', ic:'🏭', t:'Planta'},
       {v:'clientes', ic:'👥', t:'Clientes'},
       {v:'comisiones', ic:'🧾', t:'Comisiones'},
+      {v:'gastos', ic:'💸', t:'Gastos'},
     ];
     // hilera 2 = base de plataforma (solo admin la tiene en permitidos → solo a él le aparece)
     const ROW2=[
@@ -209,9 +210,9 @@ const App = {
       {v:'admin', ic:'👤', t:'Usuarios'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario'],
-      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario'],
+    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','datos','admin','permisos'];
+    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos'],
+      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario'],
       facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos','inventario'], planta:['dashboard','pedidos','planta','inventario']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
@@ -257,6 +258,7 @@ const App = {
     if(window.NC_EMPRESA==='smart' && view==='despachos') return this.vDespachosSmart();
     if(window.NC_EMPRESA==='smart' && view==='autopedido') return this.vAutoPedidosSmart();
     if(view==='comisiones') return this.vComisiones();
+    if(view==='gastos') return this.vGastos();
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
@@ -3859,7 +3861,194 @@ const App = {
   /* pestañas que se pueden repartir · la llave es la misma que usa el nav */
   CED_MODS:[['panel','📈 Panel'],['crm','📇 CRM'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],
     ['despachos','🚚 Despachos'],['cartera','💳 Cartera'],['clientes','👥 Clientes'],
-    ['planta','🏭 Planta'],['comisiones','🧾 Comisiones']],
+    ['planta','🏭 Planta'],['comisiones','🧾 Comisiones'],['gastos','🧾 Gastos']],
+
+  /* ================= GASTOS =================
+     Cada sucursal ve y carga SOLO los suyos: la tabla ced_gastos filtra por
+     RLS con mi_ced(), igual que el resto de CED. El Principal ve toda la red
+     y puede elegir a qué sucursal le carga el gasto. */
+  CAT_GASTO:['Arriendo','Nómina y aportes','Servicios públicos','Transporte y fletes',
+    'Mercadeo y pauta','Papelería y oficina','Aseo y cafetería','Mantenimiento',
+    'Impuestos y tasas','Tecnología','Comisiones bancarias','Otros'],
+  FORMAS_PAGO:['Transferencia','Efectivo','Tarjeta','Cheque','Crédito'],
+
+  async vGastos(){
+    this.set('<h1>Gastos</h1><div class="sub">Cargando…</div>');
+    const { data, error } = await this.sb.from('ced_gastos').select('*')
+      .order('fecha',{ascending:false}).limit(4000);
+    if(error){
+      this.set(`<h1>Gastos</h1>
+        <div class="card" style="border-color:#f0c4c4;background:#fdecec">
+          <b>No se pudo leer la tabla de gastos.</b>
+          <div style="margin-top:6px;font-size:13.5px">${esc(error.message||'')}</div>
+          <div style="margin-top:8px;font-size:13px">Si dice que <b>ced_gastos</b> no existe, falta correr su SQL una sola vez.</div>
+        </div>`); return; }
+    this._gastos=data||[];
+    /* qué sucursales puede ver: si solo ve la suya, el selector no aparece */
+    const ceds=[...new Set(this._gastos.map(g=>g.ced).filter(Boolean))].sort();
+    this._gCeds=ceds;
+    this._gPaint();
+  },
+
+  _gPaint(){
+    const G=this._gastos||[];
+    const meses=[...new Set(G.map(g=>String(g.fecha||'').slice(0,7)).filter(Boolean))].sort().reverse();
+    const hoyM=new Date().toISOString().slice(0,7);
+    if(!meses.includes(hoyM)) meses.unshift(hoyM);
+    const mes=(this._gMes&&meses.includes(this._gMes))?this._gMes:meses[0];
+    this._gMes=mes;
+    const sucSel=this._gSuc||'';
+    const varias=(this._gCeds||[]).length>1;
+    let del=G.filter(g=>String(g.fecha||'').slice(0,7)===mes);
+    if(sucSel) del=del.filter(g=>g.ced===sucSel);
+    del.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
+
+    const tot=del.reduce((a,g)=>a+(+g.monto||0),0);
+    const pag=del.filter(g=>g.pagado).reduce((a,g)=>a+(+g.monto||0),0);
+    const pen=tot-pag;
+    const tIva=del.reduce((a,g)=>a+(+g.iva||0),0);
+    /* mes anterior, para saber si el gasto se disparó */
+    const iM=meses.indexOf(mes), mAnt=iM>=0?meses[iM+1]:null;
+    let totAnt=0;
+    if(mAnt){ let p=G.filter(g=>String(g.fecha||'').slice(0,7)===mAnt);
+      if(sucSel) p=p.filter(g=>g.ced===sucSel); totAnt=p.reduce((a,g)=>a+(+g.monto||0),0); }
+    const dif=totAnt>0?((tot-totAnt)/totAnt*100):null;
+
+    const porCat={}; del.forEach(g=>{const k=g.categoria||'Sin categoría';
+      const o=porCat[k]=porCat[k]||{n:0,t:0}; o.n++; o.t+=+g.monto||0;});
+    const cats=Object.keys(porCat).sort((a,b)=>porCat[b].t-porCat[a].t);
+    const mxCat=cats.length?porCat[cats[0]].t:0;
+
+    this.set(`<h1>Gastos</h1>
+      <div class="sub">Lo que sale de caja, mes por mes. Cada sucursal ve solo los suyos.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <select onchange="App._gMes=this.value;App._gPaint()" style="width:auto">
+          ${meses.map(m=>`<option value="${esc(m)}" ${m===mes?'selected':''}>${esc(this._mesNom(m))}</option>`).join('')}</select>
+        ${varias?`<select onchange="App._gSuc=this.value;App._gPaint()" style="width:auto">
+          <option value="" ${sucSel?'':'selected'}>Toda la red</option>
+          ${this._gCeds.map(c=>`<option value="${esc(c)}" ${c===sucSel?'selected':''}>${esc(c)}</option>`).join('')}</select>`:''}
+        <button class="btn btn-main" onclick="App.gModal()" style="margin-left:auto">＋ Nuevo gasto</button>
+      </div>
+
+      <div class="kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">Total del mes</div>
+          <b style="font-size:21px">${money(tot)}</b>
+          ${dif!==null?`<div style="font-size:11.5px;font-weight:700;color:${dif>1?'#c0392b':(dif<-1?'#2e9e4f':'#8a93a6')}">${dif>0?'▲ +':(dif<0?'▼ ':'= ')}${Math.abs(dif)<1?'igual que':Math.abs(dif).toFixed(0)+'% vs'} ${esc(this._mesNom(mAnt))}</div>`:''}</div>
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">Pagado</div>
+          <b style="font-size:21px;color:#2e9e4f">${money(pag)}</b></div>
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">Por pagar</div>
+          <b style="font-size:21px;color:${pen>0?'#c0392b':'#2e9e4f'}">${money(pen)}</b></div>
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">IVA del mes</div>
+          <b style="font-size:21px">${money(tIva)}</b></div>
+      </div>
+
+      ${cats.length?`<div class="card">
+        <b style="font-size:15px">En qué se fue la plata</b>
+        <div style="margin-top:9px">
+        ${cats.map(c=>`<div style="display:flex;gap:9px;align-items:center;padding:4px 0;font-size:13px">
+          <span style="width:150px;flex:0 0 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c)}</span>
+          <span style="flex:1;height:8px;background:#eef1f5;border-radius:4px;overflow:hidden"><i style="display:block;height:100%;width:${mxCat?porCat[c].t/mxCat*100:0}%;background:var(--naranja)"></i></span>
+          <span style="width:56px;text-align:right;color:#8a93a6;font-size:11.5px">${porCat[c].n}</span>
+          <span style="width:96px;text-align:right;font-weight:700">${money(porCat[c].t)}</span>
+          <span style="width:46px;text-align:right;color:#8a93a6;font-size:11.5px">${tot?(porCat[c].t/tot*100).toFixed(0):0}%</span>
+        </div>`).join('')}</div></div>`:''}
+
+      <h1 style="font-size:17px;margin-top:18px">Los ${del.length} gasto${del.length===1?'':'s'} de ${esc(this._mesNom(mes))}</h1>
+      ${del.length?del.map(g=>`<div class="card" style="padding:11px 13px">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+          <div style="min-width:0;flex:1">
+            <div style="font-weight:700;font-size:14px">${esc(g.concepto||'—')}
+              ${g.pagado?'<span style="font-size:10.5px;background:#e6f4ea;color:#2e9e4f;padding:2px 7px;border-radius:10px;font-weight:700">pagado</span>'
+                        :'<span style="font-size:10.5px;background:#fdecec;color:#c0392b;padding:2px 7px;border-radius:10px;font-weight:700">por pagar</span>'}</div>
+            <div style="font-size:11.5px;color:#8a93a6;margin-top:2px">
+              ${esc(String(g.fecha||'').slice(5))}${g.categoria?' · '+esc(g.categoria):''}${g.proveedor?' · '+esc(g.proveedor):''}${g.factura?' · N° '+esc(g.factura):''}${varias&&!sucSel&&g.ced?' · 🏢 '+esc(g.ced):''}</div>
+            ${g.notas?`<div style="font-size:11.5px;color:#6b7280;margin-top:3px">${esc(g.notas)}</div>`:''}</div>
+          <div style="text-align:right;white-space:nowrap">
+            <div style="font-weight:800;font-size:15px">${money(g.monto)}</div>
+            ${(+g.iva||0)?`<div style="font-size:11px;color:#8a93a6">IVA ${money(g.iva)}</div>`:''}
+            <div style="margin-top:4px">
+              <a onclick="App.gModal('${g.id}')" style="color:var(--naranja);cursor:pointer;font-size:12px">✎</a>
+              <a onclick="App.gDel('${g.id}')" style="color:#d22;cursor:pointer;font-size:12px;margin-left:7px">✕</a></div></div>
+        </div></div>`).join('')
+      :`<div class="card" style="text-align:center;padding:26px 16px;color:#8a93a6">
+          Sin gastos en ${esc(this._mesNom(mes))}. Dale a <b>＋ Nuevo gasto</b>.</div>`}`);
+  },
+
+  gModal(id){
+    const g=(this._gastos||[]).find(x=>String(x.id)===String(id))||{};
+    const hoy=new Date().toISOString().slice(0,10);
+    const varias=(this._gCeds||[]).length>1;
+    const mio=(this.cedUser&&this.cedUser.ced)||'';
+    this.modal(`<h3 style="margin-bottom:10px">${id?'Editar':'Nuevo'} gasto</h3>
+      <label>Concepto</label><input id="g_con" value="${esc(g.concepto||'')}" placeholder="Arriendo de agosto, recibo de luz…">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Fecha</label><input id="g_fec" type="date" value="${esc(g.fecha||hoy)}"></div>
+        <div><label>Categoría</label><select id="g_cat">${this.CAT_GASTO.map(c=>`<option ${g.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Proveedor</label><input id="g_prov" value="${esc(g.proveedor||'')}"></div>
+        <div><label>N° factura</label><input id="g_fac" value="${esc(g.factura||'')}"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Valor total</label><input id="g_mon" type="number" value="${g.monto||''}" oninput="App.gIva()"></div>
+        <div><label>¿Tiene IVA?</label><select id="g_iva" onchange="App.gIva()">
+          <option value="no" ${g.tiene_iva?'':'selected'}>No</option>
+          <option value="si" ${g.tiene_iva?'selected':''}>Sí (19%)</option></select></div>
+      </div>
+      <div id="g_desglose" style="font-size:12px;color:#8a93a6;margin-top:4px"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Forma de pago</label><select id="g_fp">${this.FORMAS_PAGO.map(f=>`<option ${g.forma_pago===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div>
+        <div><label>¿Ya se pagó?</label><select id="g_pag">
+          <option value="no" ${g.pagado?'':'selected'}>No, queda pendiente</option>
+          <option value="si" ${g.pagado?'selected':''}>Sí, ya se pagó</option></select></div>
+      </div>
+      <label>Periodicidad</label><select id="g_per">
+        ${['Mensual','Único','Quincenal','Anual'].map(p=>`<option ${g.periodicidad===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
+      ${varias?`<label>Sucursal</label><select id="g_ced">
+        ${this._gCeds.map(c=>`<option ${((g.ced||mio)===c)?'selected':''}>${esc(c)}</option>`).join('')}</select>
+        <div style="font-size:11.5px;color:#8a93a6;margin-top:3px">Solo el Principal puede elegir; los demás quedan en la suya.</div>`:''}
+      <label>Notas</label><textarea id="g_not" rows="2">${esc(g.notas||'')}</textarea>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-main" style="flex:1" onclick="App.gSave('${id||''}')">Guardar</button>
+        <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
+    this.gIva();
+  },
+  /* Se separa base e IVA para que el contador no tenga que hacerlo a mano. */
+  gIva(){ const d=$('g_desglose'); if(!d) return;
+    const tot=+($('g_mon')||{}).value||0, con=($('g_iva')||{}).value==='si';
+    if(!tot){ d.textContent=''; return; }
+    const base=con?Math.round(tot/1.19):tot, iva=tot-base;
+    d.innerHTML=con?`Base ${money(base)} · IVA ${money(iva)} · Total <b>${money(tot)}</b>`:`Sin IVA · Total <b>${money(tot)}</b>`; },
+
+  async gSave(id){
+    const con=($('g_con').value||'').trim();
+    if(!con) return alert('Ponle un concepto al gasto');
+    const tot=+$('g_mon').value||0;
+    if(tot<=0) return alert('Ponle el valor');
+    const conIva=$('g_iva').value==='si';
+    const base=conIva?Math.round(tot/1.19):tot;
+    const b={concepto:con, fecha:$('g_fec').value||new Date().toISOString().slice(0,10),
+      categoria:$('g_cat').value, proveedor:($('g_prov').value||'').trim(),
+      factura:($('g_fac').value||'').trim(), monto:tot, base:base, iva:tot-base,
+      tiene_iva:conIva, forma_pago:$('g_fp').value, pagado:$('g_pag').value==='si',
+      periodicidad:$('g_per').value, notas:($('g_not').value||'').trim()};
+    if(b.pagado && !id) b.fecha_pago=b.fecha;
+    /* el ced solo se manda si el usuario puede elegir; si no, lo pone el trigger */
+    if($('g_ced')) b.ced=$('g_ced').value;
+    else if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Principal';
+    if(!id) b.creado_por=(this.cedUser&&this.cedUser.usuario)||'';
+    const q = id ? await this.sb.from('ced_gastos').update(b).eq('id',id)
+                 : await this.sb.from('ced_gastos').insert(b);
+    if(q.error) return alert('No se pudo guardar: '+q.error.message);
+    this.cerrarModal(); this.toast(id?'Gasto actualizado ✅':'Gasto registrado ✅');
+    this.vGastos(); },
+
+  async gDel(id){
+    const g=(this._gastos||[]).find(x=>String(x.id)===String(id))||{};
+    if(!confirm('¿Borrar el gasto "'+(g.concepto||'')+'" por '+money(g.monto)+'?')) return;
+    const { error } = await this.sb.from('ced_gastos').delete().eq('id',id);
+    if(error) return alert('No se pudo borrar: '+error.message);
+    this.toast('Gasto borrado'); this.vGastos(); },
 
   async vPermisos(){
     this.loading();
