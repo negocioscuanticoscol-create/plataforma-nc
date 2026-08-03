@@ -4232,7 +4232,13 @@ const App = {
       <label>Concepto</label><input id="g_con" value="${esc(g.concepto||'')}" placeholder="Arriendo de agosto, recibo de luz…">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
         <div><label>Fecha</label><input id="g_fec" type="date" value="${esc(g.fecha||hoy)}"></div>
-        <div><label>Categoría</label><select id="g_cat">${this.CAT_GASTO.map(c=>`<option ${g.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+        <div><label>Categoría</label>
+          <select id="g_cat" onchange="App.gOtraCat()">${this.CAT_GASTO.map(c=>`<option ${(g.categoria===c||(!this.CAT_GASTO.includes(g.categoria||'')&&g.categoria&&c==='Otros'))?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+      </div>
+      <div id="g_cat2wrap" style="display:none">
+        <label>¿Qué gasto es?</label>
+        <input id="g_cat2" value="${esc(this.CAT_GASTO.includes(g.categoria||'')?'':(g.categoria||''))}" placeholder="Escríbelo: notaría, capacitación, seguro…">
+        <div class="hint">Se guarda con ese nombre, no como «Otros» — así después se puede ver cuánto se fue en cada cosa.</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
         <div><label>Proveedor</label><input id="g_prov" value="${esc(g.proveedor||'')}"></div>
@@ -4260,8 +4266,14 @@ const App = {
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn btn-main" style="flex:1" onclick="App.gSave('${id||''}')">Guardar</button>
         <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
-    this.gIva();
+    this.gIva(); this.gOtraCat();
   },
+  /* 'Otros' sin decir qué es se vuelve un hueco negro: al final del mes nadie
+     sabe en qué se fue esa plata. Por eso pide el nombre y lo guarda como
+     categoría propia. */
+  gOtraCat(){ const s=$('g_cat'), w=$('g_cat2wrap'); if(!s||!w) return;
+    const otra=s.value==='Otros'; w.style.display=otra?'block':'none';
+    if(otra && $('g_cat2') && !$('g_cat2').value) $('g_cat2').focus(); },
   /* Se separa base e IVA para que el contador no tenga que hacerlo a mano. */
   gIva(){ const d=$('g_desglose'); if(!d) return;
     const tot=+($('g_mon')||{}).value||0, con=($('g_iva')||{}).value==='si';
@@ -4276,8 +4288,12 @@ const App = {
     if(tot<=0) return alert('Ponle el valor');
     const conIva=$('g_iva').value==='si';
     const base=conIva?Math.round(tot/1.19):tot;
+    let cat=$('g_cat').value;
+    if(cat==='Otros'){ const otra=($('g_cat2')?$('g_cat2').value:'').trim();
+      if(!otra) return alert('Escribe qué gasto es, para no dejarlo como «Otros».');
+      cat=otra; }
     const b={concepto:con, fecha:$('g_fec').value||new Date().toISOString().slice(0,10),
-      categoria:$('g_cat').value, proveedor:($('g_prov').value||'').trim(),
+      categoria:cat, proveedor:($('g_prov').value||'').trim(),
       factura:($('g_fac').value||'').trim(), monto:tot, base:base, iva:tot-base,
       tiene_iva:conIva, forma_pago:$('g_fp').value, pagado:$('g_pag').value==='si',
       periodicidad:$('g_per').value, notas:($('g_not').value||'').trim()};
