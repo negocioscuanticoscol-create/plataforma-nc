@@ -2469,7 +2469,7 @@ const App = {
   async vCotizacionNueva(editId){
     this.loading();
     this._editCotId = editId||null;
-    const { data:cli=[] } = await this.sb.from('clientes').select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado').order('nombre');
+    const { data:cli=[] } = await this.sb.from('clientes').select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1').order('nombre');
     this.set(`
       <h1>${editId?'✏️ Editar':'Nueva'} cotización</h1><div class="sub">Bota Ref. 701 · ${money(C.PRECIO_PAR)}/par + IVA</div>
       <div class="card">
@@ -2570,11 +2570,15 @@ const App = {
   /* Corregir la empresa sin salirse de la cotización. Al guardar, guardarCliente
      ya propaga el cambio a las cotizaciones y pedidos que tengan su foto, así que
      acá solo hay que refrescar lo que se ve en pantalla y no perder la selección. */
-  editarClienteDesdeCot(){
+  async editarClienteDesdeCot(){
     const s=$('co_cliente'), id=s&&s.value;
     if(!id) return alert('Primero escoge la empresa que quieres corregir.');
-    const c=(this._clientes||[]).find(x=>String(x.id)===String(id));
-    if(!c) return alert('No encontré esa empresa en la lista.');
+    /* OJO: la lista de la cotización trae solo algunas columnas. Si se le pasa
+       ese objeto recortado al formulario, los campos que no vinieron salen
+       vacíos y al guardar SE BORRAN en la base (contacto2, cel2, notas,
+       localidad, contacto de recibo). Por eso se trae la ficha COMPLETA. */
+    const { data:c, error } = await this.sb.from('clientes').select('*').eq('id',id).single();
+    if(error || !c) return alert('No se pudo abrir la ficha: '+((error&&error.message)||'no encontrada'));
     this.modalCliente(async ()=>{
       const { data } = await this.sb.from('clientes')
         .select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1')
