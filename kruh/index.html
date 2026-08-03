@@ -669,6 +669,9 @@ const App={
       if(d.length>0 && d.length<10) h='⚠️ Faltan '+(10-d.length)+' dígito(s) — un celular tiene 10'; }
     e.textContent=h; e.style.display=h?'block':'none';
     e.style.color=/^⚠️/.test(h)?'var(--warn)':(/^✓/.test(h)?'var(--ok)':'var(--acc)'); },
+  /* El 123 es el celular del cliente que no quiere dejar datos. No identifica a
+     nadie, as\u00ed que nunca se usa para buscar ni para registrar. */
+  TEL_ANONIMO:'123',
   _normLeadName(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); },
   /* Identificar al cliente. Regla de oro: ante la duda NO se adivina, porque
      equivocarse no solo muestra mal — le graba la dirección de uno al otro.
@@ -676,7 +679,8 @@ const App={
      decidir si es seguro tocarle los datos. */
   _findLeadMatch(tel,nom,excludeId){
     this._matchPor='';
-    const phone=this._telKey(String(tel||''));
+    const phone0=this._telKey(String(tel||''));
+    const phone=(phone0===this.TEL_ANONIMO)?'':phone0;   // el 123 no identifica a nadie
     const q=this._normLeadName(nom||'');
     const cand=(this._leads||[]).filter(l=>!excludeId || l.id!==excludeId);
     const idem=l=>this._normLeadName(l.nombre||'')===q;
@@ -796,6 +800,9 @@ const App={
        Antes devolvia '' en los dos casos y la cajera nunca se enteraba de que
        el cliente no habia quedado guardado. */
     if(!nom) return {falta:'el nombre del cliente'};
+    /* Cliente anónimo: el que no quiere dejar sus datos se registra con el 123.
+       Es a propósito, no un error, así que ni se avisa ni se crea ficha nueva. */
+    if(k===this.TEL_ANONIMO) return {};
     const dir=(this._cartDir||'').trim(), promo=!!this._cartPromo, tipo=this._cartTipo||'comunidad';
     const ex=this._findLeadMatch(tel,cli);
     if(ex){ // ya está en el CRM: solo se actualiza lo que cambió
