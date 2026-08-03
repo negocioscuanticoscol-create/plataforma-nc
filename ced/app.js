@@ -204,18 +204,19 @@ const App = {
       {v:'inventario', ic:'🗃️', t:'Inventario'},
       {v:'cartera', ic:'💳', t:'Cartera'},
       {v:'comisiones', ic:'🧾', t:'Comisiones'},
-      {v:'planta', ic:'🏭', t:'Planta'},
+      {v:'proveedores', ic:'🚚', t:'Proveedores'},
     ];
     // hilera 3 = base de plataforma (solo admin la tiene en permitidos → solo a él le aparece)
     const ROW3=[
       {v:'panel', ic:'📈', t:'Panel'},
+      {v:'planta', ic:'🏭', t:'Planta'},
       {v:'datos', ic:'🗄️', t:'Datos'},
       {v:'admin', ic:'👤', t:'Usuarios'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos'],
-      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos'],
+    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','datos','admin','permisos'];
+    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores'],
+      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario'],
       facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos','inventario'], planta:['dashboard','pedidos','planta','inventario']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
@@ -269,6 +270,7 @@ const App = {
     if(window.NC_EMPRESA==='smart' && view==='autopedido') return this.vAutoPedidosSmart();
     if(view==='comisiones') return this.vComisiones();
     if(view==='gastos') return this.vGastos();
+    if(view==='proveedores') return this.vProveedores();
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
@@ -3871,7 +3873,189 @@ const App = {
   /* pestañas que se pueden repartir · la llave es la misma que usa el nav */
   CED_MODS:[['panel','📈 Panel'],['crm','📇 CRM'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],
     ['despachos','🚚 Despachos'],['cartera','💳 Cartera'],['clientes','👥 Clientes'],
-    ['planta','🏭 Planta'],['comisiones','🧾 Comisiones'],['gastos','🧾 Gastos']],
+    ['planta','🏭 Planta'],['comisiones','🧾 Comisiones'],['gastos','💸 Gastos'],['proveedores','🚚 Proveedores']],
+
+  /* ================= PROVEEDORES =================
+     Dos cosas que hoy viven en la cabeza de alguien y se pierden:
+     las CONDICIONES que se negociaron (crédito, mínimo, flete, entrega) y las
+     REFERENCIAS que maneja cada proveedor con su costo. */
+  COND_PAGO:['Contado','Credito'],
+  QUIEN_FLETE:['Proveedor','CED','Compartido'],
+
+  async vProveedores(){
+    this.set('<h1>Proveedores</h1><div class="sub">Cargando…</div>');
+    const [rp,rr]=await Promise.all([
+      this.sb.from('ced_proveedores').select('*').order('nombre'),
+      this.sb.from('ced_prov_referencias').select('*').order('referencia')
+    ]);
+    if(rp.error){
+      this.set(`<h1>Proveedores</h1>
+        <div class="card" style="border-color:#f0c4c4;background:#fdecec">
+          <b>No se pudo leer la tabla de proveedores.</b>
+          <div style="margin-top:6px;font-size:13.5px">${esc(rp.error.message||'')}</div>
+          <div style="margin-top:8px;font-size:13px">Si dice que <b>ced_proveedores</b> no existe, falta correr su SQL una sola vez.</div>
+        </div>`); return; }
+    this._provs=rp.data||[]; this._refs=rr.error?[]:(rr.data||[]);
+    this._provPaint();
+  },
+
+  _provPaint(){
+    const P=this._provs||[], R=this._refs||[], q=(this._provQ||'').trim().toLowerCase();
+    const refsDe=id=>R.filter(r=>r.proveedor_id===id);
+    let lista=P;
+    if(q) lista=P.filter(p=>String(p.nombre||'').toLowerCase().includes(q)
+      || refsDe(p.id).some(r=>(String(r.referencia||'')+' '+String(r.marca||'')+' '+String(r.color||'')).toLowerCase().includes(q)));
+    const nRef=R.length, credito=P.filter(p=>p.condicion_pago==='Credito').length;
+    this.set(`<h1>Proveedores</h1>
+      <div class="sub">Con quién se compra, en qué condiciones y qué referencias maneja cada uno.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <input placeholder="Buscar proveedor, marca o referencia…" value="${esc(this._provQ||'')}"
+          oninput="App._provQ=this.value;clearTimeout(App._provT);App._provT=setTimeout(()=>App._provPaint(),300)"
+          style="flex:1;min-width:150px;padding:11px;border:1.5px solid var(--linea);border-radius:10px">
+        <button class="btn btn-main" style="width:auto;margin:0;padding:11px 16px" onclick="App.provModal()">＋ Proveedor</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px">
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">Proveedores</div><b style="font-size:21px">${P.length}</b></div>
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">Referencias</div><b style="font-size:21px">${nRef}</b></div>
+        <div class="card" style="margin:0;padding:12px 14px"><div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase">A crédito</div><b style="font-size:21px;color:var(--naranja)">${credito}</b></div>
+      </div>
+      ${lista.length?lista.map(p=>{
+        const rs=refsDe(p.id), abierto=this._provOpen===p.id;
+        return `<div class="card" style="padding:12px 14px">
+          <div style="display:flex;justify-content:space-between;gap:10px;cursor:pointer" onclick="App._provOpen=App._provOpen==='${p.id}'?'':'${p.id}';App._provPaint()">
+            <div style="min-width:0;flex:1">
+              <div style="font-weight:700;font-size:15px">${abierto?'▾':'▸'} ${esc(p.nombre)}${p.activo===false?' <span style="font-size:10.5px;background:#eef0f2;color:#666;padding:2px 7px;border-radius:10px">inactivo</span>':''}</div>
+              <div style="font-size:11.5px;color:#8a93a6;margin-top:2px">
+                ${esc(p.condicion_pago||'Contado')}${(+p.dias_credito||0)?' '+p.dias_credito+' días':''}
+                ${(+p.pedido_minimo||0)?' · mínimo '+money(p.pedido_minimo):''}
+                ${p.tiempo_entrega?' · entrega '+esc(p.tiempo_entrega):''}
+                ${p.ciudad?' · '+esc(p.ciudad):''}</div></div>
+            <div style="text-align:right;flex:none">
+              <div style="font-weight:800;color:var(--naranja)">${rs.length}</div>
+              <div style="font-size:11px;color:#8a93a6">referencia${rs.length===1?'':'s'}</div></div></div>
+          ${abierto?`<div style="margin-top:10px;border-top:1px dashed var(--linea);padding-top:9px;font-size:12.5px;line-height:1.6">
+            <div><b>Contacto:</b> ${esc(p.contacto||'—')}${p.telefono?' · 📱 '+esc(p.telefono):''}${p.email?' · '+esc(p.email):''}</div>
+            <div><b>NIT:</b> ${esc(p.nit||'—')}${p.direccion?' · '+esc(p.direccion):''}</div>
+            <div><b>Flete:</b> lo paga ${esc(p.quien_paga_flete||'Proveedor')}${(+p.descuento_pct||0)?' · descuento '+p.descuento_pct+'%':''}</div>
+            ${p.notas?`<div style="color:#6b7280;margin-top:3px">${esc(p.notas)}</div>`:''}
+            <div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">
+              <button class="btn-sm" style="background:#eef1f5" onclick="event.stopPropagation();App.provModal('${p.id}')">✎ Editar condiciones</button>
+              <button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="event.stopPropagation();App.refModal('${p.id}')">＋ Referencia</button></div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a93a6;margin:11px 0 4px">Referencias que maneja</div>
+            ${rs.length?rs.map(r=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid #f0f1f4">
+              <span style="min-width:0"><b>${esc(r.referencia)}</b>${r.marca?' · '+esc(r.marca):''}
+                <span style="color:#8a93a6">${r.color?' · '+esc(r.color):''}${r.tallas?' · tallas '+esc(r.tallas):''}</span></span>
+              <span style="white-space:nowrap">${money(r.costo)}<span style="font-size:10.5px;color:#8a93a6">/${esc(r.unidad||'par')}</span>
+                ${(+r.precio_sug||0)?'<span style="font-size:10.5px;color:#8a93a6"> → '+money(r.precio_sug)+'</span>':''}
+                <a onclick="event.stopPropagation();App.refModal('${p.id}','${r.id}')" style="color:var(--naranja);cursor:pointer;margin-left:6px">✎</a>
+                <a onclick="event.stopPropagation();App.refDel('${r.id}')" style="color:#d22;cursor:pointer;margin-left:3px">✕</a></span>
+            </div>`).join(''):'<div style="color:#8a93a6;font-size:12px">Sin referencias todavía.</div>'}
+          </div>`:''}</div>`;}).join('')
+      :`<div class="card" style="text-align:center;padding:26px 16px;color:#8a93a6">
+          ${P.length?'Nada coincide con la búsqueda.':'Todavía no hay proveedores. Dale a <b>＋ Proveedor</b>.'}</div>`}`);
+  },
+
+  provModal(id){
+    const p=(this._provs||[]).find(x=>String(x.id)===String(id))||{};
+    this.modal(`<h3 style="margin-bottom:10px">${id?'Editar':'Nuevo'} proveedor</h3>
+      <label>Nombre / Empresa</label><input id="pv_nom" value="${esc(p.nombre||'')}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>NIT</label><input id="pv_nit" value="${esc(p.nit||'')}"></div>
+        <div><label>Ciudad</label><input id="pv_ciu" value="${esc(p.ciudad||'')}"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Contacto</label><input id="pv_con" value="${esc(p.contacto||'')}"></div>
+        <div><label>Teléfono</label><input id="pv_tel" value="${esc(p.telefono||'')}"></div></div>
+      <label>Email</label><input id="pv_mail" value="${esc(p.email||'')}">
+      <label>Dirección</label><input id="pv_dir" value="${esc(p.direccion||'')}">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8a93a6;margin:14px 0 2px">Condiciones negociadas</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Pago</label><select id="pv_cp">${this.COND_PAGO.map(c=>`<option ${p.condicion_pago===c?'selected':''}>${c}</option>`).join('')}</select></div>
+        <div><label>Días de crédito</label><input id="pv_dias" type="number" value="${p.dias_credito||0}"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Pedido mínimo</label><input id="pv_min" type="number" value="${p.pedido_minimo||0}"></div>
+        <div><label>Tiempo de entrega</label><input id="pv_ent" value="${esc(p.tiempo_entrega||'')}" placeholder="8 días hábiles"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>¿Quién paga el flete?</label><select id="pv_fle">${this.QUIEN_FLETE.map(f=>`<option ${p.quien_paga_flete===f?'selected':''}>${f}</option>`).join('')}</select></div>
+        <div><label>Descuento %</label><input id="pv_desc" type="number" value="${p.descuento_pct||0}"></div></div>
+      <label>Notas</label><textarea id="pv_not" rows="2">${esc(p.notas||'')}</textarea>
+      ${id?`<label>Estado</label><select id="pv_act"><option value="si" ${p.activo!==false?'selected':''}>Activo</option><option value="no" ${p.activo===false?'selected':''}>Inactivo</option></select>`:''}
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-main" style="flex:1" onclick="App.provSave('${id||''}')">Guardar</button>
+        <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>
+      ${id?`<button class="btn" style="color:#d22;margin-top:6px" onclick="App.provDel('${id}')">Eliminar proveedor</button>`:''}`);
+  },
+
+  async provSave(id){
+    const nom=($('pv_nom').value||'').trim();
+    if(!nom) return alert('Ponle el nombre del proveedor');
+    const b={nombre:nom, nit:($('pv_nit').value||'').trim(), ciudad:($('pv_ciu').value||'').trim(),
+      contacto:($('pv_con').value||'').trim(), telefono:($('pv_tel').value||'').trim(),
+      email:($('pv_mail').value||'').trim(), direccion:($('pv_dir').value||'').trim(),
+      condicion_pago:$('pv_cp').value, dias_credito:+$('pv_dias').value||0,
+      pedido_minimo:+$('pv_min').value||0, tiempo_entrega:($('pv_ent').value||'').trim(),
+      quien_paga_flete:$('pv_fle').value, descuento_pct:+$('pv_desc').value||0,
+      notas:($('pv_not').value||'').trim()};
+    if($('pv_act')) b.activo=$('pv_act').value==='si';
+    if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Principal';
+    const q= id ? await this.sb.from('ced_proveedores').update(b).eq('id',id)
+                : await this.sb.from('ced_proveedores').insert(b);
+    if(q.error) return alert('No se pudo guardar: '+q.error.message);
+    this.cerrarModal(); this.toast(id?'Proveedor actualizado ✅':'Proveedor creado ✅'); this.vProveedores(); },
+
+  async provDel(id){
+    const p=(this._provs||[]).find(x=>String(x.id)===String(id))||{};
+    const n=(this._refs||[]).filter(r=>r.proveedor_id===id).length;
+    if(!confirm('¿Borrar «'+(p.nombre||'')+'»'+(n?' y sus '+n+' referencia(s)':'')+'?')) return;
+    const { error }=await this.sb.from('ced_proveedores').delete().eq('id',id);
+    if(error) return alert('No se pudo borrar: '+error.message);
+    this.cerrarModal(); this.toast('Proveedor eliminado'); this.vProveedores(); },
+
+  refModal(provId,id){
+    const r=(this._refs||[]).find(x=>String(x.id)===String(id))||{};
+    const p=(this._provs||[]).find(x=>String(x.id)===String(provId))||{};
+    this.modal(`<h3 style="margin-bottom:3px">${id?'Editar':'Nueva'} referencia</h3>
+      <div style="font-size:12px;color:#8a93a6;margin-bottom:9px">Proveedor: <b>${esc(p.nombre||'')}</b></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Referencia</label><input id="rf_ref" value="${esc(r.referencia||'')}" placeholder="Ej: 1220"></div>
+        <div><label>Marca</label><input id="rf_mar" value="${esc(r.marca||'')}"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Color</label><input id="rf_col" value="${esc(r.color||'')}"></div>
+        <div><label>Tallas</label><input id="rf_tal" value="${esc(r.tallas||'')}" placeholder="35-44"></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
+        <div><label>Costo</label><input id="rf_cos" type="number" value="${r.costo||''}" oninput="App.rfMargen()"></div>
+        <div><label>Precio sugerido</label><input id="rf_pre" type="number" value="${r.precio_sug||''}" oninput="App.rfMargen()"></div>
+        <div><label>Unidad</label><input id="rf_uni" value="${esc(r.unidad||'par')}"></div></div>
+      <div id="rf_margen" style="font-size:12.5px;color:#8a93a6;margin-top:5px"></div>
+      <label>Notas</label><input id="rf_not" value="${esc(r.notas||'')}">
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-main" style="flex:1" onclick="App.refSave('${provId}','${id||''}')">Guardar</button>
+        <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
+    this.rfMargen(); },
+  rfMargen(){ const d=$('rf_margen'); if(!d) return;
+    const c=+($('rf_cos')||{}).value||0, p=+($('rf_pre')||{}).value||0;
+    if(!c||!p){ d.textContent=''; return; }
+    const m=p-c, pct=p>0?(m/p*100):0;
+    d.innerHTML='Margen: <b style="color:'+(m>=0?'#2e9e4f':'#c0392b')+'">'+money(m)+' · '+pct.toFixed(0)+'%</b>'; },
+
+  async refSave(provId,id){
+    const ref=($('rf_ref').value||'').trim();
+    if(!ref) return alert('Ponle la referencia');
+    const b={proveedor_id:provId, referencia:ref, marca:($('rf_mar').value||'').trim(),
+      color:($('rf_col').value||'').trim(), tallas:($('rf_tal').value||'').trim(),
+      costo:+$('rf_cos').value||0, precio_sug:+$('rf_pre').value||0,
+      unidad:($('rf_uni').value||'par').trim(), notas:($('rf_not').value||'').trim()};
+    if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Principal';
+    const q= id ? await this.sb.from('ced_prov_referencias').update(b).eq('id',id)
+                : await this.sb.from('ced_prov_referencias').insert(b);
+    if(q.error) return alert('No se pudo guardar: '+q.error.message);
+    this.cerrarModal(); this.toast(id?'Referencia actualizada ✅':'Referencia agregada ✅'); this.vProveedores(); },
+
+  async refDel(id){
+    const r=(this._refs||[]).find(x=>String(x.id)===String(id))||{};
+    if(!confirm('¿Borrar la referencia «'+(r.referencia||'')+'»?')) return;
+    const { error }=await this.sb.from('ced_prov_referencias').delete().eq('id',id);
+    if(error) return alert('No se pudo borrar: '+error.message);
+    this.toast('Referencia borrada'); this.vProveedores(); },
 
   /* ================= GASTOS =================
      Cada sucursal ve y carga SOLO los suyos: la tabla ced_gastos filtra por
