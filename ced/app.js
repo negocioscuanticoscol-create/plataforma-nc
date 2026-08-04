@@ -143,8 +143,14 @@ const App = {
     this._startHeartbeat();
     $('view-login').classList.add('hide'); $('app').classList.remove('hide');
     $('me_nombre').textContent = this.perfil.nombre || this.user.email;
-    $('me_rol').textContent = ROL_NOMBRE[this.perfil.rol] || this.perfil.rol;
+    // El cargo manda sobre el rol. A TODOS los usuarios de la red se les creo
+    // perfiles.rol='vendedor', asi que mostrar el rol hacia que un gerente o un
+    // administrador saliera rotulado como VENDEDOR.
+    $('me_rol').textContent = this.miCargo() || ROL_NOMBRE[this.perfil.rol] || this.perfil.rol;
     try{ const { data:cfg } = await this.sb.from('config').select('value').eq('key','nav_permisos').maybeSingle(); this._permisos = cfg?cfg.value:null; }catch(e){ this._permisos=null; }
+    // Permisos de la red, por CARGO. Es lo que se edita en la pantalla Permisos.
+    try{ const { data:pm } = await this.sb.from('ced_permisos').select('cargo,tabs');
+         this._cedPerm={}; (pm||[]).forEach(p=>this._cedPerm[p.cargo]=p.tabs||[]); }catch(e){ this._cedPerm=null; }
     this.pintarNav();
     const inicio = {facturacion:'cotizaciones', bodega:'despachos', planta:'planta'}[this.perfil.rol] || (window.NC_EMPRESA==='smart'?'panel':'dashboard');
     this.go(inicio);
@@ -219,8 +225,17 @@ const App = {
       director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario'],
       facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos','inventario'], planta:['dashboard','pedidos','planta','inventario']};
-    let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
-    if(r==='admin') permitidos=TODOS;
+    /* De donde salen las pestañas, en orden:
+       1. Si la persona entra por la red (tiene CARGO), manda ced_permisos —
+          que es justo lo que se edita en la pantalla de Permisos. Antes esa
+          pantalla guardaba ahi y NADIE la leia: se editaba y no pasaba nada.
+       2. Si no, el viejo config.nav_permisos por rol.
+       3. Si tampoco, el DEF de siempre. */
+    const _cargo=this.miCargo();
+    let permitidos;
+    if(_cargo && this._cedPerm && this._cedPerm[_cargo]) permitidos=this._cedPerm[_cargo];
+    else permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
+    if(r==='admin') permitidos=TODOS;   // el dueño siempre ve todo
     this._permitidos=permitidos;
     const btn=i=>`<button data-v="${i.v}" onclick="App.go('${i.v}')"><span class="ic">${i.ic}</span>${i.t}</button>`;
     const f1=ROW1.filter(i=>permitidos.includes(i.v)).map(btn).join('');
@@ -1473,9 +1488,13 @@ const App = {
   },
   async vPanelFinanzasFeroz(){   // FEROZ · Resultados — calculado en vivo desde pedidos reales
     this.loading();
-    let peds=[], clis=[];
+    let peds=[], clis=[], gastos=[];
     try{ const r=await this.sb.from('pedidos').select('total,pares,comision_nc,comision_gpjr,es_muestra,cliente_id,creado_en,estado'); peds=r.data||[]; }catch(e){}
     try{ const r=await this.sb.from('clientes').select('id,creado_en'); clis=r.data||[]; }catch(e){}
+    // Los costos ya NO son un % inventado: son los gastos que cada sucursal
+    // grabo de verdad en el modulo de Gastos. El RLS ya los recorta por sede
+    // (la Principal ve toda la red, cada agencia solo lo suyo).
+    try{ const r=await this.sb.from('ced_gastos').select('fecha,monto,categoria'); gastos=r.data||[]; }catch(e){}
     const pedsRaw=Array.isArray(peds)?peds:[];
     const PAGADO=['consignado','autorizado','despachado','entregado'];   // cuenta como venta SOLO si ya pagó
     const muestras=pedsRaw.filter(p=>p.es_muestra); const muVend=muestras.filter(p=>(+p.total||0)>0).length, muGratis=muestras.length-muVend;
@@ -1496,21 +1515,30 @@ const App = {
     const nuevosMes={}; clis.forEach(c=>{ const m=c.creado_en?new Date(c.creado_en).getMonth()+1:0; if(m) nuevosMes[m]=(nuevosMes[m]||0)+1; });
     let acum=0; const acumMes={}; for(let m=1;m<=12;m++){ acum+=nuevosMes[m]||0; acumMes[m]=acum; }
     let hasGPJR=false;
+    // gastos reales por mes. Se lee el mes del TEXTO de la fecha ('2026-08-01'),
+    // no con new Date(): eso parsea en UTC y en Colombia (-5) el dia 1 de cada
+    // mes se corria al mes anterior.
+    const G={}; gastos.forEach(g=>{ const m=+String(g.fecha||'').slice(5,7); if(m) G[m]=(G[m]||0)+(+g.monto||0); });
+
     const rows=Object.keys(M).map(Number).sort((a,b)=>a-b).map(m=>{ const d=M[m], v=d.ventas, rec=[...d.cli].filter(id=>firstMes[id]<m).length;
-      const com=d.cNC+d.cG, herr=(m>=HERR_DESDE?HERR:0); if(d.cG>0) hasGPJR=true;
-      return { mes:MES[m], ventas_libro:v, u_bruta:v*BRUTA, comision:com, comision_nc:d.cNC, comision_gpjr:d.cG, herramientas:herr, bodega:v*BOD, logistica:v*LOG, operaciones:v*OPE,
-        utilidad_neta:v*BRUTA-com-herr-v*BOD-v*LOG-v*OPE, unidades:d.pares,
+      const com=d.cNC+d.cG, herr=(m>=HERR_DESDE?HERR:0), gas=G[m]||0; if(d.cG>0) hasGPJR=true;
+      return { mes:MES[m], ventas_libro:v, u_bruta:v*BRUTA, comision:com, comision_nc:d.cNC, comision_gpjr:d.cG, herramientas:herr, gastos:gas,
+        utilidad_neta:v*BRUTA-com-herr-gas, unidades:d.pares,
         clientes_registrados:acumMes[m], clientes_nuevos:nuevosMes[m]||0, clientes_recurrentes:rec }; });
-    this._renderPanelFin(rows, {titulo:'Feroz', unidLabel:'Pares', pBod:'1%', pLog:'1%', pOpe:'1%', splitComision:true, hasGPJR,
+    this._renderPanelFin(rows, {titulo:'Feroz', unidLabel:'Pares', splitComision:true, hasGPJR,
       nVentas:peds.length, muestras:{vend:muVend, gratis:muGratis},
-      sub:'EN VIVO desde pedidos reales · '+(HERR?'herramientas $4.000.000/mes (desde julio) · ':'')+'bodega 1% · logística 1% · operaciones 1% · U.bruta 20%',
+      costoFilas:[['Gastos de la sucursal','gastos','lo grabado']],
+      sub:'EN VIVO desde pedidos reales · '+(HERR?'herramientas $4.000.000/mes (desde julio) · ':'')+'costos = lo que grabó la sucursal en Gastos · U.bruta 20%',
       vacio:'Aún no hay pedidos con valor en Feroz. A medida que se vendan, aparecen aquí.'});
   },
   _renderPanelFin(rows, cfg){   // renderizador COMPARTIDO (Smart y Feroz)
     const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO'), nm=n=>Math.round(n||0).toLocaleString('es-CO');
     if(!rows.length) return this.set(`<h1>📊 Resultados · ${cfg.titulo}</h1><div class="empty">${cfg.vacio||'Sin datos todavía.'}</div>`);
-    const C={}; ['ventas_libro','u_bruta','comision','comision_nc','comision_gpjr','herramientas','bodega','logistica','operaciones','utilidad_neta','unidades','clientes_nuevos','clientes_recurrentes'].forEach(k=>C[k]=rows.reduce((a,x)=>a+(+x[k]||0),0));
-    const costos=C.comision+C.herramientas+C.bodega+C.logistica+C.operaciones;
+    // Que filas de costo se muestran lo decide quien llama: Smart sigue con sus
+    // porcentajes, Feroz ahora usa el gasto real de la sucursal.
+    const COSTOS=cfg.costoFilas||[['Bodega','bodega',cfg.pBod||''],['Logística','logistica',cfg.pLog||''],['Operaciones','operaciones',cfg.pOpe||'']];
+    const C={}; ['ventas_libro','u_bruta','comision','comision_nc','comision_gpjr','herramientas','utilidad_neta','unidades','clientes_nuevos','clientes_recurrentes'].concat(COSTOS.map(c=>c[1])).forEach(k=>C[k]=rows.reduce((a,x)=>a+(+x[k]||0),0));
+    const costos=C.comision+C.herramientas+COSTOS.reduce((a,c)=>a+(C[c[1]]||0),0);
     const th=rows.map(x=>`<th style="text-align:right">${(x.mes||'').slice(0,3)}</th>`).join('');
     const fila=(l,k,p)=>`<tr><td>${l}${p?` <span style="color:#8a93a6;font-size:11px">${p}</span>`:''}</td>${rows.map(x=>{const v=+x[k]||0;return `<td style="text-align:right${v<0?';color:#dc2626':''}">${cl(v)}</td>`}).join('')}<td style="text-align:right;font-weight:800">${cl(C[k])}</td></tr>`;
     const filaN=(l,k)=>`<tr><td>${l}</td>${rows.map(x=>`<td style="text-align:right">${nm(+x[k]||0)}</td>`).join('')}<td style="text-align:right;font-weight:800">${nm(C[k])}</td></tr>`;
@@ -1530,9 +1558,7 @@ const App = {
         ${fila('U. Bruta','u_bruta','20%')}
         ${cfg.splitComision ? `${fila('Comisiones NC','comision_nc','var')}${fila('Comisiones GPJR','comision_gpjr','⭐')}` : fila('Comisiones','comision','var')}
         ${fila('Herramientas','herramientas','fijo')}
-        ${fila('Bodega','bodega',cfg.pBod||'')}
-        ${fila('Logística','logistica',cfg.pLog||'')}
-        ${fila('Operaciones','operaciones',cfg.pOpe||'')}
+        ${COSTOS.map(c=>fila(c[0],c[1],c[2])).join('')}
         <tr style="background:#eafaf0;font-weight:800;color:#16a34a"><td>UTILIDAD NETA</td>${rows.map(x=>`<td style="text-align:right${(+x.utilidad_neta||0)<0?';color:#dc2626':''}">${cl(+x.utilidad_neta||0)}</td>`).join('')}<td style="text-align:right">${cl(C.utilidad_neta)}</td></tr>
         <tr><td colspan="${rows.length+2}" style="background:#fafafa;padding:3px"></td></tr>
         ${filaN('📦 '+cfg.unidLabel,'unidades')}
@@ -3930,9 +3956,15 @@ const App = {
 
   /* ---------- PERMISOS (qué ve cada rol) ---------- */
   /* pestañas que se pueden repartir · la llave es la misma que usa el nav */
-  CED_MODS:[['panel','📈 Panel'],['crm','📇 CRM'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],
-    ['despachos','🚚 Despachos'],['cartera','💳 Cartera'],['clientes','👥 Clientes'],
-    ['planta','🏭 Planta'],['comisiones','🧾 Comisiones'],['gastos','💸 Gastos'],['proveedores','🚚 Proveedores']],
+  /* Tiene que traer TODOS los modulos del menu (ROW1+ROW2+ROW3). Si a esta
+     lista le falta uno, ese modulo no se puede marcar — y como el menu ahora se
+     rige por ced_permisos, lo que no este aca queda invisible para todo cargo.
+     Faltaban Inventario, Datos, Usuarios y Permisos. */
+  CED_MODS:[['crm','📇 CRM'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],
+    ['despachos','🚚 Despachos'],['gastos','💸 Gastos'],['inventario','🗃️ Inventario'],
+    ['cartera','💳 Cartera'],['comisiones','🧾 Comisiones'],['proveedores','🚚 Proveedores'],
+    ['panel','📈 Panel'],['planta','🏭 Planta'],['clientes','👥 Clientes'],
+    ['datos','🗄️ Datos'],['admin','👤 Usuarios'],['permisos','🔐 Permisos']],
 
   /* ================= PROVEEDORES =================
      Dos cosas que hoy viven en la cabeza de alguien y se pierden:
