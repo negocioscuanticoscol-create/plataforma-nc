@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cotización · Smart Packaging Colombia</title>
+<meta property="og:title" content="Tu cotización · Smart Packaging Colombia">
+<meta property="og:description" content="Envases herméticos · precios con IVA y flete incluidos.">
+<meta name="theme-color" content="#15171c">
+<style>
+  /* Página PÚBLICA de solo lectura: es lo que ve el cliente cuando el agente le
+     manda el enlace por WhatsApp. Sin botones de editar, sin datos internos.
+     NUNCA mostrar el costo/convenio (l5): es la base de la comisión. */
+  :root{ --tinta:#15171c; --gris:#f4f5f7; --linea:#e3e5ea; --suave:#6b7280;
+         --verde:#0f9d58; --naranja:#E8620C; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',-apple-system,Roboto,Arial,sans-serif;background:var(--gris);
+       color:var(--tinta);line-height:1.5;padding:14px;font-variant-numeric:tabular-nums}
+  .hoja{max-width:620px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;
+        box-shadow:0 4px 24px rgba(0,0,0,.09)}
+  .top{background:var(--tinta);color:#fff;padding:18px 22px}
+  .top .marca{font-size:19px;font-weight:800;letter-spacing:-.01em}
+  .top .sub{font-size:10.5px;letter-spacing:.18em;color:#9aa1ac;margin-top:2px;text-transform:uppercase}
+  .folio{display:flex;justify-content:space-between;align-items:baseline;
+         background:#1f2229;color:#fff;padding:11px 22px;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+  .folio b{color:var(--naranja);font-size:13.5px;letter-spacing:0}
+  .cuerpo{padding:20px 22px}
+  .et{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--suave);
+      margin:20px 0 7px}
+  .et:first-child{margin-top:0}
+  .item{display:flex;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #f0f1f4}
+  .item .nom{font-weight:700;font-size:14.5px}
+  .item .det{font-size:12px;color:var(--suave);margin-top:2px}
+  .item .val{font-weight:700;white-space:nowrap;font-size:14.5px}
+  .fila{display:flex;justify-content:space-between;padding:5px 0;font-size:13.5px}
+  .fila.dim{color:var(--suave)}
+  .total{display:flex;justify-content:space-between;align-items:baseline;
+         border-top:2px solid var(--tinta);margin-top:9px;padding-top:12px}
+  .total span{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+  .total b{font-size:25px;font-weight:800;color:var(--verde)}
+  .caja{background:var(--tinta);color:#fff;border-radius:12px;padding:15px 18px;margin-top:18px}
+  .caja .k{font-size:10px;letter-spacing:.1em;color:#9aa1ac;text-transform:uppercase;font-weight:700}
+  .caja .n{font-size:19px;font-weight:800;margin-top:5px;letter-spacing:.02em}
+  .caja .a{font-size:12.5px;color:#c9ced6;margin-top:3px}
+  .datos{background:#fafbfc;border:1px solid var(--linea);border-radius:12px;padding:14px 16px;margin-top:16px}
+  .datos .r{display:flex;justify-content:space-between;gap:14px;padding:4px 0;font-size:13px}
+  .datos .r span:first-child{color:var(--suave);flex:0 0 auto}
+  .datos .r span:last-child{text-align:right;font-weight:600;word-break:break-word}
+  .pie{padding:14px 22px 20px;font-size:11.5px;color:var(--suave);text-align:center;line-height:1.6}
+  .wa{display:block;background:#25D366;color:#fff;text-align:center;text-decoration:none;
+      font-weight:700;padding:15px;font-size:15px;border-radius:12px;margin-top:18px}
+  .cargando,.error{max-width:620px;margin:60px auto;text-align:center;color:var(--suave);
+                   background:#fff;border-radius:16px;padding:40px 24px}
+  .error b{display:block;color:var(--tinta);font-size:16px;margin-bottom:6px}
+  @media print{ body{background:#fff;padding:0} .hoja{box-shadow:none} .wa{display:none} }
+</style>
+</head>
+<body>
+<div id="app"><div class="cargando">Cargando tu cotización…</div></div>
+
+<script>
+const SBU='https://fnayedgvamxktxfvywwl.supabase.co';
+const SBK='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const WA_SMART='573112852137';   // por si quiere escribirnos desde la cotización
+
+const $=id=>document.getElementById(id);
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+const num=n=>(+n||0).toLocaleString('es-CO');
+
+function pinta(err){
+  $('app').innerHTML=`<div class="error"><b>${esc(err)}</b>
+    Si crees que es un error, escríbenos y te la reenviamos.
+    <a class="wa" href="https://wa.me/${WA_SMART}">💬 Escribir a Smart Packaging</a></div>`;
+}
+
+(async function(){
+  const p=new URLSearchParams(location.search);
+  const folio=(p.get('f')||p.get('folio')||'').trim();
+  if(!folio) return pinta('No encontramos el número de cotización.');
+  let c=null;
+  try{
+    const r=await fetch(SBU+'/rest/v1/nc_cotizaciones?folio=eq.'+encodeURIComponent(folio)+'&select=*&limit=1',
+      {headers:{apikey:SBK,Authorization:'Bearer '+SBK}});
+    const arr=await r.json();
+    c=Array.isArray(arr)?arr[0]:null;
+  }catch(e){}
+  if(!c) return pinta('No encontramos la cotización '+folio+'.');
+  if(String(c.estado||'').toLowerCase().startsWith('anulad'))
+    return pinta('La cotización '+folio+' fue anulada.');
+
+  const d=c.datos||{};
+  /* los productos vienen como texto JSON dentro de datos.productos */
+  let prods=[];
+  try{ prods=typeof d.productos==='string'?JSON.parse(d.productos):(d.productos||[]); }catch(e){ prods=[]; }
+
+  const sub=+d.subtotal_sin_iva||0, iva=+d.iva||0, flete=+d.flete||0;
+  const total=+c.total||+d.total||0;
+  const uds=+d.total_uds||prods.reduce((a,x)=>a+(+x.qty||0),0);
+  const lista=d.lista_nombre||'';
+  const fecha=d.fecha||String(c.creado_en||'').slice(0,10).split('-').reverse().join('/');
+
+  const dirEnt=[d.envio_dir,d.envio_barrio,d.envio_ciudad].filter(Boolean).join(', ');
+
+  $('app').innerHTML=`
+    <div class="hoja">
+      <div class="top">
+        <div class="marca">SMART PACKAGING</div>
+        <div class="sub">Colombia · Envases herméticos</div>
+      </div>
+      <div class="folio"><span>Cotización</span><b>${esc(c.folio||folio)}</b></div>
+      <div class="cuerpo">
+
+        <div class="et">Para</div>
+        <div style="font-size:16px;font-weight:800">${esc(c.cliente||d.empresa||'—')}</div>
+        ${c.contacto&&c.contacto!==c.cliente?`<div style="font-size:13px;color:var(--suave)">At. ${esc(c.contacto)}</div>`:''}
+        ${d.cedula_nit?`<div style="font-size:12.5px;color:var(--suave)">NIT/CC ${esc(d.cedula_nit)}</div>`:''}
+
+        <div class="et">Productos</div>
+        ${prods.length?prods.map(x=>`
+          <div class="item">
+            <div><div class="nom">${esc(x.ref||'')}</div>
+              <div class="det">${esc(x.color||'')}${x.qty?' · '+num(x.qty)+' uds × '+money(x.precio):''}${lista?' · '+esc(lista):''}</div></div>
+            <div class="val">${money(x.subtotal||((+x.qty||0)*(+x.precio||0)))}</div>
+          </div>`).join('')
+        :`<div class="item"><div><div class="nom">${esc(d.alimento||'Pedido')}</div>
+            <div class="det">${uds?num(uds)+' unidades':''}</div></div>
+            <div class="val">${money(sub||total)}</div></div>`}
+
+        <div style="margin-top:14px">
+          ${sub?`<div class="fila dim"><span>Subtotal sin IVA</span><span>${money(sub)}</span></div>`:''}
+          ${iva?`<div class="fila dim"><span>IVA 19%</span><span>${money(iva)}</span></div>`:''}
+          ${flete?`<div class="fila dim"><span>Flete</span><span>${money(flete)}</span></div>`
+                 :`<div class="fila dim"><span>Flete</span><span>Incluido</span></div>`}
+          <div class="total"><span>Total a pagar</span><b>${money(total)}</b></div>
+        </div>
+
+        <div class="caja">
+          <div class="k">Datos para consignación</div>
+          <div class="n">Bancolombia · Ahorros</div>
+          <div class="n" style="font-size:22px;letter-spacing:.06em">860 663 50101</div>
+          <div class="a">MARTÍN GUEVARA MEJÍA · CC 1.126.604.274</div>
+          <div class="a" style="margin-top:7px">📲 Envía el comprobante por WhatsApp y despachamos.</div>
+        </div>
+
+        ${(dirEnt||d.envio_nombre||d.envio_tel)?`
+        <div class="et">Datos de entrega</div>
+        <div class="datos">
+          ${d.envio_nombre?`<div class="r"><span>Recibe</span><span>${esc(d.envio_nombre)}</span></div>`:''}
+          ${dirEnt?`<div class="r"><span>Dirección</span><span>${esc(dirEnt)}</span></div>`:''}
+          ${d.envio_tel?`<div class="r"><span>Celular</span><span>${esc(d.envio_tel)}</span></div>`:''}
+          ${d.tipo_transporte?`<div class="r"><span>Transporte</span><span>${esc(d.tipo_transporte==='incluido'?'Incluido en factura':d.tipo_transporte)}</span></div>`:''}
+        </div>`:''}
+
+        <a class="wa" href="https://wa.me/${WA_SMART}?text=${encodeURIComponent('Hola, sobre mi cotización '+(c.folio||folio))}">
+          💬 Confirmar o preguntar por WhatsApp</a>
+      </div>
+      <div class="pie">
+        Precios sin IVA en lista. IVA 19% y flete incluidos en el total.<br>
+        Cotización del ${esc(fecha)} · válida 5 días hábiles · envíos a todo Colombia en 2–3 días hábiles.
+      </div>
+    </div>`;
+  document.title='Cotización '+(c.folio||folio)+' · Smart Packaging';
+})();
+</script>
+</body>
+</html>
