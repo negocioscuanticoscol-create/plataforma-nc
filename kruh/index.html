@@ -1909,18 +1909,90 @@ const App={
       ${caj('organico','🌱','Orgánico','Voz a voz, referidos y lo que llega solo',`<span class="tag">por armar</span>`)}`);
   },
   _mkVolver(){ return `<a onclick="App._mkView='';App.vMarketing()" style="color:var(--acc);cursor:pointer;font-weight:700;font-size:13px">← Marketing</a>`; },
-  vMkInstitucional(){
-    const sub=(ic,tit,des)=>`<div class="item"><div class="top"><div style="display:flex;gap:11px;align-items:flex-start">
-      <div style="font-size:24px;line-height:1">${ic}</div>
-      <div><div class="nm">${tit}</div><div class="mt">${des}</div></div></div>
-      <span class="tag">falta la base</span></div></div>`;
+  /* ===== INSTITUCIONAL · prospectos por capitulo =====
+     Cada capitulo (hoteles, kermes, clubes, embajadas) se trabaja aparte: son
+     discursos distintos y quien llama no deberia mezclarlos. Se marca el
+     circulo al llamar y se escribe el resultado, igual que el marcador. */
+  async vMkInstitucional(){
+    this.loading();
+    const pros = await GETALL('kruh_prospectos?order=categoria,nombre&limit=2000');
+    this._pros = pros || [];
+    this._mkInstPaint();
+  },
+  _mkInstPaint(){
+    const P = this._pros || [];
+    if (!P.length) {
+      this.set(`${this._mkVolver()}<h1 style="margin-top:8px">Institucional</h1>
+        <div class="card"><div class="empty">Todavia no hay prospectos cargados.</div></div>`);
+      return;
+    }
+    const cats = [...new Set(P.map(x => x.categoria))];
+    const cat = (this._proCat && cats.includes(this._proCat)) ? this._proCat : cats[0];
+    this._proCat = cat;
+    const lista = P.filter(x => x.categoria === cat);
+    const hechos = lista.filter(x => x.llamado).length;
+    const tot = P.length, hechosTot = P.filter(x => x.llamado).length;
+    const ICO = {'Hoteles boutique':'🏨','Kermés · bazares':'🎪','Clubes':'⛳','Embajadas europeas':'🏛️'};
+
     this.set(`${this._mkVolver()}<h1 style="margin-top:8px">Institucional</h1>
-      <div class="sub">Venta al por mayor. Cada frente va a tener su propia base de datos y su marcador.</div>
-      ${sub('🍽️','Restaurantes','Cocinas que compran pan a diario')}
-      ${sub('🏨','Hoteles','Desayunos y eventos — pedidos grandes y fijos')}
-      <div class="card" style="border-color:var(--acc)">
-        <div style="font-family:Fraunces,serif;font-size:16px">Lo que falta</div>
-        <div class="hint" style="margin-top:4px">Todavía no hay base de datos de restaurantes ni de hoteles. Cuando las armemos, cada una entra acá con su propio marcador y su campaña, igual que el de clientes.</div></div>`);
+      <div class="sub">Pan de 72 horas · ${tot} prospectos en ${cats.length} frentes · ${hechosTot} ya contactados</div>
+
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        ${cats.map(c => {
+          const l = P.filter(x => x.categoria === c), h = l.filter(x => x.llamado).length;
+          return `<div class="cajon ${c === cat ? 'on' : ''}" style="cursor:pointer;min-width:150px"
+            onclick="App._proCat=${JSON.stringify(c).replace(/"/g, '&quot;')};App._mkInstPaint()">
+            <b>${h}/${l.length}</b>${ICO[c] || '•'} ${esc(c)}
+            <div style="font-size:11px;opacity:.75">${l.length - h} por llamar</div></div>`;
+        }).join('')}
+      </div>
+
+      <div class="bar" style="margin-bottom:12px"><i style="width:${lista.length ? hechos / lista.length * 100 : 0}%;background:var(--ok)"></i></div>
+
+      ${lista.map(x => {
+        const t = String(x.telefono || '').replace(/\D/g, '');
+        const enc = String(x.encaje || '').toLowerCase();
+        const colEnc = enc.startsWith('máx') || enc.startsWith('max') ? 'var(--ok)' : (enc.startsWith('alt') ? 'var(--acc)' : 'var(--mut)');
+        return `<div class="item" style="${x.llamado ? 'opacity:.62' : ''}">
+          <div class="top">
+            <div style="flex:1;min-width:0">
+              <div class="nm">${esc(x.nombre)}
+                ${x.encaje ? `<span class="tag" style="color:${colEnc};border-color:${colEnc}">${esc(x.encaje)}</span>` : ''}</div>
+              <div class="mt">${x.zona ? esc(x.zona) + ' · ' : ''}${esc(x.direccion || '')}${x.rating ? ' · ⭐ ' + esc(x.rating) : ''}</div>
+              ${x.perfil ? `<div class="mt">${esc(x.perfil)}</div>` : ''}
+              ${x.porque ? `<div class="mt" style="color:var(--ink2);font-style:italic;margin-top:3px">${esc(x.porque)}</div>` : ''}
+              <div class="row" style="gap:8px;margin-top:7px;flex-wrap:wrap">
+                ${t ? `<a class="btn gh sm" style="text-decoration:none" href="tel:${t}">📞 ${esc(x.telefono)}</a>
+                       <a class="btn gh sm" style="text-decoration:none" href="https://wa.me/${t.length > 10 ? t : '57' + t}" target="_blank">💬 WhatsApp</a>` : ''}
+              </div>
+              <div style="margin-top:8px">
+                <input id="nt_${x.id}" value="${esc(x.notas || '')}" placeholder="Notas: qué dijeron, con quién hablaste, cuándo volver…"
+                  onchange="App.proNota('${x.id}', this.value)" style="font-size:12.5px">
+              </div>
+            </div>
+            <div style="text-align:center;flex:none;margin-left:8px">
+              <span class="circ ${x.llamado ? 'on' : ''}" title="${x.llamado ? 'Ya lo llamé' : 'Marcar como llamado'}"
+                    style="cursor:pointer" onclick="App.proLlamado('${x.id}')"></span>
+              <div style="font-size:9.5px;color:var(--mut);margin-top:3px">${x.llamado ? 'llamado' : 'llamar'}</div>
+            </div>
+          </div>
+          ${x.fecha_contacto ? `<div class="mt" style="color:var(--ok)">✓ contactado ${String(x.fecha_contacto).slice(0, 10)}</div>` : ''}
+        </div>`;
+      }).join('')}`);
+  },
+  async proLlamado(id) {
+    const x = (this._pros || []).find(p => p.id === id); if (!x) return;
+    const nv = !x.llamado;
+    x.llamado = nv; x.fecha_contacto = nv ? new Date().toISOString() : null;
+    this._mkInstPaint();
+    const r = await PATCH('kruh_prospectos?id=eq.' + id, { llamado: nv, fecha_contacto: x.fecha_contacto });
+    if (r && !r.ok) { toast('⚠️ No se guardó, revisa'); }
+  },
+  async proNota(id, txt) {
+    const x = (this._pros || []).find(p => p.id === id); if (!x) return;
+    x.notas = txt;
+    const r = await PATCH('kruh_prospectos?id=eq.' + id, { notas: txt });
+    toast(r && r.ok ? 'Nota guardada' : '⚠️ No se guardó');
   },
   vMkPorHacer(cual){
     const t=cual==='digital'
