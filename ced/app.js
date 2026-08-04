@@ -66,8 +66,25 @@ const App = {
     const { data } = await this.sb.from('ced_usuarios').select('*')
       .eq('usuario', em.replace('@ced.local','')).maybeSingle();
     if(data) this.cedUser=data;
+    // Si su sede es la principal, ve toda la red; si es agencia, solo lo suyo.
+    this._esPrincipal=false;
+    if(this.cedUser){
+      try{ const { data:s } = await this.sb.from('ced').select('principal').eq('nombre',this.cedUser.ced).maybeSingle();
+           this._esPrincipal=!!(s&&s.principal); }catch(e){}
+    }
   },
   miCargo(){ return (this.cedUser&&this.cedUser.cargo)||null; },
+  miSede(){ return (this.cedUser&&this.cedUser.ced)||null; },
+
+  /* Filtro de sede para las consultas que van con la llave publica.
+     Las tablas del marcador y del bot estan ABIERTAS a proposito (las leen
+     ocho apps sin sesion), asi que el aislamiento no lo puede poner el RLS:
+     hay que ponerlo en la consulta. Devuelve '' para la Principal y para las
+     cuentas de correo de siempre — esas ven toda la red. */
+  fCed(){
+    const s=this.miSede();
+    return (!s || this._esPrincipal) ? '' : '&ced=eq.'+encodeURIComponent(s);
+  },
 
   /* ---------- MANUAL DE USUARIO ----------
      Cada pestaña y cada botón tiene su ficha en ced_manual. Se muestra la del
@@ -3195,13 +3212,13 @@ const App = {
     this.loading();
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
     let cli=[]; try{ const r=await this.sb.from('clientes').select('*').order('creado_en',{ascending:false}); cli=r.data||[]; }catch(e){}
-    let res=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_resultados?select=fila,nombre,cel,ciudad,resultado,mundo,fecha&order=fecha.desc&limit=5000',{headers:H}); const j=await r.json(); res=Array.isArray(j)?j:[]; }catch(e){}
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.feroz&limit=5000',{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmEmbRows.forEach(x=>this._crmEmb[x.lead_key]=x.etapa); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; }
+    let res=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_resultados?select=fila,nombre,cel,ciudad,resultado,mundo,fecha&order=fecha.desc&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); res=Array.isArray(j)?j:[]; }catch(e){}
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.feroz&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmEmbRows.forEach(x=>this._crmEmb[x.lead_key]=x.etapa); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; }
     this._crmFRes=res; const inter=res.filter(r=>/interes/i.test(r.resultado||''));
-    let bot=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000',{headers:H}); const j=await r.json(); bot=Array.isArray(j)?j:[]; }catch(e){}
+    let bot=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000'+this.fCed(),{headers:H}); const j=await r.json(); bot=Array.isArray(j)?j:[]; }catch(e){}
     let cots=[]; try{ const r=await this.sb.from('cotizaciones').select('id,cliente_id,numero,total,estado,es_muestra,creado_en').order('creado_en',{ascending:false}); cots=r.data||[]; }catch(e){}
     const cotByCli={}; cots.forEach(q=>{ if(q.cliente_id && !cotByCli[q.cliente_id]) cotByCli[q.cliente_id]=q; }); this._crmFCots=cotByCli;
-    const cnt=async(mundo)=>{ try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_leads?mundo=eq.'+mundo+'&select=fila&limit=1',{headers:{...H,'Prefer':'count=exact'}}); return +((r.headers.get('content-range')||'').split('/')[1])||0; }catch(e){ return 0; } };
+    const cnt=async(mundo)=>{ try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_leads?mundo=eq.'+mundo+'&select=fila&limit=1'+this.fCed(),{headers:{...H,'Prefer':'count=exact'}}); return +((r.headers.get('content-range')||'').split('/')[1])||0; }catch(e){ return 0; } };
     const nEmp=await cnt('empresa'), nDist=await cnt('distribuidor');
     const prosp=cli.filter(c=>c.embudo!=='cliente');   // prospectos = aún no compran
     this._crmFCli=prosp; this._crmFInter=inter; this._crmFBot=bot; this._crmFCnt={emp:nEmp,dist:nDist};
@@ -3408,7 +3425,7 @@ const App = {
   async crmLeadAnular(tel){
     tel=(tel||'').toString().replace(/\D/g,''); if(!tel) return;
     if(!confirm('¿Anular este lead y devolverlo a Curioso?')) return;
-    try{ await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?telefono=eq.'+encodeURIComponent(tel),{method:'PATCH',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({etiqueta:'curioso'})}); }catch(e){}
+    try{ await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?telefono=eq.'+encodeURIComponent(tel)+this.fCed(),{method:'PATCH',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify({etiqueta:'curioso'})}); }catch(e){}
     this._toast('↩️ Devuelto a Curioso'); this.vCrm();
   },
   crmLeadAProspecto(i){
