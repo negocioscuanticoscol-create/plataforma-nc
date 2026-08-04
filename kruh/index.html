@@ -1945,7 +1945,7 @@ const App={
     this._camps=camps||[];
     const conTel=(leads||[]).filter(l=>String(l.telefono||'').replace(/\D/g,'').length>=7).length;
     const nomRes=r=>({interesado:'Interesado',no_interesado:'No interesado',habeas:'Habeas data',
-      no_contesta:'No contesta',like_promo:'Like Promo'})[r]||r||'—';
+      no_contesta:'No contesta',like_promo:'Like Promo',flyer:'Flyer anuncio'})[r]||r||'—';
     const hoy=new Date().toISOString().slice(0,10);
     const mesIni=new Date(); mesIni.setDate(1);
     const delMes=(marc||[]).filter(m=>new Date(m.creado_en)>=new Date(mesIni.getFullYear(),mesIni.getMonth(),1));
@@ -1953,7 +1953,7 @@ const App={
     const cuenta=r=>delMes.filter(m=>m.resultado===r).length;
     const int=cuenta('interesado'), no=cuenta('no_interesado'), hab=cuenta('habeas');
     /* segmentacion nueva del marcador: quedan aparte de interesado/no interesado */
-    const nc=cuenta('no_contesta'), lk=cuenta('like_promo');
+    const nc=cuenta('no_contesta'), lk=cuenta('like_promo'), fl=cuenta('flyer');
     const tot=delMes.length, pct=tot?(int/tot*100):0;
     // llamados unicos del mes, para saber cuanto falta de la base
     const unicos=new Set(delMes.map(m=>m.lead_id)).size;
@@ -1989,7 +1989,7 @@ const App={
         <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">LLAMADAS DEL MES</div><b style="font-size:19px">${num(tot)}</b><div class="dim" style="font-size:10px">${nHoy} hoy</div></div>
         <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">INTERESADOS</div><b style="font-size:19px;color:var(--ok)">${num(int)}</b><div class="dim" style="font-size:10px">${pct.toFixed(0)}% de las llamadas</div></div>
         <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">NO INTERESADOS</div><b style="font-size:19px;color:var(--bad)">${num(no)}</b><div class="dim" style="font-size:10px">habeas: ${num(hab)}</div></div>
-        <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">SEGMENTACIÓN</div><b style="font-size:19px;color:var(--acc)">${num(lk)}</b><div class="dim" style="font-size:10px">👍 like promo · 📵 ${num(nc)} no contesta</div></div>
+        <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">SEGMENTACIÓN</div><b style="font-size:19px;color:var(--acc)">${num(lk+fl)}</b><div class="dim" style="font-size:10px">👍 ${num(lk)} · 📄 ${num(fl)} flyer · 📵 ${num(nc)}</div></div>
         <div class="card" style="flex:1;min-width:110px"><div class="dim" style="font-size:10.5px">BASE CUBIERTA</div><b style="font-size:19px">${num(unicos)}/${num(conTel)}</b><div class="dim" style="font-size:10px">clientes con teléfono</div></div>
       </div>
 

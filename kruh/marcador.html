@@ -41,8 +41,8 @@
   .b-int{background:var(--ok)} .b-no{background:var(--bad)} .b-hab{background:#6b5f52}
   .b-sin{background:var(--mut)}
   /* segmentación rápida: lo que más se repite en una jornada de llamadas */
-  .b-nc{background:#8a93a6} .b-like{background:var(--acc)} .b-promo{background:var(--gold)}
-  .res .fila3{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .b-nc{background:#8a93a6} .b-like{background:var(--acc)} .b-flyer{background:#5b7c99}
+  .res .fila3{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
   .hist{border-top:1px solid var(--line2);margin-top:12px;padding-top:10px}
   .hrow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line2)}
   .hrow:last-child{border:none}
@@ -52,6 +52,7 @@
   .pill.no{background:var(--badbg);border-color:#eec9c1;color:var(--bad)}
   .pill.tibio{background:#fdf1e3;border-color:#f0d4ae;color:var(--acc)}
   .pill.gris{background:#eef0f2;border-color:#dfe3e8;color:#6b7280}
+  .pill.flyer{background:#e8f0f6;border-color:#c5d8e6;color:#40607a}
   .empty{text-align:center;color:var(--mut);padding:38px 12px;font-size:14px}
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:var(--ink);color:var(--paper);
     padding:11px 18px;border-radius:9px;font-size:13.5px;font-weight:600;z-index:60;box-shadow:var(--sh)}
@@ -182,8 +183,9 @@ const M={
 
         <div class="res">
           <div class="fila3">
-            <button class="b-nc"   onclick="M.marcar('no_contesta')">📵 No contesta</button>
-            <button class="b-like" onclick="M.marcar('like_promo')">👍 Like Promo</button>
+            <button class="b-nc"    onclick="M.marcar('no_contesta')">📵 No contesta</button>
+            <button class="b-like"  onclick="M.marcar('like_promo')">👍 Like Promo</button>
+            <button class="b-flyer" onclick="M.marcar('flyer')">📄 Flyer anuncio</button>
           </div>
           <button class="b-int" onclick="M.marcar('interesado')">🔥 Interesado</button>
           <button class="b-no"  onclick="M.marcar('no_interesado')">❌ No interesado</button>
@@ -191,7 +193,7 @@ const M={
           <button class="b-sin" onclick="M.saltar()">↷ Saltar</button>
         </div>
         <div class="dim" style="font-size:11px;text-align:center;margin-top:7px">
-          <b>No contesta</b> lo deja para volver a llamar · <b>Habeas data</b> lo saca de la lista para siempre.</div>
+          <b>Flyer anuncio</b> = no se le escribe, se le manda el flyer · <b>Habeas data</b> lo saca para siempre.</div>
       </div>`;
     }
 
@@ -233,9 +235,9 @@ const M={
   },
 
   clasePill(r){ return ({interesado:'ok', no_interesado:'no', habeas:'no',
-    like_promo:'tibio', no_contesta:'gris'})[r] || ''; },
+    like_promo:'tibio', no_contesta:'gris', flyer:'flyer'})[r] || ''; },
   nombreRes(r){ return ({interesado:'Interesado', no_interesado:'No interesado', habeas:'Habeas data',
-    no_contesta:'No contesta', like_promo:'Like Promo'})[r] || r || '—'; },
+    no_contesta:'No contesta', like_promo:'Like Promo', flyer:'Flyer anuncio'})[r] || r || '—'; },
 
   saltar(){ this.idx++; this.pintar(); window.scrollTo(0,0); },
 
