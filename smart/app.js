@@ -260,6 +260,8 @@ const App = {
           oninput="App._chatQ=this.value;clearTimeout(App._chatT);App._chatT=setTimeout(()=>App._chatsPaint(),300)"
           style="flex:1;min-width:150px;padding:10px;border:1.5px solid var(--linea);border-radius:9px">
         <button class="btn-sm" style="background:#eef1f5" onclick="App.vChats()">↻</button>
+        <a class="btn-sm" href="../agente-prueba.html" target="_blank"
+           style="background:var(--negro);color:#fff;text-decoration:none;white-space:nowrap">🧪 Probar el agente</a>
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6b7280;cursor:pointer;margin:0">
           <input type="checkbox" ${this._chatVivo?'checked':''} onchange="App.chatVivo(this.checked)" style="width:16px;height:16px;accent-color:var(--naranja)">
           en vivo</label>

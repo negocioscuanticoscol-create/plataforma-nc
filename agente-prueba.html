@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Probar el agente · Smart</title>
+<style>
+  /* Simulador: hablarle al agente nuevo como si fuera un cliente, sin gastar
+     WhatsApp ni tocar a Valentina. Todo lo que se escriba acá se guarda con el
+     teléfono prefijado 'sim-' para poder borrarlo sin tocar datos reales. */
+  :root{ --tinta:#15171c; --gris:#eceff3; --linea:#dfe3e8; --suave:#6b7280;
+         --naranja:#E8620C; --verde:#25D366; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',-apple-system,Roboto,Arial,sans-serif;background:var(--gris);
+       color:var(--tinta);height:100dvh;display:flex;flex-direction:column}
+  header{background:var(--tinta);color:#fff;padding:11px 16px;display:flex;
+         justify-content:space-between;align-items:center;gap:10px;flex:none}
+  header b{font-size:15px}
+  header .sub{font-size:11px;color:#9aa1ac}
+  header button{background:#2b2f37;color:#fff;border:none;border-radius:8px;padding:7px 11px;
+                font-size:12px;cursor:pointer;font-family:inherit}
+  #chat{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:9px}
+  .msg{max-width:78%;padding:9px 13px;border-radius:14px;font-size:14.5px;line-height:1.5;
+       white-space:pre-wrap;word-break:break-word}
+  .yo{align-self:flex-end;background:#d9fdd3;border-bottom-right-radius:4px}
+  .ella{align-self:flex-start;background:#fff;border-bottom-left-radius:4px;
+        box-shadow:0 1px 2px rgba(0,0,0,.07)}
+  .sis{align-self:center;background:#fff4e5;color:#8a5300;font-size:12px;padding:7px 12px;
+       border-radius:10px;max-width:92%;text-align:center}
+  .err{align-self:center;background:#fdecec;color:#b3261e;font-size:12.5px;padding:9px 13px;
+       border-radius:10px;max-width:92%}
+  .msg a{color:#1a5fd0}
+  .meta{font-size:10.5px;color:var(--suave);margin-top:4px}
+  form{flex:none;display:flex;gap:8px;padding:11px;background:#fff;border-top:1px solid var(--linea)}
+  input{flex:1;padding:13px 15px;border:1.5px solid var(--linea);border-radius:24px;font-size:15px;
+        font-family:inherit;outline:none}
+  input:focus{border-color:var(--naranja)}
+  button.enviar{background:var(--verde);color:#fff;border:none;width:48px;height:48px;
+                border-radius:50%;font-size:19px;cursor:pointer}
+  button.enviar:disabled{opacity:.5}
+  .sug{display:flex;gap:7px;overflow-x:auto;padding:0 11px 11px;background:#fff}
+  .sug button{flex:0 0 auto;background:#eef1f5;border:none;border-radius:16px;padding:7px 13px;
+              font-size:12.5px;cursor:pointer;font-family:inherit;color:#444}
+</style>
+</head>
+<body>
+<header>
+  <div><b>🧪 Probar el agente</b><div class="sub" id="est">Smart · no toca a Valentina</div></div>
+  <button onclick="reiniciar()">Empezar de nuevo</button>
+</header>
+
+<div id="chat"></div>
+
+<div class="sug">
+  <button onclick="mandar('Hola, vi su anuncio')">Hola, vi su anuncio</button>
+  <button onclick="mandar('¿Cuánto vale el de 500 ml?')">¿Cuánto vale el de 500?</button>
+  <button onclick="mandar('Necesito 600 unidades transparentes, ¿me cotiza?')">Cotízame 600</button>
+  <button onclick="mandar('¿Y el kit de muestras?')">¿Y el kit?</button>
+  <button onclick="mandar('Listo, quiero comprar')">Quiero comprar</button>
+</div>
+
+<form onsubmit="event.preventDefault();mandar()">
+  <input id="txt" placeholder="Escribe como si fueras un cliente…" autocomplete="off">
+  <button class="enviar" id="btn" type="submit">➤</button>
+</form>
+
+<script>
+const FN='https://fnayedgvamxktxfvywwl.supabase.co/functions/v1/agente?sim=1';
+const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const $=id=>document.getElementById(id);
+const esc=s=>(s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* un teléfono distinto por sesión: así cada prueba arranca sin memoria de la anterior */
+let tel = sessionStorage.getItem('simtel') || ('9'+Date.now().toString().slice(-9));
+sessionStorage.setItem('simtel', tel);
+
+function burbuja(clase, html, meta){
+  const d=document.createElement('div');
+  d.className='msg '+clase;
+  d.innerHTML=html+(meta?`<div class="meta">${meta}</div>`:'');
+  $('chat').appendChild(d);
+  $('chat').scrollTop=$('chat').scrollHeight;
+  return d;
+}
+
+function conEnlaces(t){
+  return esc(t).replace(/(https?:\/\/[^\s]+)/g,'<a href="$1" target="_blank">$1</a>');
+}
+
+function reiniciar(){
+  tel='9'+Date.now().toString().slice(-9);
+  sessionStorage.setItem('simtel',tel);
+  $('chat').innerHTML='';
+  burbuja('sis','Conversación nueva. El agente no recuerda nada de la anterior.');
+}
+
+async function mandar(texto){
+  const t=(texto!==undefined?texto:$('txt').value).trim();
+  if(!t) return;
+  $('txt').value=''; $('btn').disabled=true; $('est').textContent='escribiendo…';
+  burbuja('yo', esc(t));
+  const esperando=burbuja('ella','<i style="color:#9aa1ac">…</i>');
+  const t0=Date.now();
+  try{
+    const r=await fetch(FN,{method:'POST',
+      headers:{'Content-Type':'application/json',Authorization:'Bearer '+KEY},
+      body:JSON.stringify({telefono:tel,mensaje:t})});
+    const j=await r.json().catch(()=>({}));
+    const seg=((Date.now()-t0)/1000).toFixed(1)+'s';
+    if(!r.ok){
+      esperando.remove();
+      burbuja('err','<b>Se cayó el agente</b><br>'+esc(String(j.error||('HTTP '+r.status)).slice(0,300))
+        +'<br><br>Así lo verías tú por Telegram, y el cliente recibiría un mensaje honesto en vez de "dame un segundo".');
+    } else {
+      esperando.innerHTML=conEnlaces(j.respuesta||'(sin respuesta)')+`<div class="meta">${seg}</div>`;
+      if(j.folio) burbuja('sis','🧾 Cotización <b>'+esc(j.folio)+'</b> guardada · quedaría en rojo en Cotizaciones');
+      if(j.handoff) burbuja('sis','🔥 <b>HANDOFF</b> — te llegaría por Telegram: '+esc(j.handoff));
+    }
+  }catch(e){
+    esperando.remove();
+    burbuja('err','No se pudo conectar con el agente. '+esc(e.message||''));
+  }
+  $('btn').disabled=false; $('est').textContent='Smart · no toca a Valentina'; $('txt').focus();
+}
+
+burbuja('sis','Escríbele como si fueras un cliente. Lo que pase acá <b>no toca a Valentina</b> ni gasta WhatsApp.');
+$('txt').focus();
+</script>
+</body>
+</html>
