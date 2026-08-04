@@ -1482,8 +1482,12 @@ const App = {
     peds=pedsRaw.filter(p=>!p.es_muestra && (+p.total||0)>0 && PAGADO.includes(p.estado));
     clis=Array.isArray(clis)?clis:[];
     const MES=['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-    const HERR=4000000, BOD=.01, LOG=.01, OPE=.01, BRUTA=.20;
-    const HERR_DESDE=7;   // el gasto de herramientas ($4M/mes) empezó en JULIO (antes no hubo)
+    // Herramientas: es un gasto de la PRINCIPAL (plataforma, licencias, agentes).
+    // Las agencias — Tolima y Av 68 — no lo pagan, asi que cargarselo les hundia
+    // la utilidad neta con una plata que nunca salio de su bolsillo.
+    const _miCed=(this.cedUser&&this.cedUser.ced)||'Principal';
+    const HERR=(_miCed==='Principal')?4000000:0;
+    const HERR_DESDE=7;   // en la Principal el gasto de herramientas empezó en JULIO (antes no hubo)
     const M={}, firstMes={};
     peds.forEach(p=>{ const m=new Date(p.creado_en).getMonth()+1; (M[m]=M[m]||{ventas:0,pares:0,cNC:0,cG:0,cli:new Set()});
       M[m].ventas+=+p.total||0; M[m].pares+=+p.pares||0; M[m].cNC+=+p.comision_nc||0; M[m].cG+=+p.comision_gpjr||0; M[m].cli.add(p.cliente_id);
@@ -1499,7 +1503,7 @@ const App = {
         clientes_registrados:acumMes[m], clientes_nuevos:nuevosMes[m]||0, clientes_recurrentes:rec }; });
     this._renderPanelFin(rows, {titulo:'Feroz', unidLabel:'Pares', pBod:'1%', pLog:'1%', pOpe:'1%', splitComision:true, hasGPJR,
       nVentas:peds.length, muestras:{vend:muVend, gratis:muGratis},
-      sub:'EN VIVO desde pedidos reales · herramientas $4.000.000/mes (desde julio) · bodega 1% · logística 1% · operaciones 1% · U.bruta 20%',
+      sub:'EN VIVO desde pedidos reales · '+(HERR?'herramientas $4.000.000/mes (desde julio) · ':'')+'bodega 1% · logística 1% · operaciones 1% · U.bruta 20%',
       vacio:'Aún no hay pedidos con valor en Feroz. A medida que se vendan, aparecen aquí.'});
   },
   _renderPanelFin(rows, cfg){   // renderizador COMPARTIDO (Smart y Feroz)
