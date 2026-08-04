@@ -2521,8 +2521,16 @@ const App = {
     this.loading();
     this._editCotId = editId||null;
     const { data:cli=[] } = await this.sb.from('clientes').select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1,nombre_comercial').order('nombre');
+    // Quien puede facturar y con que nombre sale el CED de cara al cliente
+    let facts=[], sede=null;
+    try{ const r=await this.sb.from('ced_facturadores').select('*').eq('activo',true).order('tipo'); facts=r.data||[]; }catch(e){}
+    try{ const r=await this.sb.from('ced').select('nombre,nombre_comercial,ciudad')
+           .eq('nombre', this.miSede()||'Principal').maybeSingle(); sede=r.data||null; }catch(e){}
+    this._facts=facts; this._sedeCot=sede;
+    const nomCed=(sede&&(sede.nombre_comercial||sede.nombre))||'Principal';
     this.set(`
-      <h1>${editId?'✏️ Editar':'Nueva'} cotización</h1><div class="sub">Bota Ref. 701 · ${money(C.PRECIO_PAR)}/par + IVA</div>
+      <h1>${editId?'✏️ Editar':'Nueva'} cotización</h1>
+      <div class="sub">${esc(nomCed)} · Bota Ref. 701 · ${money(C.PRECIO_PAR)}/par + IVA</div>
       <div class="card">
         <label>Empresa *</label>
         <select class="field" id="co_cliente" onchange="App.cotContactoAuto()">
@@ -2559,6 +2567,20 @@ const App = {
             <option value="sin">Sin transporte — $0 (recoge / al cobro)</option>
           </select></div>
       </div>
+      <div class="card" style="border-left:4px solid var(--azul)">
+        <label style="margin:0"><b>🧾 ¿Quién factura? *</b></label>
+        <select class="field" id="co_factura" onchange="App.cotFacturaPreview()" style="margin-top:6px">
+          <option value="">— Selecciona quién emite la factura —</option>
+          ${(facts||[]).map(f=>{
+            const et={aliado:'🤝 Factura el aliado', empresa:'🏭 Factura directamente la empresa'}[f.tipo] || ('⚙️ '+esc(f.nombre));
+            return `<option value="${f.id}">${et}${f.tipo!=='otro'?' · '+esc(f.nombre):''}</option>`;
+          }).join('')}
+        </select>
+        <div class="hint" style="margin-top:6px">Define desde el principio quién emite la factura y a qué cuenta
+          consigna el cliente. Se decide acá para no tener que rehacer el documento después.</div>
+        <div id="co_factura_datos" style="margin-top:9px"></div>
+      </div>
+
       <div class="card" id="co_curva_card">
         <label>Arma la curva — pares por talla</label>
         <div class="hint">Cada caja se completa con ${C.PARES_CAJA} pares.</div>
@@ -2713,6 +2735,11 @@ const App = {
     }
     const cu=this.curva();
     if(cu.pares<1){ alert('Arma la curva (pares por talla) o marca 🎁 Cotizar MUESTRA.'); return; }
+    // Quien factura es obligatorio: cambia los datos tributarios y la cuenta de
+    // consignacion, y decidirlo despues obliga a rehacer el documento.
+    const fid=($('co_factura')||{value:''}).value;
+    if(!fid){ alert('Falta indicar QUIÉN FACTURA.\n\nEs obligatorio: define los datos tributarios y la cuenta a la que consigna el cliente.'); if($('co_factura')) $('co_factura').focus(); return; }
+    const fac=(this._facts||[]).find(x=>x.id===fid)||null;
     if(!cu.libre && cu.faltan!==0 && !confirm(`Falta(n) ${cu.faltan} par(es) para completar la última caja. ¿Guardar igual?`)) return;
     const conIva=(($('co_iva')||{checked:true}).checked);
     const subtotal=cu.pares*C.PRECIO_PAR, iva=conIva?Math.round(subtotal*C.IVA):0, total=subtotal+iva;
@@ -2724,13 +2751,40 @@ const App = {
     const comNC=vNC*cu.pares, comGPJR=vGPJR*cu.pares;
     const reg={numero:num,cliente_id:cid,cliente_snap:cl,curva:cu.tallas,pares:cu.pares,cajas:cu.cajas,resto:cu.resto,
       precio_par:C.PRECIO_PAR,subtotal,iva,total,flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this.user.id,
-      referencia:cl.referencia||'701',valor_par_nc:vNC,valor_par_gpjr:vGPJR,recomendado:!!cl.recomendado,comision_nc:comNC,comision_gpjr:comGPJR};
+      referencia:cl.referencia||'701',valor_par_nc:vNC,valor_par_gpjr:vGPJR,recomendado:!!cl.recomendado,comision_nc:comNC,comision_gpjr:comGPJR,
+      // quien factura + FOTO de sus datos. Se copia, no se referencia: si mañana
+      // cambia la cuenta bancaria, esta cotizacion tiene que seguir mostrando
+      // la que el cliente realmente vio.
+      factura_por:(fac&&fac.tipo)||null, facturador_id:fid||null,
+      factura_snap: fac?{nombre:fac.nombre,nit:fac.nit,direccion:fac.direccion,ciudad:fac.ciudad,
+        telefono:fac.telefono,email:fac.email,banco:fac.banco,tipo_cuenta:fac.tipo_cuenta,
+        cuenta:fac.cuenta,titular:fac.titular}:null,
+      ced_comercial:(this._sedeCot&&(this._sedeCot.nombre_comercial||this._sedeCot.nombre))||null};
     const error=await this._saveCot(reg);
     if(error){ alert('Error: '+error.message); return; }
     await this._avanzarEmbudo(cid,'interesado');   // aparece en CRM → Prospectos con la gestión
     const we=editing; this._editCotId=null; this._editCot=null;
     alert('✅ Cotización '+(we?'actualizada':'guardada')+': '+num+'\nTotal '+money(total));
     this.go('cotizaciones');
+  },
+
+  /* Muestra los datos de facturacion apenas se escoge quien factura, para que
+     el vendedor vea la cuenta ANTES de guardar y no despues de mandarla. */
+  cotFacturaPreview(){
+    const cont=$('co_factura_datos'); if(!cont) return;
+    const id=($('co_factura')||{value:''}).value;
+    const f=(this._facts||[]).find(x=>x.id===id);
+    if(!f){ cont.innerHTML=''; return; }
+    const fila=(t,v)=>v?`<div style="display:flex;gap:7px"><span style="color:var(--suave);min-width:96px">${t}</span><b>${esc(v)}</b></div>`:'';
+    cont.innerHTML=`<div style="background:#f4f7ff;border:1px solid #d5e0f7;border-radius:10px;padding:11px;font-size:13px;line-height:1.65">
+      <div style="font-weight:800;color:var(--azul);font-size:11.5px;letter-spacing:.4px;margin-bottom:5px">ASÍ SALDRÁ EN LA PROFORMA</div>
+      ${fila('Factura',f.nombre)}${fila('NIT',f.nit)}${fila('Dirección',f.direccion)}
+      ${fila('Ciudad',f.ciudad)}${fila('Teléfono',f.telefono)}
+      ${(f.banco||f.cuenta)?`<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #c9d6ef">
+        <div style="font-weight:800;color:var(--azul);font-size:11.5px;margin-bottom:3px">CONSIGNAR A</div>
+        ${fila('Banco',f.banco)}${fila('Cuenta',(f.tipo_cuenta?f.tipo_cuenta+' ':'')+(f.cuenta||''))}${fila('Titular',f.titular)}</div>`
+        :`<div style="margin-top:6px;color:var(--rojo);font-size:12px">⚠️ Este facturador no tiene cuenta bancaria cargada. El cliente no va a saber dónde consignar.</div>`}
+    </div>`;
   },
 
   async cotizarAPedido(cotId){
@@ -4004,6 +4058,10 @@ const App = {
           <div style="margin-top:8px;font-size:13px">Si dice que <b>ced_proveedores</b> no existe, falta correr su SQL una sola vez.</div>
         </div>`); return; }
     this._provs=rp.data||[]; this._refs=rr.error?[]:(rr.data||[]);
+    // Las listas de precios se necesitan para el formulario de referencia:
+    // cada referencia lleva un precio de venta POR lista.
+    try{ const rl=await this.sb.from('ced_listas').select('*').eq('activo',true).order('orden');
+         this._listas=rl.data||[]; }catch(e){ this._listas=[]; }
     this._provPaint();
   },
 
@@ -4118,39 +4176,77 @@ const App = {
     if(error) return alert('No se pudo borrar: '+error.message);
     this.cerrarModal(); this.toast('Proveedor eliminado'); this.vProveedores(); },
 
+  /* Ficha completa de la referencia. Jose 2026-08-04: "el formulario de
+     proveedores debe ser mas largo, porque ahi mismo se configura la referencia
+     y lo demas, y debe ser mejor presentado".
+     Va en tres bloques: QUE ES · A COMO SE COMPRA · A COMO SE VENDE por lista. */
   refModal(provId,id){
     const r=(this._refs||[]).find(x=>String(x.id)===String(id))||{};
     const p=(this._provs||[]).find(x=>String(x.id)===String(provId))||{};
-    this.modal(`<h3 style="margin-bottom:3px">${id?'Editar':'Nueva'} referencia</h3>
-      <div style="font-size:12px;color:#8a93a6;margin-bottom:9px">Proveedor: <b>${esc(p.nombre||'')}</b></div>
+    const L=this._listas||[];
+    const sec=t=>`<div style="font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+      color:var(--naranja);margin:16px 0 7px;padding-bottom:5px;border-bottom:2px solid #ffe6d3">${t}</div>`;
+
+    this.modal(`<h3 style="margin-bottom:2px">${id?'✎ Editar':'＋ Nueva'} referencia</h3>
+      <div style="font-size:12.5px;color:#8a93a6;margin-bottom:2px">Proveedor: <b style="color:var(--texto)">${esc(p.nombre||'')}</b>${p.nit?' · NIT '+esc(p.nit):''}</div>
+
+      ${sec('1 · Qué es')}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-        <div><label>Referencia</label><input id="rf_ref" value="${esc(r.referencia||'')}" placeholder="Ej: 1220"></div>
-        <div><label>Marca</label><input id="rf_mar" value="${esc(r.marca||'')}"></div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-        <div><label>Color</label><input id="rf_col" value="${esc(r.color||'')}"></div>
-        <div><label>Tallas</label><input id="rf_tal" value="${esc(r.tallas||'')}" placeholder="35-44"></div></div>
+        <div><label style="margin-top:0">Referencia *</label><input id="rf_ref" value="${esc(r.referencia||'')}" placeholder="Ej: 701"></div>
+        <div><label style="margin-top:0">Marca</label><input id="rf_mar" value="${esc(r.marca||'')}" placeholder="Feroz / Alpaca"></div></div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px">
-        <div><label>Costo</label><input id="rf_cos" type="number" value="${r.costo||''}" oninput="App.rfMargen()"></div>
-        <div><label>Precio sugerido</label><input id="rf_pre" type="number" value="${r.precio_sug||''}" oninput="App.rfMargen()"></div>
+        <div><label>Color</label><input id="rf_col" value="${esc(r.color||'')}" placeholder="Miel, negro…"></div>
+        <div><label>Tallas</label><input id="rf_tal" value="${esc(r.tallas||'')}" placeholder="34-46"></div>
         <div><label>Unidad</label><input id="rf_uni" value="${esc(r.unidad||'par')}"></div></div>
-      <div id="rf_margen" style="font-size:12.5px;color:#8a93a6;margin-top:5px"></div>
-      <label>Notas</label><input id="rf_not" value="${esc(r.notas||'')}">
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn btn-main" style="flex:1" onclick="App.refSave('${provId}','${id||''}')">Guardar</button>
-        <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
+
+      ${sec('2 · A cómo se compra')}
+      <label style="margin-top:0">Valor de compra <span style="font-weight:400;color:#8a93a6">— lo que le pagamos al proveedor</span></label>
+      <input id="rf_cos" type="number" inputmode="numeric" value="${r.costo||''}" oninput="App.rfMargen()" placeholder="0">
+
+      ${sec('3 · A cómo se vende, por lista')}
+      <div class="hint" style="margin-bottom:8px">El margen sale de acá contra el valor de compra. <b>No depende de quién facture.</b></div>
+      ${L.length?L.slice(0,4).map((l,i)=>{
+        const k='l'+(i+1);
+        return `<div style="display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:9px;align-items:end;margin-bottom:7px">
+          <div style="padding-bottom:11px"><b style="font-size:13.5px">${i+1} · ${esc(l.nombre)}</b></div>
+          <div><label style="margin:0 0 4px">Valor de venta</label>
+            <input id="rf_${k}" type="number" inputmode="numeric" value="${r[k]||''}" oninput="App.rfMargen()" placeholder="0"></div>
+          <div id="rf_m_${k}" style="font-size:12px;padding-bottom:11px;text-align:right;color:#8a93a6">—</div>
+        </div>`;
+      }).join(''):`<div style="color:var(--rojo);font-size:13px">⚠️ No hay listas de precios activas. Créalas primero.</div>`}
+
+      ${sec('4 · Otros')}
+      <label style="margin-top:0">Notas</label><textarea id="rf_not" rows="2" placeholder="Condiciones especiales, mínimos, tiempos…">${esc(r.notas||'')}</textarea>
+      <input type="hidden" id="rf_pre" value="${r.precio_sug||''}">
+
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-main" style="flex:1" onclick="App.refSave('${provId}','${id||''}')">Guardar referencia</button>
+        <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>
+      ${id?`<button class="btn" style="color:#d22;margin-top:6px" onclick="App.refDel('${id}')">Eliminar referencia</button>`:''}`);
     this.rfMargen(); },
-  rfMargen(){ const d=$('rf_margen'); if(!d) return;
-    const c=+($('rf_cos')||{}).value||0, p=+($('rf_pre')||{}).value||0;
-    if(!c||!p){ d.textContent=''; return; }
-    const m=p-c, pct=p>0?(m/p*100):0;
-    d.innerHTML='Margen: <b style="color:'+(m>=0?'#2e9e4f':'#c0392b')+'">'+money(m)+' · '+pct.toFixed(0)+'%</b>'; },
+
+  /* Margen por lista, en vivo. Si una lista queda por debajo del costo se
+     pinta en rojo: es un error de digitacion caro y hay que verlo al momento. */
+  rfMargen(){
+    const c=+(($('rf_cos')||{}).value)||0;
+    for(let i=1;i<=4;i++){
+      const d=$('rf_m_l'+i); if(!d) continue;
+      const v=+(($('rf_l'+i)||{}).value)||0;
+      if(!c||!v){ d.innerHTML='<span style="color:#c3c8d0">—</span>'; continue; }
+      const m=v-c, pct=v>0?(m/v*100):0;
+      d.innerHTML=`<b style="color:${m>0?'#2e9e4f':'#c0392b'}">${money(m)}</b>
+        <span style="color:#8a93a6"> · ${pct.toFixed(0)}%</span>`;
+    }
+  },
 
   async refSave(provId,id){
     const ref=($('rf_ref').value||'').trim();
     if(!ref) return alert('Ponle la referencia');
+    const v=k=>{ const e=$(k); return e?(+e.value||0):0; };
     const b={proveedor_id:provId, referencia:ref, marca:($('rf_mar').value||'').trim(),
       color:($('rf_col').value||'').trim(), tallas:($('rf_tal').value||'').trim(),
-      costo:+$('rf_cos').value||0, precio_sug:+$('rf_pre').value||0,
+      costo:v('rf_cos'), precio_sug:v('rf_pre')||v('rf_l4')||v('rf_l1'),
+      l1:v('rf_l1')||null, l2:v('rf_l2')||null, l3:v('rf_l3')||null, l4:v('rf_l4')||null,
       unidad:($('rf_uni').value||'par').trim(), notas:($('rf_not').value||'').trim()};
     if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Principal';
     const q= id ? await this.sb.from('ced_prov_referencias').update(b).eq('id',id)
