@@ -216,6 +216,16 @@ const App = {
     this._chatsPaint();
   },
   _tel10(t){ return String(t||'').replace(/\D/g,'').slice(-10); },
+  /* Modo en vivo: recarga sola cada 10s. Se apaga sola al salir de Chats para
+     no seguir pidiéndole datos a Supabase desde otra pestaña. */
+  chatVivo(on){
+    this._chatVivo=!!on;
+    if(this._chatTick){ clearInterval(this._chatTick); this._chatTick=null; }
+    if(on){ this._chatTick=setInterval(()=>{
+      if(this.view!=='chats'){ clearInterval(this._chatTick); this._chatTick=null; this._chatVivo=false; return; }
+      this.vChats();
+    },10000); }
+    this._chatsPaint(); },
   _chatsPaint(){
     const msgs=this._chatMsgs||[], leads=this._chatLeads||{};
     const emp=this._chatEmp||'', q=(this._chatQ||'').trim().toLowerCase();
@@ -249,7 +259,11 @@ const App = {
         <input placeholder="Buscar nombre o celular…" value="${esc(this._chatQ||'')}"
           oninput="App._chatQ=this.value;clearTimeout(App._chatT);App._chatT=setTimeout(()=>App._chatsPaint(),300)"
           style="flex:1;min-width:150px;padding:10px;border:1.5px solid var(--linea);border-radius:9px">
-        <button class="btn-sm" style="background:#eef1f5" onclick="App.vChats()">↻</button></div>
+        <button class="btn-sm" style="background:#eef1f5" onclick="App.vChats()">↻</button>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6b7280;cursor:pointer;margin:0">
+          <input type="checkbox" ${this._chatVivo?'checked':''} onchange="App.chatVivo(this.checked)" style="width:16px;height:16px;accent-color:var(--naranja)">
+          en vivo</label>
+        ${this._chatVivo?'<span style="font-size:11px;color:#2e9e4f;font-weight:700">● actualizando cada 10s</span>':''}</div>
       ${(nAt||nEsp)?`<div class="card" style="border-left:4px solid ${nAt?'#c0392b':'var(--naranja)'};padding:11px 14px">
         ${nAt?`<div style="font-weight:700;color:#c0392b">⚠️ ${nAt} conversación${nAt===1?'':'es'} atascada${nAt===1?'':'s'}</div>
           <div style="font-size:12.5px;margin-top:3px">La última respuesta fue «Disculpa, dame un segundo». El cliente quedó sin respuesta real.</div>`:''}
