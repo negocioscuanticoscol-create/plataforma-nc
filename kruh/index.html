@@ -2165,6 +2165,7 @@ const App={
   async vVentas(){
     this.loading();
     const [ventas,seg,peds,leads,movsV,prodsV]=await Promise.all([GETALL('kruh_ventas?order=creado_en.desc&limit=8000'),GET('kruh_seguimiento?limit=3000'),GETALL('kruh_pedidos?select=items,creado_en,forma_pago,total,descuento,domicilio&limit=3000'),GET('kruh_leads?select=creado_en&limit=5000'),GETALL('kruh_movimientos?tipo=in.(muestra,perdida)&select=producto_id,tipo,cantidad,creado_en&limit=20000'),GET('kruh_productos?select=id,nombre,precio&limit=1000')]);
+    this._ventas=ventas;   // para poder anular una por id
     const segSet={}; seg.forEach(s=>segSet[s.cliente]=s.contactado);
     const mesIni=new Date(); mesIni.setDate(1); mesIni.setHours(0,0,0,0);
     const by={};
@@ -2369,7 +2370,8 @@ const App={
               <div class="row" style="justify-content:space-between;gap:8px;align-items:flex-start">
                 <span style="flex:1;font-size:12.5px">${esc(v.producto||'—')}</span>
                 <b style="font-size:12.5px;white-space:nowrap">${money(v.monto)}</b></div>
-              <div class="mt">${FP[fp]||'•'} ${esc(fp)} · 🕐 ${new Date(v.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${ds>0?` · <span style="color:var(--bad)">−${money(ds)} dcto</span>`:''}${dm>0?` · 🛵 ${money(dm)}`:''}</div></div>`;}).join('');
+              <div class="mt">${FP[fp]||'•'} ${esc(fp)} · 🕐 ${new Date(v.creado_en).toLocaleString('es-CO',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}${ds>0?` · <span style="color:var(--bad)">−${money(ds)} dcto</span>`:''}${dm>0?` · 🛵 ${money(dm)}`:''}
+                <a onclick="event.stopPropagation();App.ventaAnular('${v.id}')" style="color:var(--bad);cursor:pointer;font-weight:700;margin-left:8px">✕ anular</a></div></div>`;}).join('');
         return `<div class="item"><div class="top">
         <div class="row" style="gap:9px;align-items:flex-start;flex:1;cursor:pointer" onclick="App.cliDet('${id}')">
           <span class="circ on" title="compró en este periodo"></span>
@@ -2380,6 +2382,60 @@ const App={
           <span class="circ wa ${on?'on':''}" title="seguimiento WhatsApp" onclick="App.segToggle('${esc(o.cliente).replace(/'/g,"")}',${on?1:0})"></span></div></div>
         <div id="${id}" style="display:none;margin-top:4px">${det}</div></div>`;}).join('')
         :'<div class="empty">Ningún cliente compró en este periodo.</div>'}`;
+  },
+  /* ===== ANULAR UNA VENTA =====
+     Una venta mal registrada deja rastro en CUATRO sitios: kruh_ventas,
+     kruh_pedidos, los movimientos de inventario y las existencias del producto.
+     Borrar solo la venta deja el inventario descuadrado — que es justo como
+     aparecieron los negativos que tocaba arreglar con el lápiz.
+     Acá se revierte todo junto, o no se toca nada. */
+  async ventaAnular(id){
+    const v=(this._ventas||[]).find(x=>String(x.id)===String(id));
+    if(!v) return alert('No encontré esa venta. Recarga la pantalla.');
+
+    /* el pedido gemelo: mismo cliente, mismo monto, dentro de 3 minutos */
+    const t=new Date(v.creado_en).getTime(), cerca=x=>Math.abs(new Date(x.creado_en)-t)<=180000;
+    const nom=s=>String(s||'').trim().toLowerCase();
+    const peds=await GETALL('kruh_pedidos?select=id,cliente,total,items,creado_en&limit=3000');
+    const ped=(peds||[]).find(p=>cerca(p) && (+p.total||0)===(+v.monto||0) && nom(p.cliente)===nom(v.cliente));
+
+    /* los movimientos de inventario de ese pedido */
+    const movs=await GETALL('kruh_movimientos?tipo=eq.salida&select=id,producto_id,cantidad,creado_en,motivo&limit=20000');
+    const mios=(movs||[]).filter(m=>cerca(m) && String(m.motivo||'').startsWith('Pedido'));
+
+    const prods=this._prods&&this._prods.length?this._prods:await GET('kruh_productos?select=id,nombre,existencias&limit=1000');
+    const nomProd=i=>{const p=prods.find(x=>x.id===i);return p?p.nombre:'?';};
+
+    const resumen=[
+      '¿ANULAR esta venta?','',
+      (v.cliente||'—')+' · '+money(v.monto),
+      v.producto||'', '',
+      'Se va a borrar:',
+      '· la venta',
+      ped?'· el pedido':'· (no encontré el pedido)',
+      mios.length?('· '+mios.length+' movimiento(s) de inventario'):'· (no encontré movimientos)',
+      mios.length?'\nSe DEVUELVE al inventario:':'',
+      ...mios.map(m=>'   +'+m.cantidad+'  '+nomProd(m.producto_id)),
+      '','Esto no se puede deshacer.',
+    ].filter(x=>x!=='').join('\n');
+    if(!confirm(resumen)) return;
+    if(!this._okBorrar()) return;
+
+    try{
+      /* 1) devolver existencias, 2) borrar movimientos */
+      for(const m of mios){
+        const p=prods.find(x=>x.id===m.producto_id);
+        if(p) await PATCH('kruh_productos?id=eq.'+m.producto_id,{existencias:(+p.existencias||0)+(+m.cantidad||0)});
+        await DEL('kruh_movimientos?id=eq.'+m.id);
+      }
+      /* 3) el pedido y 4) la venta */
+      if(ped) await DEL('kruh_pedidos?id=eq.'+ped.id);
+      await DEL('kruh_ventas?id=eq.'+id);
+      toast('Venta anulada · inventario devuelto');
+    }catch(e){
+      alert('Algo falló a mitad de camino: '+(e.message||e)+'\nRevisa el inventario antes de seguir.');
+    }
+    this.vVentas();
   },
   /* despliega el detalle de un cliente sin repintar la vista entera */
   cliDet(id){ const e=$(id); if(!e)return;
