@@ -40,6 +40,9 @@
     color:#fff;cursor:pointer;font-family:inherit;line-height:1.25}
   .b-int{background:var(--ok)} .b-no{background:var(--bad)} .b-hab{background:#6b5f52}
   .b-sin{background:var(--mut)}
+  /* segmentación rápida: lo que más se repite en una jornada de llamadas */
+  .b-nc{background:#8a93a6} .b-like{background:var(--acc)} .b-promo{background:var(--gold)}
+  .res .fila3{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
   .hist{border-top:1px solid var(--line2);margin-top:12px;padding-top:10px}
   .hrow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line2)}
   .hrow:last-child{border:none}
@@ -47,6 +50,8 @@
     background:var(--paper);border:1px solid var(--line);color:var(--ink2)}
   .pill.ok{background:var(--okbg);border-color:#c3ddbb;color:var(--ok)}
   .pill.no{background:var(--badbg);border-color:#eec9c1;color:var(--bad)}
+  .pill.tibio{background:#fdf1e3;border-color:#f0d4ae;color:var(--acc)}
+  .pill.gris{background:#eef0f2;border-color:#dfe3e8;color:#6b7280}
   .empty{text-align:center;color:var(--mut);padding:38px 12px;font-size:14px}
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:var(--ink);color:var(--paper);
     padding:11px 18px;border-radius:9px;font-size:13.5px;font-weight:600;z-index:60;box-shadow:var(--sh)}
@@ -166,7 +171,7 @@ const M={
         <div class="tel">${esc(l.telefono)}</div>
 
         <div style="margin-top:6px">
-          ${u?`<span class="pill ${u.resultado==='interesado'?'ok':(u.resultado==='no_interesado'?'no':'')}">
+          ${u?`<span class="pill ${this.clasePill(u.resultado)}">
                  Última vez: ${cuando}</span>
                <div class="dim" style="font-size:12px;margin-top:5px">
                  Campaña que se usó: <b>${esc(u.campana||'—')}</b> · resultado: <b>${esc(this.nombreRes(u.resultado))}</b></div>`
@@ -176,13 +181,18 @@ const M={
         <a class="llamar" href="tel:${soloTel(l.telefono)}">📞 LLAMAR</a>
 
         <div class="res">
+          <div class="fila3">
+            <button class="b-nc"    onclick="M.marcar('no_contesta')">📵 No contesta</button>
+            <button class="b-like"  onclick="M.marcar('like')">👍 Like</button>
+            <button class="b-promo" onclick="M.marcar('promo')">🎁 Promo</button>
+          </div>
           <button class="b-int" onclick="M.marcar('interesado')">🔥 Interesado</button>
           <button class="b-no"  onclick="M.marcar('no_interesado')">❌ No interesado</button>
           <button class="b-hab" onclick="M.marcar('habeas')">🚫 Habeas data</button>
           <button class="b-sin" onclick="M.saltar()">↷ Saltar</button>
         </div>
         <div class="dim" style="font-size:11px;text-align:center;margin-top:7px">
-          Habeas data lo saca de la lista para siempre.</div>
+          <b>No contesta</b> lo deja para volver a llamar · <b>Habeas data</b> lo saca de la lista para siempre.</div>
       </div>`;
     }
 
@@ -217,13 +227,16 @@ const M={
         <div class="hist">
           ${this.marc.slice(0,8).map(m=>`<div class="hrow">
             <div><b>${esc(m.cliente||'—')}</b><div class="dim" style="font-size:11px">${esc(m.campana||'')} · ${hace(m.creado_en)||''}</div></div>
-            <span class="pill ${m.resultado==='interesado'?'ok':(m.resultado==='no_interesado'?'no':'')}">${esc(this.nombreRes(m.resultado))}</span>
+            <span class="pill ${this.clasePill(m.resultado)}">${esc(this.nombreRes(m.resultado))}</span>
           </div>`).join('')||'<div class="dim" style="font-size:12.5px">Todavía no hay llamadas.</div>'}
         </div>
       </div>`;
   },
 
-  nombreRes(r){ return r==='interesado'?'Interesado':(r==='no_interesado'?'No interesado':(r==='habeas'?'Habeas data':r||'—')); },
+  clasePill(r){ return ({interesado:'ok', no_interesado:'no', habeas:'no',
+    like:'tibio', promo:'tibio', no_contesta:'gris'})[r] || ''; },
+  nombreRes(r){ return ({interesado:'Interesado', no_interesado:'No interesado', habeas:'Habeas data',
+    no_contesta:'No contesta', like:'Like', promo:'Promo'})[r] || r || '—'; },
 
   saltar(){ this.idx++; this.pintar(); window.scrollTo(0,0); },
 
