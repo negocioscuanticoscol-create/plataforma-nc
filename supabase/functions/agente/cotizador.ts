@@ -26,7 +26,7 @@ export const KIT_PRECIO = 39000;   // promoción vigente, envío incluido
 
 export type Prod = {
   sku: string; nombre: string; pack: number; colores: string[];
-  l1: number; l2: number; l3: number; l4: number; l5: number;
+  l1: number; l2: number; l3: number; l4: number;   // 'costo' NO se pide nunca: es la base de la comisión
 };
 export type Linea = { sku: string; nombre: string; color: string; qty: number; precio: number; subtotal: number };
 
