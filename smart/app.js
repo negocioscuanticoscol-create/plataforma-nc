@@ -1483,6 +1483,10 @@ const App = {
     this._toast('✅ '+ok+' venta(s) reparada(s) y sumada(s) a comisión');
     this.vVentasSmart();
   },
+  /* Costo fijo mensual de herramientas. Un solo sitio: si cambia, se cambia acá
+     y se aplica a todos los meses calculados en vivo. Los meses ya cerrados en
+     nc_resumen_mensual conservan el valor con que se cerraron. */
+  HERRAMIENTAS_MES:1000000,
   async vPanelFinanzas(){   // SMART · Resultados — lee la tabla pre-agregada
     this.loading();
     let rows=[];
@@ -1502,8 +1506,13 @@ const App = {
           const o=por[m]=por[m]||{n:0,total:0,comision:0,cli:new Set()};
           o.n++; o.total+=+v.total_vendido||0; o.comision+=+v.comision_bruta||0;
           if(v.cliente) o.cli.add(String(v.cliente).trim().toLowerCase()); });
+        /* el mes en curso SIEMPRE aparece, aunque todavía no tenga ventas: así se ve
+           que el informe está corriendo y no que se quedó pegado otra vez */
+        const _MA=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+        const _h=new Date(), _mesAct=_MA[_h.getMonth()]+'-'+_h.getFullYear();
+        if(!yaHay.has(_mesAct) && !por[_mesAct]) por[_mesAct]={n:0,total:0,comision:0,cli:new Set()};
         Object.keys(por).forEach(m=>{
-          const o=por[m], total=o.total, herr=2000000;   // herramientas $2M/mes desde julio-2026
+          const o=por[m], total=o.total, herr=this.HERRAMIENTAS_MES;
           const u_bruta=total*0.20, bodega=total*0.03, logistica=total*0.02, operaciones=total*0.01;
           rows.push({mes:m,ventas:o.n,total,ventas_libro:total,comision:o.comision,u_bruta,
             herramientas:herr,bodega,logistica,operaciones,
