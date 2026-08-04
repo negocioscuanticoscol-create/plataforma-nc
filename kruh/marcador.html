@@ -42,7 +42,7 @@
   .b-sin{background:var(--mut)}
   /* segmentación rápida: lo que más se repite en una jornada de llamadas */
   .b-nc{background:#8a93a6} .b-like{background:var(--acc)} .b-promo{background:var(--gold)}
-  .res .fila3{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .res .fila3{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .hist{border-top:1px solid var(--line2);margin-top:12px;padding-top:10px}
   .hrow{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line2)}
   .hrow:last-child{border:none}
@@ -182,9 +182,8 @@ const M={
 
         <div class="res">
           <div class="fila3">
-            <button class="b-nc"    onclick="M.marcar('no_contesta')">📵 No contesta</button>
-            <button class="b-like"  onclick="M.marcar('like')">👍 Like</button>
-            <button class="b-promo" onclick="M.marcar('promo')">🎁 Promo</button>
+            <button class="b-nc"   onclick="M.marcar('no_contesta')">📵 No contesta</button>
+            <button class="b-like" onclick="M.marcar('like_promo')">👍 Like Promo</button>
           </div>
           <button class="b-int" onclick="M.marcar('interesado')">🔥 Interesado</button>
           <button class="b-no"  onclick="M.marcar('no_interesado')">❌ No interesado</button>
@@ -234,9 +233,9 @@ const M={
   },
 
   clasePill(r){ return ({interesado:'ok', no_interesado:'no', habeas:'no',
-    like:'tibio', promo:'tibio', no_contesta:'gris'})[r] || ''; },
+    like_promo:'tibio', no_contesta:'gris'})[r] || ''; },
   nombreRes(r){ return ({interesado:'Interesado', no_interesado:'No interesado', habeas:'Habeas data',
-    no_contesta:'No contesta', like:'Like', promo:'Promo'})[r] || r || '—'; },
+    no_contesta:'No contesta', like_promo:'Like Promo'})[r] || r || '—'; },
 
   saltar(){ this.idx++; this.pintar(); window.scrollTo(0,0); },
 
