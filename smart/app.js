@@ -1487,23 +1487,35 @@ const App = {
     this.loading();
     let rows=[];
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_resumen_mensual?empresa=eq.smart',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const j=await r.json(); rows=Array.isArray(j)?j:[]; }catch(e){}
-    // Mes actual EN VIVO: si no está en la tabla pre-agregada, lo calcula desde nc_ventas → así julio y cada mes nuevo aparecen solos
-    const _MA=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'], _hoy=new Date(), _mesAct=_MA[_hoy.getMonth()]+'-'+_hoy.getFullYear();
-    if(!rows.some(r=>(r.mes||'')===_mesAct)){
-      try{
-        const rv=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&mes=eq.'+encodeURIComponent(_mesAct)+'&select=total_vendido,comision_bruta',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}});
-        const vs=await rv.json();
-        if(Array.isArray(vs)&&vs.length){
-          const total=vs.reduce((a,x)=>a+(+x.total_vendido||0),0), comision=vs.reduce((a,x)=>a+(+x.comision_bruta||0),0), herr=2000000;   // herramientas $2M/mes desde julio-2026
+    /* TODO mes que no esté en la tabla pre-agregada se calcula EN VIVO desde nc_ventas.
+       Antes solo se calculaba el mes ACTUAL, y por eso julio desapareció: no estaba en
+       nc_resumen_mensual (que se llenó a mano hasta junio) y tampoco era el mes de hoy,
+       así que se quedó en el hueco entre las dos reglas. */
+    try{
+      const rv=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&select=mes,cliente,total_vendido,comision_bruta&limit=5000',
+        {headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}});
+      const vs=await rv.json();
+      if(Array.isArray(vs)&&vs.length){
+        const yaHay=new Set(rows.map(r=>String(r.mes||'')));
+        const por={};
+        vs.forEach(v=>{ const m=String(v.mes||''); if(!m||yaHay.has(m))return;
+          const o=por[m]=por[m]||{n:0,total:0,comision:0,cli:new Set()};
+          o.n++; o.total+=+v.total_vendido||0; o.comision+=+v.comision_bruta||0;
+          if(v.cliente) o.cli.add(String(v.cliente).trim().toLowerCase()); });
+        Object.keys(por).forEach(m=>{
+          const o=por[m], total=o.total, herr=2000000;   // herramientas $2M/mes desde julio-2026
           const u_bruta=total*0.20, bodega=total*0.03, logistica=total*0.02, operaciones=total*0.01;
-          rows.push({mes:_mesAct,ventas:vs.length,total,ventas_libro:total,comision,u_bruta,herramientas:herr,bodega,logistica,operaciones,utilidad_neta:u_bruta-comision-herr-bodega-logistica-operaciones,unidades:0,clientes_registrados:0,clientes_nuevos:0,clientes_recurrentes:0,origen:'en-vivo'});
-        }
-      }catch(e){}
-    }
+          rows.push({mes:m,ventas:o.n,total,ventas_libro:total,comision:o.comision,u_bruta,
+            herramientas:herr,bodega,logistica,operaciones,
+            utilidad_neta:u_bruta-o.comision-herr-bodega-logistica-operaciones,
+            unidades:0,clientes_registrados:0,clientes_nuevos:o.cli.size,clientes_recurrentes:0,origen:'en-vivo'});
+        });
+      }
+    }catch(e){}
     const ORD={ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12};
     rows.sort((a,b)=>(ORD[(a.mes||'').slice(0,3)]||99)-(ORD[(b.mes||'').slice(0,3)]||99));
     this._renderPanelFin(rows, {titulo:'Smart', unidLabel:'Unidades', pBod:'3%', pLog:'2%', pOpe:'1%',
-      sub:'EN VIVO desde nc_resumen_mensual · bodega 3% · logística 2% · operaciones 1% · U.bruta 20%',
+      sub:'Meses cerrados desde nc_resumen_mensual · los demás calculados EN VIVO desde nc_ventas · bodega 3% · logística 2% · operaciones 1% · U.bruta 20%',
       vacio:'La tabla nc_resumen_mensual está vacía.'});
   },
   async vPanelFinanzasFeroz(){   // FEROZ · Resultados — calculado en vivo desde pedidos reales
