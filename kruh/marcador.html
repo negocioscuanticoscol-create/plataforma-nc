@@ -53,6 +53,10 @@
   .pill.tibio{background:#fdf1e3;border-color:#f0d4ae;color:var(--acc)}
   .pill.gris{background:#eef0f2;border-color:#dfe3e8;color:#6b7280}
   .pill.flyer{background:#e8f0f6;border-color:#c5d8e6;color:#40607a}
+  .chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:4px}
+  .chip{flex:0 0 auto;border:1px solid var(--line);background:var(--paper);color:var(--ink2);
+    border-radius:16px;padding:6px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}
+  .chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
   .empty{text-align:center;color:var(--mut);padding:38px 12px;font-size:14px}
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:var(--ink);color:var(--paper);
     padding:11px 18px;border-radius:9px;font-size:13.5px;font-weight:600;z-index:60;box-shadow:var(--sh)}
@@ -95,7 +99,7 @@ function hace(iso){
 const soloTel=s=>String(s||'').replace(/\D/g,'');
 
 const M={
-  lista:[], idx:0, marc:[], camps:[], campana:'', filtro:'',
+  lista:[], idx:0, marc:[], camps:[], campana:'', filtro:'', verRes:'',
 
   async init(){
     const [leads,marc,camps]=await Promise.all([
@@ -224,12 +228,21 @@ const M={
       ${cuerpo}
 
       <div class="card">
-        <label style="margin:0 0 6px">Últimas llamadas</label>
+        <label style="margin:0 0 6px">Lo marcado</label>
+        <div class="chips">
+          ${[['','Todo'],['flyer','📄 Flyer'],['like_promo','👍 Like Promo'],['interesado','🔥 Interesado'],['no_contesta','📵 No contesta']]
+            .map(([v,t])=>{ const n=v?this.marc.filter(m=>m.resultado===v).length:this.marc.length;
+              return `<button class="chip${this.verRes===v?' on':''}" onclick="M.verRes='${v}';M.pintar()">${t} ${n}</button>`;}).join('')}
+        </div>
         <div class="hist">
-          ${this.marc.slice(0,8).map(m=>`<div class="hrow">
-            <div><b>${esc(m.cliente||'—')}</b><div class="dim" style="font-size:11px">${esc(m.campana||'')} · ${hace(m.creado_en)||''}</div></div>
-            <span class="pill ${this.clasePill(m.resultado)}">${esc(this.nombreRes(m.resultado))}</span>
-          </div>`).join('')||'<div class="dim" style="font-size:12.5px">Todavía no hay llamadas.</div>'}
+          ${(()=>{ const l=this.verRes?this.marc.filter(m=>m.resultado===this.verRes):this.marc;
+            if(!l.length) return '<div class="dim" style="font-size:12.5px">Nada marcado acá todavía.</div>';
+            return l.slice(0,60).map(m=>`<div class="hrow">
+              <div><b>${esc(m.cliente||'—')}</b>
+                <div class="dim" style="font-size:11px">${m.telefono?`<a href="https://wa.me/57${soloTel(m.telefono)}" target="_blank" style="color:var(--acc)">${esc(m.telefono)}</a> · `:''}${hace(m.creado_en)||''}</div></div>
+              <span class="pill ${this.clasePill(m.resultado)}">${esc(this.nombreRes(m.resultado))}</span>
+            </div>`).join('') + (l.length>60?`<div class="dim" style="font-size:11px;margin-top:6px">y ${l.length-60} más</div>`:'');
+          })()}
         </div>
       </div>`;
   },
