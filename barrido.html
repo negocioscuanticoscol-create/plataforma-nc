@@ -29,7 +29,23 @@ textarea{min-height:58px;resize:vertical}
 #save:disabled{background:#555}
 .cnt{text-align:center;font-size:12px;color:#8ea3b5;margin:10px 0}
 .toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%);background:#0c3a26;color:#9ff0c8;padding:11px 16px;border-radius:10px;font-size:13px;z-index:99;max-width:90%;display:none}
+/* ===== PANTALLA DE ENTRADA · sin clave, solo el botón ===== */
+#gate{position:fixed;inset:0;z-index:50;background:#0f1620;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:24px;text-align:center}
+#gate img{width:100%;max-width:300px;height:auto;border-radius:50%;box-shadow:0 14px 44px #0009}
+#gate .wm{font-size:30px;font-weight:800;letter-spacing:-.02em}
+#gate .wm span{color:#E8620C}
+#gate .sl{font-size:13.5px;color:#8ea3b5;margin-top:16px;max-width:300px;line-height:1.5}
+#gate button{margin-top:26px;width:100%;max-width:300px;background:#E8620C;color:#fff;border:none;
+  border-radius:14px;padding:17px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit}
+#gate button:active{background:#c85209}
 </style></head><body>
+<div id="gate">
+  <img src="assets/logo-barrido.png" alt="Barrido Comercial"
+       onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'wm',innerHTML:'🐕 BARRIDO <span>COMERCIAL</span>'}))">
+  <div class="sl">Buscamos puerta a puerta tus clientes.</div>
+  <button onclick="entrar()">Entrar</button>
+</div>
 <header><b>🥾 BARRIDO <span>PRESENCIAL</span></b><div id="gps" class="bad">📍 Obteniendo ubicación…</div></header>
 <main>
   <div class="cnt" id="cnt">Hoy: 0 negocios</div>
@@ -63,7 +79,8 @@ const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V
 let pos={lat:null,lng:null}, urls={fachada:null,comp1:null,comp2:null,tarjeta:null}, interes='';
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',3500);}
 function gps(){navigator.geolocation.getCurrentPosition(p=>{pos.lat=p.coords.latitude;pos.lng=p.coords.longitude;const g=document.getElementById('gps');g.className='';g.textContent='📍 Ubicación lista ('+pos.lat.toFixed(5)+', '+pos.lng.toFixed(5)+')';},e=>{const g=document.getElementById('gps');g.className='bad';g.textContent='📍 Activa el permiso de ubicación y recarga';},{enableHighAccuracy:true,timeout:15000});}
-gps();
+/* el GPS se pide al entrar, no al abrir: así el permiso no salta detrás del logo */
+function entrar(){ const g=document.getElementById('gate'); if(g)g.remove(); gps(); }
 function pick(k){document.getElementById('in_'+k).click();}
 async function cap(k,input){
   const f=input.files&&input.files[0]; if(!f) return;
