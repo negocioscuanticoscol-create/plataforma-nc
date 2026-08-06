@@ -413,7 +413,7 @@ const A={
     if(cel.length<7){ toast('Falta el celular'); return; }
     const repe=this.agentes.find(a=>soloNum(a.celular)===cel && a.id!==f.id);
     if(repe){ toast('Ese celular ya es de '+repe.nombre); return; }
-    const b={slug:norm(f.nombre), nombre:f.nombre.trim(), celular:cel,
+    const b={clave:norm(f.nombre), nombre:f.nombre.trim(), celular:cel,
       password:(f.password||'').trim()||cel, rol:f.rol, nivel:f.nivel||'principiante',
       ced:f.ced||'todos', estado:f.estado||'activo'};
     const ok=f.id ? await PATCH('mkr_agentes?id=eq.'+f.id,b) : !!(await POST('mkr_agentes',b));

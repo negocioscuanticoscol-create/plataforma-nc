@@ -346,7 +346,7 @@ async function hacerEntrar(){
   if(u.length<7){ errGate('Escribe tu celular completo'); return; }
   if(!p){ errGate('Escribe tu clave'); return; }
 
-  const ags=await GET('mkr_agentes?select=id,slug,nombre,celular,password,estado,rol,nivel,ced&limit=500');
+  const ags=await GET('mkr_agentes?select=id,clave,nombre,celular,password,estado,rol,nivel,ced&limit=500');
   if(!Array.isArray(ags)){ errGate(porQueFallo()); return; }
 
   const a=ags.find(x=>soloNum(x.celular)===u);
@@ -360,7 +360,7 @@ async function hacerEntrar(){
     errGate('No perteneces a ese centro. El tuyo es '+a.ced+'.'); return; }
 
   localStorage.setItem('cp_ced',ced);
-  YO=a; localStorage.setItem('cp_yo',JSON.stringify({id:a.id,slug:a.slug}));
+  YO=a; localStorage.setItem('cp_yo',JSON.stringify({id:a.id,slug:a.clave}));
   await entrarApp();
 }
 
@@ -606,7 +606,7 @@ async function sincronizar(){
   if(g){
     try{
       const {id}=JSON.parse(g);
-      const ags=await GET('mkr_agentes?select=id,slug,nombre,celular,estado,rol,nivel,ced&id=eq.'+encodeURIComponent(id)+'&limit=1');
+      const ags=await GET('mkr_agentes?select=id,clave,nombre,celular,estado,rol,nivel,ced&id=eq.'+encodeURIComponent(id)+'&limit=1');
       if(Array.isArray(ags)&&ags[0]&&ags[0].estado==='activo'){ YO=ags[0]; await entrarApp(); return; }
     }catch(e){}
     localStorage.removeItem('cp_yo');
