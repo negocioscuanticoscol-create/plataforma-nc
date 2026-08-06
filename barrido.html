@@ -79,8 +79,17 @@ const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V
 let pos={lat:null,lng:null}, urls={fachada:null,comp1:null,comp2:null,tarjeta:null}, interes='';
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',3500);}
 function gps(){navigator.geolocation.getCurrentPosition(p=>{pos.lat=p.coords.latitude;pos.lng=p.coords.longitude;const g=document.getElementById('gps');g.className='';g.textContent='📍 Ubicación lista ('+pos.lat.toFixed(5)+', '+pos.lng.toFixed(5)+')';},e=>{const g=document.getElementById('gps');g.className='bad';g.textContent='📍 Activa el permiso de ubicación y recarga';},{enableHighAccuracy:true,timeout:15000});}
-/* el GPS se pide al entrar, no al abrir: así el permiso no salta detrás del logo */
-function entrar(){ const g=document.getElementById('gate'); if(g)g.remove(); gps(); }
+/* El GPS se pide al entrar, no al abrir, para que el permiso no salte detras del logo.
+   Va en try/catch y despues de quitar la portada: si el GPS falla, igual se entra. */
+function entrar(){
+  const g=document.getElementById('gate');
+  if(g){ g.style.display='none'; g.remove(); }
+  try{ gps(); }catch(e){ console.warn('GPS',e); }
+}
+/* ademas del onclick del boton, por si el inline no corre */
+document.addEventListener('DOMContentLoaded',function(){
+  const b=document.querySelector('#gate button'); if(b)b.addEventListener('click',entrar);
+});
 function pick(k){document.getElementById('in_'+k).click();}
 async function cap(k,input){
   const f=input.files&&input.files[0]; if(!f) return;
