@@ -289,8 +289,8 @@ function pintarGate(){
       <div class="slogan">El pozo de bases de la red. Ninguna base es de nadie hasta que la marcas.</div>
       <label for="gCed">Tu centro</label>
       <select id="gCed"><option value="">Cargando centros…</option></select>
-      <label for="gU" style="margin-top:11px">Usuario · tu celular</label>
-      <input id="gU" inputmode="numeric" placeholder="3001234567" autocomplete="username">
+      <label for="gU" style="margin-top:11px">Tu usuario</label>
+      <input id="gU" placeholder="Tu usuario" autocapitalize="none" autocomplete="username">
       <label for="gP" style="margin-top:11px">Clave</label>
       <input id="gP" type="password" placeholder="Tu clave" autocomplete="current-password">
       <div id="gHallado"></div>
@@ -341,26 +341,25 @@ async function cargarCeds(){
 function errGate(m){ const h=$('gHallado'); if(h) h.innerHTML=`<div class="err">${esc(m)}</div>`; }
 
 async function hacerEntrar(){
-  const u=soloNum(($('gU')||{}).value||''), p=(($('gP')||{}).value||'').trim();
+  const u=(($('gU')||{}).value||'').trim(), p=(($('gP')||{}).value||'').trim();
   const ced=($('gCed')||{}).value||'todos';
-  if(u.length<7){ errGate('Escribe tu celular completo'); return; }
+  if(!u){ errGate('Escribe tu usuario'); return; }
   if(!p){ errGate('Escribe tu clave'); return; }
 
-  const ags=await GET('mkr_agentes?select=id,clave,nombre,celular,password,estado,rol,nivel,ced&limit=500');
+  /* La tabla usa 'usuario' + 'clave'. Antes se pedian 'celular' y 'password',
+     que no existen ahi: la consulta fallaba entera y no entraba nadie. */
+  const ags=await GET('mkr_agentes?select=id,nombre,usuario,clave,nivel,ced,activo&limit=500');
   if(!Array.isArray(ags)){ errGate(porQueFallo()); return; }
 
-  const a=ags.find(x=>soloNum(x.celular)===u);
-  if(!a){ errGate('Ese celular no está inscrito. Toca abajo para inscribirte.'); return; }
-  /* la clave arranca igual al celular; si nunca la cambió, ambas sirven */
-  const ok = a.password ? (p===String(a.password)) : (p===u);
-  if(!ok){ errGate('La clave no es correcta.'); return; }
-  if(a.estado==='anulado'){ errGate('Tu cuenta está anulada. Habla con el supervisor.'); return; }
-  if(a.estado==='restringido'){ errGate('Hola '+a.nombre+'. Todavía no estás habilitado: falta la capacitación y la prueba.'); return; }
+  const a=ags.find(x=>norm(x.usuario)===norm(u));
+  if(!a){ errGate('Ese usuario no está inscrito. Toca abajo para inscribirte.'); return; }
+  if(String(a.clave||'')!==p){ errGate('La clave no es correcta.'); return; }
+  if(a.activo===false){ errGate('Hola '+a.nombre+'. Todavía no estás habilitado: falta la capacitación y la prueba.'); return; }
   if(ced!=='todos' && a.ced && a.ced!=='todos' && a.ced!==ced){
     errGate('No perteneces a ese centro. El tuyo es '+a.ced+'.'); return; }
 
   localStorage.setItem('cp_ced',ced);
-  YO=a; localStorage.setItem('cp_yo',JSON.stringify({id:a.id,slug:a.clave}));
+  YO=a; localStorage.setItem('cp_yo',JSON.stringify({id:a.id,slug:a.usuario}));
   await entrarApp();
 }
 
@@ -370,8 +369,10 @@ async function hacerInscribir(){
   if(c.length<7){ gate('inscribir','Falta tu celular'); return; }
   try{
     const r=await fetch(SB+'/rest/v1/mkr_agentes',{method:'POST',headers:{...H,Prefer:'return=minimal'},
-      body:JSON.stringify({clave:norm(n),nombre:n.trim(),celular:c,rol:'telemercaderista',
-        nivel:'principiante',estado:'restringido',nota:q?('Nequi '+q):null})});
+      /* usuario = el nombre normalizado · clave = el celular, como dice la pantalla.
+         Queda activo:false hasta que pase la capacitacion y la prueba. */
+      body:JSON.stringify({usuario:norm(n),clave:c,nombre:n.trim(),
+        nivel:'principiante',ced:'todos',activo:false})});
     if(!r.ok){ const t=await r.text();
       gate('inscribir',
         /duplicate|unique/i.test(t) ? 'Ya hay alguien inscrito con ese nombre.'
@@ -606,8 +607,8 @@ async function sincronizar(){
   if(g){
     try{
       const {id}=JSON.parse(g);
-      const ags=await GET('mkr_agentes?select=id,clave,nombre,celular,estado,rol,nivel,ced&id=eq.'+encodeURIComponent(id)+'&limit=1');
-      if(Array.isArray(ags)&&ags[0]&&ags[0].estado==='activo'){ YO=ags[0]; await entrarApp(); return; }
+      const ags=await GET('mkr_agentes?select=id,nombre,usuario,clave,nivel,ced,activo&id=eq.'+encodeURIComponent(id)+'&limit=1');
+      if(Array.isArray(ags)&&ags[0]&&ags[0].activo!==false){ YO=ags[0]; await entrarApp(); return; }
     }catch(e){}
     localStorage.removeItem('cp_yo');
   }
