@@ -32,7 +32,8 @@ textarea{min-height:58px;resize:vertical}
 /* ===== PANTALLA DE ENTRADA · sin clave, solo el botón ===== */
 #gate{position:fixed;inset:0;z-index:50;background:#0f1620;display:flex;flex-direction:column;
   align-items:center;justify-content:center;padding:24px;text-align:center}
-#gate img{width:100%;max-width:300px;height:auto;border-radius:50%;box-shadow:0 14px 44px #0009}
+/* radio suave, NO 50%: un circulo perfecto le cortaria el pin de arriba y el texto de abajo */
+#gate img{width:100%;max-width:290px;height:auto;border-radius:26px;box-shadow:0 14px 44px #000a}
 #gate .wm{font-size:30px;font-weight:800;letter-spacing:-.02em}
 #gate .wm span{color:#E8620C}
 #gate .sl{font-size:13.5px;color:#8ea3b5;margin-top:16px;max-width:300px;line-height:1.5}
