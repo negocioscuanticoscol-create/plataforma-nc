@@ -284,14 +284,9 @@ function pintarGate(){
   if(PASO==='inicio'){
     HALLADO=null;
     $('gateBody').innerHTML=`
-      <div class="bien">Bienvenido a</div>
-      <div class="ced1">CED</div>
-      <div class="ced2">Red de Distribución</div>
-      <div class="marcas">
-        <img src="../assets/logo.png" alt="Feroz" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'wm',textContent:'FEROZ'}))">
-        <span class="sep"></span>
-        <span class="wm">ALPACA</span>
-      </div>
+      <img class="lupe" src="raton.png" alt="Lupe">
+      <div class="lema">Lupe <b>marca y gana</b></div>
+      <div class="slogan">El pozo de bases de la red. Ninguna base es de nadie hasta que la marcas.</div>
       <label for="gCed">Tu centro</label>
       <select id="gCed"><option value="">Cargando centros…</option></select>
       <label for="gU" style="margin-top:11px">Usuario · tu celular</label>
