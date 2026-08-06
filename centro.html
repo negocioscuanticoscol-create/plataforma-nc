@@ -90,7 +90,10 @@ const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const nm=n=>Math.round(+n||0).toLocaleString('es-CO');
-async function api(pth,o={}){ try{ const r=await fetch(SB+'/rest/v1/'+pth,{headers:H,...o}); if(o.count){ return +((r.headers.get('content-range')||'0/0').split('/')[1])||0; } const t=await r.text(); if(!r.ok){ console.warn(pth,t.slice(0,120)); return o.method?null:[]; } const d=t?JSON.parse(t):[]; return d; }catch(e){ console.warn(e); return o.method?null:[]; } }
+async function api(pth,o={}){ try{ const hdr={...H,...(o.headers||{})};
+  /* sin Prefer:count=exact el servidor responde "0-55/*" y el total salia NaN -> 0 */
+  if(o.count){ hdr.Prefer='count=exact'; hdr.Range='0-0'; }
+  const r=await fetch(SB+'/rest/v1/'+pth,{...o,headers:hdr}); if(o.count){ return +((r.headers.get('content-range')||'0/0').split('/')[1])||0; } const t=await r.text(); if(!r.ok){ console.warn(pth,t.slice(0,120)); return o.method?null:[]; } const d=t?JSON.parse(t):[]; return d; }catch(e){ console.warn(e); return o.method?null:[]; } }
 const patch=(pth,b)=>api(pth,{method:'PATCH',body:JSON.stringify(b),headers:{...H,Prefer:'return=minimal'}});
 const post=(pth,b)=>api(pth,{method:'POST',body:JSON.stringify(b),headers:{...H,Prefer:'return=minimal'}});
 function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; $('toast').appendChild(t); setTimeout(()=>t.remove(),2200); }
@@ -150,10 +153,10 @@ async finPagado(id,val){ await patch('nc_finanzas?id=eq.'+id,{pagado:val}); cons
 async finDel(id){ if(!confirm('¿Eliminar esta línea?'))return; await api('nc_finanzas?id=eq.'+id,{method:'DELETE',headers:{...H,Prefer:'return=minimal'}}); toast('Eliminada'); this.vFinanciero(); },
 async finAdd(tipo){ const con=prompt((tipo==='ingreso'?'Ingreso':'Gasto')+' — concepto:'); if(!con)return; const mo=prompt('Monto ($):','0'); const b={tipo,concepto:con.trim(),monto:+mo||0,orden:50}; if(tipo==='gasto'){ const d=prompt('Día de pago del mes (1-31, opcional):',''); if(d)b.dia_pago=+d||null; } await post('nc_finanzas',b); toast('Agregado'); this.vFinanciero(); },
 
+/* total historico: todos los leads que han entrado, no solo los del mes */
 async _leadsMes(){
-  const desde=mesISO();
-  const smart=await api('nc_bot_leads?empresa=eq.smart&creado_en=gte.'+desde+'&select=telefono',{count:true});
-  const feroz=await api('nc_bot_leads_feroz?creado_en=gte.'+desde+'&select=telefono',{count:true});
+  const smart=await api('nc_bot_leads?empresa=eq.smart&select=telefono',{count:true});
+  const feroz=await api('nc_bot_leads_feroz?select=telefono',{count:true});
   return {smart,feroz};
 },
 
@@ -186,7 +189,7 @@ async vResumen(){
     return `<div class="empc" ${e.u?`onclick="window.open('${e.u}','_blank')" style="cursor:pointer"`:''}>
       <div class="en">${esc(e.n)}</div><div class="ed">${esc(e.d)}</div>
       <div style="display:flex;gap:14px;margin-top:10px;font-size:12.5px">
-        ${lm!=null?`<span>💬 <b style="color:var(--ok)">${nm(lm)}</b> leads/mes</span>`:'<span style="color:var(--faint)">sin bot</span>'}
+        ${lm!=null?`<span>💬 <b style="color:var(--ok)">${nm(lm)}</b> leads</span>`:'<span style="color:var(--faint)">sin bot</span>'}
         ${seg?`<span>👥 <b>${nm(seg)}</b></span>`:''}</div>
       ${e.u?'<span class="go">Abrir →</span>':''}</div>`; };
   const grupo=g=>`<div class="emp">${emp.filter(e=>e.g===g).map(card).join('')}</div>`;
@@ -200,7 +203,7 @@ async vResumen(){
   $('main').innerHTML=`<h1>📊 Resumen · Negocios Cuánticos</h1>
     <div class="sub">La foto de NC en un vistazo.</div>
     <div class="kpis">
-      <div class="kpi ok"><b>${nm(totLeads)}</b><span>Leads de bots este mes</span></div>
+      <div class="kpi ok"><b>${nm(totLeads)}</b><span>Leads de bots (total)</span></div>
       <div class="kpi acc"><b>${nm(totSeg)}</b><span>Seguidores (total)</span></div>
       <div class="kpi azul"><b>${nCli} · ${nAce} · ${nHer}</b><span>Clientes · Aceleradores · Apps</span></div>
     </div>
@@ -230,7 +233,7 @@ async vMarketing(){
     <div class="sub">Elige una marca y ve su marketing: redes, seguidores, pauta y agentes.</div>
     <div class="kpis">
       <div class="kpi acc"><b>${nm(totSeg)}</b><span>Seguidores (total)</span></div>
-      <div class="kpi ok"><b>${nm(totLeads)}</b><span>Leads de bots este mes</span></div>
+      <div class="kpi ok"><b>${nm(totLeads)}</b><span>Leads de bots (total)</span></div>
       <div class="kpi azul"><b>${clientes.length}</b><span>Marcas</span></div>
     </div>
     <div class="cajones">${clientes.map(cl=>`<button class="caj ${cl===sel?'on':''}" onclick="App.mkSel('${esc(cl)}')">${esc(cl)}</button>`).join('')}<button class="caj add" onclick="App.addCuenta()">＋ marca</button></div>
@@ -248,7 +251,7 @@ _cardCliente(cl, reds, leadsBy){
     <div class="top"><h2>${esc(cl)}</h2><span class="badge">${nm(seg)} seguidores</span></div>
     <div class="redes">${reds.map(r=>this._red(r)).join('')}</div>
     ${leads!=null?`<div class="pauta">
-      <div>Leads del bot este mes · <b>${nm(leads)}</b></div>
+      <div>Leads del bot en total · <b>${nm(leads)}</b></div>
       <div style="color:var(--sub)">objetivo pauta: <b style="color:var(--tx);font-size:13px">Mensajes</b></div></div>`:''}
     <div class="agentes">${agentes}</div>
   </div>`;
