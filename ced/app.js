@@ -2407,7 +2407,7 @@ const App = {
       <label>Nombre comercial</label><input class="field" id="cl_comercial" value="${v(e.nombre_comercial)}" placeholder="Con el que se conoce el negocio">
       <div class="hint">La razón social es la que va en la factura. El nombre comercial es con el que la gente lo llama — si son iguales, deja el segundo vacío.</div>
       <div class="row2"><div><label>NIT / Cédula <span style="color:#9aa3b0;font-weight:400">(opcional · después)</span></label><input class="field" id="cl_nit" value="${v(e.nit)}" oninput="App.validarEnLaRed()"></div>
-        <div><label>Celular 1 *</label><input class="field" id="cl_tel" inputmode="tel" value="${v(e.tel)}" oninput="App.validarEnLaRed()"></div></div>
+        <div><label>Celular 1 *</label><input class="field" id="cl_tel" inputmode="tel" value="${v(e.tel)}"></div></div>
       <div id="cl_valida"></div>
       <div class="row2">
         <div><label>Tipo de pago</label><select class="field" id="cl_tipo"><option value="contado" ${e.tipo_pago!=='credito'?'selected':''}>Contado</option><option value="credito" ${e.tipo_pago==='credito'?'selected':''}>Crédito</option></select></div>
@@ -2460,10 +2460,10 @@ const App = {
   },
   async _validarYa(){
     const caja = $('cl_valida'); if(!caja) return;
-    const limpia = s => String(s||'').replace(/\D/g,'');
-    const nit = limpia($('cl_nit') && $('cl_nit').value);
-    const tel = limpia($('cl_tel') && $('cl_tel').value);
-    if(nit.length < 6 && tel.length < 7){ caja.innerHTML=''; return; }
+    /* Solo por cédula o NIT: es el documento el que identifica a la persona o
+       la empresa. El celular cambia y se comparte; el documento no. */
+    const nit = String(($('cl_nit')&&$('cl_nit').value)||'').replace(/\D/g,'');
+    if(nit.length < 6){ caja.innerHTML=''; return; }
 
     /* Va por una función de la base y no por la tabla, a propósito: el RLS
        aísla cada sede, así que consultando `clientes` directo nunca veríamos
@@ -2471,10 +2471,7 @@ const App = {
        función mira toda la red pero solo devuelve lo mínimo para decidir. */
     let hallados = [];
     try{
-      const { data } = await this.sb.rpc('cliente_en_la_red', {
-        doc: nit.length >= 6 ? nit : null,
-        cel: tel.length >= 7 ? tel : null,
-        nom: null });
+      const { data } = await this.sb.rpc('cliente_en_la_red', { doc:nit, cel:null, nom:null });
       hallados = data || [];
     }catch(err){ caja.innerHTML=''; return; }
     if(this._editClienteId) hallados = hallados.filter(x=>x.id!==this._editClienteId);
