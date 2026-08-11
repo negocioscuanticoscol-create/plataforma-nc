@@ -2298,17 +2298,39 @@ const App = {
     cont.innerHTML='<div class="hint">Buscando en sistema, empresas y distribuidores…</div>';
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
     const enc=encodeURIComponent('*'+q+'*'); const res=[];
-    try{ const r=await fetch(this._SBU()+'/rest/v1/clientes?or=(nombre.ilike.'+enc+',tel.ilike.'+enc+')&select=id,nombre,nit,tel,ciudad,depto,contacto1&limit=15',{headers:H}); const a=await r.json(); (Array.isArray(a)?a:[]).forEach(x=>res.push({id:x.id,nombre:x.nombre,cel:x.tel,ciudad:x.ciudad,depto:x.depto,contacto:x.contacto1,mundo:'sistema'})); }catch(e){}
+    /* Los clientes se consultan por la función y NO por la tabla: el RLS aísla
+       cada sede, así que la consulta directa devolvía vacío siempre y esto
+       respondía "no está en sistema" aunque el cliente existiera en otra sede.
+       La función mira toda la red y devuelve de qué sede es. */
+    try{
+      const soloNum = q.replace(/\D/g,'');
+      const { data } = await this.sb.rpc('cliente_en_la_red', {
+        doc: soloNum.length>=6 ? soloNum : null,
+        cel: soloNum.length>=7 ? soloNum : null,
+        nom: /[a-zA-Z]/.test(q) ? q : null });
+      (data||[]).forEach(x=>res.push({id:x.id,nombre:x.nombre_comercial||x.nombre,cel:x.tel,
+        ciudad:x.ciudad,ced:x.ced,calif:x.calificacion,mundo:'sistema'}));
+    }catch(e){}
     try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_leads?or=(nombre.ilike.'+enc+',cel.ilike.'+enc+')&select=nombre,ciudad,depto,contacto,cel,mundo&limit=30',{headers:H}); const a=await r.json(); (Array.isArray(a)?a:[]).forEach(x=>res.push({nombre:x.nombre,cel:x.cel,ciudad:x.ciudad,depto:x.depto,contacto:x.contacto,mundo:x.mundo})); }catch(e){}
     this._clBusRes=res;
     if(!res.length){ cont.innerHTML='<div class="hint" style="color:#8a93a6">No está en sistema, empresas ni distribuidores — llénalo manual abajo.</div>'; return; }
-    const lab=m=> m==='sistema'?['✅ ya en sistema','#16a34a'] : m==='distribuidor'?['distribuidor','#b8860b'] : ['empresa','#3a48b3'];
-    cont.innerHTML=res.map((x,i)=>{ const L=lab(x.mundo);
-      const accion = x.mundo==='sistema'
-        ? `<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.editarDesdeBusq(${x.id})">✏️ Editar</button>`
-        : `<button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.usarLeadCliente(${i})">Usar</button>`;
+    const miSede=this.miSede();
+    cont.innerHTML=res.map((x,i)=>{
+      /* Para los que ya son clientes, la etiqueta dice DE QUÉ SEDE son. Ese es
+         el dato que evita que dos sedes se peleen el mismo cliente. */
+      let L;
+      if(x.mundo!=='sistema') L = x.mundo==='distribuidor'?['distribuidor','#b8860b']:['empresa','#3a48b3'];
+      else if(x.calif==='no_tocar')            L=['🚫 NO TOCAR · '+(x.ced||''),'#dc2626'];
+      else if(x.ced && miSede && x.ced!==miSede) L=['⚠️ ya es de '+x.ced,'#d97706'];
+      else                                      L=['✅ ya en tu sede','#16a34a'];
+      /* Un cliente de otra sede no se puede abrir: el RLS no deja leerlo. */
+      const ajeno = x.mundo==='sistema' && x.ced && miSede && x.ced!==miSede;
+      const accion = x.mundo!=='sistema'
+        ? `<button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.usarLeadCliente(${i})">Usar</button>`
+        : ajeno ? `<span style="font-size:11px;color:#92400e">lo maneja ${esc(x.ced)}</span>`
+                : `<button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.editarDesdeBusq(${x.id})">✏️ Editar</button>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--linea)">
-      <div style="font-size:12.5px"><b>${esc(x.nombre||'—')}</b> <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:${L[1]}22;color:${L[1]}">${L[0]}</span><br><span style="color:#667">📱 ${esc(x.cel||'')}${x.ciudad?' · '+esc(x.ciudad):''}</span></div>
+      <div style="font-size:12.5px"><b>${esc(x.nombre||'—')}</b> <span style="font-size:10px;padding:1px 6px;border-radius:8px;background:${L[1]}22;color:${L[1]}">${esc(L[0])}</span><br><span style="color:#667">📱 ${esc(x.cel||'')}${x.ciudad?' · '+esc(x.ciudad):''}</span></div>
       ${accion}</div>`; }).join('');
   },
   async editarDesdeBusq(id){
@@ -2451,7 +2473,8 @@ const App = {
     try{
       const { data } = await this.sb.rpc('cliente_en_la_red', {
         doc: nit.length >= 6 ? nit : null,
-        cel: tel.length >= 7 ? tel : null });
+        cel: tel.length >= 7 ? tel : null,
+        nom: null });
       hallados = data || [];
     }catch(err){ caja.innerHTML=''; return; }
     if(this._editClienteId) hallados = hallados.filter(x=>x.id!==this._editClienteId);
