@@ -130,6 +130,11 @@ main{flex:1;padding:13px 15px 0}
 .call{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--ok);color:#03291D;
   text-decoration:none;font-size:20px;font-weight:800;padding:17px;border-radius:14px;margin:15px 0 4px}
 .call:active{filter:brightness(.9)}
+/* La extensión NO se pega al número: si va en el enlace, el celular marca 14
+   dígitos y la llamada no entra. Va como nota, para marcarla al contestar. */
+.ext{margin:6px 0 2px;font-size:13.5px;text-align:center;padding:8px 10px;border-radius:10px;
+  background:rgba(255,193,84,.14);border:1px solid rgba(255,193,84,.35)}
+.ext b{font-size:16px;letter-spacing:.5px}
 .res{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:13px}
 .res button{border:none;border-radius:11px;padding:14px 6px;font-size:13px;font-weight:700;cursor:pointer;
   color:#fff;font-family:inherit;line-height:1.25;display:flex;flex-direction:column;gap:3px;align-items:center}
@@ -436,7 +441,9 @@ async function abrirBase(b){
   $('bases').innerHTML='<div class="vacio">Cargando prospectos…</div>';
 
   // el filtro de la base, traducido a la consulta
-  let q='mkr_leads?select=id,nombre,contacto,cel,ciudad,departamento,barrio,sector&aplica=is.true';
+  /* La vista mkr_leads ya deja por fuera a los que no tienen número marcable:
+     el que no se puede llamar no aparece en el marcador. */
+  let q='mkr_leads?select=id,nombre,contacto,cel,extension,tipo_tel,ciudad,departamento,barrio,sector,direccion&aplica=is.true';
   SEG.forEach(k=>{ const v=b[k]; if(v&&v!=='todos') q+='&'+k+'=eq.'+encodeURIComponent(v); });
   q+='&limit=20000';
 
@@ -492,6 +499,7 @@ function render(){
     ${l.contacto?`<div class="cont">${esc(l.contacto)}</div>`:''}
     <div class="num mono">${esc(cel.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3'))}</div>
     <a class="call" href="tel:+57${esc(cel)}">📞 LLAMAR</a>
+    ${l.extension?`<div class="ext">Al contestar, marca la extensión <b>${esc(l.extension)}</b></div>`:''}
     <div class="res">${botones}</div>
     <div id="panel"></div>
     <div class="nav"><button onclick="mover(1)">Saltar sin marcar ⏭</button></div>

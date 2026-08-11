@@ -132,6 +132,7 @@ const App = {
       {v:'cartera', ic:'💳', t:'Cartera'},
       {v:'planta', ic:'🏭', t:'Planta'},
       {v:'clientes', ic:'👥', t:'Clientes'},
+      {v:'comisiones', ic:'🧾', t:'Comisiones'},
     ];
     // hilera 2 = base de plataforma (solo admin la tiene en permitidos → solo a él le aparece)
     const ROW2=[
@@ -139,9 +140,9 @@ const App = {
       {v:'admin', ic:'⚙️', t:'Equipo'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido'],
-      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido'],
+    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','datos','admin','permisos'];
+    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones'],
+      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
       facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
@@ -186,6 +187,7 @@ const App = {
     if(window.NC_EMPRESA==='smart' && view==='pedidos') return this.vPedidosSmart();
     if(window.NC_EMPRESA==='smart' && view==='despachos') return this.vDespachosSmart();
     if(window.NC_EMPRESA==='smart' && view==='autopedido') return this.vAutoPedidosSmart();
+    if(view==='comisiones') return this.vComisiones();
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
@@ -876,6 +878,142 @@ const App = {
 
   /* ---------- COTIZACIONES (landing IGUAL para todas las empresas) ---------- */
   _SBU(){ return 'https://fnayedgvamxktxfvywwl.supabase.co'; }, _SBK(){ return 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv'; },
+
+  /* ===================== COMISIONES · estado de cuenta =====================
+     Un solo lugar donde se ve lo que se le cobra y lo que ya pagó.
+     Cargos: los 2 millones del mes, la comisión del cierre y los extras.
+     Pagos:  fecha, banco, nombre y valor. El saldo es la resta.        */
+  _ctaH(){ return {apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json'}; },
+  _mesHoy(){ return new Date().toISOString().slice(0,7); },
+  _mesNom(m){ const N=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const p=String(m||'').split('-'); return p[1]?(N[+p[1]]+' '+p[0]):(m||'—'); },
+
+  async vComisiones(){
+    const emp=window.NC_EMPRESA||'smart';
+    this.set('<h1>Comisiones</h1><div class="sub">Cargando estado de cuenta…</div>');
+    let filas=null;
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_cuenta?empresa=eq.'+emp+
+        '&order=fecha.desc,creado_en.desc&limit=3000',{headers:this._ctaH()});
+      filas=r.ok?await r.json():null; }catch(e){ filas=null; }
+    if(!Array.isArray(filas)){
+      this.set(`<h1>Comisiones</h1>
+        <div class="card" style="border-color:#f0c4c4;background:#fdecec">
+          <b>Falta la tabla.</b><br>
+          Todavía no se ha corrido el SQL de <b>nc_cuenta</b>. Esta pestaña funciona apenas exista.
+        </div>`); return; }
+    this._cta=filas; this._ctaEmp=emp;
+    this._ctaPaint();
+  },
+
+  _ctaPaint(){
+    const f=this._cta||[];
+    const cargos=f.filter(x=>x.tipo==='cargo'), pagos=f.filter(x=>x.tipo==='pago');
+    const tC=cargos.reduce((a,x)=>a+(+x.valor||0),0);
+    const tP=pagos.reduce((a,x)=>a+(+x.valor||0),0);
+    const saldo=tC-tP;
+    /* agrupado por mes, del más nuevo al más viejo */
+    const meses={};
+    f.forEach(x=>{ const m=x.mes||String(x.fecha||'').slice(0,7)||'sin mes';
+      const g=meses[m]=meses[m]||{cargos:[],pagos:[]};
+      (x.tipo==='pago'?g.pagos:g.cargos).push(x); });
+    const orden=Object.keys(meses).sort().reverse();
+
+    const linea=x=>{
+      const esPago=x.tipo==='pago';
+      return `<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;
+        padding:9px 0;border-bottom:1px solid #f0f1f4">
+        <div style="min-width:0">
+          <div style="font-size:13.5px;font-weight:600">${esc(x.concepto)}</div>
+          <div style="font-size:11.5px;color:#8a93a6">
+            ${x.fecha?esc(x.fecha):''}${x.banco?' · '+esc(x.banco):''}${x.nombre?' · '+esc(x.nombre):''}${x.cuenta_cobro?' · N° '+esc(x.cuenta_cobro):''}</div>
+        </div>
+        <div style="white-space:nowrap;font-weight:800;font-size:13.5px;color:${esPago?'#2e9e4f':'#1d1f24'}">
+          ${esPago?'−':''}${money(x.valor)}
+          <a onclick="App.ctaDel(${x.id})" style="color:#d22;cursor:pointer;font-weight:400;margin-left:7px">✕</a></div>
+      </div>`; };
+
+    const bloques=orden.map(m=>{
+      const g=meses[m];
+      const c=g.cargos.reduce((a,x)=>a+(+x.valor||0),0);
+      const p=g.pagos.reduce((a,x)=>a+(+x.valor||0),0);
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+          <b style="font-size:15px;text-transform:capitalize">${esc(this._mesNom(m))}</b>
+          <span style="font-size:12px;color:#8a93a6">cargos ${money(c)} · pagos ${money(p)}
+            · <b style="color:${c-p>0?'#d22':'#2e9e4f'}">${money(c-p)}</b></span>
+        </div>
+        ${g.cargos.map(linea).join('')}
+        ${g.pagos.length?`<div style="font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+          color:#8a93a6;font-weight:700;margin-top:10px">Pagos recibidos</div>`+g.pagos.map(linea).join(''):''}
+      </div>`; }).join('');
+
+    this.set(`<h1>Comisiones</h1>
+      <div class="sub">Estado de cuenta: los servicios del mes, la comisión del cierre,
+        los extras y lo que ya se pagó. El saldo es la resta.</div>
+      <div class="kpis" style="margin-bottom:12px">
+        <div class="kpi"><b>${money(tC)}</b><span>Total cobrado</span></div>
+        <div class="kpi"><b style="color:#2e9e4f">${money(tP)}</b><span>Total pagado</span></div>
+        <div class="kpi ${saldo>0?'':''}"><b style="color:${saldo>0?'#d22':'#2e9e4f'}">${money(saldo)}</b>
+          <span>${saldo>0?'Saldo pendiente':(saldo<0?'Saldo a favor':'Al día')}</span></div>
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <button class="btn btn-ghost" onclick="App.ctaCargoMes()" style="padding:14px;line-height:1.45">📅<br>Servicios del mes</button>
+        <button class="btn btn-main" onclick="App.ctaPago()" style="padding:14px;line-height:1.45">💵<br>Registrar pago</button>
+      </div>
+      <div class="row2" style="margin-bottom:14px">
+        <button class="btn btn-ghost" onclick="App.ctaComision()" style="padding:12px;font-size:12.5px">＋ Comisión del cierre</button>
+        <button class="btn btn-ghost" onclick="App.ctaOtro()" style="padding:12px;font-size:12.5px">＋ Otro cargo</button>
+      </div>
+      ${bloques||'<div class="card">Todavía no hay movimientos.</div>'}`);
+  },
+
+  async _ctaAdd(b){
+    b.empresa=this._ctaEmp||window.NC_EMPRESA||'smart';
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_cuenta',{method:'POST',
+      headers:{...this._ctaH(),Prefer:'return=minimal'},body:JSON.stringify(b)});
+      if(!r.ok){ alert('No se pudo guardar'); return false; } }catch(e){ alert('Sin conexión'); return false; }
+    await this.vComisiones(); return true;
+  },
+  async ctaDel(id){
+    if(!confirm('¿Borrar este movimiento del estado de cuenta?'))return;
+    try{ await fetch(this._SBU()+'/rest/v1/nc_cuenta?id=eq.'+id,{method:'DELETE',headers:this._ctaH()}); }catch(e){}
+    await this.vComisiones();
+  },
+  /* los 2 millones fijos del mes */
+  ctaCargoMes(){
+    const m=prompt('¿De qué mes son los servicios? (AAAA-MM)',this._mesHoy()); if(!m)return;
+    const v=prompt('Valor de los servicios del mes:','2000000'); if(v===null)return;
+    this._ctaAdd({tipo:'cargo',concepto:'Servicios del mes · plataforma y herramientas',
+      mes:m.trim(),valor:+String(v).replace(/\D/g,'')||0,fecha:m.trim()+'-01'});
+  },
+  /* la comisión que sale al cierre */
+  ctaComision(){
+    const m=prompt('Comisión del cierre · ¿de qué mes? (AAAA-MM)',this._mesHoy()); if(!m)return;
+    const per=prompt('Periodo que cubre:','1 al 30 de '+this._mesNom(m).split(' ')[0]); if(per===null)return;
+    const v=prompt('Valor de la comisión:',''); if(v===null)return;
+    this._ctaAdd({tipo:'cargo',concepto:'Comisiones sobre ventas · '+per.trim(),
+      mes:m.trim(),valor:+String(v).replace(/\D/g,'')||0,
+      fecha:new Date().toISOString().slice(0,10)});
+  },
+  ctaOtro(){
+    const c=prompt('¿Qué se le cobra?',''); if(!c||!c.trim())return;
+    const m=prompt('¿A qué mes va? (AAAA-MM)',this._mesHoy()); if(!m)return;
+    const v=prompt('Valor:',''); if(v===null)return;
+    const cc=prompt('N° de cuenta de cobro (opcional):','')||'';
+    this._ctaAdd({tipo:'cargo',concepto:c.trim(),mes:m.trim(),
+      valor:+String(v).replace(/\D/g,'')||0,fecha:new Date().toISOString().slice(0,10),
+      cuenta_cobro:cc.trim()||null});
+  },
+  /* pago manual: fecha, banco, nombre y valor */
+  ctaPago(){
+    const fe=prompt('Fecha del pago (AAAA-MM-DD):',new Date().toISOString().slice(0,10)); if(!fe)return;
+    const ba=prompt('Banco:','Nequi'); if(ba===null)return;
+    const no=prompt('A nombre de quién / de quién viene:',''); if(no===null)return;
+    const v=prompt('Valor consignado:',''); if(v===null)return;
+    this._ctaAdd({tipo:'pago',concepto:'Pago recibido',mes:String(fe).slice(0,7),
+      valor:+String(v).replace(/\D/g,'')||0,fecha:fe.trim(),
+      banco:ba.trim()||null,nombre:no.trim()||null});
+  },
   async vCotLanding(){
     this.loading();
     const e=window.NC_EMPRESA||'feroz';

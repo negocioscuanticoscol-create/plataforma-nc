@@ -265,9 +265,11 @@ const App={
   },
   dashDow(w){ this._dashDow=(this._dashDow===w)?null:w;
     const c=$('dashSem'); if(c) c.innerHTML=this._dashSemana(); },
-  /* Qué producto se mueve ese día de la semana → cuánto hay que hornear. */
-  _dashDowProds(w){
-    const V=((this._dashCtx||{}).ventas)||[], cuenta={};
+  /* Qué producto se mueve ese día de la semana → cuánto hay que hornear.
+     Lo usan dos pantallas: el Dashboard (con sus ventas) y el informe de unidades
+     de Inventario, que le pasa las suyas en 'ventas'. */
+  _dashDowProds(w,ventas){
+    const V=ventas||((this._dashCtx||{}).ventas)||[], cuenta={};
     let dias=new Set();
     V.forEach(v=>{ const d=new Date(v.creado_en); if(isNaN(d)||d.getDay()!==w)return;
       dias.add(this._diaKey(d));
@@ -1035,10 +1037,70 @@ const App={
   async leadDel(id){ if(!this._okBorrar())return; await DEL('kruh_leads?id=eq.'+id); this.vCrm(); },
 
   /* ===================== INVENTARIO + índice de cobertura ===================== */
+  /* ====== QUÉ DÍA SE MUEVE MÁS — el mismo informe del Dashboard, pero SIN PLATA ======
+     Acá lo único que importa son las UNIDADES: es lo que hay que hornear y tener listo.
+     Las unidades salen del texto de la venta ("Pan x 3, Croissant x 2"), igual que en
+     el Dashboard, así que los dos informes cuentan lo mismo. */
+  _uds(v){ let t=0;
+    String(v.producto||'').split(',').forEach(p=>{
+      const m=p.match(/^\s*(.+?)\s*[x×]\s*(\d+)\s*$/); if(m) t+=+m[2]||0; });
+    return t; },
+  _invSemana(){
+    const V=this._invVentas||[]; if(!V.length) return '';
+    const DIA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const por={}, fechas={}; let sinDet=0;
+    V.forEach(v=>{ const d=new Date(v.creado_en); if(isNaN(d))return;
+      const w=d.getDay(), u=this._uds(v);
+      if(!u) sinDet++;
+      const o=por[w]=por[w]||{u:0,n:0}; o.u+=u; o.n++;
+      (fechas[w]=fechas[w]||new Set()).add(this._diaKey(d)); });
+    const filas=Object.keys(por).map(w=>{ const o=por[w], ds=(fechas[w]||new Set()).size;
+      return {w:+w,u:o.u,n:o.n,ds,prom:ds?o.u/ds:0,uv:o.n?o.u/o.n:0}; });
+    if(!filas.length) return '';
+    const gu=filas.reduce((a,f)=>a+f.u,0);
+    if(!gu) return `<div class="card"><div class="hint">No se pueden contar unidades: las ventas
+      no traen el detalle "producto x cantidad".</div></div>`;
+    const max=Math.max(...filas.map(f=>f.prom));
+    filas.sort((a,b)=>b.prom-a.prom);
+    const ab=this._invDow, tu=filas.reduce((a,f)=>a+f.u,0), td=filas.reduce((a,f)=>a+f.ds,0),
+          tn=filas.reduce((a,f)=>a+f.n,0);
+    return `<div class="card" style="padding:12px 14px">
+      <div style="font-family:Fraunces,serif;font-size:16px">Qué día se mueve más <small class="dim" style="font-size:11px;font-weight:400">— en unidades</small></div>
+      <div class="hint" style="margin:2px 0 9px">Sin plata: solo cuánto sale. Toca un día para ver qué hornear ese día.</div>
+      <div class="kpis" style="margin-bottom:10px">
+        <div class="kpi dark"><b>${num(tu)}</b><span>Unidades vendidas</span></div>
+        <div class="kpi"><b>${num(td?tu/td:0)}</b><span>Unidades por día</span></div>
+        <div class="kpi"><b>${(tn?tu/tn:0).toFixed(1)}</b><span>Unidades por venta</span></div>
+        <div class="kpi"><b style="color:var(--ok)">${DIA[filas[0].w]}</b><span>El que más mueve</span></div>
+      </div>
+      <div style="display:flex;gap:8px;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);border-bottom:1px solid var(--line);padding-bottom:6px">
+        <span style="flex:1">Día</span><span style="width:96px;text-align:right">Unidades por día</span>
+        <span style="width:46px;text-align:right">Días</span><span style="width:52px;text-align:right">Ventas</span>
+        <span style="width:70px;text-align:right">Und/venta</span><span style="width:48px;text-align:right">Peso</span></div>
+      ${filas.map((f,i)=>{const o=ab===f.w;return `<div>
+        <div onclick="App.invDow(${f.w})" style="display:flex;gap:8px;align-items:center;padding:8px 0;font-size:13.5px;cursor:pointer;border-bottom:1px solid var(--line2)">
+          <span style="flex:1;font-weight:${i===0?'800':'600'}">${o?'▾':'▸'} ${DIA[f.w]}${i===0?' <span class="tag np">el que más mueve</span>':''}${i===filas.length-1?' <span class="tag pe">el más flojo</span>':''}</span>
+          <span style="width:96px;text-align:right;font-weight:800">${num(f.prom)}</span>
+          <span style="width:46px;text-align:right;color:var(--mut)">${f.ds}</span>
+          <span style="width:52px;text-align:right;color:var(--mut)">${num(f.n)}</span>
+          <span style="width:70px;text-align:right;color:var(--mut)">${f.uv.toFixed(1)}</span>
+          <span style="width:48px;text-align:right;color:var(--mut)">${(f.u/gu*100).toFixed(1)}%</span></div>
+        <div class="bar" style="height:6px;margin-bottom:${o?'8px':'4px'}">
+          <i style="width:${max?f.prom/max*100:0}%;background:${i===0?'var(--ok)':'var(--acc2)'}"></i></div>
+        ${o?this._dashDowProds(f.w,V):''}</div>`;}).join('')}
+      <div class="hint" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px">
+        Se compara <b>unidades por día</b>, no el total: cada día de la semana ha caído una
+        cantidad distinta de veces.${sinDet?` <span style="color:var(--warn)">${sinDet} venta${sinDet===1?'':'s'}
+        sin detalle de cantidades no se pudo${sinDet===1?'':'n'} contar.</span>`:''}</div></div>`;
+  },
+  invDow(w){ this._invDow=(this._invDow===w)?null:w; this.vInventario(); },
+
   async vInventario(){
     this.loading();
-    const [prods,movs,ventas]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GETALL('kruh_movimientos?order=creado_en.desc&limit=1000'),GETALL('kruh_ventas?select=monto,creado_en&limit=20000')]);
-    this._prods=prods; this._movs=movs;
+    /* Se pide tambien 'producto': sin esa columna no se pueden contar las UNIDADES
+       que salen cada dia, que es lo que sirve para surtir. */
+    const [prods,movs,ventas]=await Promise.all([GET('kruh_productos?order=nombre&limit=1000'),GETALL('kruh_movimientos?order=creado_en.desc&limit=1000'),GETALL('kruh_ventas?select=monto,creado_en,producto&limit=20000')]);
+    this._prods=prods; this._movs=movs; this._invVentas=ventas;
     // consumo diario prom (salidas ult 30 dias) — las perdidas NO cuentan, no salio nada del estante
     const hoy=new Date(), d30=new Date(hoy-30*864e5);
     const salBy={}; movs.forEach(m=>{ if((m.tipo==='salida'||m.tipo==='muestra') && new Date(m.creado_en)>=d30){ salBy[m.producto_id]=(salBy[m.producto_id]||0)+(+m.cantidad||0);} });
@@ -1081,7 +1143,8 @@ const App={
         <div class="row" style="justify-content:space-between"><span class="dim">Promedio otros días</span><b>${money(promNormal)}</b></div>
         <div class="row" style="justify-content:space-between;border-top:1px solid var(--line);margin-top:5px;padding-top:5px"><span>Diferencia</span><b style="color:${dif>=0?'var(--ok)':'var(--bad)'}">${dif>0?'+':''}${dif.toFixed(0)}%</b></div>
         <div class="hint" style="margin-top:6px">${(pago.n+normal.n)<20?'⏳ Aún con pocos datos — la tendencia se afina a medida que se registran pedidos.':(dif>15?'📈 Sí se ve efecto: los días de pago venden más.':(dif<-15?'📉 Los días de pago venden menos que el resto.':'➖ No se ve un efecto claro de la quincena todavía.'))}</div></div>
-      <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Por día de la semana</div>
+      ${this._invSemana()}
+      <div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Por día de la semana <small class="dim" style="font-size:11px;font-weight:400">— en plata</small></div>
         ${DOW.map((nm,i)=>`<div class="row" style="align-items:center;gap:8px;margin-bottom:3px"><span style="width:74px;font-size:12px" class="dim">${nm}</span><div class="bar" style="flex:1"><i style="width:${Math.round(byDow[i]/maxDow*100)}%;background:var(--acc2)"></i></div><b style="font-size:11px;width:72px;text-align:right">${money(byDow[i])}</b></div>`).join('')}</div>
       ${topProd.length?`<div class="card"><div style="font-family:Fraunces,serif;font-size:16px;margin-bottom:6px">Más pedidos</div>${topProd.map(t=>`<div class="row" style="justify-content:space-between;padding:3px 0"><span>${esc(t.p.nombre)}</span><b>${num(t.q)}</b></div>`).join('')}</div>`:''}`
       : '<div class="empty">Aún sin ventas para analizar. Genera pedidos y aquí verás el patrón por día y el efecto de la quincena.</div>';

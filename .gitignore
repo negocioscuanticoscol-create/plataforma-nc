@@ -17,3 +17,9 @@ db_schema.sql
 _backup_*
 SETUP.md
 .DS_Store
+
+# Local: editor, temporales y scripts sueltos
+.claude/
+.vscode/
+supabase/.temp/
+dedup.ps1

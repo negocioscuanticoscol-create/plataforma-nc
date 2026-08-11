@@ -1,0 +1,67 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nido Colchones · Catálogo de producto</title>
+<meta name="description" content="Catálogo de producto de Nido Colchones: pillowtop, Sensaflex, BabyNido, camas de mascota y Nido Truck.">
+<style>
+  :root{
+    --navy:#144357; --navy2:#0e3243; --gold:#bca890; --gold2:#d9c8b6;
+    --crema:#f0e8db; --papel:#f4efe4; --card:#fffdf8; --ink:#14313f; --mut:#8b9aa3;
+    --line:#e4dccd;
+    --sh:0 1px 2px rgba(20,67,87,.06),0 14px 34px -20px rgba(20,67,87,.34);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--papel);color:var(--ink);
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5;
+    -webkit-font-smoothing:antialiased}
+  header{background:var(--navy);color:#fff;padding:22px 0;border-bottom:3px solid var(--gold)}
+  .hd{max-width:1000px;margin:0 auto;padding:0 18px;display:flex;align-items:center;
+    justify-content:space-between;gap:14px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand img{width:52px;height:42px;object-fit:contain}
+  .t1{font-family:Georgia,serif;font-size:22px;font-weight:700;letter-spacing:.08em;line-height:1}
+  .t2{font-size:9px;letter-spacing:.36em;color:var(--gold2);text-transform:uppercase;margin-top:3px}
+  .acc{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{padding:9px 15px;border-radius:9px;background:var(--gold);color:var(--navy2);
+    font-weight:700;font-size:13px;text-decoration:none;border:none;cursor:pointer;
+    font-family:inherit;white-space:nowrap}
+  .btn.gh{background:transparent;border:1px solid rgba(217,200,182,.45);color:#e7dfd2}
+  main{max-width:1000px;margin:0 auto;padding:22px 18px 70px}
+  .pag{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    overflow:hidden;box-shadow:var(--sh);margin-bottom:18px}
+  .pag img{width:100%;height:auto;display:block}
+  .pie{max-width:1000px;margin:0 auto;padding:0 18px 40px;font-size:12.5px;color:var(--mut)}
+  .pie b{color:var(--ink)}
+  @media print{
+    header,.acc,.pie{display:none}
+    body{background:#fff}
+    main{max-width:none;padding:0}
+    .pag{border:none;border-radius:0;box-shadow:none;margin:0;page-break-after:always}
+  }
+</style>
+
+<header><div class="hd">
+  <div class="brand">
+    <img src="../assets/nido-logo.png" alt="Nido Colchones">
+    <div><div class="t1">NIDO</div><div class="t2">Colchones</div></div>
+  </div>
+  <div class="acc">
+    <a class="btn" href="https://wa.me/573134856744?text=Hola,%20vi%20el%20cat%C3%A1logo%20de%20Nido%20Colchones"
+       target="_blank" rel="noopener">Escribir por WhatsApp</a>
+    <button class="btn gh" onclick="window.print()">Imprimir / PDF</button>
+  </div>
+</div></header>
+
+<main>
+  <div class="pag"><img src="catalogo/nido-catalogo-p1.jpg" alt="Colchones: Pillowtop Cassata y Pillowtop Resortado" loading="eager"></div>
+  <div class="pag"><img src="catalogo/nido-catalogo-p2.jpg" alt="Crea tu colchón, el servicio a la medida" loading="lazy"></div>
+  <div class="pag"><img src="catalogo/nido-catalogo-p3.jpg" alt="Sensaflex D26 y BabyNido" loading="lazy"></div>
+  <div class="pag"><img src="catalogo/nido-catalogo-p4.jpg" alt="Nido Mascotas: camas anti-fluido y jacquard, cinco tallas" loading="lazy"></div>
+  <div class="pag"><img src="catalogo/nido-catalogo-p5.jpg" alt="Nido Truck: colchones para camión" loading="lazy"></div>
+  <div class="pag"><img src="catalogo/nido-catalogo-p6.jpg" alt="Nido Truck: formas y cotas de los cuatro moldes" loading="lazy"></div>
+</main>
+
+<div class="pie">
+  Medidas aproximadas y sujetas a tolerancia de fabricación. Precios sujetos a cambios sin previo aviso.
+  FVR, Fotón y Kenworth se citan como referencia de cabina: <b>Nido no está afiliada a esas marcas</b>
+  ni cuenta con su respaldo.
+</div>
