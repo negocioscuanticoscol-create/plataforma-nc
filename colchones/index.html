@@ -247,7 +247,7 @@ const App={
       `<button class="${this.view===k?'on':''}" onclick="App.ir('${k}')">${t}</button>`).join('');
     const nv=$('navventas');
     if(nv) nv.innerHTML=this.VENTAS.map(([k,t])=>
-      `<button onclick="location.href='../superior/index.html'">${t}</button>`).join(''); },
+      `<button onclick="location.href='../nido/index.html'">${t}</button>`).join(''); },
   ir(v){ this.view=v; if(location.hash!=='#'+v) history.replaceState(null,'','#'+v);
     this.pintaNav(); this.render(); scrollTo({top:0,behavior:'smooth'}); },
 
