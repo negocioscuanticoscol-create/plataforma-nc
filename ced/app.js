@@ -33,9 +33,29 @@ const CALIF = [
   {k:'no_tocar',       t:'🚫 NO TOCAR',                        bool:{no_contactar:true}},
 ];
 
+/* Cómo se mueve la mercancía. Solo 'envio' cobra: los otros tres no suman al
+   valor a consignar — al cobro lo paga el cliente al recibir, el propio y el
+   de planta no se le facturan. */
+const TRANSPORTES = [
+  {k:'al_cobro',      t:'Al cobro (paga el cliente al recibir)', cobra:false},
+  {k:'propio',        t:'Transporte propio',                     cobra:false},
+  {k:'transp_planta', t:'Transportadora de planta',              cobra:false},
+  {k:'envio',         t:'Envío (se cobra)',                      cobra:true},
+];
+const transpDe = k => TRANSPORTES.find(x=>x.k===k) || TRANSPORTES[0];
+
 const App = {
   sb:null, user:null, perfil:null, view:'dashboard', signupMode:false,
-  CLASES, CALIF,
+  CLASES, CALIF, TRANSPORTES,
+
+  /* El valor solo se pide cuando el envío se cobra */
+  cotTransporte(){
+    const s=$('co_transporte'), w=$('co_transp_wrap'); if(!s||!w) return;
+    const cobra = transpDe(s.value).cobra;
+    w.style.display = cobra ? '' : 'none';
+    if(!cobra && $('co_transp_valor')) $('co_transp_valor').value='';
+    if(this.calcCot) this.calcCot();
+  },
 
   /* De qué calificación viene un cliente ya guardado. Si todavía no tiene la
      columna nueva, se deduce de las casillas viejas. */
@@ -2556,6 +2576,12 @@ const App = {
   },
   _proformaFlete(c){
     const pares=+c.pares||0;
+    /* Si la cotización trae transporte escogido a mano, ese manda sobre
+       cualquier regla automática: fue una decisión de quien cotizó. */
+    if(c.transporte){
+      const t=transpDe(c.transporte), v=+c.flete||0;
+      return t.cobra ? {lbl:'Envío · '+money(v), val:v} : {lbl:t.t, val:0};
+    }
     if(c.es_muestra && (c.muestra_tipo==='pie'||c.muestra_tipo==='parsv')) return {lbl:'Envío gratis',val:0};
     if(c.es_muestra && c.muestra_tipo==='par'){ const v=(c.flete==null||c.flete==='')?Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000):(+c.flete||0); return {lbl:v?money(v):'Sin transporte',val:v}; }
     const cajas=(+c.cajas)||(pares/C.PARES_CAJA);
@@ -2578,9 +2604,19 @@ const App = {
     const tallasRows = tallas.length ? tallas.map(t=>`<tr><td>Talla ${t}</td><td style="text-align:right">${curva[t]} par(es)</td></tr>`).join('') : '';
     const fecha=new Date(c.creado_en||Date.now()).toLocaleDateString('es-CO');
     const dir=[cl.direccion,cl.barrio,cl.ciudad,cl.depto].filter(Boolean).join(', ');
-    const txt=[`*PROFORMA ${c.numero||''}* - INDUSTRIAS FEROZ SAS`,`Cliente: ${cl.nombre||''}${cl.nit?' NIT '+cl.nit:''}`,`${concepto} - ${pares} par(es)`];
+    /* Quién factura (la foto guardada) y desde qué sede se atendió. Son cosas
+       distintas: la factura la puede emitir Feroz o Botas Agro, pero quien
+       atiende es el CED, y el cliente tiene que ver a quién llamarle. */
+    const emisor = c.factura_snap || {nombre:'INDUSTRIAS FEROZ SAS', nit:'902.072.014-3'};
+    const sede = c.ced_snap || {nombre:c.ced_comercial || c.ced || ''};
+    const sedeLinea = [sede.direccion, sede.ciudad, sede.telefono?'Tel '+sede.telefono:''].filter(Boolean).join(' · ');
+    const cuenta = emisor.banco
+      ? `${emisor.banco} · ${emisor.tipo_cuenta||'Ahorros'} ${emisor.cuenta||''} · ${emisor.titular||emisor.nombre}`
+      : C.CUENTA;
+    const txt=[`*PROFORMA ${c.numero||''}* - ${emisor.nombre||'INDUSTRIAS FEROZ SAS'}`,`Cliente: ${cl.nombre||''}${cl.nit?' NIT '+cl.nit:''}`,`${concepto} - ${pares} par(es)`];
     if(sub) txt.push(`Subtotal: ${money(sub)}`); if(iva) txt.push(`IVA: ${money(iva)}`);
-    txt.push(`Transporte: ${fl.lbl}`,`TOTAL: ${money(tot)}`,'',`Para confirmar consigna en:`,C.CUENTA);
+    txt.push(`Transporte: ${fl.lbl}`,`TOTAL: ${money(tot)}`,'',`Para confirmar consigna en:`,cuenta);
+    if(sedeLinea) txt.push('', `Te atiende ${sede.nombre||''}: ${sedeLinea}`);
     const wa=(cl.tel?('https://wa.me/57'+String(cl.tel).replace(/\D/g,'')):'https://wa.me/')+'?text='+encodeURIComponent(txt.join('\n'));
     return `<!doctype html><html><head><meta charset="utf-8"><title>Proforma ${esc(c.numero||'')}</title>
     <style>*{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}body{margin:0;padding:24px;color:#1a1a1a;background:#f3f4f6}
@@ -2594,7 +2630,9 @@ const App = {
     .acts{padding:0 26px 24px;display:flex;gap:10px}.acts a,.acts button{flex:1;text-align:center;padding:12px;border-radius:8px;border:none;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
     .b1{background:#111;color:#fff}.b2{background:#25D366;color:#fff}@media print{body{background:#fff;padding:0}.acts{display:none}.pf{box-shadow:none}}</style></head><body>
       <div class="pf">
-        <div class="hd"><div><h1>FEROZ</h1><div class="sub">INDUSTRIAS FEROZ SAS · NIT 902.072.014</div></div>
+        <div class="hd"><div><h1>${esc(sede.nombre||'FEROZ')}</h1>
+            <div class="sub">${esc(emisor.nombre||'INDUSTRIAS FEROZ SAS')}${emisor.nit?' · NIT '+esc(emisor.nit):''}</div>
+            ${sedeLinea?`<div class="sub">${esc(sedeLinea)}</div>`:''}</div>
           <div style="text-align:right"><div style="font-size:18px;font-weight:800">PROFORMA</div><div class="sub">${esc(c.numero||'')}</div><div class="sub">${fecha}</div></div></div>
         <div class="pf-body">
           <div class="box"><b>Cliente:</b> ${esc(cl.nombre||'—')}${cl.nit?` · NIT/CC ${esc(cl.nit)}`:''}${cl.tel?`<br><b>Tel:</b> ${esc(cl.tel)}`:''}${dir?`<br><b>Entrega:</b> ${esc(dir)}`:''}</div>
@@ -2606,7 +2644,8 @@ const App = {
             <tr><td>IVA (19%)</td><td style="text-align:right">${money(iva)}</td></tr>
             <tr><td>🚚 Transporte</td><td style="text-align:right">${fl.val?money(fl.val):esc(fl.lbl)}</td></tr>
             <tr><td class="big">TOTAL</td><td style="text-align:right" class="big">${money(tot)}</td></tr></table></div>
-          <div class="cuenta"><b>💳 Para confirmar tu pedido, consigna en:</b><br><span style="font-family:'IBM Plex Mono',Consolas,'Courier New',monospace;letter-spacing:.5px;font-weight:600">${esc(C.CUENTA)}</span><br><span style="color:#16a34a">Envía el comprobante por WhatsApp y lo despachamos.</span></div>
+          <div class="cuenta"><b>💳 Para confirmar tu pedido, consigna en:</b><br><span style="font-family:'IBM Plex Mono',Consolas,'Courier New',monospace;letter-spacing:.5px;font-weight:600">${esc(cuenta)}</span><br><span style="color:#16a34a">Envía el comprobante por WhatsApp y lo despachamos.</span>
+            ${sedeLinea?`<div style="margin-top:9px;padding-top:9px;border-top:1px dashed #86efac;color:#166534;font-size:12.5px"><b>Te atiende ${esc(sede.nombre||'')}</b> · ${esc(sedeLinea)}</div>`:''}</div>
         </div>
         <div class="acts"><button class="b1" onclick="window.print()">🖨️ Imprimir / PDF</button><a class="b2" href="${wa}" target="_blank">📱 Enviar por WhatsApp</a></div>
       </div>
@@ -2675,6 +2714,19 @@ const App = {
         <div class="hint" style="margin-top:6px">Define desde el principio quién emite la factura y a qué cuenta
           consigna el cliente. Se decide acá para no tener que rehacer el documento después.</div>
         <div id="co_factura_datos" style="margin-top:9px"></div>
+      </div>
+
+      <div class="card" style="border-left:4px solid var(--naranja)">
+        <label style="margin:0"><b>🚚 Transporte *</b></label>
+        <select class="field" id="co_transporte" onchange="App.cotTransporte()" style="margin-top:6px">
+          ${TRANSPORTES.map(t=>`<option value="${t.k}">${t.t}</option>`).join('')}
+        </select>
+        <div id="co_transp_wrap" style="display:none;margin-top:8px">
+          <label style="margin:0">Valor del envío</label>
+          <input class="field" id="co_transp_valor" inputmode="numeric" placeholder="Ej: 25000"
+                 oninput="App.calcCot&&App.calcCot()">
+          <div class="hint">Sale en la proforma y se suma al valor que el cliente consigna.</div>
+        </div>
       </div>
 
       <div class="card" id="co_curva_card">
@@ -2838,7 +2890,14 @@ const App = {
     const fac=(this._facts||[]).find(x=>x.id===fid)||null;
     if(!cu.libre && cu.faltan!==0 && !confirm(`Falta(n) ${cu.faltan} par(es) para completar la última caja. ¿Guardar igual?`)) return;
     const conIva=(($('co_iva')||{checked:true}).checked);
-    const subtotal=cu.pares*C.PRECIO_PAR, iva=conIva?Math.round(subtotal*C.IVA):0, total=subtotal+iva;
+    const subtotal=cu.pares*C.PRECIO_PAR, iva=conIva?Math.round(subtotal*C.IVA):0;
+    /* El envío entra en el total: es plata que el cliente consigna. Los otros
+       tres tipos de transporte no se le cobran, así que no suman. */
+    const tKey=(($('co_transporte')||{}).value)||'al_cobro';
+    const envio = transpDe(tKey).cobra
+      ? (+String((($('co_transp_valor')||{}).value)||'').replace(/\D/g,'')||0) : 0;
+    if(transpDe(tKey).cobra && !envio){ alert('Escogiste Envío, así que falta el VALOR del envío.'); if($('co_transp_valor')) $('co_transp_valor').focus(); return; }
+    const total=subtotal+iva+envio;
     // comisión por par desde la TABLA feroz_comisiones (ref+lista). Default global: NC $1.900 · si recomendado NC $900 + GPJR $1.000
     let rate=null;
     try{ const {data}=await this.sb.from('feroz_comisiones').select('*').eq('referencia',(cl.referencia||'701')).eq('lista',(cl.lista_precio||'Distribuidor')).maybeSingle(); rate=data; }catch(e){}
@@ -2855,7 +2914,16 @@ const App = {
       factura_snap: fac?{nombre:fac.nombre,nit:fac.nit,direccion:fac.direccion,ciudad:fac.ciudad,
         telefono:fac.telefono,email:fac.email,banco:fac.banco,tipo_cuenta:fac.tipo_cuenta,
         cuenta:fac.cuenta,titular:fac.titular}:null,
-      ced_comercial:(this._sedeCot&&(this._sedeCot.nombre_comercial||this._sedeCot.nombre))||null};
+      ced_comercial:(this._sedeCot&&(this._sedeCot.nombre_comercial||this._sedeCot.nombre))||null,
+      // transporte: solo 'envio' cobra, y ese valor se suma a lo que consigna
+      transporte:(($('co_transporte')||{}).value)||'al_cobro',
+      flete: transpDe((($('co_transporte')||{}).value)||'al_cobro').cobra
+             ? (+String((($('co_transp_valor')||{}).value)||'').replace(/\D/g,'')||0) : 0,
+      // FOTO de la sede, igual que la del facturador: la proforma debe seguir
+      // mostrando la dirección y el teléfono que el cliente vio ese día.
+      ced_snap: this._sedeCot ? {nombre:this._sedeCot.nombre_comercial||this._sedeCot.nombre,
+        ciudad:this._sedeCot.ciudad, direccion:this._sedeCot.direccion,
+        telefono:this._sedeCot.telefono, nit:this._sedeCot.nit} : null};
     const error=await this._saveCot(reg);
     if(error){ alert('Error: '+error.message); return; }
     await this._avanzarEmbudo(cid,'interesado');   // aparece en CRM → Prospectos con la gestión
