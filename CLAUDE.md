@@ -83,4 +83,3 @@ tocar TODOS los archivos.
 - Entregar archivos completos de reemplazo, no parches parciales.
 - Español informal, directo.
 - No crear archivos de notas, README ni TODOs por iniciativa propia.
-- No tocar nada fuera de C:\NC\plataforma-nc

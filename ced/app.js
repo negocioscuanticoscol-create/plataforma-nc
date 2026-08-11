@@ -2423,14 +2423,15 @@ const App = {
     const tel = limpia($('cl_tel') && $('cl_tel').value);
     if(nit.length < 6 && tel.length < 7){ caja.innerHTML=''; return; }
 
-    const o = [];
-    if(nit.length >= 6) o.push('nit.ilike.*'+nit+'*');
-    if(tel.length >= 7) o.push('tel.ilike.*'+tel+'*', 'cel2.ilike.*'+tel+'*', 'cel_recibe.ilike.*'+tel+'*');
+    /* Va por una función de la base y no por la tabla, a propósito: el RLS
+       aísla cada sede, así que consultando `clientes` directo nunca veríamos
+       un cliente de otra sede — que es justo lo que hay que detectar. La
+       función mira toda la red pero solo devuelve lo mínimo para decidir. */
     let hallados = [];
     try{
-      const { data } = await this.sb.from('clientes')
-        .select('id,nombre,nombre_comercial,nit,tel,ciudad,ced,calificacion,recomendado,especial,no_contactar')
-        .or(o.join(',')).limit(6);
+      const { data } = await this.sb.rpc('cliente_en_la_red', {
+        doc: nit.length >= 6 ? nit : null,
+        cel: tel.length >= 7 ? tel : null });
       hallados = data || [];
     }catch(err){ caja.innerHTML=''; return; }
     if(this._editClienteId) hallados = hallados.filter(x=>x.id!==this._editClienteId);
