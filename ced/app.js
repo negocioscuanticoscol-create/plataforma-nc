@@ -10,8 +10,52 @@ const ESTADOS = {
 };
 const ROL_NOMBRE = {admin:'Admin', gerente:'Gerente', director:'Director General', vendedor:'Vendedor', facturacion:'Facturación', bodega:'Bodega', planta:'Jefe de Planta'};
 
+/* Clase de cliente. 'redes' entró después: son los que llegan por Instagram,
+   Facebook o WhatsApp, que no son ni empresa ni distribuidor. */
+const CLASES = [
+  {k:'empresa',      t:'Empresa'},
+  {k:'distribuidor', t:'Distribuidor'},
+  {k:'redes',        t:'Redes'},
+];
+
+/* Calificación del lead. Antes vivía en tres casillas de sí/no
+   (recomendado, especial, no_contactar) y por eso "Grupo Pérez" y "No tocar"
+   eran lo mismo. Ahora es una sola columna, `calificacion`, y las casillas se
+   siguen llenando para no romper el cálculo de comisiones, que lee
+   `recomendado`. */
+const CALIF = [
+  {k:'ninguno',        t:'— Ninguno',                          bool:{}},
+  {k:'cliente_nc',     t:'🏠 Cliente NC',                      bool:{}},
+  {k:'potencial',      t:'👤 Yo lo veo potencial',             bool:{}},
+  {k:'referido_perez', t:'🤝 Referido por Pérez Group',        bool:{}},
+  {k:'gpjr',           t:'⭐ GPJR (paga comisión)',            bool:{recomendado:true}},
+  {k:'especial',       t:'⭐⭐ Especial (referido)',           bool:{especial:true}},
+  {k:'no_tocar',       t:'🚫 NO TOCAR',                        bool:{no_contactar:true}},
+];
+
 const App = {
   sb:null, user:null, perfil:null, view:'dashboard', signupMode:false,
+  CLASES, CALIF,
+
+  /* De qué calificación viene un cliente ya guardado. Si todavía no tiene la
+     columna nueva, se deduce de las casillas viejas. */
+  _califDe(e){
+    if(!e) return 'ninguno';
+    if(e.calificacion) return e.calificacion;
+    if(e.no_contactar) return 'no_tocar';
+    if(e.especial)     return 'especial';
+    if(e.recomendado)  return 'gpjr';
+    return 'potencial';
+  },
+  _califTexto(k){ const c=CALIF.find(x=>x.k===k); return c?c.t:'—'; },
+  /* Lo que se manda a guardar: la columna nueva y, además, las tres casillas
+     viejas. Hay que seguir llenándolas porque las comisiones leen `recomendado`
+     y varias pantallas leen `no_contactar`. */
+  _califGuardar(k){
+    const c = CALIF.find(x=>x.k===k) || CALIF[0];
+    return { calificacion:c.k, recomendado:!!c.bool.recomendado,
+             especial:!!c.bool.especial, no_contactar:!!c.bool.no_contactar };
+  },
 
   async init(){
     this.sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_KEY);
@@ -2320,14 +2364,15 @@ const App = {
       <label>Empresa · razón social *</label><input class="field" id="cl_nombre" value="${v(e.nombre)}" placeholder="Como aparece en el RUT">
       <label>Nombre comercial</label><input class="field" id="cl_comercial" value="${v(e.nombre_comercial)}" placeholder="Con el que se conoce el negocio">
       <div class="hint">La razón social es la que va en la factura. El nombre comercial es con el que la gente lo llama — si son iguales, deja el segundo vacío.</div>
-      <div class="row2"><div><label>NIT / Cédula <span style="color:#9aa3b0;font-weight:400">(opcional · después)</span></label><input class="field" id="cl_nit" value="${v(e.nit)}"></div>
-        <div><label>Celular 1 *</label><input class="field" id="cl_tel" inputmode="tel" value="${v(e.tel)}"></div></div>
+      <div class="row2"><div><label>NIT / Cédula <span style="color:#9aa3b0;font-weight:400">(opcional · después)</span></label><input class="field" id="cl_nit" value="${v(e.nit)}" oninput="App.validarEnLaRed()"></div>
+        <div><label>Celular 1 *</label><input class="field" id="cl_tel" inputmode="tel" value="${v(e.tel)}" oninput="App.validarEnLaRed()"></div></div>
+      <div id="cl_valida"></div>
       <div class="row2">
         <div><label>Tipo de pago</label><select class="field" id="cl_tipo"><option value="contado" ${e.tipo_pago!=='credito'?'selected':''}>Contado</option><option value="credito" ${e.tipo_pago==='credito'?'selected':''}>Crédito</option></select></div>
-        <div><label>Clase</label><select class="field" id="cl_clase"><option value="empresa" ${e.clase!=='distribuidor'?'selected':''}>Empresa</option><option value="distribuidor" ${e.clase==='distribuidor'?'selected':''}>Distribuidor</option></select></div>
+        <div><label>Clase</label><select class="field" id="cl_clase">${this.CLASES.map(c=>`<option value="${c.k}" ${e.clase===c.k?'selected':''}>${c.t}</option>`).join('')}</select></div>
       </div>
       <div class="row2">
-        <div><label>🎯 Calificación de lead (referido)</label><select class="field" id="cl_recom"><option value="no" ${(!e.recomendado&&!e.especial&&!e.no_contactar)?'selected':''}>👤 NC — yo le veo potencial</option><option value="si" ${(e.recomendado&&!e.especial&&!e.no_contactar)?'selected':''}>⭐ GPJR — me lo consiguió GPJR (paga comisión)</option><option value="especial" ${(e.especial&&!e.no_contactar)?'selected':''}>⭐⭐ Especial — me lo recomendaron (referido)</option><option value="grupo_perez" ${e.no_contactar?'selected':''}>🚫 Grupo Pérez — NO tocar</option></select></div>
+        <div><label>🎯 Calificación de lead</label><select class="field" id="cl_recom">${this.CALIF.map(c=>`<option value="${c.k}" ${this._califDe(e)===c.k?'selected':''}>${c.t}</option>`).join('')}</select></div>
         <div></div>
       </div>
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">📦 ENVÍO Y COBERTURA</div>
@@ -2361,6 +2406,58 @@ const App = {
     `);
     this._onSaveCliente = onSave;
   },
+  /* ---------- VALIDADOR CRUZADO ENTRE SEDES ----------
+     Busca el documento o el celular en TODA la red, no solo en la sede de
+     quien está escribiendo. Sirve para dos cosas: que dos sedes no se pisen
+     el mismo cliente, y que el 🚫 NO TOCAR se vea en todas partes.
+     Se dispara mientras se escribe, con un respiro para no consultar en cada
+     tecla. */
+  async validarEnLaRed(){
+    clearTimeout(this._tVal);
+    this._tVal = setTimeout(()=>this._validarYa(), 450);
+  },
+  async _validarYa(){
+    const caja = $('cl_valida'); if(!caja) return;
+    const limpia = s => String(s||'').replace(/\D/g,'');
+    const nit = limpia($('cl_nit') && $('cl_nit').value);
+    const tel = limpia($('cl_tel') && $('cl_tel').value);
+    if(nit.length < 6 && tel.length < 7){ caja.innerHTML=''; return; }
+
+    const o = [];
+    if(nit.length >= 6) o.push('nit.ilike.*'+nit+'*');
+    if(tel.length >= 7) o.push('tel.ilike.*'+tel+'*', 'cel2.ilike.*'+tel+'*', 'cel_recibe.ilike.*'+tel+'*');
+    let hallados = [];
+    try{
+      const { data } = await this.sb.from('clientes')
+        .select('id,nombre,nombre_comercial,nit,tel,ciudad,ced,calificacion,recomendado,especial,no_contactar')
+        .or(o.join(',')).limit(6);
+      hallados = data || [];
+    }catch(err){ caja.innerHTML=''; return; }
+    if(this._editClienteId) hallados = hallados.filter(x=>x.id!==this._editClienteId);
+    if(!hallados.length){ caja.innerHTML=''; return; }
+
+    const miSede = this.miSede();
+    caja.innerHTML = hallados.map(x=>{
+      const k = this._califDe(x);
+      const otra = x.ced && miSede && x.ced !== miSede;
+      /* El NO TOCAR manda sobre cualquier otro aviso: va en rojo y grande. */
+      const rojo = k === 'no_tocar';
+      const col = rojo ? {bg:'#fee2e2',bd:'#dc2626',tx:'#7f1d1d'}
+                : otra ? {bg:'#fef3c7',bd:'#d97706',tx:'#78350f'}
+                       : {bg:'#e0f2fe',bd:'#0284c7',tx:'#075985'};
+      const titulo = rojo ? '🚫 NO TOCAR — este cliente está marcado en la red'
+                  : otra  ? '⚠️ Ya existe en otra sede: '+esc(x.ced)
+                          : 'ℹ️ Ya está en tu sede';
+      return `<div style="background:${col.bg};border-left:4px solid ${col.bd};border-radius:0 8px 8px 0;
+        padding:9px 12px;margin:8px 0;color:${col.tx}">
+        <div style="font-weight:800;font-size:${rojo?'14':'12.5'}px;margin-bottom:2px">${titulo}</div>
+        <div style="font-size:13px"><b>${esc(x.nombre_comercial||x.nombre)}</b>
+          ${x.nit?' · NIT '+esc(x.nit):''}${x.tel?' · '+esc(x.tel):''}${x.ciudad?' · '+esc(x.ciudad):''}</div>
+        <div style="font-size:12px;opacity:.85;margin-top:2px">Sede ${esc(x.ced||'—')} · ${esc(this._califTexto(k))}</div>
+      </div>`;
+    }).join('');
+  },
+
   async guardarCliente(){
     const nombre=$('cl_nombre').value.trim(), nit=$('cl_nit').value.trim(), tel=$('cl_tel').value.trim();
     const falta=[]; if(!nombre)falta.push('Nombre / Empresa'); if(!tel)falta.push('Celular 1 (el de arriba)');
@@ -2381,9 +2478,7 @@ const App = {
       notas:($('cl_notas')?$('cl_notas').value.trim():''),
       referencia:($('cl_ref')?$('cl_ref').value.trim():'701'),
       lista_precio:($('cl_lista')?$('cl_lista').value:'Distribuidor'),
-      recomendado:($('cl_recom')?($('cl_recom').value==='si'||$('cl_recom').value==='especial'):false),
-      especial:($('cl_recom')?$('cl_recom').value==='especial':false),
-      no_contactar:($('cl_recom')?$('cl_recom').value==='grupo_perez':false)};
+      ...this._califGuardar($('cl_recom')?$('cl_recom').value:'ninguno')};
     if(this._editClienteId){
       const id=this._editClienteId;
       const { error } = await this.sb.from('clientes').update(base).eq('id', id);
@@ -2520,7 +2615,7 @@ const App = {
   async vCotizacionNueva(editId){
     this.loading();
     this._editCotId = editId||null;
-    const { data:cli=[] } = await this.sb.from('clientes').select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1,nombre_comercial').order('nombre');
+    const { data:cli=[] } = await this.sb.from('clientes').select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,especial,no_contactar,calificacion,contacto1,nombre_comercial').order('nombre');
     // Quien puede facturar y con que nombre sale el CED de cara al cliente
     let facts=[], sede=null;
     try{ const r=await this.sb.from('ced_facturadores').select('*').eq('activo',true).order('tipo'); facts=r.data||[]; }catch(e){}
@@ -2654,7 +2749,7 @@ const App = {
     if(error || !c) return alert('No se pudo abrir la ficha: '+((error&&error.message)||'no encontrada'));
     this.modalCliente(async ()=>{
       const { data } = await this.sb.from('clientes')
-        .select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,contacto1,nombre_comercial')
+        .select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,especial,no_contactar,calificacion,contacto1,nombre_comercial')
         .eq('id',id).single();
       if(!data) return;
       const i=(this._clientes||[]).findIndex(x=>String(x.id)===String(id));
