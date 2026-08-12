@@ -1978,8 +1978,13 @@ const App={
      circulo al llamar y se escribe el resultado, igual que el marcador. */
   async vMkInstitucional(){
     this.loading();
-    const pros = await GETALL('kruh_prospectos?order=categoria,nombre&limit=2000');
+    const [pros, usus] = await Promise.all([
+      GETALL('kruh_prospectos?order=categoria,nombre&limit=2000'),
+      GET('kruh_usuarios?select=nombre&activo=is.true&order=nombre&limit=50')]);
     this._pros = pros || [];
+    /* Los vendedores salen de Usuarios, no escritos en el codigo: asi el
+       cliente agrega o quita gente sin que haya que tocar nada. */
+    this._vends = (usus || []).map(u => u.nombre).filter(Boolean);
     this._mkInstPaint();
   },
   _mkInstPaint(){
@@ -2039,9 +2044,49 @@ const App={
               <div style="font-size:9.5px;color:var(--mut);margin-top:3px">${x.llamado ? 'llamado' : 'llamar'}</div>
             </div>
           </div>
-          ${x.fecha_contacto ? `<div class="mt" style="color:var(--ok)">✓ contactado ${String(x.fecha_contacto).slice(0, 10)}</div>` : ''}
+          ${this._proVend(x)}
         </div>`;
       }).join('')}`);
+  },
+  /* Quien hizo el trabajo y cuando. Antes solo quedaba el circulito de
+     "llamado" y la fecha: no habia forma de saber quien lo hizo, que es lo
+     primero que se pregunta cuando hay que retomar un prospecto. */
+  _fechaCorta(f) {
+    if (!f) return '';
+    const d = new Date(f); if (isNaN(d)) return String(f).slice(0, 10);
+    return d.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+  },
+  _proVend(x) {
+    const V = this._vends || [];
+    const hecho = x.vendedor || '';
+    const fecha = x.fecha_contacto ? this._fechaCorta(x.fecha_contacto) : '';
+    if (hecho) {
+      return `<div class="mt" style="color:var(--ok);font-weight:700;margin-top:6px">
+        ✓ Lo trabajó ${esc(hecho)}${fecha ? ' · ' + esc(fecha) : ''}
+        <a onclick="App.proVendedor('${x.id}','')" style="color:var(--mut);cursor:pointer;font-weight:400;margin-left:6px">quitar</a></div>`;
+    }
+    if (!V.length) {
+      return `${fecha ? `<div class="mt" style="color:var(--ok)">✓ contactado ${esc(fecha)}</div>` : ''}
+        <div class="hint" style="margin-top:5px">Agrega los vendedores en 👤 <b>Usuarios</b> para poder marcar quién lo trabajó.</div>`;
+    }
+    return `<div class="row" style="gap:5px;flex-wrap:wrap;align-items:center;margin-top:7px">
+      <span style="font-size:10.5px;color:var(--mut);font-weight:700">¿QUIÉN LO TRABAJÓ?</span>
+      ${V.map(n => `<button class="btn gh sm" style="padding:4px 10px;font-size:11px"
+        onclick="App.proVendedor('${x.id}','${esc(n).replace(/'/g, "&#39;")}')">${esc(n)}</button>`).join('')}
+      ${fecha ? `<span style="font-size:11px;color:var(--ok)">· contactado ${esc(fecha)}</span>` : ''}
+    </div>`;
+  },
+  /* Marcar el vendedor cuenta como haber hecho el trabajo: deja el prospecto
+     como llamado y le pone la fecha si aun no la tenia. */
+  async proVendedor(id, quien) {
+    const x = (this._pros || []).find(p => p.id === id); if (!x) return;
+    const body = { vendedor: quien || null };
+    if (quien) { if (!x.llamado) body.llamado = true;
+                 if (!x.fecha_contacto) body.fecha_contacto = new Date().toISOString(); }
+    Object.assign(x, body);
+    this._mkInstPaint();
+    const r = await PATCH('kruh_prospectos?id=eq.' + id, body);
+    toast(r && r.ok ? (quien ? 'Marcado: ' + quien : 'Sin vendedor') : '⚠️ No se guardó');
   },
   async proLlamado(id) {
     const x = (this._pros || []).find(p => p.id === id); if (!x) return;
