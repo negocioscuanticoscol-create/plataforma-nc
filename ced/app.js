@@ -67,6 +67,15 @@ const App = {
      y el selector de sede ni se pinta. */
   _veRed(){ return !this.cedUser || !!this._esPrincipal; },
 
+  /* La casa matriz, sacada de las sedes ya cargadas. Es el valor por defecto
+     cuando quien escribe no tiene sede propia (las cuentas de correo). Antes
+     esto vivía en una variable que solo llenaba la pantalla de Gastos: si se
+     entraba directo a otra, no había default y quedaba marcada la primera de
+     la lista alfabética — Av 68 —, cargándole cosas a una agencia por error. */
+  _sedePrincipal(){
+    const p=(this._ceds||[]).find(c=>c.principal && c.activo!==false);
+    return (p&&p.nombre) || this._gPrincipal || ''; },
+
   /* El valor solo se pide cuando el envío se cobra */
   cotTransporte(){
     const s=$('co_transporte'), w=$('co_transp_wrap'); if(!s||!w) return;
@@ -4709,7 +4718,7 @@ const App = {
     /* Un gasto nuevo cae en tu sede; si no tienes (cuenta de correo), en la casa
        matriz. Sin esto quedaba en la primera de la lista alfabética — Av 68 —
        y el gasto se cargaba a una agencia por accidente. */
-    const mio=(this.cedUser&&this.cedUser.ced)||this._gPrincipal||'';
+    const mio=(this.cedUser&&this.cedUser.ced)||this._sedePrincipal()||'';
     this.modal(`<h3 style="margin-bottom:10px">${id?'Editar':'Nuevo'} gasto</h3>
       <label>Concepto</label><input id="g_con" value="${esc(g.concepto||'')}" placeholder="Arriendo de agosto, recibo de luz…">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
@@ -4804,7 +4813,7 @@ const App = {
     if(b.pagado && !id) b.fecha_pago=b.fecha;
     /* el ced solo se manda si el usuario puede elegir; si no, lo pone el trigger */
     if($('g_ced')) b.ced=$('g_ced').value;
-    else if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||this._gPrincipal||'Feroz';
+    else if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||this._sedePrincipal()||'Feroz';
     if(!id) b.creado_por=(this.cedUser&&this.cedUser.usuario)||'';
     const q = id ? await this.sb.from('ced_gastos').update(b).eq('id',id)
                  : await this.sb.from('ced_gastos').insert(b);
@@ -4814,7 +4823,7 @@ const App = {
     if(provNuevo){
       const ya=(this._gProvs||[]).some(p=>p.toLowerCase()===provNuevo.toLowerCase());
       if(!ya){ try{ await this.sb.from('ced_proveedores')
-        .insert({nombre:provNuevo, ced:b.ced||(this.cedUser&&this.cedUser.ced)||this._gPrincipal, activo:true}); }catch(e){} }
+        .insert({nombre:provNuevo, ced:b.ced||(this.cedUser&&this.cedUser.ced)||this._sedePrincipal(), activo:true}); }catch(e){} }
     }
     this.cerrarModal(); this.toast(id?'Gasto actualizado ✅':'Gasto registrado ✅');
     this.vGastos(); },
@@ -5712,7 +5721,7 @@ const App = {
   pSede(v){ this._pSede=v||''; this._pPaint(); },
   pModal(id){
     const p=(this._pend||[]).find(x=>String(x.id)===String(id))||{};
-    const mia=(this.cedUser&&this.cedUser.ced)||this._gPrincipal||'';
+    const mia=(this.cedUser&&this.cedUser.ced)||this._sedePrincipal()||'';
     const sedes=(this._ceds||[]).filter(c=>c.activo!==false).map(c=>c.nombre);
     this.modal(`<h3 style="margin-bottom:10px">${id?'Editar':'Nuevo'} pendiente</h3>
       <label>¿Qué hay que hacer?</label>
