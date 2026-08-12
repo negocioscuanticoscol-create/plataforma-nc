@@ -219,7 +219,9 @@ _bqPaint(){
             ${x.estado==='anulado'
               ? `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAnular('${esc(x.id)}',false)">↩︎ Reactivar</button>`
               : `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAbrir('${esc(x.id)}')">✎ Trabajar</button>
-                 ${x.estado!=='creado'?`<button class="btn" style="padding:6px 10px" onclick="App.bqRef('${esc(x.id)}')">＋ Ref.</button>`:''}
+                 ${x.estado==='creado'
+                    ? `<button class="btn" style="padding:6px 10px" title="Editar la referencia y sus costos" onclick="App.bqRef('${esc(x.id)}')">✎ Ref.</button>`
+                    : `<button class="btn" style="padding:6px 10px" onclick="App.bqRef('${esc(x.id)}')">＋ Ref.</button>`}
                  <button class="btn gh" style="padding:6px 9px;color:#b3261e" title="Anular: sale de la lista pero no se borra"
                          onclick="App.bqAnular('${esc(x.id)}',true)">⃠</button>`}
           </div>
@@ -306,42 +308,54 @@ async bqBorrar(id){
 },
 
 /* ---------- crear la referencia con el costo de importación ---------- */
-bqRef(id){
+/* Sirve para crear y para corregir: si la ficha ya tiene referencia, trae sus
+   costos guardados y al guardar los actualiza en vez de crear otra. */
+async bqRef(id){
   const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
-  this._bqRefId=id;
-  modal(`<h3>＋ Crear referencia</h3>
+  this._bqRefId=id; this._bqEdit=null;
+  if(x.referencia_id){
+    const r=await api('ff_referencias?id=eq.'+encodeURIComponent(x.referencia_id)+'&limit=1');
+    this._bqEdit=(r&&r[0])||null;
+  }
+  const e=this._bqEdit||{};
+  const val=k=>(e[k]!=null&&e[k]!=='')?e[k]:'';
+  modal(`<h3>${e.id?'✎ Editar referencia':'＋ Crear referencia'}</h3>
     <div class="mini">${esc(x.nombre)}${x.proveedor?' · '+esc(x.proveedor):''}</div>
     <div class="g2" style="margin-top:8px">
-      <div><label>Código</label><input id="rf_cod" placeholder="FES-001"></div>
+      <div><label>Código</label><input id="rf_cod" value="${esc(val('codigo'))}" placeholder="FES-001"></div>
       <div><label>Categoría</label><input id="rf_cat" value="${esc(x.categoria||'')}" placeholder="Bombas, filtros, acoples…"></div>
     </div>
     <label>Nombre</label><input id="rf_nom" value="${esc(x.nombre)}">
     <div class="mini" style="margin-top:11px;font-weight:700">🇨🇳 COSTO DE IMPORTACIÓN</div>
     <div class="g2">
-      <div><label>FOB China (USD)</label><input id="rf_usd" inputmode="decimal" placeholder="0" oninput="App.bqCalc()"></div>
-      <div><label>TRM (pesos por dólar)</label><input id="rf_trm" inputmode="decimal" placeholder="4000" oninput="App.bqCalc()"></div>
+      <div><label>FOB China (USD)</label><input id="rf_usd" value="${val('costo_usd')}" inputmode="decimal" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>TRM (pesos por dólar)</label><input id="rf_trm" value="${val('trm')}" inputmode="decimal" placeholder="4000" oninput="App.bqCalc()"></div>
     </div>
     <div class="g2">
-      <div><label>Comisión comprador China %</label><input id="rf_com" inputmode="decimal" placeholder="5" oninput="App.bqCalc()"></div>
-      <div><label>Flete internacional</label><input id="rf_fle" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>Comisión comprador China %</label><input id="rf_com" value="${val('comision_pct')}" inputmode="decimal" placeholder="5" oninput="App.bqCalc()"></div>
+      <div><label>Flete internacional</label><input id="rf_fle" value="${val('flete_int')}" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
     </div>
     <div class="g2">
-      <div><label>Seguro</label><input id="rf_seg" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>Seguro</label><input id="rf_seg" value="${val('seguro')}" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
       <div></div>
     </div>
     <div class="g2">
-      <div><label>Arancel %</label><input id="rf_ara" inputmode="decimal" placeholder="0" oninput="App.bqCalc()"></div>
-      <div><label>IVA importación %</label><input id="rf_iva" inputmode="decimal" value="19" oninput="App.bqCalc()"></div>
+      <div><label>Arancel %</label><input id="rf_ara" value="${val('arancel_pct')}" inputmode="decimal" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>IVA importación %</label><input id="rf_iva" value="${e.iva_pct!=null?e.iva_pct:19}" inputmode="decimal" oninput="App.bqCalc()"></div>
     </div>
     <div class="g2">
-      <div><label>Nacionalización (SIA, puerto)</label><input id="rf_nac" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
-      <div><label>Transporte interno</label><input id="rf_tra" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>Nacionalización (SIA, puerto)</label><input id="rf_nac" value="${val('nacionalizac')}" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>Transporte interno</label><input id="rf_tra" value="${val('transp_int')}" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
     </div>
     <div id="rf_desglose" class="card" style="margin-top:10px;padding:11px;background:#f6f7f9"></div>
-    <label>Margen %</label><input id="rf_mar" inputmode="decimal" placeholder="35" oninput="App.bqCalc()">
+    <div class="g2">
+      <div><label>Margen %</label><input id="rf_mar" value="${val('margen_pct')}" inputmode="decimal" placeholder="35" oninput="App.bqCalc('margen')"></div>
+      <div><label>Precio de venta</label><input id="rf_pv" value="${val('precio_venta')}" inputmode="numeric" placeholder="0" oninput="App.bqCalc('precio')"></div>
+    </div>
+    <div class="mini">Escribe cualquiera de los dos: si pones el margen sale el precio, y si pones el precio sale el margen.</div>
     <div id="rf_venta" style="font-weight:800;font-size:17px;margin-top:8px"></div>
     <div class="row" style="gap:8px;margin-top:12px">
-      <button class="btn" style="flex:1" onclick="App.bqRefOk()">Crear referencia</button>
+      <button class="btn" style="flex:1" onclick="App.bqRefOk()">${e.id?'Guardar cambios':'Crear referencia'}</button>
       <button class="btn gh" onclick="cerrar()">Cancelar</button>
     </div>`);
   this.bqCalc();
@@ -350,7 +364,7 @@ _n(id){ return +String(($(id)||{}).value||'').replace(/[^0-9.]/g,'')||0; },
 /* El IVA de importación NO es costo: se descuenta después. Por eso el precio de
    venta sale del costo SIN IVA; el IVA solo se muestra para saber cuánta plata
    hay que poner en la nacionalización. */
-bqCalc(){
+bqCalc(desde){
   const usd=this._n('rf_usd'), trm=this._n('rf_trm'), fle=this._n('rf_fle'), seg=this._n('rf_seg');
   const ara=this._n('rf_ara'), ivp=this._n('rf_iva'), nac=this._n('rf_nac'), tra=this._n('rf_tra');
   const cop=this._n('rf_com');
@@ -363,9 +377,15 @@ bqCalc(){
   const arancel=cif*ara/100;
   const ivaImp=(cif+arancel)*ivp/100;
   const costo=cif+comis+arancel+nac+tra;       // el IVA se recupera, no suma
-  const mar=this._n('rf_mar');
-  const venta=Math.round(costo*(1+mar/100));
-  this._bqCosto=Math.round(costo); this._bqVenta=venta; this._bqIvaImp=Math.round(ivaImp);
+  /* Los dos sentidos: si escribio el margen sale el precio, y si escribio el
+     precio sale el margen. Casi siempre se sabe a cuanto se puede vender y lo
+     que hay que averiguar es cuanto deja, no al reves. */
+  let mar=this._n('rf_mar'), venta=this._n('rf_pv');
+  if(desde==='precio' && costo>0){ mar=venta>0?((venta/costo)-1)*100:0;
+    const e=$('rf_mar'); if(e) e.value=mar?mar.toFixed(1):''; }
+  else { venta=Math.round(costo*(1+mar/100));
+    const e=$('rf_pv'); if(e) e.value=venta||''; }
+  this._bqCosto=Math.round(costo); this._bqVenta=Math.round(venta); this._bqMargen=mar; this._bqIvaImp=Math.round(ivaImp);
   const fila=(t,v,x)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;${x||''}"><span>${t}</span><b>${money(v)}</b></div>`;
   const d=$('rf_desglose'); if(d) d.innerHTML =
     fila('FOB en pesos ('+(usd||0)+' USD × '+(trm||0)+')',fob)
@@ -376,7 +396,9 @@ bqCalc(){
     + fila('+ Nacionalización',nac) + fila('+ Transporte interno',tra)
     + fila('= COSTO PUESTO EN BODEGA',costo,'border-top:1px solid #94a3b8;padding-top:4px;margin-top:4px;font-size:14px')
     + `<div class="mini" style="margin-top:6px">IVA de importación ${money(ivaImp)} — se paga al nacionalizar y se descuenta después, por eso no entra al costo.</div>`;
-  const e=$('rf_venta'); if(e) e.innerHTML='Precio de venta: <span style="color:#0f6b4f">'+money(venta)+'</span>';
+  const g=costo>0?Math.round(venta-costo):0;
+  const e=$('rf_venta'); if(e) e.innerHTML='Deja <span style="color:#0f6b4f">'+money(g)+'</span> por unidad'
+    + (costo>0&&venta>0?' <span style="font-size:13px;color:#6b7280">· margen '+mar.toFixed(1)+'% sobre el costo</span>':'');
 },
 async bqRefOk(){
   const id=this._bqRefId; const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
@@ -393,7 +415,12 @@ async bqRefOk(){
     seguro:this._n('rf_seg'), arancel_pct:this._n('rf_ara'), iva_pct:this._n('rf_iva'),
     nacionalizac:this._n('rf_nac'), transp_int:this._n('rf_tra'), comision_pct:this._n('rf_com'),
     costo_bodega:this._bqCosto, ultimo_costo:this._bqCosto, costo_promedio:this._bqCosto,
-    margen_pct:this._n('rf_mar'), precio_venta:this._bqVenta, existencias:0};
+    margen_pct:+(this._bqMargen||0).toFixed(2), precio_venta:this._bqVenta, existencias:0};
+  if(this._bqEdit&&this._bqEdit.id){
+    const u=await patch('ff_referencias?id=eq.'+encodeURIComponent(this._bqEdit.id),b);
+    if(u===null){ toast('⚠️ No se pudo guardar'); return; }
+    cerrar(); toast('Referencia '+cod+' actualizada · venta '+money(this._bqVenta)); this._bqPaint(); return;
+  }
   const r=await post('ff_referencias',b);
   if(!r||!r.length){ toast('⚠️ No se pudo crear la referencia'); return; }
   await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),
