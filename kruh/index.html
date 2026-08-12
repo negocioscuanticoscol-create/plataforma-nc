@@ -1982,9 +1982,13 @@ const App={
       GETALL('kruh_prospectos?order=categoria,nombre&limit=2000'),
       GET('kruh_usuarios?select=nombre&activo=is.true&order=nombre&limit=50')]);
     this._pros = pros || [];
-    /* Los vendedores salen de Usuarios, no escritos en el codigo: asi el
-       cliente agrega o quita gente sin que haya que tocar nada. */
-    this._vends = (usus || []).map(u => u.nombre).filter(Boolean);
+    /* Quien prospecta para Kruh es el equipo de Negocios Cuanticos, no el
+       personal de la panaderia. Por eso el equipo va primero y fijo; los
+       usuarios de Kruh se suman despues por si alguno tambien llama. */
+    const EQUIPO = ['Sandra', 'José', 'Boso'];
+    const extra = (usus || []).map(u => u.nombre).filter(Boolean)
+                    .filter(n => !EQUIPO.some(e => e.toLowerCase() === String(n).toLowerCase()));
+    this._vends = [...EQUIPO, ...extra];
     this._mkInstPaint();
   },
   _mkInstPaint(){
