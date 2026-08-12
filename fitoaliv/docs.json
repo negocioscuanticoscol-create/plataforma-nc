@@ -1,0 +1,20 @@
+[
+ {
+  "f": "fitoaliv-presentacion-comprador.dat",
+  "t": "Presentación al comprador",
+  "d": "El documento comercial que se le entrega a la cadena.",
+  "kb": 35
+ },
+ {
+  "f": "fitoaliv-modelo-venta.dat",
+  "t": "Hipótesis de venta",
+  "d": "El modelo y las preguntas que hay que hacerle a la cadena.",
+  "kb": 29
+ },
+ {
+  "f": "fitoaliv-protocolo-seleccion-puntos.dat",
+  "t": "Protocolo de selección de puntos",
+  "d": "Cómo se corre la sesión de datos y se escogen los puntos.",
+  "kb": 29
+ }
+]

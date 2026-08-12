@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fitoaliv · Documentos</title>
+<meta name="robots" content="noindex,nofollow">
+<style>
+  :root{
+    --fondo:#f3f5f2; --card:#fff; --tinta:#14201a; --tinta2:#46574f; --mut:#7d8f87;
+    --linea:#dde5e0; --verde:#1f6b4a; --verdebg:#e6f1eb; --rojo:#a5352c;
+    --sh:0 1px 2px rgba(20,32,26,.05),0 14px 34px -22px rgba(20,32,26,.4);
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --fondo:#0d1310; --card:#161e1a; --tinta:#e6ede9; --tinta2:#a4b5ac; --mut:#748a80;
+      --linea:#243029; --verde:#5cbf95; --verdebg:#10241b; --rojo:#e08376;
+      --sh:0 1px 2px rgba(0,0,0,.4),0 14px 34px -22px rgba(0,0,0,.85);
+    }
+  }
+  :root[data-theme="dark"]{
+    --fondo:#0d1310; --card:#161e1a; --tinta:#e6ede9; --tinta2:#a4b5ac; --mut:#748a80;
+    --linea:#243029; --verde:#5cbf95; --verdebg:#10241b; --rojo:#e08376;
+    --sh:0 1px 2px rgba(0,0,0,.4),0 14px 34px -22px rgba(0,0,0,.85);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--fondo);color:var(--tinta);font-family:var(--sans);line-height:1.6;
+    -webkit-font-smoothing:antialiased;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .caja{width:100%;max-width:560px}
+  .marca{text-align:center;margin-bottom:26px}
+  .marca h1{font-size:34px;font-weight:800;letter-spacing:.06em;color:var(--verde)}
+  .marca p{font-size:11px;letter-spacing:.26em;text-transform:uppercase;color:var(--mut);margin-top:2px}
+  .card{background:var(--card);border:1px solid var(--linea);border-radius:14px;padding:26px 24px;box-shadow:var(--sh)}
+  .card h2{font-size:17px;font-weight:800;margin-bottom:4px}
+  .card .sub{font-size:14px;color:var(--tinta2);margin-bottom:18px}
+  label{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--mut);margin-bottom:6px}
+  input{width:100%;background:var(--fondo);border:1px solid var(--linea);border-radius:10px;
+    padding:13px 15px;font-size:16px;color:var(--tinta);font-family:inherit}
+  input:focus{outline:2px solid var(--verde);outline-offset:1px}
+  button{width:100%;margin-top:12px;background:var(--verde);color:#fff;border:none;border-radius:10px;
+    padding:14px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
+  button:hover{filter:brightness(1.08)}
+  button:disabled{opacity:.6;cursor:default}
+  .err{display:none;margin-top:12px;background:#fbe9e7;color:var(--rojo);border-radius:9px;
+    padding:10px 13px;font-size:14px;font-weight:600}
+  :root[data-theme="dark"] .err,
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .err{background:#2d1a17}}
+  .doc{display:flex;justify-content:space-between;align-items:center;gap:14px;
+    padding:15px 0;border-bottom:1px solid var(--linea);text-align:left}
+  .doc:last-of-type{border-bottom:none}
+  .doc b{display:block;font-size:15.5px}
+  .doc span{display:block;font-size:13px;color:var(--tinta2);margin-top:1px}
+  .doc a{background:var(--verdebg);color:var(--verde);text-decoration:none;font-weight:800;
+    font-size:13.5px;padding:9px 15px;border-radius:9px;white-space:nowrap;cursor:pointer}
+  .doc a:hover{filter:brightness(.96)}
+  .pie{text-align:center;font-size:12px;color:var(--mut);margin-top:18px}
+  .hide{display:none}
+</style>
+
+<div class="caja">
+  <div class="marca"><h1>FITOALIV</h1><p>Documentos</p></div>
+
+  <div class="card" id="puerta">
+    <h2>Acceso</h2>
+    <div class="sub">Escribe la clave que te compartieron para ver los documentos.</div>
+    <label for="cl">Clave</label>
+    <input id="cl" type="password" autocomplete="current-password" autofocus
+           onkeydown="if(event.key==='Enter')abrir()">
+    <button id="btn" onclick="abrir()">Entrar</button>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card hide" id="lista">
+    <h2>Documentos</h2>
+    <div class="sub">Ábrelos en una pestaña nueva. Se pueden imprimir o guardar como PDF.</div>
+    <div id="docs"></div>
+    <div class="pie">Documentos confidenciales · no compartir el enlace ni la clave</div>
+  </div>
+</div>
+
+<script>
+/* Los documentos están cifrados en el servidor. La clave nunca viaja ni está
+   escrita en ninguna parte: con ella se deriva la llave aquí en el navegador y
+   se descifra el archivo. Si la clave está mal, no hay nada que mostrar —
+   ni siquiera mirando el código fuente o pidiendo el .dat directo. */
+const $=id=>document.getElementById(id);
+
+async function llave(clave, salt){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(clave),
+    'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt, iterations:250000, hash:'SHA-256'},
+    base, {name:'AES-GCM', length:256}, false, ['decrypt']);
+}
+
+function deB64(s){
+  const b=atob(s.trim()); const u=new Uint8Array(b.length);
+  for(let i=0;i<b.length;i++) u[i]=b.charCodeAt(i);
+  return u;
+}
+
+async function descifrar(archivo, clave){
+  const txt = await (await fetch(archivo, {cache:'no-store'})).text();
+  const u = deB64(txt);
+  const salt=u.slice(0,16), iv=u.slice(16,28), cuerpo=u.slice(28);
+  const k = await llave(clave, salt);
+  const plano = await crypto.subtle.decrypt({name:'AES-GCM', iv}, k, cuerpo);
+  return new TextDecoder().decode(plano);
+}
+
+let CLAVE=null, DOCS=[];
+
+async function abrir(){
+  const cl=$('cl').value.trim(), err=$('err'), btn=$('btn');
+  if(!cl) return;
+  err.style.display='none'; btn.disabled=true; btn.textContent='Abriendo…';
+  try{
+    DOCS = await (await fetch('docs.json',{cache:'no-store'})).json();
+    /* Se prueba con el primero: si descifra, la clave sirve para todos. */
+    await descifrar(DOCS[0].f, cl);
+    CLAVE=cl;
+    $('puerta').classList.add('hide');
+    $('lista').classList.remove('hide');
+    $('docs').innerHTML = DOCS.map((d,i)=>`<div class="doc">
+      <div><b>${d.t}</b><span>${d.d}</span></div>
+      <a onclick="ver(${i})">Abrir</a></div>`).join('');
+  }catch(e){
+    err.textContent='Esa clave no abre los documentos. Revísala e intenta de nuevo.';
+    err.style.display='block';
+    $('cl').select();
+  }finally{ btn.disabled=false; btn.textContent='Entrar'; }
+}
+
+async function ver(i){
+  const d=DOCS[i];
+  const w=window.open('','_blank');
+  if(!w){ alert('Permite las ventanas emergentes para abrir el documento.'); return; }
+  w.document.write('<!doctype html><meta charset="utf-8"><title>'+d.t+'</title>'
+    +'<body style="font-family:system-ui;padding:40px;color:#555">Abriendo…</body>');
+  try{
+    const html = await descifrar(d.f, CLAVE);
+    w.document.open(); w.document.write(html); w.document.close();
+    w.document.title = d.t + ' · Fitoaliv';
+  }catch(e){
+    w.document.body.textContent='No se pudo abrir el documento.';
+  }
+}
+</script>
+</html>
