@@ -26,6 +26,7 @@ const CLASES = [
 const CALIF = [
   {k:'ninguno',        t:'— Ninguno',                          bool:{}},
   {k:'cliente_nc',     t:'🏠 Cliente NC',                      bool:{}},
+  {k:'cliente_ced',    t:'🏢 Cliente CED',                     bool:{}},
   {k:'potencial',      t:'👤 Yo lo veo potencial',             bool:{}},
   {k:'referido_perez', t:'🤝 Referido por Pérez Group',        bool:{}},
   {k:'gpjr',           t:'⭐ GPJR (paga comisión)',            bool:{recomendado:true}},
@@ -47,6 +48,24 @@ const transpDe = k => TRANSPORTES.find(x=>x.k===k) || TRANSPORTES[0];
 const App = {
   sb:null, user:null, perfil:null, view:'dashboard', signupMode:false,
   CLASES, CALIF, TRANSPORTES,
+
+  /* Las listas de precio son UNA sola cosa en todo CED: las de la tabla
+     ced_listas, las mismas que se llenan al ingresar inventario (l1…l4).
+     Antes la ficha del cliente traía otras cuatro escritas a mano
+     (Empresa pequeña/mediana/grande) que no existían en ningún otro lado.
+     Este arreglo es el respaldo si la tabla no responde; el orden importa
+     porque es el que amarra cada lista con su columna l1…l4. */
+  LISTAS:['Redes','Publico','Mayoreo','Distribuidor'],
+  async _cargarListas(){
+    try{ const { data } = await this.sb.from('ced_listas').select('nombre').eq('activo',true).order('orden');
+      if(data && data.length) this.LISTAS=data.map(l=>l.nombre).filter(Boolean); }catch(e){}
+    return this.LISTAS; },
+
+  /* ¿Esta persona ve toda la red o solo su sede? Es el mismo criterio que usa
+     mi_ced() en la base: la casa matriz y las cuentas de correo ven todo. A los
+     demás la base ya les devuelve solo lo suyo, así que no hay nada que filtrar
+     y el selector de sede ni se pinta. */
+  _veRed(){ return !this.cedUser || !!this._esPrincipal; },
 
   /* El valor solo se pide cuando el envío se cobra */
   cotTransporte(){
@@ -220,6 +239,7 @@ const App = {
       location.href = location.pathname+'?empresa='+this.perfil.empresa; return;
     }
     await this.cargarCedUser();
+    await this._cargarListas();
     this._loginTs=Date.now();
     this._startHeartbeat();
     $('view-login').classList.add('hide'); $('app').classList.remove('hide');
@@ -2440,7 +2460,7 @@ const App = {
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">💰 CONDICIONES DE COMISIONES</div>
       <div class="row2">
         <div><label>Referencia</label><input class="field" id="cl_ref" value="${v(e.referencia)||'701'}"></div>
-        <div><label>Lista de precios</label><select class="field" id="cl_lista">${['Distribuidor','Empresa pequeña','Empresa mediana','Empresa grande'].map(L=>`<option ${e.lista_precio===L?'selected':''}>${L}</option>`).join('')}</select></div>
+        <div><label>Lista de precios</label><select class="field" id="cl_lista">${this.LISTAS.map(L=>`<option ${e.lista_precio===L?'selected':''}>${esc(L)}</option>`).join('')}${(e.lista_precio&&!this.LISTAS.includes(e.lista_precio))?`<option selected>${esc(e.lista_precio)}</option>`:''}</select></div>
       </div>
       <div class="hint">La comisión por par sale de la 💰 <b>Tabla de comisiones</b> (referencia + lista). Default: NC $1.900 · si ⭐ Recomendado → NC $900 + GPJR $1.000.</div>
       <button class="btn btn-main" onclick="App.guardarCliente()">${e.id?'Guardar cambios':'Guardar cliente'}</button>
@@ -2555,12 +2575,27 @@ const App = {
   /* ---------- COTIZACIONES ---------- */
   async vCotizaciones(){
     this.loading();
-    const { data:cots=[] } = await this.sb.from('cotizaciones').select('*').order('creado_en',{ascending:false}).limit(200);
+    const { data:todas=[] } = await this.sb.from('cotizaciones').select('*').order('creado_en',{ascending:false}).limit(200);
+    /* Filtro por sede: solo para quien ve la red completa, y solo si de verdad
+       hay cotizaciones de más de una sede. Los totales de arriba se calculan
+       sobre lo filtrado, para que el número que se ve sea el de esa sede. */
+    const sedes=[...new Set(todas.map(c=>c.ced).filter(Boolean))].sort();
+    const verFiltro=this._veRed() && sedes.length>1;
+    const sel=(verFiltro && this._cotSede && sedes.includes(this._cotSede)) ? this._cotSede : '';
+    this._cotSede=sel;
+    const cots = sel ? todas.filter(c=>c.ced===sel) : todas;
     const enCot=cots.filter(c=>c.estado==='cotizada');
     const sumCot=enCot.reduce((a,c)=>a+(+c.total||0),0);
     const nContact=enCot.filter(c=>c.contactado).length;
     this.set(`
-      <h1>Cotizaciones</h1><div class="sub">${cots.length} guardadas</div>
+      <h1>Cotizaciones</h1>
+      <div class="sub">${cots.length} guardadas${sel?' · sede '+esc(sel)+' (de '+todas.length+' en la red)':''}</div>
+      ${verFiltro?`<div style="margin:10px 0">
+        <label style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8a93a6">Sede</label>
+        <select class="field" onchange="App.cotSede(this.value)">
+          <option value="">Todas las sedes · ${todas.length}</option>
+          ${sedes.map(s=>`<option value="${esc(s)}" ${s===sel?'selected':''}>${esc(s)} · ${todas.filter(c=>c.ced===s).length}</option>`).join('')}
+        </select></div>`:''}
       <div class="kpis">
         <div class="kpi naranja"><b>${enCot.length}</b><span>📋 En cotización</span></div>
         <div class="kpi"><b>${money(sumCot)}</b><span>💰 Valor en cotización</span></div>
@@ -2569,7 +2604,7 @@ const App = {
       <button class="btn btn-main" style="margin-bottom:14px" onclick="App.go('cotizacionNueva')">+ Nueva cotización</button>
       ${cots.length?cots.map(c=>{const cl=c.cliente_snap||{};return `
         <div class="item"><div class="top"><div>
-          <div class="nom">${esc(cl.nombre||'Cliente')} ${c.es_muestra?'<span class="badge b-cotizada">MUESTRA</span>':''}</div>
+          <div class="nom">${esc(cl.nombre||'Cliente')} ${c.es_muestra?'<span class="badge b-cotizada">MUESTRA</span>':''}${(verFiltro&&!sel&&c.ced)?`<span style="font-size:10.5px;font-weight:700;background:#eef1f5;color:#54636b;padding:2px 7px;border-radius:9px;margin-left:5px">${esc(c.ced)}</span>`:''}</div>
           <div class="meta">${esc(c.numero||'')}${(cl.tel||cl.cel2)?' · 📱 '+esc(cl.tel||cl.cel2):''} · ${c.es_muestra?esc(c.detalle||'muestra'):(c.pares+' pares ('+c.cajas+' cajas)')} · ${new Date(c.creado_en).toLocaleDateString('es-CO')}</div>
         </div><div style="text-align:right"><div class="tot">${money(c.total)}</div>
           <span class="badge b-${c.estado}">${c.estado}</span></div></div>
@@ -2583,6 +2618,7 @@ const App = {
         </div></div>`}).join(''):'<div class="empty">Aún no hay cotizaciones.</div>'}
     `);
   },
+  cotSede(v){ this._cotSede=v||''; this.vCotizaciones(); },
   async cotFContacto(id){
     const { data:c } = await this.sb.from('cotizaciones').select('contactado').eq('id',id).single();
     await this.sb.from('cotizaciones').update({contactado:!(c&&c.contactado)}).eq('id',id);
@@ -2685,6 +2721,11 @@ const App = {
     try{ const r=await this.sb.from('ced').select('*').eq('activo',true); this._ceds=r.data||[]; }catch(e){}
     sede=(this._ceds||[]).find(c=>c.nombre===(this.miSede()||'Feroz'))||null;
     this._facts=facts; this._sedeCot=sede;
+    /* Las referencias que se pueden cotizar salen del INVENTARIO: son las que
+       alguien cargó al ingresar una curva. Los precios por lista y la
+       descripción viven en ced_prov_referencias, así que se cruzan por
+       referencia+color. La base ya filtra por sede: cada CED ve las suyas. */
+    const refsCot=await this._cotRefs();
     const nomCed=(sede&&(sede.nombre_comercial||sede.nombre))||'Feroz';
     this.set(`
       <h1>${editId?'✏️ Editar':'Nueva'} cotización</h1>
@@ -2707,9 +2748,10 @@ const App = {
           en esta cotización sin tocar la ficha del cliente.</div>
       </div>
       <div class="card" style="border:1.5px dashed var(--naranja)">
-        <label style="margin:0"><b>🎁 ¿Cotizar una muestra?</b></label>
+        <label style="margin:0"><b>📋 ¿Qué vas a hacer?</b></label>
         <select class="field" id="co_muestra_tipo" onchange="App.toggleCotMuestra()" style="margin-top:6px">
-          <option value="">No — cotización normal (curva)</option>
+          <option value="">Cotizar — curva normal</option>
+          <option value="pedido">Generar pedido — curva normal</option>
           <option value="par">Muestra PAR — ${money(C.MUESTRA_PAR)}/par + IVA + transporte ${money(C.MUESTRA_FLETE||22000)}</option>
           <option value="parsv">Muestra PAR — SIN valor comercial (regalo, no se cobra)</option>
           <option value="pie">Muestra DE PIE — sin valor comercial · envío gratis</option>
@@ -2752,6 +2794,15 @@ const App = {
         <div class="hint" style="margin-top:6px">Define desde el principio quién emite la factura y a qué cuenta
           consigna el cliente. Se decide acá para no tener que rehacer el documento después.</div>
         <div id="co_factura_datos" style="margin-top:9px"></div>
+      </div>
+
+      <div class="card" style="border-left:4px solid var(--verde)">
+        <label style="margin:0"><b>👟 Referencia *</b></label>
+        <select class="field" id="co_ref" onchange="App.cotRefPrecio()" style="margin-top:6px">
+          ${refsCot.length?refsCot.map(r=>`<option value="${esc(r.k)}">${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}</option>`).join('')
+            :`<option value="701||">701</option>`}
+        </select>
+        <div id="co_ref_precio" class="hint" style="margin-top:6px"></div>
       </div>
 
       <div class="card" style="border-left:4px solid var(--naranja)">
@@ -2797,6 +2848,7 @@ const App = {
     `);
     this._clientes = cli;
     $('co_grid').innerHTML = C.TALLAS.map(t=>`<div class="t"><span>Talla ${t}</span><input type="number" min="0" inputmode="numeric" data-talla="${t}" oninput="App.curva()"></div>`).join('');
+    this.cotRefPrecio();   // pinta de una el precio de la referencia que salga elegida
     this.curva();
     if(editId){
       const { data:ec } = await this.sb.from('cotizaciones').select('*').eq('id',editId).single();
@@ -2865,7 +2917,51 @@ const App = {
     this._curva={pares,cajas,resto,faltan,tallas:t,libre};
     return this._curva;
   },
-  toggleCotMuestra(){ const v=$('co_muestra_tipo')&&$('co_muestra_tipo').value; const esPie=(v==='pie');
+  /* 'pedido' es la MISMA cotización normal, solo con otro nombre en pantalla.
+     Se normaliza a vacío en todos lados para que ninguna lógica de muestras lo
+     confunda con una muestra (cualquier valor distinto de vacío lo es). */
+  _cotTipoM(){ const v=($('co_muestra_tipo')||{}).value||''; return v==='pedido'?'':v; },
+
+  /* Referencias cotizables = las que existen en inventario, con el precio por
+     lista y la descripción que traiga su ficha. La llave es referencia||color
+     porque el mismo modelo en dos colores son dos cosas distintas. */
+  async _cotRefs(){
+    const [ri,rr]=await Promise.all([
+      this.sb.from('inventario').select('referencia,color'),
+      this.sb.from('ced_prov_referencias').select('referencia,color,descripcion,l1,l2,l3,l4')
+    ]);
+    const fichas={}; (rr.data||[]).forEach(f=>{ fichas[(f.referencia||'')+'||'+(f.color||'')]=f; });
+    const m={};
+    (ri.data||[]).forEach(x=>{ const k=(x.referencia||'')+'||'+(x.color||'');
+      if(!x.referencia || m[k]) return;
+      const f=fichas[k]||{};
+      m[k]={k, referencia:x.referencia, color:x.color||'', descripcion:f.descripcion||'',
+            precios:[f.l1,f.l2,f.l3,f.l4].map(v=>+v||0)}; });
+    this._refsCot=Object.values(m).sort((a,b)=>
+      (a.referencia+a.color).localeCompare(b.referencia+b.color,'es'));
+    return this._refsCot; },
+
+  /* El precio por par de la referencia escogida, según la lista del cliente.
+     Si esa lista todavía no tiene precio cargado, se usa el de siempre y se
+     avisa en pantalla: es preferible a cotizar en cero sin que nadie lo note. */
+  _cotPrecioPar(){
+    const k=($('co_ref')||{}).value||'';
+    const r=(this._refsCot||[]).find(x=>x.k===k);
+    const cid=($('co_cliente')||{}).value;
+    const cl=(this._clientes||[]).find(c=>c.id==cid)||{};
+    const i=this.LISTAS.indexOf(cl.lista_precio||'Distribuidor');
+    const p=(r && i>=0) ? (r.precios[i]||0) : 0;
+    return {valor: p>0?p:C.PRECIO_PAR, deLista: p>0,
+            lista: cl.lista_precio||'Distribuidor', ref:r||null}; },
+  cotRefPrecio(){
+    const e=$('co_ref_precio'); if(!e) return;
+    const p=this._cotPrecioPar();
+    e.innerHTML = p.deLista
+      ? `Precio lista <b>${esc(p.lista)}</b>: <b>${money(p.valor)}</b>/par + IVA`
+      : `<span style="color:#b45309">⚠️ Esta referencia no tiene precio en la lista <b>${esc(p.lista)}</b>.
+         Se usa ${money(C.PRECIO_PAR)}/par. Cárgalo en Inventario → Ingresar inventario.</span>`;
+    if(this.calcCot) this.calcCot(); },
+  toggleCotMuestra(){ const v=this._cotTipoM(); const esPie=(v==='pie');
     const grid=$('co_curva_card'), pie=$('co_pie_box');
     if(grid) grid.style.display = esPie ? 'none' : 'block';   // DE PIE no usa grilla
     if(pie)  pie.style.display  = esPie ? 'block' : 'none';
@@ -2879,10 +2975,13 @@ const App = {
     const s=$('co_cliente'), o=s&&s.options[s.selectedIndex]; if(!o||!o.dataset) return;
     const c=$('co_contacto'), t=$('co_contacto_tel');
     if(c && !c.value.trim()) c.value=o.dataset.con||'';
-    if(t && !t.value.trim()) t.value=o.dataset.tel||''; },
+    if(t && !t.value.trim()) t.value=o.dataset.tel||'';
+    /* El precio depende de la lista del cliente, así que al cambiar de empresa
+       hay que recalcularlo. */
+    this.cotRefPrecio(); },
   async guardarCotizacion(){
     const cid=$('co_cliente').value;
-    const tipoMv=$('co_muestra_tipo')?$('co_muestra_tipo').value:'';
+    const tipoMv=this._cotTipoM();
     const asesorV=(($('co_asesor')||{}).value||'').trim();
     if(tipoMv==='vendedor'){ if(!asesorV){ alert('Escribe el nombre del vendedor/asesor.'); return; } }
     else if(!cid){ alert('Selecciona un cliente.'); return; }
@@ -2890,7 +2989,7 @@ const App = {
     const dM=new Date(), editing=!!this._editCotId;
     const num = (editing&&this._editCot&&this._editCot.numero) ? this._editCot.numero : ('COT-'+dM.getFullYear()+('0'+(dM.getMonth()+1)).slice(-2)+('0'+dM.getDate()).slice(-2)+'-'+('0'+dM.getHours()).slice(-2)+('0'+dM.getMinutes()).slice(-2)+('0'+dM.getSeconds()).slice(-2));
     // MUESTRA: PAR ($40.900 + IVA + transporte $22.000, se cobra) o DE PIE (sin valor comercial, envío gratis).
-    const tipoM=$('co_muestra_tipo')?$('co_muestra_tipo').value:'';
+    const tipoM=this._cotTipoM();
     if(tipoM){
       const esPie=(tipoM==='pie'), esSVC=(tipoM==='svc'), esVend=(tipoM==='vendedor'), esParSV=(tipoM==='parsv'), sinValor=(esPie||esSVC||esVend||esParSV);
       let cu;
@@ -2928,7 +3027,11 @@ const App = {
     const fac=(this._facts||[]).find(x=>x.id===fid)||null;
     if(!cu.libre && cu.faltan!==0 && !confirm(`Falta(n) ${cu.faltan} par(es) para completar la última caja. ¿Guardar igual?`)) return;
     const conIva=(($('co_iva')||{checked:true}).checked);
-    const subtotal=cu.pares*C.PRECIO_PAR, iva=conIva?Math.round(subtotal*C.IVA):0;
+    /* El precio por par sale de la referencia escogida y de la lista del
+       cliente. Si esa lista no tiene precio cargado, cae en el de siempre
+       (la pantalla ya lo avisó en naranja al escoger la referencia). */
+    const pp=this._cotPrecioPar();
+    const subtotal=cu.pares*pp.valor, iva=conIva?Math.round(subtotal*C.IVA):0;
     /* El envío entra en el total: es plata que el cliente consigna. Los otros
        tres tipos de transporte no se le cobran, así que no suman. */
     const tKey=(($('co_transporte')||{}).value)||'al_cobro';
@@ -2943,8 +3046,8 @@ const App = {
     const vGPJR= cl.recomendado ? (rate?+rate.valor_par_gpjr:1000) : 0;
     const comNC=vNC*cu.pares, comGPJR=vGPJR*cu.pares;
     const reg={numero:num,cliente_id:cid,cliente_snap:cl,curva:cu.tallas,pares:cu.pares,cajas:cu.cajas,resto:cu.resto,
-      precio_par:C.PRECIO_PAR,subtotal,iva,total,flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this.user.id,
-      referencia:cl.referencia||'701',valor_par_nc:vNC,valor_par_gpjr:vGPJR,recomendado:!!cl.recomendado,comision_nc:comNC,comision_gpjr:comGPJR,
+      precio_par:pp.valor,subtotal,iva,total,flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this.user.id,
+      referencia:(pp.ref&&pp.ref.referencia)||cl.referencia||'701',valor_par_nc:vNC,valor_par_gpjr:vGPJR,recomendado:!!cl.recomendado,comision_nc:comNC,comision_gpjr:comGPJR,
       // quien factura + FOTO de sus datos. Se copia, no se referencia: si mañana
       // cambia la cuenta bancaria, esta cotizacion tiene que seguir mostrando
       // la que el cliente realmente vio.
@@ -5253,7 +5356,9 @@ const App = {
     const gr={};
     inv.forEach(r=>{ const d=r.dueno||'ced'; const k=r.referencia+'||'+(r.color||'')+'||'+d;
       if(!gr[k]) gr[k]={ref:r.referencia, color:r.color||'', dueno:d, tallas:[], total:0,
-                        prov:r.proveedor||'', costo:+r.costo||0, minimo:+r.minimo||0};
+                        prov:r.proveedor||'', costo:+r.costo||0, minimo:+r.minimo||0,
+                        desc:r.descripcion||''};
+      if(!gr[k].desc && r.descripcion) gr[k].desc=r.descripcion;
       gr[k].tallas.push(r); gr[k].total+=(+r.stock||0); });
     const grupos=Object.values(gr).sort((a,b)=>
       (a.dueno===b.dueno? String(a.ref).localeCompare(String(b.ref)) : (a.dueno==='ced'?-1:1)));
@@ -5302,6 +5407,7 @@ const App = {
                 <span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;margin-left:5px;
                   background:${esCed?'#fdeee2':'#eef1f4'};color:${esCed?'#9a5312':'#54636b'}">
                   ${esCed?'CONSIGNACIÓN':'DEL ALIADO'}</span></div>
+              ${g.desc?`<div class="meta" style="color:#5a6b7d">${esc(g.desc)}</div>`:''}
               <div class="meta" style="color:${col};font-weight:700">${txt}</div>
               <div class="meta">${g.prov?'📋 '+esc(g.prov):'⚠️ sin proveedor'}${g.costo?' · costo '+money(g.costo):''}${g.minimo?' · mínimo '+g.minimo:''}</div></div>
             <div class="tot">${g.total}</div>
@@ -5349,6 +5455,7 @@ const App = {
     /* Lo que ya existe sale en la lista; si no está, se escribe. */
     const refs=[...new Set(inv.map(r=>r.referencia).filter(Boolean))].sort();
     const cols=[...new Set(inv.map(r=>r.color).filter(Boolean))].sort();
+    const descs=[...new Set(inv.map(r=>r.descripcion).filter(Boolean))].sort();
     this.modal(`<h3>＋ Ingresar inventario</h3>
       <div class="sub">La curva completa de una vez</div>
 
@@ -5369,8 +5476,12 @@ const App = {
         <div><label>Color</label>
           <input id="iv_col" class="field" list="iv_col_dl" placeholder="negro">
           <datalist id="iv_col_dl">${cols.map(c=>`<option value="${esc(c)}">`).join('')}
-            <option value="negro"><option value="miel"><option value="café"></datalist></div>
+            <option value="negro"><option value="blanco"><option value="miel"><option value="café"></datalist></div>
       </div>
+      <label>Descripción</label>
+      <input id="iv_desc" class="field" list="iv_desc_dl" placeholder="Bota caña alta en cuero graso, puntera de acero">
+      <datalist id="iv_desc_dl">${descs.map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
+      <div class="hint">Qué es la referencia, en palabras. Sale en los saldos y en la ficha.</div>
       <div id="iv_prev" class="hint"></div>
 
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">👟 CURVA · PARES POR TALLA</div>
@@ -5382,7 +5493,7 @@ const App = {
       </div>
       <div id="iv_curva_tot" style="font-size:13px;font-weight:700;color:var(--verde);margin-bottom:4px">0 pares</div>
 
-      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">💰 COSTO Y PRECIOS</div>
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">💰 COSTO Y PRECIOS · ANTES DE IVA</div>
       <div class="row2">
         <div><label>Costo por par</label><input id="iv_costo" class="field" inputmode="numeric" placeholder="28000"></div>
         <div><label>Mínimo en bodega</label><input id="iv_min" class="field" type="number" placeholder="0"></div>
@@ -5391,13 +5502,21 @@ const App = {
         ${listas.map((L,i)=>`<div><label style="margin-top:0">${esc(L.nombre)}</label>
           <input id="iv_l${i+1}" class="field" inputmode="numeric" placeholder="0" style="padding:8px"></div>`).join('')}
       </div>
-      <div class="hint">El precio de cada lista. Se guardan con la referencia y quedan para cotizar.</div>
+      <div class="hint">El precio de cada lista, <b>sin IVA</b>. Se guardan con la referencia y quedan para cotizar.
+        El 19% se suma en la cotización, donde viene marcado por defecto y se puede quitar si el cliente lo pide sin IVA.</div>
 
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">📋 ORIGEN Y CONDICIONES</div>
       <label>Proveedor *</label>
-      <input id="iv_prov" class="field" list="iv_prov_dl" placeholder="Quién la fabricó o la vendió">
-      <datalist id="iv_prov_dl">${provs.map(p=>`<option value="${esc(p.nombre)}">`).join('')}
-        <option value="BOTAS AGROINDUSTRIAL SAS"><option value="INDUSTRIAS FEROZ SAS"><option value="Planta Superior"></datalist>
+      <select id="iv_prov" class="field" onchange="App._invOtroProv()">
+        <option value="">— escoge el proveedor —</option>
+        ${provs.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}
+        <option value="__nuevo">＋ Otro proveedor…</option>
+      </select>
+      <div id="iv_prov2wrap" style="display:none;margin-top:6px">
+        <label style="margin-top:0">¿Cómo se llama?</label>
+        <input id="iv_prov2" class="field" placeholder="Quién la fabricó o la vendió">
+        <div class="hint">Queda creado en <b>Proveedores</b>: la próxima vez sale en la lista.</div>
+      </div>
       <label>Documento</label><input id="iv_doc" class="field" placeholder="Remisión 1234 · factura 5678">
       <label>Condiciones de venta</label>
       <textarea id="iv_cond" class="field" style="min-height:52px"
@@ -5408,6 +5527,9 @@ const App = {
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
     this._invRefPreview();
   },
+  _invOtroProv(){ const s=$('iv_prov'), w=$('iv_prov2wrap'); if(!s||!w) return;
+    const nuevo=s.value==='__nuevo'; w.style.display=nuevo?'block':'none';
+    if(nuevo && $('iv_prov2')) $('iv_prov2').focus(); },
   _invCurvaTotal(){
     const t=this.TALLAS.reduce((a,x)=>a+(+($('iv_t'+x)||{}).value||0),0);
     const e=$('iv_curva_tot'); if(e) e.textContent=t+' pares en total';
@@ -5420,8 +5542,21 @@ const App = {
   },
   async invIngresarOk(){
     const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim();
-    const dueno=$('iv_dueno').value, prov=$('iv_prov').value.trim();
+    const dueno=$('iv_dueno').value;
+    /* El proveedor ya no es texto suelto: se escoge de la lista y se guarda
+       también su id, para que el inventario quede amarrado a su ficha. Si es
+       uno nuevo, se crea en Proveedores y se usa el id que devuelva. */
+    const provSel=($('iv_prov')||{}).value||'';
+    let prov='', provId=null;
+    if(provSel==='__nuevo'){
+      prov=(($('iv_prov2')||{}).value||'').trim();
+      if(!prov){ alert('Escribe el nombre del proveedor nuevo.'); $('iv_prov2').focus(); return; }
+    }else if(provSel){
+      const p=(this._provs||[]).find(x=>String(x.id)===String(provSel));
+      if(p){ prov=p.nombre; provId=p.id; }
+    }
     const doc=$('iv_doc').value.trim(), cond=$('iv_cond').value.trim();
+    const desc=(($('iv_desc')||{}).value||'').trim();
     const num=id=>+String(($(id)||{}).value||'').replace(/\D/g,'')||null;
     const costo=num('iv_costo'), min=+$('iv_min').value||0;
     const sede=$('iv_ced').value;
@@ -5431,8 +5566,18 @@ const App = {
     if(!total){ alert('La curva está vacía: pon los pares en al menos una talla.'); return; }
     if(!prov){ alert('Falta el proveedor.\n\nSin él no se sabe de dónde salió la mercancía ni a quién reclamarle.'); $('iv_prov').focus(); return; }
 
+    /* Un proveedor nuevo se crea antes de guardar la curva, para tener su id. */
+    if(!provId){
+      try{ const { data:np } = await this.sb.from('ced_proveedores')
+        .insert({nombre:prov, ced:sede, activo:true}).select('id').single();
+        if(np) provId=np.id; }catch(e){ console.warn('proveedor nuevo:', e.message||e); }
+    }
+
     /* 1) el catálogo de la referencia: costo, precios y condiciones */
-    const cat={ ced:sede, referencia:ref, color:color||null, dueno, proveedor_id:null,
+    /* color va vacío, nunca null: la llave única de la referencia es
+       (ced, referencia, color, dueno) y un null rompía el upsert. */
+    const cat={ ced:sede, referencia:ref, color:color||'', dueno, proveedor_id:provId,
+      descripcion:desc||null,
       marca:this._duenoDe(dueno).et, costo, minimo:min, condiciones:cond||null, activo:true,
       tallas:curva.map(([t])=>t).join(','), notas:prov,
       l1:num('iv_l1'), l2:num('iv_l2'), l3:num('iv_l3'), l4:num('iv_l4') };
@@ -5444,13 +5589,17 @@ const App = {
     let ok=0;
     for(const [t,c] of curva){
       const r=await this._invSumar(ref,color,t,c,'entrada',doc||'Ingreso de curva',
-        {dueno, proveedor:prov, costo, minimo:min, documento:doc, ced:sede});
+        {dueno, proveedor:prov, proveedor_id:provId, costo, minimo:min, documento:doc,
+         descripcion:desc, ced:sede});
       if(r) ok+=c; else break;
     }
     if(!ok) return;
     this.cerrarModal();
     this.toast('＋'+ok+' pares de '+this.refVisible(ref,dueno)+' en '+sede);
-    this.vInventario();
+    /* Después de ingresar la curva se vuelve al panel de Inventario arrancando
+       arriba. Antes solo se repintaba la lista y la página quedaba a media
+       altura, donde la había dejado el modal: parecía que no se había guardado. */
+    this.go('inventario');
   },
 
   /* suma (o resta, si viene negativo) y deja el movimiento escrito.
@@ -5470,15 +5619,19 @@ const App = {
                      +' hay '+((actual&&actual.stock)||0)+' pares.'); return false; }
     const fila={referencia:ref, color:color, talla:talla, stock:nuevo, dueno,
                 actualizado_en:new Date().toISOString(), ced:mio};
-    if(e.proveedor) fila.proveedor=e.proveedor;
-    if(e.costo)     fila.costo=e.costo;
-    if(e.minimo)    fila.minimo=e.minimo;
+    if(e.proveedor)    fila.proveedor=e.proveedor;
+    if(e.proveedor_id) fila.proveedor_id=e.proveedor_id;
+    if(e.descripcion)  fila.descripcion=e.descripcion;
+    if(e.costo)        fila.costo=e.costo;
+    if(e.minimo)       fila.minimo=e.minimo;
     const { error } = await this.sb.from('inventario')
       .upsert(fila,{onConflict:'ced,referencia,color,talla,dueno'});
     if(error){ alert('No se pudo guardar el inventario: '+error.message); return false; }
     await this.sb.from('inv_movimientos').insert({ referencia:ref, color:color, talla:talla, tipo:tipo,
       cantidad:Math.abs(cant), motivo:motivo, usuario:(this.perfil&&this.perfil.nombre)||'',
-      dueno, proveedor:e.proveedor||null, costo:e.costo||null, documento:e.documento||null });
+      dueno, proveedor:e.proveedor||null, proveedor_id:e.proveedor_id||null,
+      costo:e.costo||null, documento:e.documento||null,
+      descripcion:e.descripcion||null, ced:mio });
     return true;
   },
 
