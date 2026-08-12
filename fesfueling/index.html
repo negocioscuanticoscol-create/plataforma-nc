@@ -322,8 +322,12 @@ bqRef(id){
       <div><label>TRM (pesos por dólar)</label><input id="rf_trm" inputmode="decimal" placeholder="4000" oninput="App.bqCalc()"></div>
     </div>
     <div class="g2">
+      <div><label>Comisión comprador China %</label><input id="rf_com" inputmode="decimal" placeholder="5" oninput="App.bqCalc()"></div>
       <div><label>Flete internacional</label><input id="rf_fle" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+    </div>
+    <div class="g2">
       <div><label>Seguro</label><input id="rf_seg" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+      <div></div>
     </div>
     <div class="g2">
       <div><label>Arancel %</label><input id="rf_ara" inputmode="decimal" placeholder="0" oninput="App.bqCalc()"></div>
@@ -349,11 +353,16 @@ _n(id){ return +String(($(id)||{}).value||'').replace(/[^0-9.]/g,'')||0; },
 bqCalc(){
   const usd=this._n('rf_usd'), trm=this._n('rf_trm'), fle=this._n('rf_fle'), seg=this._n('rf_seg');
   const ara=this._n('rf_ara'), ivp=this._n('rf_iva'), nac=this._n('rf_nac'), tra=this._n('rf_tra');
+  const cop=this._n('rf_com');
   const fob=usd*trm;
+  /* La comision del comprador en China se calcula sobre el FOB, pero NO entra al
+     CIF: la aduana liquida el arancel sobre CIF, y una comision de compra no es
+     parte del valor de la mercancia. Meterla ahi pagaria arancel de mas. */
+  const comis=fob*cop/100;
   const cif=fob+fle+seg;
   const arancel=cif*ara/100;
   const ivaImp=(cif+arancel)*ivp/100;
-  const costo=cif+arancel+nac+tra;             // el IVA se recupera, no suma
+  const costo=cif+comis+arancel+nac+tra;       // el IVA se recupera, no suma
   const mar=this._n('rf_mar');
   const venta=Math.round(costo*(1+mar/100));
   this._bqCosto=Math.round(costo); this._bqVenta=venta; this._bqIvaImp=Math.round(ivaImp);
@@ -362,6 +371,7 @@ bqCalc(){
     fila('FOB en pesos ('+(usd||0)+' USD × '+(trm||0)+')',fob)
     + fila('+ Flete internacional',fle) + fila('+ Seguro',seg)
     + fila('= CIF',cif,'border-top:1px dashed #cbd5e1;padding-top:3px;margin-top:3px')
+    + fila('+ Comisión comprador China '+cop+'%',comis)
     + fila('+ Arancel '+ara+'%',arancel)
     + fila('+ Nacionalización',nac) + fila('+ Transporte interno',tra)
     + fila('= COSTO PUESTO EN BODEGA',costo,'border-top:1px solid #94a3b8;padding-top:4px;margin-top:4px;font-size:14px')
@@ -381,7 +391,7 @@ async bqRefOk(){
     pais_origen:'China', unidad:'UND', activo:true,
     costo_usd:this._n('rf_usd'), trm:this._n('rf_trm'), flete_int:this._n('rf_fle'),
     seguro:this._n('rf_seg'), arancel_pct:this._n('rf_ara'), iva_pct:this._n('rf_iva'),
-    nacionalizac:this._n('rf_nac'), transp_int:this._n('rf_tra'),
+    nacionalizac:this._n('rf_nac'), transp_int:this._n('rf_tra'), comision_pct:this._n('rf_com'),
     costo_bodega:this._bqCosto, ultimo_costo:this._bqCosto, costo_promedio:this._bqCosto,
     margen_pct:this._n('rf_mar'), precio_venta:this._bqVenta, existencias:0};
   const r=await post('ff_referencias',b);
