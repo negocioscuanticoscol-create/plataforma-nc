@@ -5174,15 +5174,17 @@ const App = {
      El grano es referencia + color + talla. */
   async vInventario(){
     this.loading();
-    const [ri,rm,rc,rp] = await Promise.all([
+    const [ri,rm,rc,rp,rl] = await Promise.all([
       this.sb.from('inventario').select('*').order('referencia').order('talla'),
       this.sb.from('inv_movimientos').select('*').order('creado_en',{ascending:false}).limit(500),
       this.sb.from('ced').select('*').eq('activo',true),        // para escoger a qué sede entra
-      this.sb.from('ced_proveedores').select('id,nombre').eq('activo',true).order('nombre')
+      this.sb.from('ced_proveedores').select('id,nombre').eq('activo',true).order('nombre'),
+      this.sb.from('ced_listas').select('*').eq('activo',true).order('orden')   // precios por lista
     ]);
     const inv=ri.data||[], movs=rm.data||[];
     this._inv=inv; this._movs=movs;
     this._ceds=rc.data||this._ceds||[]; this._provs=rp.data||[];
+    this._listas=rl.data||[];
 
     // cobertura: cuantos pares salieron este mes, para saber cuantos dias aguanta
     const hoy=new Date(), ym=hoy.toISOString().slice(0,7), diaDelMes=Math.max(1,hoy.getDate());
@@ -5260,9 +5262,11 @@ const App = {
      lo vende como quiera. Un mismo SKU puede existir de las dos formas en la
      misma bodega, por eso el dueño entra en la llave. */
   DUENOS:[
-    {k:'ced',    t:'De CED · en consignación', suf:' CED'},
-    {k:'aliado', t:'Del aliado · compra en firme', suf:''},
+    {k:'agro',     t:'1 · Mercancía Agro',     suf:'',     et:'AGRO'},
+    {k:'superior', t:'2 · Mercancía Superior', suf:'',     et:'SUPERIOR'},
+    {k:'ced',      t:'3 · Mercancía CED',      suf:' CED', et:'CED'},
   ],
+  TALLAS:[34,35,36,37,38,39,40,41,42,43,44,45,46],
   _duenoDe(k){ return this.DUENOS.find(x=>x.k===k)||this.DUENOS[0]; },
   /* Como se ve la referencia. Se le pega el CED al nombre para que el
      distribuidor sepa de un vistazo cual mercancia es nuestra. */
@@ -5279,53 +5283,118 @@ const App = {
       ${this.DUENOS.map(d=>`<option value="${d.k}" ${u&&u.dueno===d.k?'selected':''}>${d.t}</option>`).join('')}
     </select>`; },
 
+  /* Ingreso por CURVA: se entra la referencia una vez y se reparten los pares
+     por talla en una sola pantalla. Antes había que repetir el formulario
+     talla por talla, que para una curva de 13 tallas era inviable. */
   invIngresar(){
-    const provs=this._provs||[];
-    /* La sede a la que ENTRA la mercancía. Quien ve toda la red la escoge —así
-       la bodega principal despacha a cualquier punto—; los demás solo pueden
-       ingresar a la suya. */
+    const provs=this._provs||[], inv=this._inv||[], listas=this._listas||[];
     const mia=(this.cedUser&&this.cedUser.ced)||'Feroz';
     const todas=(this._ceds||[]).filter(c=>c.activo!==false);
-    const puedeElegir=this._esPrincipal && todas.length>1;
+    /* Lo que ya existe sale en la lista; si no está, se escribe. */
+    const refs=[...new Set(inv.map(r=>r.referencia).filter(Boolean))].sort();
+    const cols=[...new Set(inv.map(r=>r.color).filter(Boolean))].sort();
     this.modal(`<h3>＋ Ingresar inventario</h3>
-      <div class="sub">Mercancía que llega a la bodega</div>
-      <label>¿A qué sede entra?</label>
-      ${puedeElegir
-        ? `<select id="iv_ced" class="field">${todas.map(c=>
-            `<option value="${esc(c.nombre)}" ${c.nombre===mia?'selected':''}>${esc(c.nombre_comercial||c.nombre)}${c.ciudad?' · '+esc(c.ciudad):''}</option>`).join('')}</select>`
-        : `<input class="field" value="${esc(mia)}" disabled><input type="hidden" id="iv_ced" value="${esc(mia)}">`}
-      ${this._invCampos()}
-      <div class="hint">Lo de CED sale como <b>701 CED</b> en toda la plataforma, para que se
-        distinga de lo que el aliado compró en firme.</div>
+      <div class="sub">La curva completa de una vez</div>
+
       <div class="row2">
-        <div><label>Cuántos pares entran</label><input id="iv_can" class="field" type="number" placeholder="0"></div>
-        <div><label>Costo por par</label><input id="iv_costo" class="field" inputmode="numeric" placeholder="Ej: 28000"></div>
+        <div><label>¿A qué sede entra?</label>
+          <select id="iv_ced" class="field">${todas.map(c=>
+            `<option value="${esc(c.nombre)}" ${c.nombre===mia?'selected':''}>${esc(c.nombre_comercial||c.nombre)}</option>`).join('')}</select></div>
+        <div><label>¿De quién es?</label>
+          <select id="iv_dueno" class="field" onchange="App._invRefPreview()">
+            ${this.DUENOS.map(d=>`<option value="${d.k}" ${d.k==='ced'?'selected':''}>${d.t}</option>`).join('')}
+          </select></div>
       </div>
-      <label>Proveedor</label>
-      <input id="iv_prov" class="field" list="iv_prov_dl" placeholder="Quién la fabricó o la vendió">
-      <datalist id="iv_prov_dl">${provs.map(p=>`<option value="${esc(p.nombre)}">`).join('')}
-        <option value="Planta Feroz"><option value="Botas Agroindustrial"></datalist>
+
       <div class="row2">
-        <div><label>Documento</label><input id="iv_doc" class="field" placeholder="Remisión 1234 · factura"></div>
+        <div><label>Referencia</label>
+          <input id="iv_ref" class="field" list="iv_ref_dl" placeholder="701" oninput="App._invRefPreview()">
+          <datalist id="iv_ref_dl">${refs.map(r=>`<option value="${esc(r)}">`).join('')}</datalist></div>
+        <div><label>Color</label>
+          <input id="iv_col" class="field" list="iv_col_dl" placeholder="negro">
+          <datalist id="iv_col_dl">${cols.map(c=>`<option value="${esc(c)}">`).join('')}
+            <option value="negro"><option value="miel"><option value="café"></datalist></div>
+      </div>
+      <div id="iv_prev" class="hint"></div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">👟 CURVA · PARES POR TALLA</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;margin:8px 0">
+        ${this.TALLAS.map(t=>`<div style="text-align:center">
+          <div style="font-size:11px;color:#8a93a6;font-weight:700">${t}</div>
+          <input id="iv_t${t}" class="field" type="number" min="0" placeholder="0"
+                 style="padding:7px 4px;text-align:center" oninput="App._invCurvaTotal()"></div>`).join('')}
+      </div>
+      <div id="iv_curva_tot" style="font-size:13px;font-weight:700;color:var(--verde);margin-bottom:4px">0 pares</div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">💰 COSTO Y PRECIOS</div>
+      <div class="row2">
+        <div><label>Costo por par</label><input id="iv_costo" class="field" inputmode="numeric" placeholder="28000"></div>
         <div><label>Mínimo en bodega</label><input id="iv_min" class="field" type="number" placeholder="0"></div>
       </div>
-      <div class="hint">El mínimo sirve para avisar cuándo hay que reponer antes de que falte.</div>
-      <button class="btn btn-main" onclick="App.invIngresarOk()">Ingresar</button>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:6px">
+        ${listas.map((L,i)=>`<div><label style="margin-top:0">${esc(L.nombre)}</label>
+          <input id="iv_l${i+1}" class="field" inputmode="numeric" placeholder="0" style="padding:8px"></div>`).join('')}
+      </div>
+      <div class="hint">El precio de cada lista. Se guardan con la referencia y quedan para cotizar.</div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">📋 ORIGEN Y CONDICIONES</div>
+      <label>Proveedor *</label>
+      <input id="iv_prov" class="field" list="iv_prov_dl" placeholder="Quién la fabricó o la vendió">
+      <datalist id="iv_prov_dl">${provs.map(p=>`<option value="${esc(p.nombre)}">`).join('')}
+        <option value="BOTAS AGROINDUSTRIAL SAS"><option value="INDUSTRIAS FEROZ SAS"><option value="Planta Superior"></datalist>
+      <label>Documento</label><input id="iv_doc" class="field" placeholder="Remisión 1234 · factura 5678">
+      <label>Condiciones de venta</label>
+      <textarea id="iv_cond" class="field" style="min-height:52px"
+        placeholder="Ej: no se vende por debajo de la lista Distribuidor · el flete lo paga el cliente · devolución a los 30 días"></textarea>
+      <div class="hint">Lo que el aliado debe respetar al vender esta mercancía. Sale en la ficha de la referencia.</div>
+
+      <button class="btn btn-main" onclick="App.invIngresarOk()">Ingresar la curva</button>
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+    this._invRefPreview();
+  },
+  _invCurvaTotal(){
+    const t=this.TALLAS.reduce((a,x)=>a+(+($('iv_t'+x)||{}).value||0),0);
+    const e=$('iv_curva_tot'); if(e) e.textContent=t+' pares en total';
+  },
+  /* Muestra cómo va a quedar el nombre, para que no haya sorpresas */
+  _invRefPreview(){
+    const e=$('iv_prev'); if(!e) return;
+    const r=($('iv_ref')&&$('iv_ref').value.trim())||'', d=($('iv_dueno')&&$('iv_dueno').value)||'ced';
+    e.innerHTML = r ? `Va a quedar como <b>${esc(this.refVisible(r,d))}</b>` : 'Escoge o escribe la referencia.';
   },
   async invIngresarOk(){
-    const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim(), talla=+$('iv_tal').value||0;
-    const can=+$('iv_can').value||0, doc=$('iv_doc').value.trim();
+    const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim();
     const dueno=$('iv_dueno').value, prov=$('iv_prov').value.trim();
-    const costo=+String($('iv_costo').value||'').replace(/\D/g,'')||null;
-    const min=+$('iv_min').value||0;
-    if(!ref||!talla||can<=0){ alert('Referencia, talla y cantidad son obligatorios.'); return; }
-    if(!prov){ alert('Falta el proveedor.\n\nSin él no se puede saber de dónde salió la mercancía ni reclamarle a nadie.'); $('iv_prov').focus(); return; }
-    const sede=($('iv_ced')&&$('iv_ced').value)||null;
-    const ok=await this._invSumar(ref,color,talla,can,'entrada',doc||'Ingreso de inventario',
-      {dueno, proveedor:prov, costo, minimo:min, documento:doc, ced:sede});
+    const doc=$('iv_doc').value.trim(), cond=$('iv_cond').value.trim();
+    const num=id=>+String(($(id)||{}).value||'').replace(/\D/g,'')||null;
+    const costo=num('iv_costo'), min=+$('iv_min').value||0;
+    const sede=$('iv_ced').value;
+    const curva=this.TALLAS.map(t=>[t, +($('iv_t'+t)||{}).value||0]).filter(([t,c])=>c>0);
+    const total=curva.reduce((a,[t,c])=>a+c,0);
+    if(!ref){ alert('Falta la referencia.'); $('iv_ref').focus(); return; }
+    if(!total){ alert('La curva está vacía: pon los pares en al menos una talla.'); return; }
+    if(!prov){ alert('Falta el proveedor.\n\nSin él no se sabe de dónde salió la mercancía ni a quién reclamarle.'); $('iv_prov').focus(); return; }
+
+    /* 1) el catálogo de la referencia: costo, precios y condiciones */
+    const cat={ ced:sede, referencia:ref, color:color||null, dueno, proveedor_id:null,
+      marca:this._duenoDe(dueno).et, costo, minimo:min, condiciones:cond||null, activo:true,
+      tallas:curva.map(([t])=>t).join(','), notas:prov,
+      l1:num('iv_l1'), l2:num('iv_l2'), l3:num('iv_l3'), l4:num('iv_l4') };
+    const { error:e1 } = await this.sb.from('ced_prov_referencias')
+      .upsert(cat,{onConflict:'ced,referencia,color,dueno'});
+    if(e1) console.warn('catálogo:', e1.message);   // no frena el ingreso
+
+    /* 2) los pares, talla por talla */
+    let ok=0;
+    for(const [t,c] of curva){
+      const r=await this._invSumar(ref,color,t,c,'entrada',doc||'Ingreso de curva',
+        {dueno, proveedor:prov, costo, minimo:min, documento:doc, ced:sede});
+      if(r) ok+=c; else break;
+    }
     if(!ok) return;
-    this.cerrarModal(); this.toast('＋'+can+' pares de '+this.refVisible(ref,dueno)); this.vInventario();
+    this.cerrarModal();
+    this.toast('＋'+ok+' pares de '+this.refVisible(ref,dueno)+' en '+sede);
+    this.vInventario();
   },
 
   /* suma (o resta, si viene negativo) y deja el movimiento escrito.
