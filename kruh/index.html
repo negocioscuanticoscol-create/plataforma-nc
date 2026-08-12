@@ -2756,15 +2756,52 @@ const App={
     <button class="btn acc full" onclick="App.ventaSave()">Guardar</button>`); },
   async ventaSave(){ const b={cliente:$('v_cli').value.trim(),telefono:$('v_tel').value.trim(),producto:$('v_pro').value.trim(),monto:+$('v_mon').value||0};
     if(!b.cliente){alert('Cliente');return;} await POST('kruh_ventas',b); cerrar(); toast('Venta registrada'); this.vVentas(); },
+  /* Descompone el texto de la venta ("Pan ×2, Ghee ×1") en sus lineas.
+     Ningun producto tiene comas ni × en el nombre, asi que es seguro. */
+  _sinTildes(x){ return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim(); },
+  _lineasVenta(txt){
+    const out=[]; const re=/([^,]+?)\s*[×x]\s*(\d+)/g; let m;
+    while((m=re.exec(String(txt||'')))!==null) out.push({nombre:m[1].trim(), qty:+m[2]||0});
+    return out;
+  },
+  /* Reparte el valor de la venta entre sus productos y saca el IVA de cada uno
+     con el iva_pct de su ficha. Se hace aca porque la venta guardo el IVA en
+     cero: solo se calculaba cuando pagaban con tarjeta. */
+  _ivaDeVenta(r, prodIdx){
+    const neto=(+r.monto||0)-(+r.domicilio||0);
+    const lin=this._lineasVenta(r.producto);
+    if(!lin.length) return {base:neto, iva:0, gravado:0, exento:neto, ok:false, conIva:''};
+    let suma=0; const val=[];
+    lin.forEach(l=>{ const p=prodIdx[this._sinTildes(l.nombre)];
+      const v=(p?(+p.precio||0):0)*l.qty; val.push({l,p,v}); suma+=v; });
+    if(!suma) return {base:neto, iva:0, gravado:0, exento:neto, ok:false, conIva:''};
+    const f=neto/suma;                      // absorbe descuentos y redondeos
+    let grav=0, exen=0, iva=0; const nom=[];
+    val.forEach(x=>{ const v=x.v*f, pct=x.p?(+x.p.iva_pct||0):0;
+      if(pct>0){ const b=v/(1+pct/100); grav+=b; iva+=v-b; nom.push(x.l.nombre); }
+      else exen+=v; });
+    return {base:grav+exen, iva:Math.round(iva), gravado:Math.round(grav),
+            exento:Math.round(exen), ok:true, conIva:nom.join(', ')};
+  },
   async ventasExcel(){ toast('Generando Excel…');
-    const v=await GETALL('kruh_ventas?order=creado_en.desc&limit=20000');
-    const cols=['Fecha','Cliente','Teléfono','Productos','Forma de pago','Subtotal','IVA','Domicilio','Total'];
+    const [v,prods]=await Promise.all([
+      GETALL('kruh_ventas?order=creado_en.desc&limit=20000'),
+      GET('kruh_productos?select=nombre,precio,iva_pct&limit=1000')]);
+    const prodIdx={}; (prods||[]).forEach(p=>{ prodIdx[this._sinTildes(p.nombre)]=p; });
+    const cols=['Fecha','Cliente','Teléfono','Productos','Forma de pago','Base gravada','Base exenta','IVA','Domicilio','Total','Productos con IVA','Revisar'];
     const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-    const rows=v.map(r=>[(r.creado_en||'').slice(0,10),r.cliente||'',r.telefono||'',r.producto||'',r.forma_pago||'',(+r.subtotal||0),(+r.iva||0),(+r.domicilio||0),(+r.monto||0)].map(q).join(';'));
+    let nIva=0, totIva=0;
+    const rows=v.map(r=>{
+      const d=this._ivaDeVenta(r, prodIdx);
+      if(d.iva>0){ nIva++; totIva+=d.iva; }
+      return [(r.creado_en||'').slice(0,10),r.cliente||'',r.telefono||'',r.producto||'',r.forma_pago||'',
+              d.gravado,d.exento,d.iva,(+r.domicilio||0),(+r.monto||0),d.conIva,
+              d.ok?'':'sin desglosar'].map(q).join(';');
+    });
     const csv='﻿'+cols.map(q).join(';')+'\r\n'+rows.join('\r\n');
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
     a.download='kruh-ventas-contabilidad.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
-    toast('Excel descargado ('+v.length+' ventas)'); },
+    toast('Excel descargado · '+v.length+' ventas · '+nIva+' con IVA ('+money(totIva)+')'); },
 
   /* ===================== GASTOS (tabla del mes + cierre mensual) ===================== */
   GASFIJOS:['Luz','Agua','Arriendo','Gas','Internet','Teléfono','Nómina','Aseo'],
