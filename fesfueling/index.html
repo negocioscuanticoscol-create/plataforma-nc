@@ -59,6 +59,8 @@ label{font-size:11.5px;font-weight:700;color:var(--sub);text-transform:uppercase
 .mini{font-size:12px;color:var(--sub)}
 @media(max-width:640px){ main{padding:12px 8px 90px} .modal{padding:14px} }
 @media print{ nav,header,.no-print{display:none!important} body{background:#fff} .print-area{display:block} }
+  .grid-fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:11px}
+  @media(max-width:520px){ .grid-fotos{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))} }
 </style>
 </head>
 <body>
@@ -113,10 +115,10 @@ function safe(fn,nom){ return async function(...a){ try{ await fn.apply(App,a); 
 
 const App={
 vista:'inicio',
-TABS:[['inicio','🏠 Inicio'],['catalogo','📦 Catálogo'],['inventario','📊 Inventario'],['compras','🛒 Compras'],['facturacion','🧾 Facturación'],['cartera','💰 Cartera'],['bancos','🏦 Bancos'],['clientes','🏢 Clientes'],['proveedores','🚚 Proveedores'],['reportes','📈 Reportes'],['importacion','🚛 Importación']],
+TABS:[['inicio','🏠 Inicio'],['busqueda','🔎 Búsqueda'],['catalogo','📦 Catálogo'],['inventario','📊 Inventario'],['compras','🛒 Compras'],['facturacion','🧾 Facturación'],['cartera','💰 Cartera'],['bancos','🏦 Bancos'],['clientes','🏢 Clientes'],['proveedores','🚚 Proveedores'],['reportes','📈 Reportes'],['importacion','🚛 Importación']],
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({inicio:this.vInicio,catalogo:this.vCatalogo,inventario:this.vInventario,compras:this.vCompras,
+  ({inicio:this.vInicio,busqueda:this.vBusqueda,catalogo:this.vCatalogo,inventario:this.vInventario,compras:this.vCompras,
     facturacion:this.vFacturacion,cartera:this.vCartera,bancos:this.vBancos,clientes:this.vClientes,
     proveedores:this.vProveedores,reportes:this.vReportes,importacion:this.vImportacion}[v]).call(this); },
 set(h){ $('main').innerHTML=h; window.scrollTo(0,0); },
@@ -128,6 +130,185 @@ async provs(){ this._prov=await GETALL('ff_proveedores?order=razon_social&limit=
 async docs(){ this._docs=await GETALL('ff_documentos?order=creado_en.desc&limit=4000'); return this._docs; },
 async abonos(){ this._abo=await GETALL('ff_abonos?order=fecha.desc&limit=6000'); return this._abo; },
 cliNom(id){ const c=(this._cli||[]).find(x=>x.id===id); return c?c.empresa:'—'; },
+
+/* ================= BÚSQUEDA DE PROVEEDORES =================
+   Cada foto de producto es una ficha. Se le anotan hasta 5 direcciones de
+   proveedores candidatos, se marca cuál se ENCONTRÓ que sirve y cuál se
+   ESCOGIÓ, y con el desglose de costos de importación se crea la referencia:
+   ahí ya pasa a Catálogo (precio de venta) y a Inventario (compra + venta). */
+FOTOS:'fotos/',
+async busq(){ this._busq=await GETALL('ff_busqueda?order=nombre&limit=1000'); return this._busq; },
+vBusqueda: safe(async function(){
+  await this.busq();
+  this._bqPaint();
+},'la búsqueda'),
+_bqPaint(){
+  const B=this._busq||[];
+  const f=this._bqFil||'todos';
+  const q=(this._bqQ||'').trim().toLowerCase();
+  const cnt={todos:B.length,
+    buscando:B.filter(x=>x.estado==='buscando').length,
+    escogido:B.filter(x=>x.estado==='escogido').length,
+    creado:B.filter(x=>x.estado==='creado').length,
+    nombrar:B.filter(x=>x.por_nombrar).length};
+  let L=B;
+  if(f==='nombrar') L=B.filter(x=>x.por_nombrar); else if(f!=='todos') L=B.filter(x=>x.estado===f);
+  if(q) L=L.filter(x=>String(x.nombre||'').toLowerCase().includes(q));
+  const caj=(k,t)=>`<button class="btn ${f===k?'':'gh'}" style="padding:8px 13px" onclick="App._bqFil='${k}';App._bqPaint()">${t}</button>`;
+  const badge=x=> x.estado==='creado' ? '<span class="tag" style="background:#e7f6ec;color:#1c7a3e">✓ referencia creada</span>'
+                : x.estado==='escogido' ? '<span class="tag" style="background:#fff4e5;color:#8a5300">proveedor escogido</span>'
+                : '<span class="tag">buscando</span>';
+  this.set(`<h2>🔎 Búsqueda de proveedores</h2>
+    <div class="mini">Cada foto es un producto por cotizar. Anota hasta 5 direcciones, marca la que sirve y crea la referencia.</div>
+    <div class="row" style="gap:7px;flex-wrap:wrap;margin:12px 0">
+      ${caj('todos','Todos · '+cnt.todos)}${caj('buscando','Buscando · '+cnt.buscando)}
+      ${caj('escogido','Escogidos · '+cnt.escogido)}${caj('creado','Creados · '+cnt.creado)}
+      ${caj('nombrar','⚠️ Sin nombre · '+cnt.nombrar)}
+      <input placeholder="Buscar por nombre…" value="${esc(this._bqQ||'')}" style="flex:1;min-width:160px"
+             oninput="App._bqQ=this.value;clearTimeout(App._bqT);App._bqT=setTimeout(()=>App._bqPaint(),300)">
+    </div>
+    <div class="grid-fotos">
+      ${L.length?L.map(x=>`
+        <div class="card" style="padding:10px">
+          <img src="${this.FOTOS}${esc(x.archivo)}" alt="${esc(x.nombre)}" loading="lazy"
+               style="width:100%;height:140px;object-fit:contain;background:#f6f7f9;border-radius:8px;cursor:pointer"
+               onclick="App.bqAbrir('${esc(x.id)}')">
+          <div style="font-weight:700;font-size:13px;margin-top:7px;${x.por_nombrar?'color:#b45309':''}">${esc(x.nombre)}</div>
+          <div style="margin-top:4px">${badge(x)}</div>
+          <div class="row" style="gap:6px;margin-top:7px">
+            <button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAbrir('${esc(x.id)}')">✎ Trabajar</button>
+            ${x.estado!=='creado'?`<button class="btn" style="padding:6px 10px" onclick="App.bqRef('${esc(x.id)}')">＋ Referencia</button>`:''}
+          </div>
+        </div>`).join('')
+      :'<div class="empty">Nada con ese filtro.</div>'}
+    </div>`);
+},
+bqAbrir(id){
+  const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
+  modal(`<h3>${esc(x.nombre)}</h3>
+    <img src="${this.FOTOS}${esc(x.archivo)}" style="width:100%;max-height:230px;object-fit:contain;background:#f6f7f9;border-radius:9px;margin:8px 0">
+    <label>Nombre del producto</label>
+    <input id="bq_nom" value="${esc(x.nombre)}" placeholder="Cómo se llama de verdad">
+    <div class="mini" style="margin-top:9px;font-weight:700">DÓNDE PODRÍA ESTAR — hasta 5 direcciones</div>
+    ${[1,2,3,4,5].map(i=>`<input id="bq_p${i}" value="${esc(x['prov'+i]||'')}" placeholder="Dirección ${i} (Alibaba, Made-in-China…)" style="margin-top:5px">`).join('')}
+    <label style="margin-top:10px">✅ La que encontramos que sirve</label>
+    <input id="bq_enc" value="${esc(x.encontrado||'')}" placeholder="Pega la dirección que sí tiene el producto">
+    <label>⭐ La que escogemos como proveedor</label>
+    <input id="bq_esc" value="${esc(x.escogido||'')}" placeholder="La definitiva">
+    <label>Nombre del proveedor</label>
+    <input id="bq_prov" value="${esc(x.proveedor||'')}" placeholder="Cómo se llama la empresa">
+    <label>Notas</label>
+    <textarea id="bq_not" rows="2" placeholder="Precio que dieron, mínimo de compra, tiempos…">${esc(x.notas||'')}</textarea>
+    <div class="row" style="gap:8px;margin-top:12px">
+      <button class="btn" style="flex:1" onclick="App.bqGuardar('${esc(x.id)}')">Guardar</button>
+      <button class="btn gh" onclick="cerrar()">Cancelar</button>
+      <button class="btn gh" style="color:#b3261e" onclick="App.bqBorrar('${esc(x.id)}')">✕ Borrar</button>
+    </div>`);
+},
+async bqGuardar(id){
+  const v=i=>($(i)?$(i).value.trim():'');
+  const b={nombre:v('bq_nom')||'Sin nombre', prov1:v('bq_p1'),prov2:v('bq_p2'),prov3:v('bq_p3'),
+    prov4:v('bq_p4'),prov5:v('bq_p5'), encontrado:v('bq_enc'), escogido:v('bq_esc'),
+    proveedor:v('bq_prov'), notas:v('bq_not'), actualizado:new Date().toISOString()};
+  b.por_nombrar = /^por nombrar/i.test(b.nombre);
+  const x=(this._busq||[]).find(z=>z.id===id)||{};
+  if(x.estado!=='creado') b.estado = b.escogido ? 'escogido' : 'buscando';
+  const r=await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),b);
+  if(r===null){ toast('⚠️ No se guardó'); return; }
+  Object.assign(x,b); cerrar(); toast('Guardado'); this._bqPaint();
+},
+async bqBorrar(id){
+  if(!confirm('¿Quitar esta ficha de la búsqueda?\n\nLa foto no se borra del disco.')) return;
+  await api('ff_busqueda?id=eq.'+encodeURIComponent(id),{method:'DELETE'});
+  this._busq=(this._busq||[]).filter(x=>x.id!==id);
+  cerrar(); toast('Quitada'); this._bqPaint();
+},
+
+/* ---------- crear la referencia con el costo de importación ---------- */
+bqRef(id){
+  const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
+  this._bqRefId=id;
+  modal(`<h3>＋ Crear referencia</h3>
+    <div class="mini">${esc(x.nombre)}${x.proveedor?' · '+esc(x.proveedor):''}</div>
+    <div class="g2" style="margin-top:8px">
+      <div><label>Código</label><input id="rf_cod" placeholder="FES-001"></div>
+      <div><label>Categoría</label><input id="rf_cat" placeholder="Bombas, filtros, acoples…"></div>
+    </div>
+    <label>Nombre</label><input id="rf_nom" value="${esc(x.nombre)}">
+    <div class="mini" style="margin-top:11px;font-weight:700">🇨🇳 COSTO DE IMPORTACIÓN</div>
+    <div class="g2">
+      <div><label>FOB China (USD)</label><input id="rf_usd" inputmode="decimal" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>TRM (pesos por dólar)</label><input id="rf_trm" inputmode="decimal" placeholder="4000" oninput="App.bqCalc()"></div>
+    </div>
+    <div class="g2">
+      <div><label>Flete internacional</label><input id="rf_fle" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>Seguro</label><input id="rf_seg" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+    </div>
+    <div class="g2">
+      <div><label>Arancel %</label><input id="rf_ara" inputmode="decimal" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>IVA importación %</label><input id="rf_iva" inputmode="decimal" value="19" oninput="App.bqCalc()"></div>
+    </div>
+    <div class="g2">
+      <div><label>Nacionalización (SIA, puerto)</label><input id="rf_nac" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+      <div><label>Transporte interno</label><input id="rf_tra" inputmode="numeric" placeholder="0" oninput="App.bqCalc()"></div>
+    </div>
+    <div id="rf_desglose" class="card" style="margin-top:10px;padding:11px;background:#f6f7f9"></div>
+    <label>Margen %</label><input id="rf_mar" inputmode="decimal" placeholder="35" oninput="App.bqCalc()">
+    <div id="rf_venta" style="font-weight:800;font-size:17px;margin-top:8px"></div>
+    <div class="row" style="gap:8px;margin-top:12px">
+      <button class="btn" style="flex:1" onclick="App.bqRefOk()">Crear referencia</button>
+      <button class="btn gh" onclick="cerrar()">Cancelar</button>
+    </div>`);
+  this.bqCalc();
+},
+_n(id){ return +String(($(id)||{}).value||'').replace(/[^0-9.]/g,'')||0; },
+/* El IVA de importación NO es costo: se descuenta después. Por eso el precio de
+   venta sale del costo SIN IVA; el IVA solo se muestra para saber cuánta plata
+   hay que poner en la nacionalización. */
+bqCalc(){
+  const usd=this._n('rf_usd'), trm=this._n('rf_trm'), fle=this._n('rf_fle'), seg=this._n('rf_seg');
+  const ara=this._n('rf_ara'), ivp=this._n('rf_iva'), nac=this._n('rf_nac'), tra=this._n('rf_tra');
+  const fob=usd*trm;
+  const cif=fob+fle+seg;
+  const arancel=cif*ara/100;
+  const ivaImp=(cif+arancel)*ivp/100;
+  const costo=cif+arancel+nac+tra;             // el IVA se recupera, no suma
+  const mar=this._n('rf_mar');
+  const venta=Math.round(costo*(1+mar/100));
+  this._bqCosto=Math.round(costo); this._bqVenta=venta; this._bqIvaImp=Math.round(ivaImp);
+  const fila=(t,v,x)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;${x||''}"><span>${t}</span><b>${money(v)}</b></div>`;
+  const d=$('rf_desglose'); if(d) d.innerHTML =
+    fila('FOB en pesos ('+(usd||0)+' USD × '+(trm||0)+')',fob)
+    + fila('+ Flete internacional',fle) + fila('+ Seguro',seg)
+    + fila('= CIF',cif,'border-top:1px dashed #cbd5e1;padding-top:3px;margin-top:3px')
+    + fila('+ Arancel '+ara+'%',arancel)
+    + fila('+ Nacionalización',nac) + fila('+ Transporte interno',tra)
+    + fila('= COSTO PUESTO EN BODEGA',costo,'border-top:1px solid #94a3b8;padding-top:4px;margin-top:4px;font-size:14px')
+    + `<div class="mini" style="margin-top:6px">IVA de importación ${money(ivaImp)} — se paga al nacionalizar y se descuenta después, por eso no entra al costo.</div>`;
+  const e=$('rf_venta'); if(e) e.innerHTML='Precio de venta: <span style="color:#0f6b4f">'+money(venta)+'</span>';
+},
+async bqRefOk(){
+  const id=this._bqRefId; const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
+  const cod=($('rf_cod')?$('rf_cod').value.trim():''), nom=($('rf_nom')?$('rf_nom').value.trim():'');
+  if(!cod){ alert('Ponle un código a la referencia.'); return; }
+  if(!nom){ alert('Falta el nombre.'); return; }
+  if(!this._bqCosto){ alert('Falta el costo: al menos el FOB en dólares y la TRM.'); return; }
+  const b={codigo:cod, nombre:nom, categoria:($('rf_cat')?$('rf_cat').value.trim():''),
+    foto:x.archivo, foto_url:'fotos/'+x.archivo,
+    proveedor:x.proveedor||'', url_proveedor:x.escogido||x.encontrado||'',
+    pais_origen:'China', unidad:'UND', activo:true,
+    costo_usd:this._n('rf_usd'), trm:this._n('rf_trm'), flete_int:this._n('rf_fle'),
+    seguro:this._n('rf_seg'), arancel_pct:this._n('rf_ara'), iva_pct:this._n('rf_iva'),
+    nacionalizac:this._n('rf_nac'), transp_int:this._n('rf_tra'),
+    costo_bodega:this._bqCosto, ultimo_costo:this._bqCosto, costo_promedio:this._bqCosto,
+    margen_pct:this._n('rf_mar'), precio_venta:this._bqVenta, existencias:0};
+  const r=await post('ff_referencias',b);
+  if(!r||!r.length){ toast('⚠️ No se pudo crear la referencia'); return; }
+  await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),
+    {estado:'creado', referencia_id:r[0].id, actualizado:new Date().toISOString()});
+  x.estado='creado'; x.referencia_id=r[0].id;
+  cerrar(); toast('Referencia '+cod+' creada · venta '+money(this._bqVenta)); this._bqPaint();
+},
 
 /* ================= INICIO ================= */
 vInicio: safe(async function(){
