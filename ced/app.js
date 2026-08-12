@@ -2860,7 +2860,7 @@ const App = {
         </div>
       </div>
       <div id="co_anexos"></div>
-      <button class="btn btn-ghost" style="margin-bottom:12px" onclick="App.cotAnexar()">＋ Anexar otro producto</button>
+      <button class="btn" style="margin-bottom:12px;background:var(--azul);color:#fff" onclick="App.cotAnexar()">＋ Anexar otro producto</button>
       <div class="card" id="co_pie_box" style="display:none">
         <label>🎁 Muestra de pie (nono) — sin valor comercial</label>
         <div class="hint">Es un zapato suelto de muestra. No necesita curva de tallas.</div>
@@ -5557,6 +5557,26 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.invGarantia()">🛡️ Garantía</button>
         <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.invMovs()">📋 Movimientos</button>
       </div>
+      ${(this._prods||[]).length?`<h1 style="font-size:16px">Productos creados</h1>
+        <div class="sub">La ficha de cada uno: precio, tallas y proveedor. Toca ✎ para corregirlo.</div>
+        ${this._prods.map(p=>{
+          const pv=(this._provs||[]).find(v=>v.id===p.proveedor_id);
+          const enBodega=(this._inv||[]).filter(r=>r.referencia===p.referencia && (r.color||'')===(p.color||'')
+                          && (r.dueno||'ced')===(p.dueno||'ced') && r.ced===p.ced)
+                          .reduce((a,r)=>a+(+r.stock||0),0);
+          return `<div class="item"><div class="top"><div style="min-width:0;flex:1">
+            <div class="nom">${esc(p.referencia)}${p.color?' · '+esc(p.color):''}
+              <span style="font-size:10px;font-weight:700;background:#eef1f5;color:#54636b;padding:2px 7px;border-radius:9px;margin-left:4px">${esc(p.categoria||'sin categoría')}</span>
+              ${this._veRed()&&p.ced?`<span style="font-size:10px;font-weight:700;background:#fdeee2;color:#9a5312;padding:2px 7px;border-radius:9px;margin-left:3px">${esc(p.ced)}</span>`:''}</div>
+            ${p.descripcion?`<div class="meta" style="color:#5a6b7d">${esc(p.descripcion)}</div>`:''}
+            <div class="meta">${pv?'📋 '+esc(pv.nombre):'⚠️ sin proveedor'}
+              ${+p.costo?' · costo '+money(p.costo):' · <span style="color:#b45309">sin costo</span>'}
+              ${p.tallas?' · tallas '+esc(p.tallas):''}</div>
+            <div class="meta">${(this._listas||[]).map((L,i)=>esc(L.nombre)+' '+(+p['l'+(i+1)]?money(p['l'+(i+1)]):'—')).join(' · ')}</div>
+          </div><div style="text-align:right">
+            <div class="tot">${enBodega}</div><div class="meta">en bodega</div>
+            <a onclick="App.invProducto('${esc(this._prodK(p))}')" style="color:var(--naranja);cursor:pointer;font-size:13px">✎ editar</a>
+          </div></div></div>`;}).join('')}`:''}
       <h1 style="font-size:16px">Saldos</h1>
       <div class="sub">Índice de cobertura: cuántos días aguanta al ritmo de venta de este mes</div>
       ${grupos.length?grupos.map(g=>{
@@ -5595,6 +5615,21 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     {k:'ced',      t:'3 · Mercancía CED',      suf:' CED', et:'CED'},
   ],
   TALLAS:[34,35,36,37,38,39,40,41,42,43,44,45,46],
+  /* Cada categoría tiene su propio tallaje. Un guante o un casco no van por
+     talla de zapato, y una camisa tampoco. La talla se guarda como TEXTO en
+     inventario, justamente para que quepa una M o una XL. */
+  TALLAS_CAT:{
+    'Calzado':['34','35','36','37','38','39','40','41','42','43','44','45','46'],
+    'Ropa':['S','M','L','XL','XXL','XXXL'],
+    'EPP':['Única','S','M','L','XL'],
+    'Otros':['Única'],
+  },
+  _tallasDe(cat){ return this.TALLAS_CAT[cat] || this.TALLAS_CAT['Otros']; },
+  /* Las que trae el producto ya creado; si no tiene, las de su categoría. */
+  _tallasProd(p){
+    const g=String((p&&p.tallas)||'').split(',').map(x=>x.trim()).filter(Boolean);
+    return g.length?g:this._tallasDe(p&&p.categoria);
+  },
   _duenoDe(k){ return this.DUENOS.find(x=>x.k===k)||this.DUENOS[0]; },
   /* Como se ve la referencia. Se le pega el CED al nombre para que el
      distribuidor sepa de un vistazo cual mercancia es nuestra. */
@@ -5655,7 +5690,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
 
       <div class="row2">
         <div><label>Categoría</label>
-          <select id="pr_cat" class="field">${this.CATEGORIAS.map(c=>`<option ${c===(p.categoria||'Calzado')?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+          <select id="pr_cat" class="field" onchange="App._prTallas()">${this.CATEGORIAS.map(c=>`<option ${c===(p.categoria||'Calzado')?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
         <div><label>Referencia *</label>
           <input id="pr_ref" class="field" value="${esc(p.referencia||'')}" placeholder="701" ${nuevo?'':'readonly'}></div>
       </div>
@@ -5668,6 +5703,11 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       </div>
       <label>Descripción</label>
       <input id="pr_desc" class="field" value="${esc(p.descripcion||'')}" placeholder="Bota caña alta en cuero graso, puntera de acero">
+
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">📏 TALLAS QUE MANEJA</div>
+      <div id="pr_tallas"></div>
+      <div class="hint">Salen según la categoría. Marca solo las que de verdad manejas: son las que
+        van a aparecer al ingresar inventario.</div>
 
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">💰 COSTO Y PRECIOS · ANTES DE IVA</div>
       <label>Costo por par *</label>
@@ -5684,7 +5724,26 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
 
       <button class="btn btn-main" onclick="App.invProductoOk('${k||''}')">${nuevo?'Crear producto':'Guardar cambios'}</button>
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+    this._prTallasSel=this._tallasProd(p); this._prTallas();
     this._prOtroProv();
+  },
+  /* Casillas de talla según la categoría escogida. Conserva lo que ya estuviera
+     marcado si la talla sigue existiendo en la categoría nueva. */
+  _prTallas(){
+    const c=$('pr_tallas'); if(!c) return;
+    const cat=(($('pr_cat')||{}).value)||'Calzado';
+    const marcadas=new Set(this._prTallasSel||[]);
+    const lista=this._tallasDe(cat);
+    c.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:6px;margin-top:6px">
+      ${lista.map(t=>`<label style="display:flex;align-items:center;gap:5px;background:#fafbfc;border:1px solid var(--linea);
+        border-radius:8px;padding:7px 6px;font-size:13px;font-weight:600;cursor:pointer;margin:0">
+        <input type="checkbox" data-talla="${esc(t)}" ${marcadas.size===0||marcadas.has(t)?'checked':''}
+               style="width:16px;height:16px;accent-color:var(--naranja)"> ${esc(t)}</label>`).join('')}
+    </div>`;
+  },
+  _prTallasLeer(){
+    return [...document.querySelectorAll('#pr_tallas input[data-talla]')]
+      .filter(i=>i.checked).map(i=>i.dataset.talla);
   },
   _prOtroProv(){ const s=$('pr_prov'), w=$('pr_prov2wrap'); if(!s||!w) return;
     const n=s.value==='__nuevo'; w.style.display=n?'block':'none';
@@ -5711,7 +5770,9 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const fila={ ced:sede, referencia:ref, color:color||'', dueno, proveedor_id:provId,
       categoria:$('pr_cat').value, descripcion:($('pr_desc').value||'').trim()||null,
       costo, minimo:+$('pr_min').value||0, condiciones:($('pr_cond').value||'').trim()||null,
-      activo:true, l1:num('pr_l1'), l2:num('pr_l2'), l3:num('pr_l3'), l4:num('pr_l4') };
+      activo:true, l1:num('pr_l1'), l2:num('pr_l2'), l3:num('pr_l3'), l4:num('pr_l4'),
+      tallas:this._prTallasLeer().join(',') };
+    if(!fila.tallas){ alert('Marca al menos una talla.'); return; }
     const { error } = await this.sb.from('ced_prov_referencias')
       .upsert(fila,{onConflict:'ced,referencia,color,dueno'});
     if(error){ alert('No se pudo guardar el producto: '+error.message); return; }
@@ -5743,19 +5804,14 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
             ${refs.map(r=>`<option>${esc(r)}</option>`).join('')}
           </select></div>
         <div><label>Color</label>
-          <select id="iv_col" class="field" onchange="App._invProdInfo()"></select></div>
+          <select id="iv_col" class="field" onchange="App._invProdInfo();App._invGrid()"></select></div>
       </div>
       <label>Proveedor</label>
       <input id="iv_provtxt" class="field" readonly style="background:#f4f5f7">
       <div id="iv_prod_info" class="hint" style="margin-top:6px"></div>
 
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">👟 CURVA · PARES POR TALLA</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;margin:8px 0">
-        ${this.TALLAS.map(t=>`<div style="text-align:center">
-          <div style="font-size:11px;color:#8a93a6;font-weight:700">${t}</div>
-          <input id="iv_t${t}" class="field" type="number" min="0" placeholder="0"
-                 style="padding:7px 4px;text-align:center" oninput="App._invCurvaTotal()"></div>`).join('')}
-      </div>
+      <div id="iv_grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;margin:8px 0"></div>
       <div id="iv_curva_tot" style="font-size:13px;font-weight:700;color:var(--verde);margin-bottom:4px">0 pares</div>
 
       <label>Documento</label><input id="iv_doc" class="field" placeholder="Remisión 1234 · factura 5678">
@@ -5772,10 +5828,23 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const opts=(this._prods||[]).filter(x=>x.referencia===ref);
     sel.innerHTML = opts.map(x=>
       `<option value="${esc(this._prodK(x))}">${esc(x.color||'sin color')}${red&&x.ced?'  ['+esc(x.ced)+']':''}</option>`).join('');
-    this._invProdInfo();
+    this._invProdInfo(); this._invGrid();
+  },
+  /* La grilla se arma con las tallas del producto: calzado saca 34-46 y ropa
+     saca S, M, L, XL. Antes siempre pintaba 34-46, así que una camisa había que
+     cargarla en tallas de zapato. */
+  _invGrid(){
+    const g=$('iv_grid'); if(!g) return;
+    const p=this._invProd();
+    this._ivTallas=this._tallasProd(p||{});
+    g.innerHTML=this._ivTallas.map(t=>`<div style="text-align:center">
+      <div style="font-size:11px;color:#8a93a6;font-weight:700">${esc(t)}</div>
+      <input id="iv_t${esc(t)}" class="field" type="number" min="0" placeholder="0"
+             style="padding:7px 4px;text-align:center" oninput="App._invCurvaTotal()"></div>`).join('');
+    this._invCurvaTotal();
   },
   _invCurvaTotal(){
-    const t=this.TALLAS.reduce((a,x)=>a+(+($('iv_t'+x)||{}).value||0),0);
+    const t=(this._ivTallas||[]).reduce((a,x)=>a+(+($('iv_t'+x)||{}).value||0),0);
     const e=$('iv_curva_tot'); if(e) e.textContent=t+' pares en total';
   },
   /* El producto elegido es el del desplegable de color: ahí va la llave completa. */
@@ -5794,7 +5863,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   async invIngresarOk(){
     const p=this._invProd();
     if(!p){ alert('Escoge la referencia y el color.'); return; }
-    const curva=this.TALLAS.map(t=>[t, +($('iv_t'+t)||{}).value||0]).filter(x=>x[1]>0);
+    const curva=(this._ivTallas||[]).map(t=>[t, +($('iv_t'+t)||{}).value||0]).filter(x=>x[1]>0);
     const total=curva.reduce((a,x)=>a+x[1],0);
     if(!total){ alert('La curva está vacía: pon los pares en al menos una talla.'); return; }
     const doc=($('iv_doc').value||'').trim();
@@ -5823,7 +5892,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     /* La sede a la que entra: la que escogieron, o la mía si no eligieron. */
     const mio = e.ced || (this.cedUser&&this.cedUser.ced) || 'Feroz';
     const actual=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color
-                                      && +r.talla===+talla && (r.dueno||'ced')===dueno
+                                      && String(r.talla)===String(talla) && (r.dueno||'ced')===dueno
                                       && r.ced===mio);
     const nuevo=(+((actual&&actual.stock)||0))+cant;
     if(nuevo<0){ alert('No alcanza: de '+this.refVisible(ref,dueno)+' talla '+talla
@@ -6040,7 +6109,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   },
   invAudDif(){
     const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim(), talla=+$('iv_tal').value||0;
-    const a=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color && +r.talla===+talla);
+    const a=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color && String(r.talla)===String(talla));
     const sis=+((a&&a.stock)||0), con=+$('iv_con').value||0, d=con-sis;
     $('iv_dif').innerHTML = (!ref||!talla) ? 'Escribe referencia y talla para comparar.'
       : `La app dice <b>${sis}</b> · contaste <b>${con}</b> · <b style="color:${d===0?'var(--verde)':'var(--rojo)'}">${d===0?'cuadra':(d>0?'sobran '+d:'faltan '+Math.abs(d))}</b>`;
@@ -6049,7 +6118,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim(), talla=+$('iv_tal').value||0;
     const con=+$('iv_con').value||0, nota=$('iv_nota').value.trim();
     if(!ref||!talla){ alert('Referencia y talla son obligatorias.'); return; }
-    const a=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color && +r.talla===+talla);
+    const a=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color && String(r.talla)===String(talla));
     const sis=+((a&&a.stock)||0);
     const { error } = await this.sb.from('inv_auditoria').insert({ referencia:ref, color:color, talla:talla,
       sistema:sis, contado:con, ajustado:!!ajustar, nota:nota, usuario:(this.perfil&&this.perfil.nombre)||'' });
