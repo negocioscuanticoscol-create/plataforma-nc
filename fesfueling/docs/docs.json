@@ -1,0 +1,116 @@
+[
+ {
+  "id": "type-c",
+  "nombre": "Type C",
+  "archivo": "type-c.pdf",
+  "kb": 1552
+ },
+ {
+  "id": "1-type-ct",
+  "nombre": "1_ Type CT_",
+  "archivo": "1-type-ct.pdf",
+  "kb": 1056
+ },
+ {
+  "id": "en-iso-1825",
+  "nombre": "EN ISO 1825",
+  "archivo": "en-iso-1825.pdf",
+  "kb": 590
+ },
+ {
+  "id": "el-1529",
+  "nombre": "El 1529",
+  "archivo": "el-1529.pdf",
+  "kb": 597
+ },
+ {
+  "id": "pd-flowmeter-data-sheet-osmeterings",
+  "nombre": "PD Flowmeter Data Sheet ---OSMeterings",
+  "archivo": "pd-flowmeter-data-sheet-osmeterings.pdf",
+  "kb": 833
+ },
+ {
+  "id": "pd-flowmeter-quotation-from-amber-osmeterings-20260224-2",
+  "nombre": "PD Flowmeter Quotation from Amber OSMeterings 20260224-2",
+  "archivo": "pd-flowmeter-quotation-from-amber-osmeterings-20260224-2.pdf",
+  "kb": 274
+ },
+ {
+  "id": "pd-flowmeter-quotation-from-amber-osmeterings-20260303",
+  "nombre": "PD Flowmeter Quotation from Amber OSMeterings 20260303",
+  "archivo": "pd-flowmeter-quotation-from-amber-osmeterings-20260303.pdf",
+  "kb": 280
+ },
+ {
+  "id": "proforma-de-water-dectetor-y-valvulas-y-otras-20",
+  "nombre": "Proforma de water dectetor y valvulas y otras 20",
+  "archivo": "proforma-de-water-dectetor-y-valvulas-y-otras-20.xlsx",
+  "kb": 651
+ },
+ {
+  "id": "clculos-envios",
+  "nombre": "clculos envios",
+  "archivo": "clculos-envios.xls",
+  "kb": 28
+ },
+ {
+  "id": "pd-flow-meter",
+  "nombre": "pd flow meter",
+  "archivo": "pd-flow-meter.pdf",
+  "kb": 715
+ },
+ {
+  "id": "cotizacion-filtros-coalescentes-facet",
+  "nombre": "Cotizacion Filtros Coalescentes FACET",
+  "archivo": "cotizacion-filtros-coalescentes-facet.pdf",
+  "kb": 133
+ },
+ {
+  "id": "efmc220v-ficha-tecnica-control-de-fluidos",
+  "nombre": "EFMC220V - Ficha tecnica control de fluidos",
+  "archivo": "efmc220v-ficha-tecnica-control-de-fluidos.pdf",
+  "kb": 1104
+ },
+ {
+  "id": "ficha-tecnica-maide-serie-m",
+  "nombre": "Ficha Técnica - MAIDE_SERIE-M",
+  "archivo": "ficha-tecnica-maide-serie-m.pdf",
+  "kb": 984
+ },
+ {
+  "id": "2025-inventario-filtros",
+  "nombre": "2025 Inventario Filtros",
+  "archivo": "2025-inventario-filtros.xlsx",
+  "kb": 114
+ },
+ {
+  "id": "catalogo",
+  "nombre": "Catalogo",
+  "archivo": "catalogo.xlsx",
+  "kb": 1831
+ },
+ {
+  "id": "energizar",
+  "nombre": "ENERGIZAR",
+  "archivo": "energizar.xlsx",
+  "kb": 10383
+ },
+ {
+  "id": "ficha-tecnica-bomba-serie-yb",
+  "nombre": "Ficha Técnica - Bomba Serie YB",
+  "archivo": "ficha-tecnica-bomba-serie-yb.pdf",
+  "kb": 1359
+ },
+ {
+  "id": "me-apoyo-en-consumibles",
+  "nombre": "ME APOYO EN CONSUMIBLES",
+  "archivo": "me-apoyo-en-consumibles.xlsx",
+  "kb": 487
+ },
+ {
+  "id": "inventario-filtros",
+  "nombre": "inventario filtros",
+  "archivo": "inventario-filtros.xlsx",
+  "kb": 17
+ }
+]

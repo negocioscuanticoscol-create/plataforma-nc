@@ -168,8 +168,19 @@ bqProm(){
                   : 'Escribe los precios para ver el promedio.';
 },
 async busq(){ this._busq=await GETALL('ff_busqueda?order=nombre&limit=1000'); return this._busq; },
+/* Biblioteca de fichas tecnicas, normas y proformas. Vive en fesfueling/docs y
+   se anexa a la ficha del producto: la norma EN ISO 1825 sirve para todas las
+   mangueras, una proforma sirve para varias valvulas. Por eso se anexan, no se
+   suben una y otra vez. */
+DOCS:'docs/',
+async docsLib(){
+  if(this._docs2) return this._docs2;
+  try{ const r=await fetch(this.DOCS+'docs.json'); this._docs2=await r.json(); }catch(e){ this._docs2=[]; }
+  return this._docs2;
+},
+_anexosDe(x){ try{ return Array.isArray(x.anexos)?x.anexos:JSON.parse(x.anexos||'[]'); }catch(e){ return []; } },
 vBusqueda: safe(async function(){
-  await this.busq();
+  await Promise.all([this.busq(), this.docsLib()]);
   this._bqPaint();
 },'la búsqueda'),
 _bqPaint(){
@@ -221,7 +232,7 @@ _bqPaint(){
                onclick="App.bqAbrir('${esc(x.id)}')">
           <div style="font-weight:700;font-size:13px;margin-top:7px;${x.por_nombrar?'color:#b45309':''}">${esc(x.nombre)}</div>
           ${(()=>{const p=this._prom(x); return p?`<div style="font-weight:800;font-size:14px;color:#0f6b4f;margin-top:3px">USD ${p.prom.toFixed(2)} <span style="font-weight:400;font-size:11px;color:#6b7280">promedio · ${p.n}</span></div>`:'';})()}
-          <div class="mini" style="margin-top:2px">${esc(x.categoria||'Otros')} · ${esc(x.aplicacion||'Mixto')}</div>
+          <div class="mini" style="margin-top:2px">${esc(x.categoria||'Otros')} · ${esc(x.aplicacion||'Mixto')}${(()=>{const n=this._anexosDe(x).length; return n?' · 📎 '+n:'';})()}</div>
           <div style="margin-top:4px">${badge(x)}</div>
           <div class="row" style="gap:6px;margin-top:7px">
             ${x.estado==='anulado'
@@ -271,14 +282,46 @@ bqAbrir(id){
     <div class="mini">De estos sale el proveedor de la referencia cuando la crees.</div>
     <label style="margin-top:10px">Nombre del proveedor</label>
     <input id="bq_prov" value="${esc(x.proveedor||'')}" placeholder="Cómo se llama la empresa">
-    <label>Notas</label>
+    <div class="mini" style="margin-top:11px;font-weight:700">📎 ANEXOS — fichas técnicas, normas, proformas</div>
+    <div id="bq_anexos"></div>
+    <select id="bq_addoc" onchange="App.bqAnexar('${esc(x.id)}',this.value);this.value=''" style="margin-top:5px">
+      <option value="">＋ Anexar un documento…</option>
+      ${(this._docs2||[]).map(dd=>`<option value="${esc(dd.id)}">${esc(dd.nombre)} · ${dd.kb} KB</option>`).join('')}
+    </select>
+    <label style="margin-top:10px">Notas</label>
     <textarea id="bq_not" rows="2" placeholder="Precio que dieron, mínimo de compra, tiempos…">${esc(x.notas||'')}</textarea>
     <div class="row" style="gap:8px;margin-top:12px">
       <button class="btn" style="flex:1" onclick="App.bqGuardar('${esc(x.id)}')">Guardar</button>
       <button class="btn gh" onclick="cerrar()">Cancelar</button>
       <button class="btn gh" style="color:#b3261e" onclick="App.bqBorrar('${esc(x.id)}')">✕ Borrar</button>
     </div>`);
-  this.bqProm();
+  this.bqProm(); this._pintaAnexos(x.id);
+},
+_pintaAnexos(id){
+  const c=$('bq_anexos'); if(!c) return;
+  const x=(this._busq||[]).find(b=>b.id===id)||{};
+  const A=this._anexosDe(x);
+  c.innerHTML = A.length ? A.map(a=>`<div class="row" style="justify-content:space-between;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #eef1f5">
+      <a href="${this.DOCS}${esc(a.archivo)}" target="_blank" style="font-size:12.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 ${esc(a.nombre)}</a>
+      <button class="btn gh" style="padding:2px 8px;font-size:11px;color:#b3261e;flex:none" onclick="App.bqQuitarAnexo('${esc(id)}','${esc(a.id)}')">✕</button>
+    </div>`).join('') : '<div class="mini">Sin anexos todavía.</div>';
+},
+async bqAnexar(id,docId){
+  if(!docId) return;
+  const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
+  const doc=(this._docs2||[]).find(d=>d.id===docId); if(!doc) return;
+  const A=this._anexosDe(x);
+  if(A.some(a=>a.id===docId)){ toast('Ya estaba anexado'); return; }
+  A.push({id:doc.id,nombre:doc.nombre,archivo:doc.archivo});
+  x.anexos=A; this._pintaAnexos(id);
+  await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),{anexos:A,actualizado:new Date().toISOString()});
+  toast('Anexado');
+},
+async bqQuitarAnexo(id,docId){
+  const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
+  const A=this._anexosDe(x).filter(a=>a.id!==docId);
+  x.anexos=A; this._pintaAnexos(id);
+  await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),{anexos:A,actualizado:new Date().toISOString()});
 },
 async bqGuardar(id){
   const v=i=>($(i)?$(i).value.trim():'');
@@ -418,7 +461,7 @@ async bqRefOk(){
     subcategoria:x.aplicacion||'',
     foto:x.archivo, foto_url:'fotos/'+x.archivo,
     proveedor:x.proveedor||'', url_proveedor:x.principal||x.escogido||x.escogido2||x.encontrado||'',
-    pais_origen:'China', unidad:'UND', activo:true,
+    pais_origen:'China', unidad:'UND', activo:true, anexos:this._anexosDe(x),
     costo_usd:this._n('rf_usd'), trm:this._n('rf_trm'), flete_int:this._n('rf_fle'),
     seguro:this._n('rf_seg'), arancel_pct:this._n('rf_ara'), iva_pct:this._n('rf_iva'),
     nacionalizac:this._n('rf_nac'), transp_int:this._n('rf_tra'), comision_pct:this._n('rf_com'),
