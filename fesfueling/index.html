@@ -191,11 +191,17 @@ bqAbrir(id){
     <input id="bq_nom" value="${esc(x.nombre)}" placeholder="Cómo se llama de verdad">
     <div class="mini" style="margin-top:9px;font-weight:700">DÓNDE PODRÍA ESTAR — hasta 5 direcciones</div>
     ${[1,2,3,4,5].map(i=>`<input id="bq_p${i}" value="${esc(x['prov'+i]||'')}" placeholder="Dirección ${i} (Alibaba, Made-in-China…)" style="margin-top:5px">`).join('')}
-    <label style="margin-top:10px">✅ La que encontramos que sirve</label>
-    <input id="bq_enc" value="${esc(x.encontrado||'')}" placeholder="Pega la dirección que sí tiene el producto">
-    <label>⭐ La que escogemos como proveedor</label>
-    <input id="bq_esc" value="${esc(x.escogido||'')}" placeholder="La definitiva">
-    <label>Nombre del proveedor</label>
+    <div class="mini" style="margin-top:11px;font-weight:700">✅ LAS QUE SÍ SIRVEN — hasta 3</div>
+    <input id="bq_enc"  value="${esc(x.encontrado||'')}"  placeholder="Sirve 1" style="margin-top:5px">
+    <input id="bq_enc2" value="${esc(x.encontrado2||'')}" placeholder="Sirve 2" style="margin-top:5px">
+    <input id="bq_enc3" value="${esc(x.encontrado3||'')}" placeholder="Sirve 3" style="margin-top:5px">
+    <div class="mini" style="margin-top:11px;font-weight:700">⭐ LAS QUE ESCOGEMOS — 2</div>
+    <input id="bq_esc"  value="${esc(x.escogido||'')}"  placeholder="Escogida 1" style="margin-top:5px">
+    <input id="bq_esc2" value="${esc(x.escogido2||'')}" placeholder="Escogida 2 (respaldo)" style="margin-top:5px">
+    <div class="mini" style="margin-top:11px;font-weight:700">🏆 AL QUE MÁS LE COMPRAMOS</div>
+    <input id="bq_ppal" value="${esc(x.principal||'')}" placeholder="El proveedor de cabecera" style="margin-top:5px">
+    <div class="mini">De estos sale el proveedor de la referencia cuando la crees.</div>
+    <label style="margin-top:10px">Nombre del proveedor</label>
     <input id="bq_prov" value="${esc(x.proveedor||'')}" placeholder="Cómo se llama la empresa">
     <label>Notas</label>
     <textarea id="bq_not" rows="2" placeholder="Precio que dieron, mínimo de compra, tiempos…">${esc(x.notas||'')}</textarea>
@@ -208,11 +214,13 @@ bqAbrir(id){
 async bqGuardar(id){
   const v=i=>($(i)?$(i).value.trim():'');
   const b={nombre:v('bq_nom')||'Sin nombre', prov1:v('bq_p1'),prov2:v('bq_p2'),prov3:v('bq_p3'),
-    prov4:v('bq_p4'),prov5:v('bq_p5'), encontrado:v('bq_enc'), escogido:v('bq_esc'),
+    prov4:v('bq_p4'),prov5:v('bq_p5'),
+    encontrado:v('bq_enc'), encontrado2:v('bq_enc2'), encontrado3:v('bq_enc3'),
+    escogido:v('bq_esc'), escogido2:v('bq_esc2'), principal:v('bq_ppal'),
     proveedor:v('bq_prov'), notas:v('bq_not'), actualizado:new Date().toISOString()};
   b.por_nombrar = /^por nombrar/i.test(b.nombre);
   const x=(this._busq||[]).find(z=>z.id===id)||{};
-  if(x.estado!=='creado') b.estado = b.escogido ? 'escogido' : 'buscando';
+  if(x.estado!=='creado') b.estado = (b.escogido||b.escogido2||b.principal) ? 'escogido' : 'buscando';
   const r=await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),b);
   if(r===null){ toast('⚠️ No se guardó'); return; }
   Object.assign(x,b); cerrar(); toast('Guardado'); this._bqPaint();
@@ -295,7 +303,7 @@ async bqRefOk(){
   if(!this._bqCosto){ alert('Falta el costo: al menos el FOB en dólares y la TRM.'); return; }
   const b={codigo:cod, nombre:nom, categoria:($('rf_cat')?$('rf_cat').value.trim():''),
     foto:x.archivo, foto_url:'fotos/'+x.archivo,
-    proveedor:x.proveedor||'', url_proveedor:x.escogido||x.encontrado||'',
+    proveedor:x.proveedor||'', url_proveedor:x.principal||x.escogido||x.escogido2||x.encontrado||'',
     pais_origen:'China', unidad:'UND', activo:true,
     costo_usd:this._n('rf_usd'), trm:this._n('rf_trm'), flete_int:this._n('rf_fle'),
     seguro:this._n('rf_seg'), arancel_pct:this._n('rf_ara'), iva_pct:this._n('rf_iva'),
