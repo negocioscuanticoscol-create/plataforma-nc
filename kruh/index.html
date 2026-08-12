@@ -3070,7 +3070,13 @@ const App={
   },
 
   /* ===================== HORAS DE ASESORÍA (solo admin) ===================== */
-  ASETIPO:['Presencial','Virtual'],
+  /* Tres formas de trabajar y se cobran distinto, asi que se suman por
+     separado: presencial es ir donde el cliente, virtual es atenderlo a
+     distancia, y programacion es el desarrollo de la app aunque el cliente no
+     este presente. */
+  ASETIPO:['Presencial','Virtual','Programación'],
+  ASEICO:{'Presencial':'🏠','Virtual':'💻','Programación':'⚙️'},
+  _aseIco(t){ return this.ASEICO[t] || '🏠'; },
   SQLASE:['create table if not exists public.kruh_asesorias (',
     '  id        uuid primary key default gen_random_uuid(),',
     '  cliente   text,','  tipo      text default \'Presencial\',',
@@ -3101,7 +3107,10 @@ const App={
     const minDe=l=>l.reduce((t,a)=>t+this._aseMin(a),0);
     const delDia=cerradas.filter(a=>this._diaKey(a.inicio)===hoyK);
     const delMes=cerradas.filter(a=>this._diaKey(a.inicio).slice(0,7)===mesK);
-    const pres=minDe(cerradas.filter(a=>a.tipo!=='Virtual')), virt=minDe(cerradas.filter(a=>a.tipo==='Virtual'));
+    /* Cada tipo por su lado. 'Presencial' se lleva tambien lo que no tenga tipo,
+       que es como estaba antes el historico dictado a mano. */
+    const minTipo=t=>minDe(cerradas.filter(a=>(a.tipo||'Presencial')===t));
+    const pres=minTipo('Presencial'), virt=minTipo('Virtual'), prog=minTipo('Programación');
     const porDia={}; cerradas.forEach(a=>{const k=this._diaKey(a.inicio);(porDia[k]=porDia[k]||[]).push(a);});
     const dias=Object.keys(porDia).sort().reverse().slice(0,20);
     return `<h1 style="font-size:18px;margin-top:18px">⏱️ Horas de asesoría</h1>
@@ -3110,7 +3119,7 @@ const App={
         <div class="kpi dark"><b>${this._hhmm(minDe(delDia))}</b><span>Hoy · ${delDia.length} sesión(es)</span></div>
         <div class="kpi"><b>${this._hhmm(minDe(delMes))}</b><span>Este mes</span></div>
         <div class="kpi"><b style="color:var(--acc)">${this._hhmm(minDe(cerradas))}</b><span>Acumulado total</span></div>
-        <div class="kpi"><b style="font-size:15px">🏠 ${this._hhmm(pres)}<br>💻 ${this._hhmm(virt)}</b><span>Presencial / Virtual</span></div>
+        <div class="kpi"><b style="font-size:13.5px;line-height:1.5">🏠 ${this._hhmm(pres)}<br>💻 ${this._hhmm(virt)}<br>⚙️ ${this._hhmm(prog)}</b><span>Presencial / Virtual / Programación</span></div>
       </div>
       ${abierta?`<div class="card" style="border:2px solid var(--ok);background:var(--okbg)">
         <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
@@ -3129,7 +3138,7 @@ const App={
           <div class="mt">${l.length} sesión(es)</div></div>
           <div class="nm" style="color:var(--acc)">${this._hhmm(minDe(l))}</div></div>
           ${l.map((a,i)=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:3px 0;border-top:1px solid var(--line2)">
-            <span>${i+1}ª · ${a.tipo==='Virtual'?'💻':'🏠'} ${esc(a.cliente||'—')} <small class="dim">${esc(this._hora(a.inicio))} → ${esc(this._hora(a.fin))}</small></span>
+            <span>${i+1}ª · ${this._aseIco(a.tipo)} ${esc(a.cliente||'—')} <small class="dim">${esc(this._hora(a.inicio))} → ${esc(this._hora(a.fin))}</small></span>
             <span style="white-space:nowrap"><b>${this._hhmm(this._aseMin(a))}</b>
               <a onclick="App.aseManual('${a.id}')" style="color:var(--acc);cursor:pointer;margin-left:7px">✎</a>
               <a onclick="App.aseDel('${a.id}')" style="color:var(--bad);cursor:pointer;margin-left:3px">✕</a></span></div>`).join('')}
