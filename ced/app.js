@@ -5385,16 +5385,18 @@ const App = {
      El grano es referencia + color + talla. */
   async vInventario(){
     this.loading();
-    const [ri,rm,rc,rp,rl] = await Promise.all([
+    const [ri,rm,rc,rp,rl,rf] = await Promise.all([
       this.sb.from('inventario').select('*').order('referencia').order('talla'),
       this.sb.from('inv_movimientos').select('*').order('creado_en',{ascending:false}).limit(500),
       this.sb.from('ced').select('*').eq('activo',true),        // para escoger a qué sede entra
       this.sb.from('ced_proveedores').select('id,nombre').eq('activo',true).order('nombre'),
-      this.sb.from('ced_listas').select('*').eq('activo',true).order('orden')   // precios por lista
+      this.sb.from('ced_listas').select('*').eq('activo',true).order('orden'),  // precios por lista
+      this.sb.from('ced_prov_referencias').select('*').eq('activo',true).order('referencia')  // las fichas de producto
     ]);
     const inv=ri.data||[], movs=rm.data||[];
     this._inv=inv; this._movs=movs;
     this._ceds=rc.data||this._ceds||[]; this._provs=rp.data||[];
+    this._prods=rf.error?[]:(rf.data||[]);   // fichas de producto, para el desplegable
     this._listas=rl.data||[];
 
     // cobertura: cuantos pares salieron este mes, para saber cuantos dias aguanta
@@ -5441,6 +5443,7 @@ const App = {
       ${enCero?`<div class="card" style="border-color:#f0c4c4;background:#fdecec;padding:11px">
         <b style="color:#b3261e">🔴 ${enCero} referencia(s) en cero</b></div>`:''}
       <div class="acciones-item" style="margin-bottom:12px">
+        <button class="btn-sm" style="background:var(--negro);color:#fff" onclick="App.invProducto()">🆕 Crear producto</button>
         <button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.invIngresar()">＋ Ingresar inventario</button>
         <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.invAuditoria()">🔍 Auditoría</button>
         <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.invGarantia()">🛡️ Garantía</button>
@@ -5503,46 +5506,131 @@ const App = {
   /* Ingreso por CURVA: se entra la referencia una vez y se reparten los pares
      por talla en una sola pantalla. Antes había que repetir el formulario
      talla por talla, que para una curva de 13 tallas era inviable. */
-  invIngresar(){
-    const provs=this._provs||[], inv=this._inv||[], listas=this._listas||[];
-    const mia=(this.cedUser&&this.cedUser.ced)||'Feroz';
+  /* ---------- PRODUCTO vs INVENTARIO ----------
+     Son dos cosas distintas y antes vivían en un solo formulario gigante:
+       · CREAR PRODUCTO = la ficha. Proveedor, categoría, referencia, costo y
+         precios por lista. Se hace UNA vez y no mueve saldos.
+       · INGRESAR INVENTARIO = sumar pares de un producto que ya existe. Solo
+         pide el producto, la curva y el documento; el costo y los precios ya
+         vienen de la ficha, así que no se pueden escribir distinto cada vez. */
+  invProducto(k){
+    const provs=this._provs||[], listas=this._listas||[];
+    const p=(this._prods||[]).find(x=>this._prodK(x)===k)||{};
+    const mia=(this.cedUser&&this.cedUser.ced)||this._sedePrincipal()||'Feroz';
     const todas=(this._ceds||[]).filter(c=>c.activo!==false);
-    /* Lo que ya existe sale en la lista; si no está, se escribe. */
-    const refs=[...new Set(inv.map(r=>r.referencia).filter(Boolean))].sort();
-    const cols=[...new Set(inv.map(r=>r.color).filter(Boolean))].sort();
-    const descs=[...new Set(inv.map(r=>r.descripcion).filter(Boolean))].sort();
-    this.modal(`<h3>＋ Ingresar inventario</h3>
-      <div class="sub">La curva completa de una vez</div>
+    const cols=[...new Set((this._inv||[]).map(r=>r.color).filter(Boolean))].sort();
+    const nuevo=!k;
+    this.modal(`<h3>${nuevo?'🆕 Crear producto':'✎ Editar producto'}</h3>
+      <div class="sub">La ficha: de quién es, qué es y a qué precio</div>
 
       <div class="row2">
-        <div><label>¿A qué sede entra?</label>
-          <select id="iv_ced" class="field">${todas.map(c=>
-            `<option value="${esc(c.nombre)}" ${c.nombre===mia?'selected':''}>${esc(c.nombre_comercial||c.nombre)}</option>`).join('')}</select></div>
-        <div><label>¿De quién es?</label>
-          <select id="iv_dueno" class="field" onchange="App._invRefPreview()">
-            ${this.DUENOS.map(d=>`<option value="${d.k}" ${d.k==='ced'?'selected':''}>${d.t}</option>`).join('')}
+        <div><label>¿De qué sede?</label>
+          <select id="pr_ced" class="field" ${nuevo?'':'disabled'}>${todas.map(c=>
+            `<option value="${esc(c.nombre)}" ${c.nombre===(p.ced||mia)?'selected':''}>${esc(c.nombre_comercial||c.nombre)}</option>`).join('')}</select></div>
+        <div><label>¿De quién es la mercancía?</label>
+          <select id="pr_dueno" class="field">
+            ${this.DUENOS.map(d=>`<option value="${d.k}" ${d.k===(p.dueno||'ced')?'selected':''}>${d.t}</option>`).join('')}
           </select></div>
       </div>
 
-      <div class="row2">
-        <div><label>Referencia</label>
-          <input id="iv_ref" class="field" list="iv_ref_dl" placeholder="701" oninput="App._invRefPreview()">
-          <datalist id="iv_ref_dl">${refs.map(r=>`<option value="${esc(r)}">`).join('')}</datalist></div>
-        <div><label>Color</label>
-          <input id="iv_col" class="field" list="iv_col_dl" placeholder="negro">
-          <datalist id="iv_col_dl">${cols.map(c=>`<option value="${esc(c)}">`).join('')}
-            <option value="negro"><option value="blanco"><option value="miel"><option value="café"></datalist></div>
+      <label>Proveedor *</label>
+      <select id="pr_prov" class="field" onchange="App._prOtroProv()">
+        <option value="">— escoge el proveedor —</option>
+        ${provs.map(x=>`<option value="${esc(x.id)}" ${x.id===p.proveedor_id?'selected':''}>${esc(x.nombre)}</option>`).join('')}
+        <option value="__nuevo">＋ Otro proveedor…</option>
+      </select>
+      <div id="pr_prov2wrap" style="display:none;margin-top:6px">
+        <label style="margin-top:0">¿Cómo se llama?</label>
+        <input id="pr_prov2" class="field" placeholder="Quién lo fabrica o lo vende">
+        <div class="hint">Queda creado en <b>Proveedores</b>.</div>
       </div>
+
       <div class="row2">
         <div><label>Categoría</label>
-          <select id="iv_cat" class="field">${this.CATEGORIAS.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
-        <div></div>
+          <select id="pr_cat" class="field">${this.CATEGORIAS.map(c=>`<option ${c===(p.categoria||'Calzado')?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+        <div><label>Referencia *</label>
+          <input id="pr_ref" class="field" value="${esc(p.referencia||'')}" placeholder="701" ${nuevo?'':'readonly'}></div>
+      </div>
+      <div class="row2">
+        <div><label>Color</label>
+          <input id="pr_col" class="field" list="pr_col_dl" value="${esc(p.color||'')}" placeholder="negro" ${nuevo?'':'readonly'}>
+          <datalist id="pr_col_dl">${cols.map(c=>`<option value="${esc(c)}">`).join('')}
+            <option value="negro"><option value="blanco"><option value="miel"><option value="café"></datalist></div>
+        <div><label>Mínimo en bodega</label><input id="pr_min" class="field" type="number" value="${p.minimo||0}"></div>
       </div>
       <label>Descripción</label>
-      <input id="iv_desc" class="field" list="iv_desc_dl" placeholder="Bota caña alta en cuero graso, puntera de acero">
-      <datalist id="iv_desc_dl">${descs.map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
-      <div class="hint">Qué es la referencia, en palabras. Sale en los saldos y en la ficha.</div>
-      <div id="iv_prev" class="hint"></div>
+      <input id="pr_desc" class="field" value="${esc(p.descripcion||'')}" placeholder="Bota caña alta en cuero graso, puntera de acero">
+
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">💰 COSTO Y PRECIOS · ANTES DE IVA</div>
+      <label>Costo por par *</label>
+      <input id="pr_costo" class="field" inputmode="numeric" value="${p.costo||''}" placeholder="28000">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:6px">
+        ${listas.map((L,i)=>`<div><label style="margin-top:0">${esc(L.nombre)}</label>
+          <input id="pr_l${i+1}" class="field" inputmode="numeric" value="${p['l'+(i+1)]||''}" placeholder="0" style="padding:8px"></div>`).join('')}
+      </div>
+      <div class="hint">El precio de cada lista, <b>sin IVA</b>. De aquí saca el precio la cotización.</div>
+
+      <label>Condiciones de venta</label>
+      <textarea id="pr_cond" class="field" style="min-height:52px"
+        placeholder="Ej: no se vende por debajo de la lista Distribuidor · el flete lo paga el cliente">${esc(p.condiciones||'')}</textarea>
+
+      <button class="btn btn-main" onclick="App.invProductoOk('${k||''}')">${nuevo?'Crear producto':'Guardar cambios'}</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+    this._prOtroProv();
+  },
+  _prOtroProv(){ const s=$('pr_prov'), w=$('pr_prov2wrap'); if(!s||!w) return;
+    const n=s.value==='__nuevo'; w.style.display=n?'block':'none';
+    if(n && $('pr_prov2')) $('pr_prov2').focus(); },
+  _prodK(x){ return (x.ced||'')+'||'+(x.referencia||'')+'||'+(x.color||'')+'||'+(x.dueno||'ced'); },
+
+  async invProductoOk(k){
+    const ref=($('pr_ref').value||'').trim().toUpperCase();
+    if(!ref){ alert('Falta la referencia.'); $('pr_ref').focus(); return; }
+    const num=id=>+String((($(id)||{}).value)||'').replace(/[^0-9]/g,'')||null;
+    const costo=num('pr_costo');
+    if(!costo){ alert('Falta el costo por par.\n\nSin costo no se puede saber cuánto deja la venta.'); $('pr_costo').focus(); return; }
+    const sede=$('pr_ced').value, dueno=$('pr_dueno').value, color=($('pr_col').value||'').trim();
+    let provId=$('pr_prov').value||'';
+    if(provId==='__nuevo'){
+      const provNom=(($('pr_prov2')||{}).value||'').trim();
+      if(!provNom){ alert('Escribe el nombre del proveedor nuevo.'); return; }
+      provId='';
+      try{ const { data:np } = await this.sb.from('ced_proveedores')
+        .insert({nombre:provNom, ced:sede, activo:true}).select('id').single();
+        if(np) provId=np.id; }catch(e){ console.warn('proveedor nuevo:', e.message||e); }
+    }
+    if(!provId){ alert('Escoge el proveedor.\n\nSin él no se sabe de dónde sale la mercancía ni a quién reclamarle.'); return; }
+    const fila={ ced:sede, referencia:ref, color:color||'', dueno, proveedor_id:provId,
+      categoria:$('pr_cat').value, descripcion:($('pr_desc').value||'').trim()||null,
+      costo, minimo:+$('pr_min').value||0, condiciones:($('pr_cond').value||'').trim()||null,
+      activo:true, l1:num('pr_l1'), l2:num('pr_l2'), l3:num('pr_l3'), l4:num('pr_l4') };
+    const { error } = await this.sb.from('ced_prov_referencias')
+      .upsert(fila,{onConflict:'ced,referencia,color,dueno'});
+    if(error){ alert('No se pudo guardar el producto: '+error.message); return; }
+    this.cerrarModal(); this.toast(k?'Producto actualizado ✅':'Producto creado ✅');
+    this.go('inventario');
+  },
+
+  /* ---------- INGRESAR INVENTARIO: solo suma pares ---------- */
+  invIngresar(){
+    const prods=this._prods||[];
+    if(!prods.length){
+      this.modal(`<h3>＋ Ingresar inventario</h3>
+        <div class="card" style="border-color:#f3ddb0;background:#fdf6e6">
+          <b>Todavía no hay productos creados.</b>
+          <div style="font-size:13.5px;margin-top:5px">El inventario suma pares de un producto que ya exista.
+            Crea primero el producto con su proveedor, categoría y costo.</div></div>
+        <button class="btn btn-main" onclick="App.cerrarModal();App.invProducto()">🆕 Crear producto</button>
+        <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+      return; }
+    const red=this._veRed();
+    this.modal(`<h3>＋ Ingresar inventario</h3>
+      <div class="sub">La curva completa de una vez</div>
+      <label>Producto *</label>
+      <select id="iv_prod" class="field" onchange="App._invProdInfo()">
+        ${prods.map(x=>`<option value="${esc(this._prodK(x))}">${esc(x.referencia)}${x.color?' · '+esc(x.color):''}${x.descripcion?' — '+esc(x.descripcion):''}${red&&x.ced?'  ['+esc(x.ced)+']':''}</option>`).join('')}
+      </select>
+      <div id="iv_prod_info" class="hint" style="margin-top:6px"></div>
 
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">👟 CURVA · PARES POR TALLA</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:6px;margin:8px 0">
@@ -5553,328 +5641,50 @@ const App = {
       </div>
       <div id="iv_curva_tot" style="font-size:13px;font-weight:700;color:var(--verde);margin-bottom:4px">0 pares</div>
 
-      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">💰 COSTO Y PRECIOS · ANTES DE IVA</div>
-      <div class="row2">
-        <div><label>Costo por par</label><input id="iv_costo" class="field" inputmode="numeric" placeholder="28000"></div>
-        <div><label>Mínimo en bodega</label><input id="iv_min" class="field" type="number" placeholder="0"></div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:6px">
-        ${listas.map((L,i)=>`<div><label style="margin-top:0">${esc(L.nombre)}</label>
-          <input id="iv_l${i+1}" class="field" inputmode="numeric" placeholder="0" style="padding:8px"></div>`).join('')}
-      </div>
-      <div class="hint">El precio de cada lista, <b>sin IVA</b>. Se guardan con la referencia y quedan para cotizar.
-        El 19% se suma en la cotización, donde viene marcado por defecto y se puede quitar si el cliente lo pide sin IVA.</div>
-
-      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">📋 ORIGEN Y CONDICIONES</div>
-      <label>Proveedor *</label>
-      <select id="iv_prov" class="field" onchange="App._invOtroProv()">
-        <option value="">— escoge el proveedor —</option>
-        ${provs.map(p=>`<option value="${esc(p.id)}">${esc(p.nombre)}</option>`).join('')}
-        <option value="__nuevo">＋ Otro proveedor…</option>
-      </select>
-      <div id="iv_prov2wrap" style="display:none;margin-top:6px">
-        <label style="margin-top:0">¿Cómo se llama?</label>
-        <input id="iv_prov2" class="field" placeholder="Quién la fabricó o la vendió">
-        <div class="hint">Queda creado en <b>Proveedores</b>: la próxima vez sale en la lista.</div>
-      </div>
       <label>Documento</label><input id="iv_doc" class="field" placeholder="Remisión 1234 · factura 5678">
-      <label>Condiciones de venta</label>
-      <textarea id="iv_cond" class="field" style="min-height:52px"
-        placeholder="Ej: no se vende por debajo de la lista Distribuidor · el flete lo paga el cliente · devolución a los 30 días"></textarea>
-      <div class="hint">Lo que el aliado debe respetar al vender esta mercancía. Sale en la ficha de la referencia.</div>
+      <div class="hint">De dónde salió esta entrada. Queda escrito en el movimiento.</div>
 
       <button class="btn btn-main" onclick="App.invIngresarOk()">Ingresar la curva</button>
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
-    this._invRefPreview();
+    this._invProdInfo();
   },
-  _invOtroProv(){ const s=$('iv_prov'), w=$('iv_prov2wrap'); if(!s||!w) return;
-    const nuevo=s.value==='__nuevo'; w.style.display=nuevo?'block':'none';
-    if(nuevo && $('iv_prov2')) $('iv_prov2').focus(); },
   _invCurvaTotal(){
     const t=this.TALLAS.reduce((a,x)=>a+(+($('iv_t'+x)||{}).value||0),0);
     const e=$('iv_curva_tot'); if(e) e.textContent=t+' pares en total';
   },
-  /* Muestra cómo va a quedar el nombre, para que no haya sorpresas */
-  _invRefPreview(){
-    const e=$('iv_prev'); if(!e) return;
-    const r=($('iv_ref')&&$('iv_ref').value.trim())||'', d=($('iv_dueno')&&$('iv_dueno').value)||'ced';
-    e.innerHTML = r ? `Va a quedar como <b>${esc(this.refVisible(r,d))}</b>` : 'Escoge o escribe la referencia.';
+  /* Recuerda de qué producto se está hablando: sede, dueño, proveedor y costo.
+     Son datos de la ficha; acá no se pueden cambiar. */
+  _invProdInfo(){
+    const e=$('iv_prod_info'); if(!e) return;
+    const p=(this._prods||[]).find(x=>this._prodK(x)===($('iv_prod')||{}).value);
+    if(!p){ e.textContent=''; return; }
+    const prov=(this._provs||[]).find(v=>v.id===p.proveedor_id);
+    e.innerHTML = `Entra a <b>${esc(p.ced||'')}</b> · ${esc(this._duenoDe(p.dueno||'ced').t)}`
+      + (prov?` · 📋 ${esc(prov.nombre)}`:'')
+      + (p.categoria?` · ${esc(p.categoria)}`:'')
+      + (+p.costo?` · costo ${money(p.costo)}`:' · <span style="color:#b45309">sin costo</span>');
   },
   async invIngresarOk(){
-    const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim();
-    const dueno=$('iv_dueno').value;
-    /* El proveedor ya no es texto suelto: se escoge de la lista y se guarda
-       también su id, para que el inventario quede amarrado a su ficha. Si es
-       uno nuevo, se crea en Proveedores y se usa el id que devuelva. */
-    const provSel=($('iv_prov')||{}).value||'';
-    let prov='', provId=null;
-    if(provSel==='__nuevo'){
-      prov=(($('iv_prov2')||{}).value||'').trim();
-      if(!prov){ alert('Escribe el nombre del proveedor nuevo.'); $('iv_prov2').focus(); return; }
-    }else if(provSel){
-      const p=(this._provs||[]).find(x=>String(x.id)===String(provSel));
-      if(p){ prov=p.nombre; provId=p.id; }
-    }
-    const doc=$('iv_doc').value.trim(), cond=$('iv_cond').value.trim();
-    const desc=(($('iv_desc')||{}).value||'').trim();
-    const categ=(($('iv_cat')||{}).value||'').trim();
-    const num=id=>+String(($(id)||{}).value||'').replace(/\D/g,'')||null;
-    const costo=num('iv_costo'), min=+$('iv_min').value||0;
-    const sede=$('iv_ced').value;
-    const curva=this.TALLAS.map(t=>[t, +($('iv_t'+t)||{}).value||0]).filter(([t,c])=>c>0);
-    const total=curva.reduce((a,[t,c])=>a+c,0);
-    if(!ref){ alert('Falta la referencia.'); $('iv_ref').focus(); return; }
+    const p=(this._prods||[]).find(x=>this._prodK(x)===($('iv_prod')||{}).value);
+    if(!p){ alert('Escoge el producto.'); return; }
+    const curva=this.TALLAS.map(t=>[t, +($('iv_t'+t)||{}).value||0]).filter(x=>x[1]>0);
+    const total=curva.reduce((a,x)=>a+x[1],0);
     if(!total){ alert('La curva está vacía: pon los pares en al menos una talla.'); return; }
-    if(!prov){ alert('Falta el proveedor.\n\nSin él no se sabe de dónde salió la mercancía ni a quién reclamarle.'); $('iv_prov').focus(); return; }
-
-    /* Un proveedor nuevo se crea antes de guardar la curva, para tener su id. */
-    if(!provId){
-      try{ const { data:np } = await this.sb.from('ced_proveedores')
-        .insert({nombre:prov, ced:sede, activo:true}).select('id').single();
-        if(np) provId=np.id; }catch(e){ console.warn('proveedor nuevo:', e.message||e); }
-    }
-
-    /* 1) el catálogo de la referencia: costo, precios y condiciones */
-    /* color va vacío, nunca null: la llave única de la referencia es
-       (ced, referencia, color, dueno) y un null rompía el upsert. */
-    const cat={ ced:sede, referencia:ref, color:color||'', dueno, proveedor_id:provId,
-      descripcion:desc||null, categoria:categ||null,
-      marca:this._duenoDe(dueno).et, costo, minimo:min, condiciones:cond||null, activo:true,
-      tallas:curva.map(([t])=>t).join(','), notas:prov,
-      l1:num('iv_l1'), l2:num('iv_l2'), l3:num('iv_l3'), l4:num('iv_l4') };
-    const { error:e1 } = await this.sb.from('ced_prov_referencias')
-      .upsert(cat,{onConflict:'ced,referencia,color,dueno'});
-    if(e1) console.warn('catálogo:', e1.message);   // no frena el ingreso
-
-    /* 2) los pares, talla por talla */
+    const doc=($('iv_doc').value||'').trim();
+    const prov=(this._provs||[]).find(v=>v.id===p.proveedor_id);
     let ok=0;
-    for(const [t,c] of curva){
-      const r=await this._invSumar(ref,color,t,c,'entrada',doc||'Ingreso de curva',
-        {dueno, proveedor:prov, proveedor_id:provId, costo, minimo:min, documento:doc,
-         descripcion:desc, categoria:categ, ced:sede});
-      if(r) ok+=c; else break;
+    for(const par of curva){
+      const r=await this._invSumar(p.referencia, p.color||'', par[0], par[1], 'entrada', doc||'Ingreso de curva',
+        {dueno:p.dueno||'ced', proveedor:(prov&&prov.nombre)||null, proveedor_id:p.proveedor_id||null,
+         costo:+p.costo||null, minimo:+p.minimo||0, documento:doc,
+         descripcion:p.descripcion||'', categoria:p.categoria||'', ced:p.ced});
+      if(r) ok+=par[1]; else break;
     }
     if(!ok) return;
     this.cerrarModal();
-    this.toast('＋'+ok+' pares de '+this.refVisible(ref,dueno)+' en '+sede);
-    /* Después de ingresar la curva se vuelve al panel de Inventario arrancando
-       arriba. Antes solo se repintaba la lista y la página quedaba a media
-       altura, donde la había dejado el modal: parecía que no se había guardado. */
+    this.toast('＋'+ok+' pares de '+this.refVisible(p.referencia,p.dueno||'ced')+' en '+p.ced);
     this.go('inventario');
   },
-
-  /* suma (o resta, si viene negativo) y deja el movimiento escrito.
-     'extra' trae dueño, proveedor, costo, mínimo y documento cuando es una
-     entrada. El dueño hace parte del grano: los pares nuestros y los del
-     aliado son saldos distintos aunque sean la misma referencia y talla. */
-  async _invSumar(ref,color,talla,cant,tipo,motivo,extra){
-    const e = extra||{};
-    const dueno = e.dueno || 'ced';
-    /* La sede a la que entra: la que escogieron, o la mía si no eligieron. */
-    const mio = e.ced || (this.cedUser&&this.cedUser.ced) || 'Feroz';
-    const actual=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color
-                                      && +r.talla===+talla && (r.dueno||'ced')===dueno
-                                      && r.ced===mio);
-    const nuevo=(+((actual&&actual.stock)||0))+cant;
-    if(nuevo<0){ alert('No alcanza: de '+this.refVisible(ref,dueno)+' talla '+talla
-                     +' hay '+((actual&&actual.stock)||0)+' pares.'); return false; }
-    const fila={referencia:ref, color:color, talla:talla, stock:nuevo, dueno,
-                actualizado_en:new Date().toISOString(), ced:mio};
-    if(e.proveedor)    fila.proveedor=e.proveedor;
-    if(e.proveedor_id) fila.proveedor_id=e.proveedor_id;
-    if(e.descripcion)  fila.descripcion=e.descripcion;
-    if(e.categoria)    fila.categoria=e.categoria;
-    if(e.costo)        fila.costo=e.costo;
-    if(e.minimo)       fila.minimo=e.minimo;
-    const { error } = await this.sb.from('inventario')
-      .upsert(fila,{onConflict:'ced,referencia,color,talla,dueno'});
-    if(error){ alert('No se pudo guardar el inventario: '+error.message); return false; }
-    await this.sb.from('inv_movimientos').insert({ referencia:ref, color:color, talla:talla, tipo:tipo,
-      cantidad:Math.abs(cant), motivo:motivo, usuario:(this.perfil&&this.perfil.nombre)||'',
-      dueno, proveedor:e.proveedor||null, proveedor_id:e.proveedor_id||null,
-      costo:e.costo||null, documento:e.documento||null,
-      descripcion:e.descripcion||null, ced:mio });
-    return true;
-  },
-
-  /* ============ PENDIENTES ============
-     Tareas escritas a mano, una lista por ciudad. La base ya aísla: cada sede
-     ve y escribe las suyas; la casa matriz y jrcalderon ven toda la red y
-     pueden asignarle un pendiente a cualquier sucursal. Ver ced_pendientes. */
-  CATEGORIAS:['Calzado','EPP','Ropa','Otros'],
-  PRIOR:['Alta','Media','Baja'],
-  DOW:['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],
-  /* Muestra solo los campos del tipo de recordatorio elegido. El de WhatsApp
-     aparece para los dos, porque sin número no hay a dónde mandarlo. */
-  pRecTipo(){
-    const v=($('p_rec')||{}).value||'no';
-    const m=(id,on)=>{ const e=$(id); if(e) e.style.display=on?'block':'none'; };
-    m('p_rec_una', v==='una'); m('p_rec_rut', v==='rutina'); m('p_rec_wa', v!=='no'); },
-  /* El texto que sale por WhatsApp. Mismo formato lo mande el bot o lo mandes tú. */
-  _pTexto(p){
-    return `🔔 Recordatorio · ${p.ced||''}\n\n*${p.titulo||''}*`
-      + (p.detalle?`\n${p.detalle}`:'')
-      + (p.responsable?`\n👤 ${p.responsable}`:'')
-      + (p.vence?`\n📅 Vence ${p.vence}`:'')
-      + (p.prioridad?`\n⚡ Prioridad ${p.prioridad}`:''); },
-  pWhats(id){
-    const p=(this._pend||[]).find(x=>String(x.id)===String(id)); if(!p) return;
-    const tel=String(p.whatsapp||'').replace(/\D/g,'');
-    if(!tel) return alert('Este pendiente no tiene número de WhatsApp.\n\nÁbrelo con ✎ Editar y ponle uno.');
-    window.open('https://wa.me/57'+tel.slice(-10)+'?text='+encodeURIComponent(this._pTexto(p)),'_blank'); },
-  async vPendientes(){
-    this.loading();
-    const { data, error } = await this.sb.from('ced_pendientes').select('*')
-      .order('hecho').order('vence',{nullsFirst:false}).order('creado_en',{ascending:false}).limit(2000);
-    if(error){
-      this.set(`<h1>✅ Pendientes</h1>
-        <div class="card" style="border-color:#f0c4c4;background:#fdecec">
-          <b>No se pudo leer la lista.</b>
-          <div style="margin-top:6px;font-size:13.5px">${esc(error.message||'')}</div>
-          <div style="margin-top:8px;font-size:13px">Si dice que <b>ced_pendientes</b> no existe, falta correr su SQL una sola vez.</div>
-        </div>`); return; }
-    this._pend=data||[];
-    if(!this._ceds||!this._ceds.length){
-      try{ const r=await this.sb.from('ced').select('*').eq('activo',true); this._ceds=r.data||[]; }catch(e){}
-    }
-    this._pPaint();
-  },
-  _pPaint(){
-    const P=this._pend||[];
-    const sedes=[...new Set(P.map(p=>p.ced).filter(Boolean))].sort();
-    const verFiltro=this._veRed() && sedes.length>1;
-    const sel=(verFiltro && this._pSede && sedes.includes(this._pSede)) ? this._pSede : '';
-    this._pSede=sel;
-    const arr = sel ? P.filter(p=>p.ced===sel) : P;
-    const hoy=new Date().toISOString().slice(0,10);
-    const abiertos=arr.filter(p=>!p.hecho), cerrados=arr.filter(p=>p.hecho);
-    const vencidos=abiertos.filter(p=>p.vence && p.vence<hoy);
-    const hoyVence=abiertos.filter(p=>p.vence===hoy);
-    const col={Alta:'#b3261e',Media:'#b45309',Baja:'#54636b'};
-    const fila=p=>{
-      const tarde=p.vence && p.vence<hoy && !p.hecho;
-      return `<div class="item" style="border-left:4px solid ${p.hecho?'#cfd6dd':(col[p.prioridad]||'#54636b')}">
-        <div class="top"><div style="min-width:0;flex:1">
-          <div class="nom" style="${p.hecho?'text-decoration:line-through;color:#8a93a6':''}">${esc(p.titulo)}</div>
-          <div class="meta">
-            ${p.responsable?'👤 '+esc(p.responsable)+' · ':''}
-            <span style="color:${col[p.prioridad]||'#54636b'};font-weight:700">${esc(p.prioridad||'Media')}</span>
-            ${p.vence?` · 📅 ${tarde?'<b style="color:#b3261e">vencido '+esc(p.vence)+'</b>':'vence '+esc(p.vence)}`:''}
-            ${(verFiltro&&!sel&&p.ced)?` · <span style="background:#eef1f5;color:#54636b;padding:1px 7px;border-radius:9px;font-weight:700">${esc(p.ced)}</span>`:''}
-            ${p.recordar==='rutina'?` · 🔔 cada ${esc(this.DOW[+p.rec_dia||0])} ${esc(String(p.rec_hora||'').slice(0,5))}`
-              :p.recordar==='una'?` · 🔔 ${esc(p.rec_fecha||'')} ${esc(String(p.rec_hora||'').slice(0,5))}`:''}
-          </div>
-          ${p.detalle?`<div class="meta" style="color:#5a6b7d">${esc(p.detalle)}</div>`:''}
-        </div></div>
-        <div class="acciones-item" style="gap:8px;flex-wrap:wrap">
-          <button class="btn-sm" style="background:${p.hecho?'#eef1f5':'var(--verde)'};color:${p.hecho?'#54636b':'#fff'}"
-            onclick="App.pHecho('${p.id}',${p.hecho?'false':'true'})">${p.hecho?'↩︎ Reabrir':'✓ Hecho'}</button>
-          ${p.whatsapp?`<button class="btn-sm" style="background:#25d366;color:#fff" onclick="App.pWhats('${p.id}')">📱 Enviar</button>`:''}
-          <button class="btn-sm" style="background:#eef1f5" onclick="App.pModal('${p.id}')">✎ Editar</button>
-          <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.pDel('${p.id}')">✕</button>
-        </div></div>`; };
-    this.set(`<h1>✅ Pendientes</h1>
-      <div class="sub">${abiertos.length} sin cerrar${sel?' · sede '+esc(sel):''}</div>
-      ${verFiltro?`<div style="margin:10px 0">
-        <label style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8a93a6">Sede</label>
-        <select class="field" onchange="App.pSede(this.value)">
-          <option value="">Todas las sedes · ${P.filter(x=>!x.hecho).length}</option>
-          ${sedes.map(s=>`<option value="${esc(s)}" ${s===sel?'selected':''}>${esc(s)} · ${P.filter(x=>x.ced===s&&!x.hecho).length}</option>`).join('')}
-        </select></div>`:''}
-      <div class="kpis">
-        <div class="kpi naranja"><b>${abiertos.length}</b><span>sin cerrar</span></div>
-        <div class="kpi"><b>${hoyVence.length}</b><span>vencen hoy</span></div>
-        <div class="kpi ${vencidos.length?'rojo':''}"><b>${vencidos.length}</b><span>vencidos</span></div>
-      </div>
-      <button class="btn btn-main" style="margin-bottom:14px" onclick="App.pModal()">＋ Nuevo pendiente</button>
-      ${abiertos.length?abiertos.map(fila).join('')
-        :'<div class="card" style="text-align:center;padding:26px 16px;color:#8a93a6">Nada pendiente. Dale a <b>＋ Nuevo pendiente</b>.</div>'}
-      ${cerrados.length?`<h1 style="font-size:15px;margin-top:18px">Cerrados</h1>
-        <div class="sub">${cerrados.length} · se pueden reabrir</div>
-        ${cerrados.slice(0,50).map(fila).join('')}`:''}`);
-  },
-  pSede(v){ this._pSede=v||''; this._pPaint(); },
-  pModal(id){
-    const p=(this._pend||[]).find(x=>String(x.id)===String(id))||{};
-    const mia=(this.cedUser&&this.cedUser.ced)||this._sedePrincipal()||'';
-    const sedes=(this._ceds||[]).filter(c=>c.activo!==false).map(c=>c.nombre);
-    this.modal(`<h3 style="margin-bottom:10px">${id?'Editar':'Nuevo'} pendiente</h3>
-      <label>¿Qué hay que hacer?</label>
-      <input id="p_tit" value="${esc(p.titulo||'')}" placeholder="Llamar a Agrocampo por la cotización">
-      <label>Detalle</label>
-      <textarea id="p_det" rows="2" placeholder="Lo que haga falta recordar">${esc(p.detalle||'')}</textarea>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-        <div><label>Responsable</label><input id="p_resp" value="${esc(p.responsable||'')}" placeholder="Quién lo hace"></div>
-        <div><label>Prioridad</label><select id="p_pri">${this.PRIOR.map(x=>`<option ${((p.prioridad||'Media')===x)?'selected':''}>${x}</option>`).join('')}</select></div>
-      </div>
-      <label>¿Para cuándo?</label><input id="p_ven" type="date" value="${esc(p.vence||'')}">
-
-      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">🔔 RECORDATORIO</div>
-      <select id="p_rec" onchange="App.pRecTipo()">
-        <option value="no"     ${(p.recordar||'no')==='no'?'selected':''}>Sin recordatorio</option>
-        <option value="una"    ${p.recordar==='una'?'selected':''}>Una sola vez — fecha y hora</option>
-        <option value="rutina" ${p.recordar==='rutina'?'selected':''}>Rutinario — todas las semanas</option>
-      </select>
-      <div id="p_rec_una" style="display:none">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-          <div><label>Fecha</label><input id="p_rfec" type="date" value="${esc(p.rec_fecha||'')}"></div>
-          <div><label>Hora</label><input id="p_rhor" type="time" value="${esc((p.rec_hora||'08:00').slice(0,5))}"></div>
-        </div>
-      </div>
-      <div id="p_rec_rut" style="display:none">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-          <div><label>Día</label><select id="p_rdia">${this.DOW.map((d,i)=>`<option value="${i}" ${(p.rec_dia!=null?+p.rec_dia:1)===i?'selected':''}>${d}</option>`).join('')}</select></div>
-          <div><label>Hora</label><input id="p_rhor2" type="time" value="${esc((p.rec_hora||'08:00').slice(0,5))}"></div>
-        </div>
-      </div>
-      <div id="p_rec_wa" style="display:none">
-        <label>WhatsApp a dónde se manda</label>
-        <input id="p_wa" inputmode="numeric" value="${esc(p.whatsapp||'')}" placeholder="3001234567">
-        <div class="hint">Solo el número, sin el 57. El recordatorio automático lo manda el bot;
-          con el botón 📱 de cada pendiente lo puedes enviar tú en cualquier momento.</div>
-      </div>
-      ${(this._veRed()&&sedes.length)?`<label>Sucursal</label>
-        <select id="p_ced">${sedes.map(s=>`<option ${((p.ced||mia)===s)?'selected':''}>${esc(s)}</option>`).join('')}</select>
-        <div class="hint">Solo tú puedes asignarle un pendiente a otra ciudad; los demás quedan en la suya.</div>`:''}
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn btn-main" style="flex:1" onclick="App.pSave('${id||''}')">Guardar</button>
-        <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
-    this.pRecTipo();
-  },
-  async pSave(id){
-    const t=($('p_tit').value||'').trim();
-    if(!t) return alert('Escribe qué hay que hacer.');
-    const rec=($('p_rec')||{value:'no'}).value||'no';
-    const b={titulo:t, detalle:($('p_det').value||'').trim(),
-      responsable:($('p_resp').value||'').trim(), prioridad:$('p_pri').value,
-      vence:$('p_ven').value||null,
-      recordar:rec,
-      rec_fecha: rec==='una'    ? ($('p_rfec').value||null) : null,
-      rec_dia:   rec==='rutina' ? +$('p_rdia').value : null,
-      rec_hora:  rec==='una' ? ($('p_rhor').value||null)
-               : rec==='rutina' ? ($('p_rhor2').value||null) : null,
-      whatsapp:  rec==='no' ? null : (($('p_wa')||{}).value||'').replace(/\D/g,'')||null};
-    if(rec!=='no' && !b.whatsapp) return alert('Ponle el número de WhatsApp al que se manda el recordatorio.');
-    if(rec==='una' && !b.rec_fecha) return alert('Ponle la fecha del recordatorio.');
-    if($('p_ced')) b.ced=$('p_ced').value;
-    if(!id) b.creado_por=(this.cedUser&&this.cedUser.usuario)||(this.perfil&&this.perfil.nombre)||'';
-    const q = id ? await this.sb.from('ced_pendientes').update(b).eq('id',id)
-                 : await this.sb.from('ced_pendientes').insert(b);
-    if(q.error) return alert('No se pudo guardar: '+q.error.message);
-    this.cerrarModal(); this.toast(id?'Pendiente actualizado ✅':'Pendiente creado ✅'); this.vPendientes(); },
-  async pHecho(id,v){
-    const b = v ? {hecho:true, hecho_en:new Date().toISOString(),
-                   hecho_por:(this.cedUser&&this.cedUser.usuario)||(this.perfil&&this.perfil.nombre)||''}
-                : {hecho:false, hecho_en:null, hecho_por:null};
-    const { error } = await this.sb.from('ced_pendientes').update(b).eq('id',id);
-    if(error) return alert('No se pudo: '+error.message);
-    this.toast(v?'Cerrado ✅':'Reabierto'); this.vPendientes(); },
-  async pDel(id){
-    const p=(this._pend||[]).find(x=>String(x.id)===String(id))||{};
-    if(!confirm('¿Borrar el pendiente "'+(p.titulo||'')+'"?')) return;
-    const { error } = await this.sb.from('ced_pendientes').delete().eq('id',id);
-    if(error) return alert('No se pudo borrar: '+error.message);
-    this.toast('Borrado'); this.vPendientes(); },
 
   invAuditoria(){
     this.modal(`<h3>🔍 Auditoría</h3>
