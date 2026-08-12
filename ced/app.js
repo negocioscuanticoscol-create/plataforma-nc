@@ -4761,7 +4761,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     /* Quién puede mandar el gasto a otra sucursal. Es el mismo criterio que usa
        mi_ced_gastos() en la base: la casa matriz y las cuentas de correo. A los
        demás la base los amarra a su sede, elijan lo que elijan. */
-    this._gElige = !this.cedUser || !!this._esPrincipal;
+    this._gElige = this._veRed();   // misma regla que el resto; ver _veRed()
     /* Los proveedores que ya se conocen, para no volver a escribirlos: los de la
        tabla de Proveedores más los que ya se hayan usado en algún gasto (esos
        venían de cuando el campo era texto libre). */
@@ -5493,18 +5493,20 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
      El grano es referencia + color + talla. */
   async vInventario(){
     this.loading();
-    const [ri,rm,rc,rp,rl,rf] = await Promise.all([
+    const [ri,rm,rc,rp,rl,rf,rk] = await Promise.all([
       this.sb.from('inventario').select('*').order('referencia').order('talla'),
       this.sb.from('inv_movimientos').select('*').order('creado_en',{ascending:false}).limit(500),
       this.sb.from('ced').select('*').eq('activo',true),        // para escoger a qué sede entra
       this.sb.from('ced_proveedores').select('id,nombre').eq('activo',true).order('nombre'),
       this.sb.from('ced_listas').select('*').eq('activo',true).order('orden'),  // precios por lista
-      this.sb.from('ced_prov_referencias').select('*').eq('activo',true).order('referencia')  // las fichas de producto
+      this.sb.from('ced_prov_referencias').select('*').eq('activo',true).order('referencia'),  // las fichas de producto
+      this.sb.from('ced_marcas').select('nombre').eq('activo',true).order('nombre')  // la marca del producto
     ]);
     const inv=ri.data||[], movs=rm.data||[];
     this._inv=inv; this._movs=movs;
     this._ceds=rc.data||this._ceds||[]; this._provs=rp.data||[];
     this._prods=rf.error?[]:(rf.data||[]);   // fichas de producto, para el desplegable
+    this._marcas=rk.error?[]:((rk.data||[]).map(m=>m.nombre).filter(Boolean));
     this._listas=rl.data||[];
 
     // cobertura: cuantos pares salieron este mes, para saber cuantos dias aguanta
@@ -5567,6 +5569,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           return `<div class="item"><div class="top"><div style="min-width:0;flex:1">
             <div class="nom">${esc(p.referencia)}${p.color?' · '+esc(p.color):''}
               <span style="font-size:10px;font-weight:700;background:#eef1f5;color:#54636b;padding:2px 7px;border-radius:9px;margin-left:4px">${esc(p.categoria||'sin categoría')}</span>
+              ${p.marca?`<span style="font-size:10px;font-weight:700;background:#e7f0ff;color:#2156c0;padding:2px 7px;border-radius:9px;margin-left:3px">${esc(p.marca)}</span>`:''}
               ${this._veRed()&&p.ced?`<span style="font-size:10px;font-weight:700;background:#fdeee2;color:#9a5312;padding:2px 7px;border-radius:9px;margin-left:3px">${esc(p.ced)}</span>`:''}</div>
             ${p.descripcion?`<div class="meta" style="color:#5a6b7d">${esc(p.descripcion)}</div>`:''}
             <div class="meta">${pv?'📋 '+esc(pv.nombre):'⚠️ sin proveedor'}
@@ -5688,6 +5691,15 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         <div class="hint">Queda creado en <b>Proveedores</b>.</div>
       </div>
 
+      <label>Marca</label>
+      <select id="pr_marca" class="field">
+        <option value="">— sin marca —</option>
+        ${(this._marcas||[]).map(m=>`<option ${m===(p.marca||'')?'selected':''}>${esc(m)}</option>`).join('')}
+      </select>
+      <div class="hint">La marca del producto, que no es lo mismo que el proveedor:
+        un proveedor puede fabricarte varias marcas, y una marca puede venir de varios proveedores.
+        Se administran en <b>Usuarios → Marcas</b>.</div>
+
       <div class="row2">
         <div><label>Categoría</label>
           <select id="pr_cat" class="field" onchange="App._prTallas()">${this.CATEGORIAS.map(c=>`<option ${c===(p.categoria||'Calzado')?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
@@ -5768,7 +5780,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     }
     if(!provId){ alert('Escoge el proveedor.\n\nSin él no se sabe de dónde sale la mercancía ni a quién reclamarle.'); return; }
     const fila={ ced:sede, referencia:ref, color:color||'', dueno, proveedor_id:provId,
-      categoria:$('pr_cat').value, descripcion:($('pr_desc').value||'').trim()||null,
+      categoria:$('pr_cat').value, marca:(($('pr_marca')||{}).value||'')||null,
+      descripcion:($('pr_desc').value||'').trim()||null,
       costo, minimo:+$('pr_min').value||0, condiciones:($('pr_cond').value||'').trim()||null,
       activo:true, l1:num('pr_l1'), l2:num('pr_l2'), l3:num('pr_l3'), l4:num('pr_l4'),
       tallas:this._prTallasLeer().join(',') };
@@ -5873,7 +5886,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       const r=await this._invSumar(p.referencia, p.color||'', par[0], par[1], 'entrada', doc||'Ingreso de curva',
         {dueno:p.dueno||'ced', proveedor:(prov&&prov.nombre)||null, proveedor_id:p.proveedor_id||null,
          costo:+p.costo||null, minimo:+p.minimo||0, documento:doc,
-         descripcion:p.descripcion||'', categoria:p.categoria||'', ced:p.ced});
+         descripcion:p.descripcion||'', categoria:p.categoria||'', marca:p.marca||'', ced:p.ced});
       if(r) ok+=par[1]; else break;
     }
     if(!ok) return;
@@ -5903,6 +5916,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     if(e.proveedor_id) fila.proveedor_id=e.proveedor_id;
     if(e.descripcion)  fila.descripcion=e.descripcion;
     if(e.categoria)    fila.categoria=e.categoria;
+    if(e.marca)        fila.marca=e.marca;
     if(e.costo)        fila.costo=e.costo;
     if(e.minimo)       fila.minimo=e.minimo;
     const { error } = await this.sb.from('inventario')
