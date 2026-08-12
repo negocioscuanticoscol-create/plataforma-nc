@@ -4297,7 +4297,8 @@ const App = {
                 ${esc(p.condicion_pago||'Contado')}${(+p.dias_credito||0)?' '+p.dias_credito+' días':''}
                 ${(+p.pedido_minimo||0)?' · mínimo '+money(p.pedido_minimo):''}
                 ${p.tiempo_entrega?' · entrega '+esc(p.tiempo_entrega):''}
-                ${p.ciudad?' · '+esc(p.ciudad):''}</div></div>
+                ${p.ciudad?' · '+esc(p.ciudad):''}
+                ${p.creado_en?' · 📅 creado '+new Date(p.creado_en).toLocaleDateString('es-CO'):''}</div></div>
             <div style="text-align:right;flex:none">
               <div style="font-weight:800;color:var(--naranja)">${rs.length}</div>
               <div style="font-size:11px;color:#8a93a6">referencia${rs.length===1?'':'s'}</div></div></div>
@@ -4484,9 +4485,29 @@ const App = {
           <div style="margin-top:8px;font-size:13px">Si dice que <b>ced_gastos</b> no existe, falta correr su SQL una sola vez.</div>
         </div>`); return; }
     this._gastos=data||[];
-    /* qué sucursales puede ver: si solo ve la suya, el selector no aparece */
-    const ceds=[...new Set(this._gastos.map(g=>g.ced).filter(Boolean))].sort();
-    this._gCeds=ceds;
+    /* Las sucursales salen de la tabla ced, NO de los gastos ya cargados. Antes
+       salían de los gastos y eso se mordía la cola: con la tabla vacía no había
+       ni una opción, el selector nunca aparecía, y apenas se cargaba el primer
+       gasto quedaba una sola sucursal — la de ese gasto — así que Feroz no salía. */
+    let sedes=[];
+    try{ const { data:cs } = await this.sb.from('ced').select('nombre,principal').eq('activo',true).order('nombre');
+         sedes=(cs||[]).map(c=>c.nombre).filter(Boolean);
+         const pr=(cs||[]).find(c=>c.principal); this._gPrincipal=pr?pr.nombre:''; }catch(e){}
+    if(!sedes.length) sedes=[...new Set(this._gastos.map(g=>g.ced).filter(Boolean))].sort();
+    this._gCeds=sedes;
+    /* Quién puede mandar el gasto a otra sucursal. Es el mismo criterio que usa
+       mi_ced_gastos() en la base: la casa matriz y las cuentas de correo. A los
+       demás la base los amarra a su sede, elijan lo que elijan. */
+    this._gElige = !this.cedUser || !!this._esPrincipal;
+    /* Los proveedores que ya se conocen, para no volver a escribirlos: los de la
+       tabla de Proveedores más los que ya se hayan usado en algún gasto (esos
+       venían de cuando el campo era texto libre). */
+    let provs=[];
+    try{ const { data:ps } = await this.sb.from('ced_proveedores').select('nombre').eq('activo',true).order('nombre');
+         provs=(ps||[]).map(p=>p.nombre).filter(Boolean); }catch(e){}
+    this._gastos.forEach(g=>{ const n=(g.proveedor||'').trim(); if(n) provs.push(n); });
+    this._gProvs=[...new Map(provs.map(n=>[n.toLowerCase(),n])).values()]
+      .sort((a,b)=>a.localeCompare(b,'es'));
     this._gPaint();
   },
 
@@ -4498,7 +4519,10 @@ const App = {
     const mes=(this._gMes&&meses.includes(this._gMes))?this._gMes:meses[0];
     this._gMes=mes;
     const sucSel=this._gSuc||'';
-    const varias=(this._gCeds||[]).length>1;
+    /* El filtro de arriba se arma con las sucursales que de verdad tienen gasto
+       cargado — no con todas las de la red — para no ofrecer filtros vacíos. */
+    const conGasto=[...new Set(G.map(g=>g.ced).filter(Boolean))].sort();
+    const varias=conGasto.length>1;
     let del=G.filter(g=>String(g.fecha||'').slice(0,7)===mes);
     if(sucSel) del=del.filter(g=>g.ced===sucSel);
     del.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));
@@ -4526,7 +4550,7 @@ const App = {
           ${meses.map(m=>`<option value="${esc(m)}" ${m===mes?'selected':''}>${esc(this._mesNom(m))}</option>`).join('')}</select>
         ${varias?`<select onchange="App._gSuc=this.value;App._gPaint()" style="width:auto">
           <option value="" ${sucSel?'':'selected'}>Toda la red</option>
-          ${this._gCeds.map(c=>`<option value="${esc(c)}" ${c===sucSel?'selected':''}>${esc(c)}</option>`).join('')}</select>`:''}
+          ${conGasto.map(c=>`<option value="${esc(c)}" ${c===sucSel?'selected':''}>${esc(c)}</option>`).join('')}</select>`:''}
         <button class="btn btn-main" onclick="App.gModal()" style="margin-left:auto">＋ Nuevo gasto</button>
       </div>
 
@@ -4577,8 +4601,11 @@ const App = {
   gModal(id){
     const g=(this._gastos||[]).find(x=>String(x.id)===String(id))||{};
     const hoy=new Date().toISOString().slice(0,10);
-    const varias=(this._gCeds||[]).length>1;
-    const mio=(this.cedUser&&this.cedUser.ced)||'';
+    const varias=this._gElige && (this._gCeds||[]).length>0;
+    /* Un gasto nuevo cae en tu sede; si no tienes (cuenta de correo), en la casa
+       matriz. Sin esto quedaba en la primera de la lista alfabética — Av 68 —
+       y el gasto se cargaba a una agencia por accidente. */
+    const mio=(this.cedUser&&this.cedUser.ced)||this._gPrincipal||'';
     this.modal(`<h3 style="margin-bottom:10px">${id?'Editar':'Nuevo'} gasto</h3>
       <label>Concepto</label><input id="g_con" value="${esc(g.concepto||'')}" placeholder="Arriendo de agosto, recibo de luz…">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
@@ -4592,8 +4619,18 @@ const App = {
         <div class="hint">Se guarda con ese nombre, no como «Otros» — así después se puede ver cuánto se fue en cada cosa.</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
-        <div><label>Proveedor</label><input id="g_prov" value="${esc(g.proveedor||'')}"></div>
+        <div><label>Proveedor</label>
+          <select id="g_prov" onchange="App.gOtroProv()">
+            <option value="">— sin proveedor —</option>
+            ${(this._gProvs||[]).map(p=>`<option ${((g.proveedor||'').toLowerCase()===p.toLowerCase())?'selected':''}>${esc(p)}</option>`).join('')}
+            <option value="__nuevo" ${(g.proveedor&&!(this._gProvs||[]).some(p=>p.toLowerCase()===(g.proveedor||'').toLowerCase()))?'selected':''}>＋ Otro proveedor…</option>
+          </select></div>
         <div><label>N° factura</label><input id="g_fac" value="${esc(g.factura||'')}"></div>
+      </div>
+      <div id="g_prov2wrap" style="display:none">
+        <label>¿Cómo se llama el proveedor?</label>
+        <input id="g_prov2" value="${esc((g.proveedor&&!(this._gProvs||[]).some(p=>p.toLowerCase()===(g.proveedor||'').toLowerCase()))?g.proveedor:'')}" placeholder="Escríbelo completo: Papelería La 15">
+        <div class="hint">Queda guardado en <b>Proveedores</b>: la próxima vez sale en la lista y no hay que volver a escribirlo.</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
         <div><label>Valor total</label><input id="g_mon" type="number" value="${g.monto||''}" oninput="App.gIva()"></div>
@@ -4617,11 +4654,16 @@ const App = {
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn btn-main" style="flex:1" onclick="App.gSave('${id||''}')">Guardar</button>
         <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
-    this.gIva(); this.gOtraCat();
+    this.gIva(); this.gOtraCat(); this.gOtroProv();
   },
   /* 'Otros' sin decir qué es se vuelve un hueco negro: al final del mes nadie
      sabe en qué se fue esa plata. Por eso pide el nombre y lo guarda como
      categoría propia. */
+  /* Mismo truco que la categoría: si el proveedor no está en la lista, se
+     escribe una vez y queda guardado en Proveedores para no repetirlo nunca más. */
+  gOtroProv(){ const s=$('g_prov'), w=$('g_prov2wrap'); if(!s||!w) return;
+    const nuevo=s.value==='__nuevo'; w.style.display=nuevo?'block':'none';
+    if(nuevo && $('g_prov2') && !$('g_prov2').value) $('g_prov2').focus(); },
   gOtraCat(){ const s=$('g_cat'), w=$('g_cat2wrap'); if(!s||!w) return;
     const otra=s.value==='Otros'; w.style.display=otra?'block':'none';
     if(otra && $('g_cat2') && !$('g_cat2').value) $('g_cat2').focus(); },
@@ -4643,19 +4685,33 @@ const App = {
     if(cat==='Otros'){ const otra=($('g_cat2')?$('g_cat2').value:'').trim();
       if(!otra) return alert('Escribe qué gasto es, para no dejarlo como «Otros».');
       cat=otra; }
+    let prov=($('g_prov').value||'').trim();
+    let provNuevo='';
+    if(prov==='__nuevo'){
+      prov=($('g_prov2')?$('g_prov2').value:'').trim();
+      if(!prov) return alert('Escribe el nombre del proveedor nuevo.');
+      provNuevo=prov;
+    }
     const b={concepto:con, fecha:$('g_fec').value||new Date().toISOString().slice(0,10),
-      categoria:cat, proveedor:($('g_prov').value||'').trim(),
+      categoria:cat, proveedor:prov,
       factura:($('g_fac').value||'').trim(), monto:tot, base:base, iva:tot-base,
       tiene_iva:conIva, forma_pago:$('g_fp').value, pagado:$('g_pag').value==='si',
       periodicidad:$('g_per').value, notas:($('g_not').value||'').trim()};
     if(b.pagado && !id) b.fecha_pago=b.fecha;
     /* el ced solo se manda si el usuario puede elegir; si no, lo pone el trigger */
     if($('g_ced')) b.ced=$('g_ced').value;
-    else if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Feroz';
+    else if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||this._gPrincipal||'Feroz';
     if(!id) b.creado_por=(this.cedUser&&this.cedUser.usuario)||'';
     const q = id ? await this.sb.from('ced_gastos').update(b).eq('id',id)
                  : await this.sb.from('ced_gastos').insert(b);
     if(q.error) return alert('No se pudo guardar: '+q.error.message);
+    /* El proveedor nuevo se guarda en su tabla para que salga en la lista la
+       próxima vez. Si falla, no se cae el gasto: el nombre ya quedó en él. */
+    if(provNuevo){
+      const ya=(this._gProvs||[]).some(p=>p.toLowerCase()===provNuevo.toLowerCase());
+      if(!ya){ try{ await this.sb.from('ced_proveedores')
+        .insert({nombre:provNuevo, ced:b.ced||(this.cedUser&&this.cedUser.ced)||this._gPrincipal, activo:true}); }catch(e){} }
+    }
     this.cerrarModal(); this.toast(id?'Gasto actualizado ✅':'Gasto registrado ✅');
     this.vGastos(); },
 
