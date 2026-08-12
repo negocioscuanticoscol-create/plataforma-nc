@@ -137,6 +137,28 @@ cliNom(id){ const c=(this._cli||[]).find(x=>x.id===id); return c?c.empresa:'—'
    ESCOGIÓ, y con el desglose de costos de importación se crea la referencia:
    ahí ya pasa a Catálogo (precio de venta) y a Inventario (compra + venta). */
 FOTOS:'fotos/',
+/* Categorias sacadas de los nombres reales del inventario de fotos, no
+   inventadas: bombas, boquillas, mangueras, filtros, medicion, deteccion de
+   agua, seguridad, valvulas, empaquetaduras, equipos y herramientas. */
+CATEGORIAS:['Bombas','Boquillas y acoples','Mangueras y carretes','Filtros y separadores',
+  'Medicion y control','Deteccion de agua','Seguridad y hombre muerto','Valvulas',
+  'Empaquetaduras y sellos','Equipos y vehiculos','Herramientas','Otros'],
+APLICACIONES:['Camion','Estacion','Mixto'],
+/* Promedio de lo que cotizaron los proveedores: sirve para saber si el que
+   escogiste esta caro o barato frente a los demas. */
+_prom(x){
+  const v=[1,2,3,4,5].map(i=>+x['precio'+i]||0).filter(n=>n>0);
+  if(!v.length) return null;
+  return {prom:v.reduce((a,b)=>a+b,0)/v.length, n:v.length,
+          min:Math.min(...v), max:Math.max(...v)};
+},
+bqProm(){
+  const e=$('bq_prom'); if(!e) return;
+  const x={}; [1,2,3,4,5].forEach(i=>{ const t=($('bq_v'+i)||{}).value||''; x['precio'+i]=+String(t).replace(/[^0-9.]/g,'')||0; });
+  const p=this._prom(x);
+  e.innerHTML = p ? `Promedio <b>USD ${p.prom.toFixed(2)}</b> · ${p.n} cotizado(s) · el más bajo USD ${p.min.toFixed(2)}`
+                  : 'Escribe los precios para ver el promedio.';
+},
 async busq(){ this._busq=await GETALL('ff_busqueda?order=nombre&limit=1000'); return this._busq; },
 vBusqueda: safe(async function(){
   await this.busq();
@@ -153,6 +175,8 @@ _bqPaint(){
     nombrar:B.filter(x=>x.por_nombrar).length};
   let L=B;
   if(f==='nombrar') L=B.filter(x=>x.por_nombrar); else if(f!=='todos') L=B.filter(x=>x.estado===f);
+  if(this._bqCat) L=L.filter(x=>(x.categoria||'Otros')===this._bqCat);
+  if(this._bqApl) L=L.filter(x=>(x.aplicacion||'Mixto')===this._bqApl);
   if(q) L=L.filter(x=>String(x.nombre||'').toLowerCase().includes(q));
   const caj=(k,t)=>`<button class="btn ${f===k?'':'gh'}" style="padding:8px 13px" onclick="App._bqFil='${k}';App._bqPaint()">${t}</button>`;
   const badge=x=> x.estado==='creado' ? '<span class="tag" style="background:#e7f6ec;color:#1c7a3e">✓ referencia creada</span>'
@@ -164,6 +188,14 @@ _bqPaint(){
       ${caj('todos','Todos · '+cnt.todos)}${caj('buscando','Buscando · '+cnt.buscando)}
       ${caj('escogido','Escogidos · '+cnt.escogido)}${caj('creado','Creados · '+cnt.creado)}
       ${caj('nombrar','⚠️ Sin nombre · '+cnt.nombrar)}
+      <select onchange="App._bqCat=this.value;App._bqPaint()" style="min-width:150px">
+        <option value="">Toda categoría</option>
+        ${this.CATEGORIAS.map(c=>`<option ${c===(this._bqCat||'')?'selected':''}>${esc(c)}</option>`).join('')}
+      </select>
+      <select onchange="App._bqApl=this.value;App._bqPaint()" style="min-width:120px">
+        <option value="">Toda aplicación</option>
+        ${this.APLICACIONES.map(c=>`<option ${c===(this._bqApl||'')?'selected':''}>${esc(c)}</option>`).join('')}
+      </select>
       <input placeholder="Buscar por nombre…" value="${esc(this._bqQ||'')}" style="flex:1;min-width:160px"
              oninput="App._bqQ=this.value;clearTimeout(App._bqT);App._bqT=setTimeout(()=>App._bqPaint(),300)">
     </div>
@@ -174,6 +206,8 @@ _bqPaint(){
                style="width:100%;height:140px;object-fit:contain;background:#f6f7f9;border-radius:8px;cursor:pointer"
                onclick="App.bqAbrir('${esc(x.id)}')">
           <div style="font-weight:700;font-size:13px;margin-top:7px;${x.por_nombrar?'color:#b45309':''}">${esc(x.nombre)}</div>
+          ${(()=>{const p=this._prom(x); return p?`<div style="font-weight:800;font-size:14px;color:#0f6b4f;margin-top:3px">USD ${p.prom.toFixed(2)} <span style="font-weight:400;font-size:11px;color:#6b7280">promedio · ${p.n}</span></div>`:'';})()}
+          <div class="mini" style="margin-top:2px">${esc(x.categoria||'Otros')} · ${esc(x.aplicacion||'Mixto')}</div>
           <div style="margin-top:4px">${badge(x)}</div>
           <div class="row" style="gap:6px;margin-top:7px">
             <button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAbrir('${esc(x.id)}')">✎ Trabajar</button>
@@ -189,8 +223,22 @@ bqAbrir(id){
     <img src="${this.FOTOS}${esc(x.archivo)}" style="width:100%;max-height:230px;object-fit:contain;background:#f6f7f9;border-radius:9px;margin:8px 0">
     <label>Nombre del producto</label>
     <input id="bq_nom" value="${esc(x.nombre)}" placeholder="Cómo se llama de verdad">
+    <div class="g2">
+      <div><label>Categoría</label><select id="bq_cat">
+        ${this.CATEGORIAS.map(c=>`<option ${c===(x.categoria||'Otros')?'selected':''}>${esc(c)}</option>`).join('')}
+      </select></div>
+      <div><label>Aplicación</label><select id="bq_apl">
+        ${this.APLICACIONES.map(c=>`<option ${c===(x.aplicacion||'Mixto')?'selected':''}>${esc(c)}</option>`).join('')}
+      </select></div>
+    </div>
     <div class="mini" style="margin-top:9px;font-weight:700">DÓNDE PODRÍA ESTAR — hasta 5 direcciones</div>
-    ${[1,2,3,4,5].map(i=>`<input id="bq_p${i}" value="${esc(x['prov'+i]||'')}" placeholder="Dirección ${i} (Alibaba, Made-in-China…)" style="margin-top:5px">`).join('')}
+    <div class="mini">La dirección y lo que cotizaron, en dólares.</div>
+    ${[1,2,3,4,5].map(i=>`<div class="row" style="gap:6px;margin-top:5px">
+      <input id="bq_p${i}" value="${esc(x['prov'+i]||'')}" placeholder="Dirección ${i}" style="flex:1;min-width:0">
+      <input id="bq_v${i}" value="${x['precio'+i]!=null?x['precio'+i]:''}" placeholder="USD" inputmode="decimal"
+             style="width:92px;flex:none" oninput="App.bqProm()">
+    </div>`).join('')}
+    <div id="bq_prom" class="mini" style="margin-top:6px;font-weight:700"></div>
     <div class="mini" style="margin-top:11px;font-weight:700">✅ LAS QUE SÍ SIRVEN — hasta 3</div>
     <input id="bq_enc"  value="${esc(x.encontrado||'')}"  placeholder="Sirve 1" style="margin-top:5px">
     <input id="bq_enc2" value="${esc(x.encontrado2||'')}" placeholder="Sirve 2" style="margin-top:5px">
@@ -210,6 +258,7 @@ bqAbrir(id){
       <button class="btn gh" onclick="cerrar()">Cancelar</button>
       <button class="btn gh" style="color:#b3261e" onclick="App.bqBorrar('${esc(x.id)}')">✕ Borrar</button>
     </div>`);
+  this.bqProm();
 },
 async bqGuardar(id){
   const v=i=>($(i)?$(i).value.trim():'');
@@ -217,7 +266,10 @@ async bqGuardar(id){
     prov4:v('bq_p4'),prov5:v('bq_p5'),
     encontrado:v('bq_enc'), encontrado2:v('bq_enc2'), encontrado3:v('bq_enc3'),
     escogido:v('bq_esc'), escogido2:v('bq_esc2'), principal:v('bq_ppal'),
-    proveedor:v('bq_prov'), notas:v('bq_not'), actualizado:new Date().toISOString()};
+    proveedor:v('bq_prov'), notas:v('bq_not'),
+    categoria:v('bq_cat')||'Otros', aplicacion:v('bq_apl')||'Mixto',
+    actualizado:new Date().toISOString()};
+  [1,2,3,4,5].forEach(i=>{ const t=v('bq_v'+i); b['precio'+i]= t? (+t.replace(/[^0-9.]/g,'')||null) : null; });
   b.por_nombrar = /^por nombrar/i.test(b.nombre);
   const x=(this._busq||[]).find(z=>z.id===id)||{};
   if(x.estado!=='creado') b.estado = (b.escogido||b.escogido2||b.principal) ? 'escogido' : 'buscando';
@@ -240,7 +292,7 @@ bqRef(id){
     <div class="mini">${esc(x.nombre)}${x.proveedor?' · '+esc(x.proveedor):''}</div>
     <div class="g2" style="margin-top:8px">
       <div><label>Código</label><input id="rf_cod" placeholder="FES-001"></div>
-      <div><label>Categoría</label><input id="rf_cat" placeholder="Bombas, filtros, acoples…"></div>
+      <div><label>Categoría</label><input id="rf_cat" value="${esc(x.categoria||'')}" placeholder="Bombas, filtros, acoples…"></div>
     </div>
     <label>Nombre</label><input id="rf_nom" value="${esc(x.nombre)}">
     <div class="mini" style="margin-top:11px;font-weight:700">🇨🇳 COSTO DE IMPORTACIÓN</div>
@@ -301,7 +353,8 @@ async bqRefOk(){
   if(!cod){ alert('Ponle un código a la referencia.'); return; }
   if(!nom){ alert('Falta el nombre.'); return; }
   if(!this._bqCosto){ alert('Falta el costo: al menos el FOB en dólares y la TRM.'); return; }
-  const b={codigo:cod, nombre:nom, categoria:($('rf_cat')?$('rf_cat').value.trim():''),
+  const b={codigo:cod, nombre:nom, categoria:($('rf_cat')?$('rf_cat').value.trim():'')||x.categoria||'',
+    subcategoria:x.aplicacion||'',
     foto:x.archivo, foto_url:'fotos/'+x.archivo,
     proveedor:x.proveedor||'', url_proveedor:x.principal||x.escogido||x.escogido2||x.encontrado||'',
     pais_origen:'China', unidad:'UND', activo:true,
