@@ -500,6 +500,13 @@ const App = {
       </div>
     </div>`;
   },
+  /* Los prospectos son filas de `clientes`, no leads sueltos: se les arma una
+     llave propia y se registran sus datos para que al marcar quede el nombre. */
+  _quienBtnsCli(c){
+    const key='c'+c.id;
+    (this._crmLeadInfo=this._crmLeadInfo||{})[key]={nombre:c.nombre||'',telefono:c.tel||'',canal:'prospecto'};
+    return this._quienBtns(key);
+  },
   async crmQuien(key,quien){
     const act=(this._crmQuien||{})[key]||'';
     const nv = act===quien ? null : quien;      // volver a tocarlo lo quita
@@ -3957,6 +3964,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
             <div style="display:flex;gap:5px"><button class="btn-sm" style="background:#6b7280;color:#fff" onclick="App.crmNota(${c.id})" title="Guardar nota del cliente">✏️ Nota</button></div>
           </div>
           <div style="display:flex;align-items:flex-start;margin-top:10px">${dots}</div>
+          ${this._quienBtnsCli(c)}
           ${q?`<div style="font-size:11px;margin-top:8px;background:#fff7ed;border:1px solid #fed7aa;border-radius:7px;padding:6px 9px;display:flex;justify-content:space-between;align-items:center"><span style="color:#9a3412">📝 ${q.es_muestra?'Muestra':'Cotización'} <b>${money(+q.total||0)}</b> · ${esc(q.estado||'')}</span><button class="btn-sm" style="background:var(--naranja);color:#fff;padding:3px 11px" onclick="App.vCotizacionNueva('${q.id}')">ver</button></div>`:''}
           ${c.notas?`<div style="font-size:11px;color:#556;margin-top:7px;background:#f6f8fa;padding:5px 8px;border-radius:6px">📝 ${esc(c.notas)}</div>`:''}
         </div>`; }).join('');
