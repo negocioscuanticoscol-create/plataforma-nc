@@ -595,6 +595,16 @@ const App={
             <option value="comunidad" ${(this._cartTipo||'comunidad')==='comunidad'?'selected':''}>Cliente comunidad</option>
             <option value="nuevo" ${this._cartTipo==='nuevo'?'selected':''}>Cliente nuevo</option></select>
           <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value;App._pedPaint()">${this.FPPEDIDO.map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
+          <div style="font-size:11px;color:var(--mut);font-weight:700;margin-top:9px">¿PAGÓ CON DOS?</div>
+          <div class="g2" style="margin-top:4px">
+            <div><label style="font-size:11px">💵 En efectivo</label>
+              <input id="pd_pef" inputmode="numeric" placeholder="0" value="${this._cartPef||''}"
+                     oninput="App._cartPef=this.value;App._pagoMix()"></div>
+            <div><label style="font-size:11px">En ${esc(this._cartFP||'Efectivo')}</label>
+              <input id="pd_pot" inputmode="numeric" placeholder="0" value="${this._cartPot||''}"
+                     oninput="App._cartPot=this.value;App._pagoMix()"></div>
+          </div>
+          <div id="pd_mix" class="hint" style="margin-top:4px"></div>
           <div style="margin-top:10px;font-size:13px">
             ${nItems?Object.keys(cart).map(id=>{const p=prods.find(x=>x.id===id);if(!p)return '';const q=cart[id];
               return `<div class="row" style="justify-content:space-between;align-items:center;gap:5px;margin-bottom:2px">
@@ -759,6 +769,7 @@ const App={
   _leerCart(){ if($('pd_cli'))this._cartCli=$('pd_cli').value; if($('pd_tel'))this._cartTel=$('pd_tel').value;
     if($('pd_dir'))this._cartDir=$('pd_dir').value; if($('pd_promo'))this._cartPromo=$('pd_promo').checked;
     if($('pd_tipo'))this._cartTipo=$('pd_tipo').value; if($('pd_fp'))this._cartFP=$('pd_fp').value;
+    if($('pd_pef'))this._cartPef=$('pd_pef').value; if($('pd_pot'))this._cartPot=$('pd_pot').value;
     if($('pd_dom'))this._cartDom=+$('pd_dom').value||0; if($('pd_desc'))this._cartDesc=+$('pd_desc').value||0; },
   cartSet(id,delta){ this._cart=this._cart||{}; this._leerCart();
     const q=(this._cart[id]||0)+delta; if(q<=0)delete this._cart[id]; else this._cart[id]=q; this._pedPaint(); },
@@ -780,7 +791,26 @@ const App={
     if($('pd_iva'))$('pd_iva').textContent=money(iva);
     if($('pd_dval'))$('pd_dval').textContent='−'+money(desc);
     if($('pd_dline'))$('pd_dline').style.display=desc>0?'flex':'none';
-    if($('pd_total'))$('pd_total').textContent=money(bruto-desc+dom); },
+    this._totalPedido=bruto-desc+dom;   // lo usa la suma del pago mixto
+    if($('pd_total'))$('pd_total').textContent=money(this._totalPedido);
+    this._pagoMix(); },
+  /* El cliente paga una parte en efectivo y el resto con la otra forma. Las dos
+     casillas se suman y se comparan contra el total, para que no se guarde un
+     pedido cobrado a medias sin que nadie lo note. Dejarlas vacías es válido:
+     significa que todo entró por la forma de pago escogida. */
+  _num(v){ return +String(v||'').replace(/[^0-9]/g,'')||0; },
+  _pagoMix(){
+    const e=$('pd_mix'); if(!e) return;
+    const ef=this._num(this._cartPef), ot=this._num(this._cartPot), suma=ef+ot;
+    const tot=(this._sub||0)+(this._iva||0)+(+(this._cartDom||0)) ;
+    const totReal=this._totalPedido!=null?this._totalPedido:tot;
+    if(!suma){ e.innerHTML='Déjalas vacías si todo entró por la forma de arriba.'; return; }
+    const dif=Math.round(totReal-suma);
+    e.innerHTML='Suma <b>'+money(suma)+'</b>'+(totReal?(
+      dif===0 ? ' · <span style="color:var(--ok);font-weight:700">cuadra ✓</span>'
+      : dif>0 ? ' · <span style="color:var(--acc);font-weight:700">faltan '+money(dif)+'</span>'
+              : ' · <span style="color:var(--bad,#c0392b);font-weight:700">sobran '+money(-dif)+'</span>'):'');
+  },
   async pedGuardar(){ if(this._savingPedido) return; const cart=this._cart||{}, prods=this._prods||[], items=[]; const fp=this._cartFP||'Efectivo', esTar=/tarjeta/i.test(fp); let sub=0, iva=0, bruto=0;
     for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0});
       if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
@@ -790,8 +820,11 @@ const App={
     const total=bruto-desc+dom;
     this._savingPedido=true; const btn=$('pd_save'); if(btn){ btn.disabled=true; btn.textContent='Guardando…'; btn.style.opacity='.5'; }
     try{
-      let ped=await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,descuento:desc,total,forma_pago:fp,estado:'nuevo'});
-      if(!ped) ped=await POST('kruh_pedidos',{cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo'});   // sin la columna descuento
+      const pef=this._num(this._cartPef), pot=this._num(this._cartPot);
+      const base={cliente:cli,telefono:tel,items,domicilio:dom,total,forma_pago:fp,estado:'nuevo',
+                  pago_efectivo:pef,pago_otro:pot};
+      let ped=await POST('kruh_pedidos',{...base,descuento:desc});
+      if(!ped) ped=await POST('kruh_pedidos',base);   // sin la columna descuento
       if(!ped){ toast('⚠️ No se pudo guardar el pedido'); return; }
       const saldos=[];
       /* Los SERVICIOS (domicilio, empaque…) se venden y se cuentan como cualquier
