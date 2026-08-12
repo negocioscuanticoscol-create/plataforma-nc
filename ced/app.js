@@ -2809,7 +2809,7 @@ const App = {
       <div class="card" style="border-left:4px solid var(--verde)">
         <label style="margin:0"><b>👟 Referencia *</b></label>
         <select class="field" id="co_ref" onchange="App.cotRefPrecio()" style="margin-top:6px">
-          ${refsCot.length?refsCot.map(r=>`<option value="${esc(r.k)}">${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}</option>`).join('')
+          ${refsCot.length?refsCot.map(r=>`<option value="${esc(r.k)}">${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}${r.mostrarCed&&r.ced?'  ['+esc(r.ced)+']':''}</option>`).join('')
             :`<option value="701||">701</option>`}
         </select>
         <div id="co_ref_precio" class="hint" style="margin-top:6px"></div>
@@ -2937,18 +2937,24 @@ const App = {
      porque el mismo modelo en dos colores son dos cosas distintas. */
   async _cotRefs(){
     const [ri,rr]=await Promise.all([
-      this.sb.from('inventario').select('referencia,color'),
-      this.sb.from('ced_prov_referencias').select('referencia,color,descripcion,l1,l2,l3,l4')
+      this.sb.from('inventario').select('ced,referencia,color'),
+      this.sb.from('ced_prov_referencias').select('ced,referencia,color,descripcion,l1,l2,l3,l4')
     ]);
-    const fichas={}; (rr.data||[]).forEach(f=>{ fichas[(f.referencia||'')+'||'+(f.color||'')]=f; });
+    /* La SEDE entra en la llave. Sin ella, la 701 de Feroz y la 701 de Ibagué
+       se fundían en una sola opción para quien ve toda la red: se perdía una de
+       las dos y el precio podía salir del inventario de la otra ciudad. */
+    const kk=x=>(x.ced||'')+'||'+(x.referencia||'')+'||'+(x.color||'');
+    const fichas={}; (rr.data||[]).forEach(f=>{ fichas[kk(f)]=f; });
+    const red=this._veRed();
     const m={};
-    (ri.data||[]).forEach(x=>{ const k=(x.referencia||'')+'||'+(x.color||'');
+    (ri.data||[]).forEach(x=>{ const k=kk(x);
       if(!x.referencia || m[k]) return;
       const f=fichas[k]||{};
-      m[k]={k, referencia:x.referencia, color:x.color||'', descripcion:f.descripcion||'',
+      m[k]={k, ced:x.ced||'', referencia:x.referencia, color:x.color||'',
+            descripcion:f.descripcion||'', mostrarCed:red,
             precios:[f.l1,f.l2,f.l3,f.l4].map(v=>+v||0)}; });
     this._refsCot=Object.values(m).sort((a,b)=>
-      (a.referencia+a.color).localeCompare(b.referencia+b.color,'es'));
+      (a.referencia+a.color+a.ced).localeCompare(b.referencia+b.color+b.ced,'es'));
     return this._refsCot; },
 
   /* El precio por par de la referencia escogida, según la lista del cliente.
@@ -5364,8 +5370,11 @@ const App = {
     /* El dueño entra en el agrupador: 701 nuestro y 701 del aliado son dos
        saldos distintos aunque sean la misma bota. */
     const gr={};
-    inv.forEach(r=>{ const d=r.dueno||'ced'; const k=r.referencia+'||'+(r.color||'')+'||'+d;
-      if(!gr[k]) gr[k]={ref:r.referencia, color:r.color||'', dueno:d, tallas:[], total:0,
+    /* La sede entra en el agrupador junto con el dueño: la misma referencia en
+       Ibagué y en Bogotá son dos saldos distintos, y quien ve toda la red las
+       veía sumadas en una sola fila. */
+    inv.forEach(r=>{ const d=r.dueno||'ced'; const k=(r.ced||'')+'||'+r.referencia+'||'+(r.color||'')+'||'+d;
+      if(!gr[k]) gr[k]={ref:r.referencia, color:r.color||'', dueno:d, sede:r.ced||'', tallas:[], total:0,
                         prov:r.proveedor||'', costo:+r.costo||0, minimo:+r.minimo||0,
                         desc:r.descripcion||''};
       if(!gr[k].desc && r.descripcion) gr[k].desc=r.descripcion;
@@ -5416,7 +5425,7 @@ const App = {
             <div><div class="nom">${esc(this.refVisible(g.ref,g.dueno))}${g.color?' · '+esc(g.color):''}
                 <span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;margin-left:5px;
                   background:${esCed?'#fdeee2':'#eef1f4'};color:${esCed?'#9a5312':'#54636b'}">
-                  ${esCed?'CONSIGNACIÓN':'DEL ALIADO'}</span></div>
+                  ${esCed?'CONSIGNACIÓN':'DEL ALIADO'}</span>${(this._veRed()&&g.sede)?`<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;margin-left:4px;background:#eef1f5;color:#54636b">${esc(g.sede)}</span>`:''}</div>
               ${g.desc?`<div class="meta" style="color:#5a6b7d">${esc(g.desc)}</div>`:''}
               <div class="meta" style="color:${col};font-weight:700">${txt}</div>
               <div class="meta">${g.prov?'📋 '+esc(g.prov):'⚠️ sin proveedor'}${g.costo?' · costo '+money(g.costo):''}${g.minimo?' · mínimo '+g.minimo:''}</div></div>
