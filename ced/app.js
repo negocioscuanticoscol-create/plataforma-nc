@@ -485,11 +485,19 @@ const App = {
   CONTACTAN:['Sandra','José','Boso'],
   _quienBtns(key){
     const act=(this._crmQuien||{})[key]||'';
-    return `<div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap;align-items:center" onclick="event.stopPropagation()">
-      <span style="font-size:10.5px;color:#8a93a6;font-weight:700">CONTACTÓ</span>
-      ${this.CONTACTAN.map(n=>`<button class="btn-sm" style="padding:4px 10px;font-size:11px;
-        background:${act===n?'var(--naranja)':'#eef1f5'};color:${act===n?'#fff':'#54636b'}"
-        onclick="App.crmQuien('${key}','${n}')">${n}</button>`).join('')}
+    /* Cuando alguien ya lo logró, lo primero que se ve es SU NOMBRE en verde.
+       Los botones quedan debajo para corregir; en una lista larga, el botón
+       naranja solo no se distinguía de un vistazo. */
+    return `<div style="margin-top:6px" onclick="event.stopPropagation()">
+      ${act?`<div style="display:inline-block;background:#e7f6ec;color:#1c7a3e;border:1px solid #9fdcb4;
+        border-radius:9px;padding:3px 10px;font-size:12px;font-weight:800;margin-bottom:5px">
+        ✅ Lo contactó ${esc(act)}</div><br>`:''}
+      <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10.5px;color:#8a93a6;font-weight:700">${act?'CAMBIAR':'¿QUIÉN LO CONTACTÓ?'}</span>
+        ${this.CONTACTAN.map(n=>`<button class="btn-sm" style="padding:4px 10px;font-size:11px;
+          background:${act===n?'var(--naranja)':'#eef1f5'};color:${act===n?'#fff':'#54636b'}"
+          onclick="App.crmQuien('${key}','${n}')">${n}</button>`).join('')}
+      </div>
     </div>`;
   },
   async crmQuien(key,quien){
