@@ -3063,8 +3063,11 @@ const App = {
     // consignacion, y decidirlo despues obliga a rehacer el documento.
     let fid=($('co_factura')||{value:''}).value;
     /* Si escogio remision, no hay facturador: se guarda la sede que remisiona. */
-    let remCed=null, tipoDoc='factura';
-    if(String(fid).startsWith('rem:')){ remCed=fid.slice(4); tipoDoc='remision'; fid=''; }
+    let remCed=null, tipoDoc='factura', remSede=null;
+    if(String(fid).startsWith('rem:')){
+      remCed=fid.slice(4); tipoDoc='remision'; fid='';
+      remSede=(this._ceds||[]).find(c=>c.nombre===remCed)||null;
+    }
     if(!fid && !remCed){ alert('Falta indicar QUIÉN FACTURA.\n\nEs obligatorio: define los datos tributarios y la cuenta a la que consigna el cliente.'); if($('co_factura')) $('co_factura').focus(); return; }
     const fac=(this._facts||[]).find(x=>x.id===fid)||null;
     if(!cu.libre && cu.faltan!==0 && !confirm(`Falta(n) ${cu.faltan} par(es) para completar la última caja. ¿Guardar igual?`)) return;
@@ -3094,7 +3097,14 @@ const App = {
       // cambia la cuenta bancaria, esta cotizacion tiene que seguir mostrando
       // la que el cliente realmente vio.
       factura_por:(fac&&fac.tipo)||null, facturador_id:fid||null,
-      factura_snap: fac?{nombre:fac.nombre,nit:fac.nit,direccion:fac.direccion,ciudad:fac.ciudad,
+      /* En remisión el emisor es la SEDE, no una empresa facturadora. Sin esta
+         foto la proforma caía en el valor por defecto y una remisión de Ibagué
+         salía con el nombre de la empresa de Bogotá. */
+      factura_snap: remSede?{nombre:(remSede.nombre_comercial||remSede.nombre),nit:remSede.nit||null,
+        direccion:remSede.direccion||null,ciudad:remSede.ciudad||null,telefono:remSede.telefono||null,
+        banco:remSede.banco||null,tipo_cuenta:remSede.tipo_cuenta||null,cuenta:remSede.cuenta||null,
+        titular:remSede.titular||null,doc:'REMISIÓN'}
+       : fac?{nombre:fac.nombre,nit:fac.nit,direccion:fac.direccion,ciudad:fac.ciudad,
         telefono:fac.telefono,email:fac.email,banco:fac.banco,tipo_cuenta:fac.tipo_cuenta,
         cuenta:fac.cuenta,titular:fac.titular}:null,
       ced_comercial:(this._sedeCot&&(this._sedeCot.nombre_comercial||this._sedeCot.nombre))||null,
