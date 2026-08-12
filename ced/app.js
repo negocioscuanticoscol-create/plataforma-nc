@@ -422,7 +422,7 @@ const App = {
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&limit=3000',{headers:H}); const j=await r.json(); ventas=Array.isArray(j)?j:[]; }catch(e){}
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads?empresa=eq.smart&order=ultima_fecha.desc&limit=2000',{headers:H}); const j=await r.json(); this._crmBot=Array.isArray(j)?j:[]; }catch(e){ this._crmBot=[]; }
     try{ const r=await fetch(this._SBU()+'/rest/v1/smart_marcador_leads?select=nombre,ciudad,depto,cel,fijo,estado,prioridad,esp,aplica,nota,web&limit=5000',{headers:H}); const j=await r.json(); window.LEADS=(Array.isArray(j)?j:[]).map(l=>({empresa:l.nombre,ciudad:l.ciudad,depto:l.depto,cel:l.cel,fijo:l.fijo,estado:l.estado,prioridad:l.prioridad,esp:l.esp,aplica:l.aplica,nota:l.nota,web:l.web})); }catch(e){}
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.smart&limit=5000',{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmEmbRows.forEach(x=>this._crmEmb[x.lead_key]=x.etapa); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; }
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.smart&limit=5000',{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmQuien={}; this._crmEmbRows.forEach(x=>{this._crmEmb[x.lead_key]=x.etapa; if(x.contactado_por) this._crmQuien[x.lead_key]=x.contactado_por;}); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; this._crmQuien={}; }
     const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\b(sas|ltda|sa|eu)\b/g,'').replace(/\s+/g,' ').trim();
     const esTest=s=>{ const n=norm(s); return !n||n.includes('prueba')||n==='smart'||n==='test'; };
     const compradores=new Set();   // ya compraron (venta NO-kit no cancelada, o un pedido) → salen del Kit
@@ -479,6 +479,32 @@ const App = {
     if(canal==='organico') { const m={curioso:0,interesado:1,kit:2}; return m[tag]!=null?m[tag]:-1; }
     return -1;   // marcador y demás: círculos vacíos hasta que haya acción
   },
+  /* Quién hizo el contacto. Es un dato de marketing, no del embudo: sirve para
+     saber a quién preguntarle por ese cliente y para repartir el trabajo. Va en
+     la misma tabla del embudo porque comparte la llave del lead. */
+  CONTACTAN:['Sandra','José','Boso'],
+  _quienBtns(key){
+    const act=(this._crmQuien||{})[key]||'';
+    return `<div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap;align-items:center" onclick="event.stopPropagation()">
+      <span style="font-size:10.5px;color:#8a93a6;font-weight:700">CONTACTÓ</span>
+      ${this.CONTACTAN.map(n=>`<button class="btn-sm" style="padding:4px 10px;font-size:11px;
+        background:${act===n?'var(--naranja)':'#eef1f5'};color:${act===n?'#fff':'#54636b'}"
+        onclick="App.crmQuien('${key}','${n}')">${n}</button>`).join('')}
+    </div>`;
+  },
+  async crmQuien(key,quien){
+    const act=(this._crmQuien||{})[key]||'';
+    const nv = act===quien ? null : quien;      // volver a tocarlo lo quita
+    (this._crmQuien=this._crmQuien||{})[key]=nv||'';
+    const info=(this._crmLeadInfo||{})[key]||{};
+    try{ await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',
+      {method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),
+       'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+       body:JSON.stringify({empresa:window.NC_EMPRESA||'feroz',lead_key:key,nombre:info.nombre||'',
+         telefono:info.telefono||'',canal:info.canal||'',contactado_por:nv})}); }catch(e){}
+    this._toast?this._toast(nv?('Contactó '+nv):'Sin marcar'):null;
+    this.go(this.view);
+  },
   _emb(key,base,canal,nombre,telefono,mode){
     mode=mode||'full';
     if(mode==='none') return '';   // tarjeta liviana, sin círculos
@@ -486,11 +512,11 @@ const App = {
     const dot=on=>`<span style="display:inline-block;width:13px;height:13px;border-radius:50%;vertical-align:middle;background:${on?'#16a34a':'#fff'};border:2px solid ${on?'#0f7a33':'#b9c2cf'}"></span>`;
     if(mode==='seg'){   // Interesado: 1 círculo para marcar seguimiento
       const on=!!(this._crmEmb&&this._crmEmb[key]!=null&&this._crmEmb[key]>=0);
-      return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px" onclick="event.stopPropagation()"><span onclick="App.crmSeg('${key}')" title="Marca si le estás haciendo seguimiento" style="cursor:pointer;font-size:11px;font-weight:${on?700:500};color:${on?'#0f7a33':'#6b7686'};white-space:nowrap">${dot(on)} ${on?'🔔 En seguimiento':'Marcar seguimiento'}</span></div>`;
+      return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px" onclick="event.stopPropagation()"><span onclick="App.crmSeg('${key}')" title="Marca si le estás haciendo seguimiento" style="cursor:pointer;font-size:11px;font-weight:${on?700:500};color:${on?'#0f7a33':'#6b7686'};white-space:nowrap">${dot(on)} ${on?'🔔 En seguimiento':'Marcar seguimiento'}</span>${this._quienBtns(key)}</div>`;
     }
     const st=(this._crmEmb&&this._crmEmb[key]!=null)?this._crmEmb[key]:(base!=null?base:-1);
     const S=this._embStages(canal);
-    return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px;display:flex;gap:8px;flex-wrap:wrap" onclick="event.stopPropagation()">${S.map((s,i)=>`<span onclick="App.crmAvanzar('${key}',${i})" title="Marcar: ${s}" style="cursor:pointer;font-size:10px;font-weight:${i<=st?700:500};color:${i<=st?'#0f7a33':'#6b7686'};white-space:nowrap">${dot(i<=st)} ${s}</span>`).join('')}</div>`;
+    return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px;display:flex;gap:8px;flex-wrap:wrap" onclick="event.stopPropagation()">${S.map((s,i)=>`<span onclick="App.crmAvanzar('${key}',${i})" title="Marcar: ${s}" style="cursor:pointer;font-size:10px;font-weight:${i<=st?700:500};color:${i<=st?'#0f7a33':'#6b7686'};white-space:nowrap">${dot(i<=st)} ${s}</span>`).join('')}</div>${this._quienBtns(key)}`;
   },
   async crmSeg(key){
     const info=(this._crmLeadInfo||{})[key]||{};
@@ -3796,7 +3822,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
     let cli=[]; try{ const r=await this.sb.from('clientes').select('*').order('creado_en',{ascending:false}); cli=r.data||[]; }catch(e){}
     let res=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_resultados?select=fila,nombre,cel,ciudad,resultado,mundo,fecha&order=fecha.desc&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); res=Array.isArray(j)?j:[]; }catch(e){}
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.feroz&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmEmbRows.forEach(x=>this._crmEmb[x.lead_key]=x.etapa); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; }
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.feroz&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmQuien={}; this._crmEmbRows.forEach(x=>{this._crmEmb[x.lead_key]=x.etapa; if(x.contactado_por) this._crmQuien[x.lead_key]=x.contactado_por;}); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; this._crmQuien={}; }
     this._crmFRes=res; const inter=res.filter(r=>/interes/i.test(r.resultado||''));
     let bot=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000'+this.fCed(),{headers:H}); const j=await r.json(); bot=Array.isArray(j)?j:[]; }catch(e){}
     let cots=[]; try{ const r=await this.sb.from('cotizaciones').select('id,cliente_id,numero,total,estado,es_muestra,creado_en').order('creado_en',{ascending:false}); cots=r.data||[]; }catch(e){}
