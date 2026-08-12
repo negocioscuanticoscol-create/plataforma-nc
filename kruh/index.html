@@ -597,10 +597,10 @@ const App={
           <select id="pd_fp" style="margin-top:6px" onchange="App._cartFP=this.value;App._pedPaint()">${this.FPPEDIDO.map(f=>`<option ${(this._cartFP||'Efectivo')===f?'selected':''}>${f}</option>`).join('')}</select>
           <div style="font-size:11px;color:var(--mut);font-weight:700;margin-top:9px">¿PAGÓ CON DOS?</div>
           <div class="g2" style="margin-top:4px">
-            <div><label style="font-size:11px">💵 En efectivo</label>
+            <div><label style="font-size:11px">Efectivo</label>
               <input id="pd_pef" inputmode="numeric" placeholder="0" value="${this._cartPef||''}"
                      oninput="App._cartPef=this.value;App._pagoMix()"></div>
-            <div><label style="font-size:11px">En ${esc(this._cartFP||'Efectivo')}</label>
+            <div><label style="font-size:11px">${esc(/efectivo/i.test(this._cartFP||'Efectivo')?'Otra forma':(this._cartFP||''))}</label>
               <input id="pd_pot" inputmode="numeric" placeholder="0" value="${this._cartPot||''}"
                      oninput="App._cartPot=this.value;App._pagoMix()"></div>
           </div>
