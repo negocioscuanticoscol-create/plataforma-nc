@@ -5650,6 +5650,25 @@ const App = {
      ve y escribe las suyas; la casa matriz y jrcalderon ven toda la red y
      pueden asignarle un pendiente a cualquier sucursal. Ver ced_pendientes. */
   PRIOR:['Alta','Media','Baja'],
+  DOW:['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],
+  /* Muestra solo los campos del tipo de recordatorio elegido. El de WhatsApp
+     aparece para los dos, porque sin número no hay a dónde mandarlo. */
+  pRecTipo(){
+    const v=($('p_rec')||{}).value||'no';
+    const m=(id,on)=>{ const e=$(id); if(e) e.style.display=on?'block':'none'; };
+    m('p_rec_una', v==='una'); m('p_rec_rut', v==='rutina'); m('p_rec_wa', v!=='no'); },
+  /* El texto que sale por WhatsApp. Mismo formato lo mande el bot o lo mandes tú. */
+  _pTexto(p){
+    return `🔔 Recordatorio · ${p.ced||''}\n\n*${p.titulo||''}*`
+      + (p.detalle?`\n${p.detalle}`:'')
+      + (p.responsable?`\n👤 ${p.responsable}`:'')
+      + (p.vence?`\n📅 Vence ${p.vence}`:'')
+      + (p.prioridad?`\n⚡ Prioridad ${p.prioridad}`:''); },
+  pWhats(id){
+    const p=(this._pend||[]).find(x=>String(x.id)===String(id)); if(!p) return;
+    const tel=String(p.whatsapp||'').replace(/\D/g,'');
+    if(!tel) return alert('Este pendiente no tiene número de WhatsApp.\n\nÁbrelo con ✎ Editar y ponle uno.');
+    window.open('https://wa.me/57'+tel.slice(-10)+'?text='+encodeURIComponent(this._pTexto(p)),'_blank'); },
   async vPendientes(){
     this.loading();
     const { data, error } = await this.sb.from('ced_pendientes').select('*')
@@ -5689,12 +5708,15 @@ const App = {
             <span style="color:${col[p.prioridad]||'#54636b'};font-weight:700">${esc(p.prioridad||'Media')}</span>
             ${p.vence?` · 📅 ${tarde?'<b style="color:#b3261e">vencido '+esc(p.vence)+'</b>':'vence '+esc(p.vence)}`:''}
             ${(verFiltro&&!sel&&p.ced)?` · <span style="background:#eef1f5;color:#54636b;padding:1px 7px;border-radius:9px;font-weight:700">${esc(p.ced)}</span>`:''}
+            ${p.recordar==='rutina'?` · 🔔 cada ${esc(this.DOW[+p.rec_dia||0])} ${esc(String(p.rec_hora||'').slice(0,5))}`
+              :p.recordar==='una'?` · 🔔 ${esc(p.rec_fecha||'')} ${esc(String(p.rec_hora||'').slice(0,5))}`:''}
           </div>
           ${p.detalle?`<div class="meta" style="color:#5a6b7d">${esc(p.detalle)}</div>`:''}
         </div></div>
         <div class="acciones-item" style="gap:8px;flex-wrap:wrap">
           <button class="btn-sm" style="background:${p.hecho?'#eef1f5':'var(--verde)'};color:${p.hecho?'#54636b':'#fff'}"
             onclick="App.pHecho('${p.id}',${p.hecho?'false':'true'})">${p.hecho?'↩︎ Reabrir':'✓ Hecho'}</button>
+          ${p.whatsapp?`<button class="btn-sm" style="background:#25d366;color:#fff" onclick="App.pWhats('${p.id}')">📱 Enviar</button>`:''}
           <button class="btn-sm" style="background:#eef1f5" onclick="App.pModal('${p.id}')">✎ Editar</button>
           <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.pDel('${p.id}')">✕</button>
         </div></div>`; };
@@ -5733,19 +5755,54 @@ const App = {
         <div><label>Prioridad</label><select id="p_pri">${this.PRIOR.map(x=>`<option ${((p.prioridad||'Media')===x)?'selected':''}>${x}</option>`).join('')}</select></div>
       </div>
       <label>¿Para cuándo?</label><input id="p_ven" type="date" value="${esc(p.vence||'')}">
+
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">🔔 RECORDATORIO</div>
+      <select id="p_rec" onchange="App.pRecTipo()">
+        <option value="no"     ${(p.recordar||'no')==='no'?'selected':''}>Sin recordatorio</option>
+        <option value="una"    ${p.recordar==='una'?'selected':''}>Una sola vez — fecha y hora</option>
+        <option value="rutina" ${p.recordar==='rutina'?'selected':''}>Rutinario — todas las semanas</option>
+      </select>
+      <div id="p_rec_una" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+          <div><label>Fecha</label><input id="p_rfec" type="date" value="${esc(p.rec_fecha||'')}"></div>
+          <div><label>Hora</label><input id="p_rhor" type="time" value="${esc((p.rec_hora||'08:00').slice(0,5))}"></div>
+        </div>
+      </div>
+      <div id="p_rec_rut" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+          <div><label>Día</label><select id="p_rdia">${this.DOW.map((d,i)=>`<option value="${i}" ${(p.rec_dia!=null?+p.rec_dia:1)===i?'selected':''}>${d}</option>`).join('')}</select></div>
+          <div><label>Hora</label><input id="p_rhor2" type="time" value="${esc((p.rec_hora||'08:00').slice(0,5))}"></div>
+        </div>
+      </div>
+      <div id="p_rec_wa" style="display:none">
+        <label>WhatsApp a dónde se manda</label>
+        <input id="p_wa" inputmode="numeric" value="${esc(p.whatsapp||'')}" placeholder="3001234567">
+        <div class="hint">Solo el número, sin el 57. El recordatorio automático lo manda el bot;
+          con el botón 📱 de cada pendiente lo puedes enviar tú en cualquier momento.</div>
+      </div>
       ${(this._veRed()&&sedes.length)?`<label>Sucursal</label>
         <select id="p_ced">${sedes.map(s=>`<option ${((p.ced||mia)===s)?'selected':''}>${esc(s)}</option>`).join('')}</select>
         <div class="hint">Solo tú puedes asignarle un pendiente a otra ciudad; los demás quedan en la suya.</div>`:''}
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn btn-main" style="flex:1" onclick="App.pSave('${id||''}')">Guardar</button>
         <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
+    this.pRecTipo();
   },
   async pSave(id){
     const t=($('p_tit').value||'').trim();
     if(!t) return alert('Escribe qué hay que hacer.');
+    const rec=($('p_rec')||{value:'no'}).value||'no';
     const b={titulo:t, detalle:($('p_det').value||'').trim(),
       responsable:($('p_resp').value||'').trim(), prioridad:$('p_pri').value,
-      vence:$('p_ven').value||null};
+      vence:$('p_ven').value||null,
+      recordar:rec,
+      rec_fecha: rec==='una'    ? ($('p_rfec').value||null) : null,
+      rec_dia:   rec==='rutina' ? +$('p_rdia').value : null,
+      rec_hora:  rec==='una' ? ($('p_rhor').value||null)
+               : rec==='rutina' ? ($('p_rhor2').value||null) : null,
+      whatsapp:  rec==='no' ? null : (($('p_wa')||{}).value||'').replace(/\D/g,'')||null};
+    if(rec!=='no' && !b.whatsapp) return alert('Ponle el número de WhatsApp al que se manda el recordatorio.');
+    if(rec==='una' && !b.rec_fecha) return alert('Ponle la fecha del recordatorio.');
     if($('p_ced')) b.ced=$('p_ced').value;
     if(!id) b.creado_por=(this.cedUser&&this.cedUser.usuario)||(this.perfil&&this.perfil.nombre)||'';
     const q = id ? await this.sb.from('ced_pendientes').update(b).eq('id',id)
