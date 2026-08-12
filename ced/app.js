@@ -3352,11 +3352,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       <div class="card" style="background:linear-gradient(135deg,#b45309,#d97706);color:#fff;border:none"><div style="font-size:12px;opacity:.85">💰 Total por cobrar</div><div style="font-size:25px;font-weight:800;margin-top:2px">${money(totalCobrar)}</div><div style="font-size:11px;opacity:.8">${cartera.length} pedido(s) a crédito sin pagar</div></div>
       ${cartera.length?cartera.map(p=>{const nom=(p.cliente_snap||{}).nombre||'—';return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(nom)}</div><div class="meta">${esc(p.numero||'')} · ${p.pares||0} pares · ${dias(p)}${p.factura_num?' · Fact '+esc(p.factura_num):''}</div></div><div style="text-align:right"><div style="font-weight:800;color:#b45309">${money(p.total)}</div><div style="font-size:10px;color:#8a93a6">${ESTADOS[p.estado]||p.estado}</div></div></div><div style="margin-top:8px;text-align:right"><button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.cartMarcarPagado('${p.id}')">💰 Marcar pagado</button></div></div>`}).join(''):'<div class="empty">Sin cartera pendiente. Las ventas a <b>crédito</b> aparecen aquí (con su total por cobrar) hasta que el cliente consigne.</div>'}`);
   },
-  async cartMarcarPagado(id){
-    if(!confirm('¿Confirmas que este cliente YA PAGÓ su crédito? Sale de Cartera (la venta se mantiene).')) return;
-    await this.sb.from('pedidos').update({consignacion_validada_por:this.user.id, consignacion_fecha:new Date().toISOString(), actualizado_en:new Date().toISOString()}).eq('id',id);
-    this.vCartera();
-  },
+  async cartMarcarPagado(id){ return this.pagoModal(id,'cartera'); },
   async vVentas(){   // FEROZ · Ventas — espejo de Ventas·Smart con datos de Feroz
     this.loading();
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
@@ -3483,13 +3479,19 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
      forma de pago única. La suma se compara contra el total del pedido para
      avisar si falta o si sobra plata. */
   FORMAS_PAGO_PEDIDO:['Transferencia','Consignación','Tarjeta','Cheque','Otra'],
-  async accConsignar(id){
-    this._consignId=id;
+  async accConsignar(id){ return this.pagoModal(id,'consignacion'); },
+  /* Un solo formulario de pago para los dos caminos: el de contado
+     (Pedidos → Marcar consignación) y el de crédito (Cartera → Marcar
+     pagado). Antes el de cartera era un simple «¿confirmas?» y no
+     registraba ni un peso: la plata entraba y no quedaba escrita. */
+  async pagoModal(id,modo){
+    this._consignId=id; this._consignModo=modo||'consignacion';
     let ped=null;
     try{ const { data } = await this.sb.from('pedidos')
       .select('total,pago_efectivo,pago_forma,pago_forma_valor').eq('id',id).maybeSingle(); ped=data; }catch(e){}
     this._consignTotal=+((ped&&ped.total)||0);
-    this.modal(`<h3>💳 Marcar consignación · validar pago</h3>
+    const esCartera=this._consignModo==='cartera';
+    this.modal(`<h3>💳 ${esCartera?'Registrar el pago del crédito':'Marcar consignación · validar pago'}</h3>
       <div class="hint">Solo quien puede <b>dar fe de que el dinero entró</b> valida. (Las muestras sin valor comercial NO requieren esto.)</div>
       ${this._consignTotal?`<div class="card" style="padding:10px 12px;margin:10px 0;background:#eef6f2;border-color:#bfe0d2">
         <b style="color:#0f6b4f">Total del pedido: ${money(this._consignTotal)}</b></div>`:''}
@@ -3543,11 +3545,20 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       + (suma<tot?`Faltan ${money(tot-suma)}.`:`Sobran ${money(suma-tot)}.`)
       + `\n\n¿Guardar así de todos modos?`)) return;
     const partes=[ef?('efectivo '+money(ef)):'', ot?((forma||'otra')+' '+money(ot)):''].filter(Boolean).join(' + ');
-    await this.sb.from('pedidos').update({estado:'consignado',consignacion_ref:ref,consignacion_validada_por:val,
+    const esCartera=this._consignModo==='cartera';
+    const upd={consignacion_ref:ref, consignacion_validada_por:val,
       pago_efectivo:ef, pago_forma:forma||null, pago_forma_valor:ot,
-      consignacion_fecha:new Date().toISOString(),marcada_por:this.user.id,actualizado_en:new Date().toISOString()}).eq('id',this._consignId);
-    await this.hist(this._consignId,'consignado','Pago '+partes+' · validado por '+val+(ref?(' · ref '+ref):''));
-    this.cerrarModal(); this.toastNotif('Facturación','Tiene un pedido para validar y autorizar.'); this.go(this.view);
+      consignacion_fecha:new Date().toISOString(), marcada_por:this.user.id,
+      actualizado_en:new Date().toISOString()};
+    /* En contado el pedido pasa a «consignado» y sigue su curso. En cartera el
+       pedido ya fue despachado: solo se registra que el crédito se pagó. */
+    if(!esCartera) upd.estado='consignado';
+    await this.sb.from('pedidos').update(upd).eq('id',this._consignId);
+    await this.hist(this._consignId, esCartera?'pagado':'consignado',
+      'Pago '+partes+' · validado por '+val+(ref?(' · ref '+ref):''));
+    this.cerrarModal();
+    if(esCartera){ this.toast('Pago registrado ✅'); this.vCartera(); }
+    else { this.toastNotif('Facturación','Tiene un pedido para validar y autorizar.'); this.go(this.view); }
   },
   async accAutorizar(id){
     const fac=prompt('N° de factura (o deja vacío):','');
