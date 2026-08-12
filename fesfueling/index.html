@@ -168,18 +168,24 @@ _bqPaint(){
   const B=this._busq||[];
   const f=this._bqFil||'todos';
   const q=(this._bqQ||'').trim().toLowerCase();
-  const cnt={todos:B.length,
+  const cnt={todos:B.filter(x=>x.estado!=='anulado').length,
     buscando:B.filter(x=>x.estado==='buscando').length,
     escogido:B.filter(x=>x.estado==='escogido').length,
     creado:B.filter(x=>x.estado==='creado').length,
-    nombrar:B.filter(x=>x.por_nombrar).length};
-  let L=B;
-  if(f==='nombrar') L=B.filter(x=>x.por_nombrar); else if(f!=='todos') L=B.filter(x=>x.estado===f);
+    anulado:B.filter(x=>x.estado==='anulado').length,
+    nombrar:B.filter(x=>x.por_nombrar&&x.estado!=='anulado').length};
+  /* Los anulados NO se borran: salen de la vista pero quedan guardados, porque
+     mañana puede volver a interesar el producto y la foto ya no estaría. */
+  let L;
+  if(f==='nombrar')     L=B.filter(x=>x.por_nombrar&&x.estado!=='anulado');
+  else if(f==='todos')  L=B.filter(x=>x.estado!=='anulado');
+  else                  L=B.filter(x=>x.estado===f);
   if(this._bqCat) L=L.filter(x=>(x.categoria||'Otros')===this._bqCat);
   if(this._bqApl) L=L.filter(x=>(x.aplicacion||'Mixto')===this._bqApl);
   if(q) L=L.filter(x=>String(x.nombre||'').toLowerCase().includes(q));
   const caj=(k,t)=>`<button class="btn ${f===k?'':'gh'}" style="padding:8px 13px" onclick="App._bqFil='${k}';App._bqPaint()">${t}</button>`;
-  const badge=x=> x.estado==='creado' ? '<span class="tag" style="background:#e7f6ec;color:#1c7a3e">✓ referencia creada</span>'
+  const badge=x=> x.estado==='anulado' ? '<span class="tag" style="background:#fde8e8;color:#b3261e">⃠ anulado</span>'
+                : x.estado==='creado' ? '<span class="tag" style="background:#e7f6ec;color:#1c7a3e">✓ referencia creada</span>'
                 : x.estado==='escogido' ? '<span class="tag" style="background:#fff4e5;color:#8a5300">proveedor escogido</span>'
                 : '<span class="tag">buscando</span>';
   this.set(`<h2>🔎 Búsqueda de proveedores</h2>
@@ -187,7 +193,7 @@ _bqPaint(){
     <div class="row" style="gap:7px;flex-wrap:wrap;margin:12px 0">
       ${caj('todos','Todos · '+cnt.todos)}${caj('buscando','Buscando · '+cnt.buscando)}
       ${caj('escogido','Escogidos · '+cnt.escogido)}${caj('creado','Creados · '+cnt.creado)}
-      ${caj('nombrar','⚠️ Sin nombre · '+cnt.nombrar)}
+      ${caj('nombrar','⚠️ Sin nombre · '+cnt.nombrar)}${cnt.anulado?caj('anulado','⃠ Anulados · '+cnt.anulado):''}
       <select onchange="App._bqCat=this.value;App._bqPaint()" style="min-width:150px">
         <option value="">Toda categoría</option>
         ${this.CATEGORIAS.map(c=>`<option ${c===(this._bqCat||'')?'selected':''}>${esc(c)}</option>`).join('')}
@@ -203,15 +209,19 @@ _bqPaint(){
       ${L.length?L.map(x=>`
         <div class="card" style="padding:10px">
           <img src="${this.FOTOS}${esc(x.archivo)}" alt="${esc(x.nombre)}" loading="lazy"
-               style="width:100%;height:140px;object-fit:contain;background:#f6f7f9;border-radius:8px;cursor:pointer"
+               style="width:100%;height:140px;object-fit:contain;background:#f6f7f9;border-radius:8px;cursor:pointer${x.estado==='anulado'?';opacity:.35;filter:grayscale(1)':''}"
                onclick="App.bqAbrir('${esc(x.id)}')">
           <div style="font-weight:700;font-size:13px;margin-top:7px;${x.por_nombrar?'color:#b45309':''}">${esc(x.nombre)}</div>
           ${(()=>{const p=this._prom(x); return p?`<div style="font-weight:800;font-size:14px;color:#0f6b4f;margin-top:3px">USD ${p.prom.toFixed(2)} <span style="font-weight:400;font-size:11px;color:#6b7280">promedio · ${p.n}</span></div>`:'';})()}
           <div class="mini" style="margin-top:2px">${esc(x.categoria||'Otros')} · ${esc(x.aplicacion||'Mixto')}</div>
           <div style="margin-top:4px">${badge(x)}</div>
           <div class="row" style="gap:6px;margin-top:7px">
-            <button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAbrir('${esc(x.id)}')">✎ Trabajar</button>
-            ${x.estado!=='creado'?`<button class="btn" style="padding:6px 10px" onclick="App.bqRef('${esc(x.id)}')">＋ Referencia</button>`:''}
+            ${x.estado==='anulado'
+              ? `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAnular('${esc(x.id)}',false)">↩︎ Reactivar</button>`
+              : `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAbrir('${esc(x.id)}')">✎ Trabajar</button>
+                 ${x.estado!=='creado'?`<button class="btn" style="padding:6px 10px" onclick="App.bqRef('${esc(x.id)}')">＋ Ref.</button>`:''}
+                 <button class="btn gh" style="padding:6px 9px;color:#b3261e" title="Anular: sale de la lista pero no se borra"
+                         onclick="App.bqAnular('${esc(x.id)}',true)">⃠</button>`}
           </div>
         </div>`).join('')
       :'<div class="empty">Nada con ese filtro.</div>'}
@@ -276,6 +286,17 @@ async bqGuardar(id){
   const r=await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),b);
   if(r===null){ toast('⚠️ No se guardó'); return; }
   Object.assign(x,b); cerrar(); toast('Guardado'); this._bqPaint();
+},
+/* Anular no borra: la ficha queda guardada con su foto y sus precios, solo sale
+   de la vista. Si mañana vuelve a interesar el producto, se reactiva y no hubo
+   que volver a conseguir la foto ni las cotizaciones. */
+async bqAnular(id,v){
+  const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
+  if(v && !confirm('¿Anular "'+(x.nombre||'')+'"? Sale de la lista pero no se borra: puedes reactivarlo cuando quieras.')) return;
+  const nv = v ? 'anulado' : (x.referencia_id?'creado':(x.escogido||x.escogido2||x.principal?'escogido':'buscando'));
+  const r=await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),{estado:nv,actualizado:new Date().toISOString()});
+  if(r===null){ toast('⚠️ No se pudo'); return; }
+  x.estado=nv; toast(v?'Anulado':'Reactivado'); this._bqPaint();
 },
 async bqBorrar(id){
   if(!confirm('¿Quitar esta ficha de la búsqueda?\n\nLa foto no se borra del disco.')) return;
