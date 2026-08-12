@@ -218,10 +218,10 @@ _bqPaint(){
           <div class="row" style="gap:6px;margin-top:7px">
             ${x.estado==='anulado'
               ? `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAnular('${esc(x.id)}',false)">↩︎ Reactivar</button>`
-              : `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAbrir('${esc(x.id)}')">✎ Trabajar</button>
+              : `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAbrir('${esc(x.id)}')">🚚 Proveedores</button>
                  ${x.estado==='creado'
-                    ? `<button class="btn" style="padding:6px 10px" title="Editar la referencia y sus costos" onclick="App.bqRef('${esc(x.id)}')">✎ Ref.</button>`
-                    : `<button class="btn" style="padding:6px 10px" onclick="App.bqRef('${esc(x.id)}')">＋ Ref.</button>`}
+                    ? `<button class="btn" style="padding:6px 10px" title="Ver y corregir el costo" onclick="App.bqRef('${esc(x.id)}')">✎ Costos</button>`
+                    : `<button class="btn" style="padding:6px 10px" onclick="App.bqRef('${esc(x.id)}')">＋ Costos</button>`}
                  <button class="btn gh" style="padding:6px 9px;color:#b3261e" title="Anular: sale de la lista pero no se borra"
                          onclick="App.bqAnular('${esc(x.id)}',true)">⃠</button>`}
           </div>
@@ -319,7 +319,7 @@ async bqRef(id){
   }
   const e=this._bqEdit||{};
   const val=k=>(e[k]!=null&&e[k]!=='')?e[k]:'';
-  modal(`<h3>${e.id?'✎ Editar referencia':'＋ Crear referencia'}</h3>
+  modal(`<h3>${e.id?'✎ Costos de la referencia':'＋ Costos y crear referencia'}</h3>
     <div class="mini">${esc(x.nombre)}${x.proveedor?' · '+esc(x.proveedor):''}</div>
     <div class="g2" style="margin-top:8px">
       <div><label>Código</label><input id="rf_cod" value="${esc(val('codigo'))}" placeholder="FES-001"></div>
@@ -355,7 +355,7 @@ async bqRef(id){
     <div class="mini">Escribe cualquiera de los dos: si pones el margen sale el precio, y si pones el precio sale el margen.</div>
     <div id="rf_venta" style="font-weight:800;font-size:17px;margin-top:8px"></div>
     <div class="row" style="gap:8px;margin-top:12px">
-      <button class="btn" style="flex:1" onclick="App.bqRefOk()">${e.id?'Guardar cambios':'Crear referencia'}</button>
+      <button class="btn" style="flex:1" onclick="App.bqRefOk()">${e.id?'Guardar los costos':'Crear referencia'}</button>
       <button class="btn gh" onclick="cerrar()">Cancelar</button>
     </div>`);
   this.bqCalc();
