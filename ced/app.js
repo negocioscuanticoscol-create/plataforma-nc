@@ -5174,12 +5174,15 @@ const App = {
      El grano es referencia + color + talla. */
   async vInventario(){
     this.loading();
-    const [ri,rm] = await Promise.all([
+    const [ri,rm,rc,rp] = await Promise.all([
       this.sb.from('inventario').select('*').order('referencia').order('talla'),
-      this.sb.from('inv_movimientos').select('*').order('creado_en',{ascending:false}).limit(500)
+      this.sb.from('inv_movimientos').select('*').order('creado_en',{ascending:false}).limit(500),
+      this.sb.from('ced').select('*').eq('activo',true),        // para escoger a qué sede entra
+      this.sb.from('ced_proveedores').select('id,nombre').eq('activo',true).order('nombre')
     ]);
     const inv=ri.data||[], movs=rm.data||[];
     this._inv=inv; this._movs=movs;
+    this._ceds=rc.data||this._ceds||[]; this._provs=rp.data||[];
 
     // cobertura: cuantos pares salieron este mes, para saber cuantos dias aguanta
     const hoy=new Date(), ym=hoy.toISOString().slice(0,7), diaDelMes=Math.max(1,hoy.getDate());
@@ -5187,21 +5190,36 @@ const App = {
     movs.filter(m=>m.tipo==='salida' && String(m.creado_en||'').slice(0,7)===ym)
         .forEach(m=>{ salMes[m.referencia]=(salMes[m.referencia]||0)+(+m.cantidad||0); });
 
+    /* El dueño entra en el agrupador: 701 nuestro y 701 del aliado son dos
+       saldos distintos aunque sean la misma bota. */
     const gr={};
-    inv.forEach(r=>{ const k=r.referencia+'||'+(r.color||'');
-      if(!gr[k]) gr[k]={ref:r.referencia, color:r.color||'', tallas:[], total:0};
+    inv.forEach(r=>{ const d=r.dueno||'ced'; const k=r.referencia+'||'+(r.color||'')+'||'+d;
+      if(!gr[k]) gr[k]={ref:r.referencia, color:r.color||'', dueno:d, tallas:[], total:0,
+                        prov:r.proveedor||'', costo:+r.costo||0, minimo:+r.minimo||0};
       gr[k].tallas.push(r); gr[k].total+=(+r.stock||0); });
-    const grupos=Object.values(gr).sort((a,b)=>String(a.ref).localeCompare(String(b.ref)));
-    const totPares=inv.reduce((a,r)=>a+(+r.stock||0),0);
+    const grupos=Object.values(gr).sort((a,b)=>
+      (a.dueno===b.dueno? String(a.ref).localeCompare(String(b.ref)) : (a.dueno==='ced'?-1:1)));
+    const paresDe=d=>inv.filter(r=>(r.dueno||'ced')===d).reduce((a,r)=>a+(+r.stock||0),0);
+    const parCed=paresDe('ced'), parAli=paresDe('aliado');
+    const valorCed=inv.filter(r=>(r.dueno||'ced')==='ced')
+                      .reduce((a,r)=>a+((+r.stock||0)*(+r.costo||0)),0);
     const enCero=grupos.filter(g=>g.total<=0).length;
+    const bajoMin=grupos.filter(g=>g.minimo>0 && g.total>0 && g.total<=g.minimo).length;
     const donde=(this.cedUser&&this.cedUser.ced)||'toda la red';
 
     this.set(`
       <h1>📦 Inventario</h1><div class="sub">Bodega de ${esc(donde)} · lo que hay hoy</div>
       <div class="kpis">
-        <div class="kpi naranja"><b>${totPares}</b><span>pares en bodega</span></div>
+        <div class="kpi naranja"><b>${parCed}</b><span>pares de CED · consignación</span></div>
+        <div class="kpi"><b>${parAli}</b><span>pares del aliado</span></div>
         <div class="kpi"><b>${grupos.length}</b><span>referencias</span></div>
       </div>
+      ${valorCed?`<div class="card" style="padding:11px 13px;background:#eef6f2;border-color:#bfe0d2">
+        <b style="color:#0f6b4f">💰 ${money(valorCed)}</b>
+        <span style="font-size:12.5px;color:#4a6a5e"> · es el capital de CED que está en esta bodega</span></div>`:''}
+      ${bajoMin?`<div class="card" style="border-color:#f3ddb0;background:#fdf6e6;padding:11px">
+        <b style="color:#8a5a12">🟡 ${bajoMin} referencia(s) por debajo del mínimo</b>
+        <span style="font-size:12.5px"> · hay que reponer antes de que falte</span></div>`:''}
       ${enCero?`<div class="card" style="border-color:#f0c4c4;background:#fdecec;padding:11px">
         <b style="color:#b3261e">🔴 ${enCero} referencia(s) en cero</b></div>`:''}
       <div class="acciones-item" style="margin-bottom:12px">
@@ -5219,10 +5237,15 @@ const App = {
         const txt = g.total<=0?'sin existencias'
                   : (dias===null?'no ha salido nada este mes'
                   : 'cobertura '+dias.toFixed(0)+' días · salieron '+(salMes[g.ref]||0)+' este mes');
-        return `<div class="item">
+        const esCed = g.dueno==='ced';
+        return `<div class="item" style="border-left:4px solid ${esCed?'var(--naranja)':'#93a3b3'}">
           <div class="top">
-            <div><div class="nom">${esc(g.ref)}${g.color?' · '+esc(g.color):''}</div>
-              <div class="meta" style="color:${col};font-weight:700">${txt}</div></div>
+            <div><div class="nom">${esc(this.refVisible(g.ref,g.dueno))}${g.color?' · '+esc(g.color):''}
+                <span style="font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px;margin-left:5px;
+                  background:${esCed?'#fdeee2':'#eef1f4'};color:${esCed?'#9a5312':'#54636b'}">
+                  ${esCed?'CONSIGNACIÓN':'DEL ALIADO'}</span></div>
+              <div class="meta" style="color:${col};font-weight:700">${txt}</div>
+              <div class="meta">${g.prov?'📋 '+esc(g.prov):'⚠️ sin proveedor'}${g.costo?' · costo '+money(g.costo):''}${g.minimo?' · mínimo '+g.minimo:''}</div></div>
             <div class="tot">${g.total}</div>
           </div>
           <div class="grid-tallas">${g.tallas.map(t=>`<div class="t">
@@ -5232,43 +5255,105 @@ const App = {
       }).join(''):'<div class="empty">Esta bodega todavía no tiene mercancía.<br>Toca “Ingresar inventario”.</div>'}`);
   },
 
+  /* El dueño del par es lo que define todo el modelo: si es nuestro, va en
+     consignación y se vende con NUESTRAS condiciones; si el aliado lo compró,
+     lo vende como quiera. Un mismo SKU puede existir de las dos formas en la
+     misma bodega, por eso el dueño entra en la llave. */
+  DUENOS:[
+    {k:'ced',    t:'De CED · en consignación', suf:' CED'},
+    {k:'aliado', t:'Del aliado · compra en firme', suf:''},
+  ],
+  _duenoDe(k){ return this.DUENOS.find(x=>x.k===k)||this.DUENOS[0]; },
+  /* Como se ve la referencia. Se le pega el CED al nombre para que el
+     distribuidor sepa de un vistazo cual mercancia es nuestra. */
+  refVisible(ref,dueno){ return String(ref||'')+this._duenoDe(dueno).suf; },
+
   _invCampos(u){ return `
     <label>Referencia</label><input id="iv_ref" class="field" value="${esc(u&&u.ref||'')}" placeholder="701">
     <div class="row2">
       <div><label>Color</label><input id="iv_col" class="field" value="${esc(u&&u.color||'')}" placeholder="negro"></div>
       <div><label>Talla</label><input id="iv_tal" class="field" type="number" value="${esc(u&&u.talla||'')}" placeholder="38"></div>
-    </div>`; },
+    </div>
+    <label>¿De quién es?</label>
+    <select id="iv_dueno" class="field">
+      ${this.DUENOS.map(d=>`<option value="${d.k}" ${u&&u.dueno===d.k?'selected':''}>${d.t}</option>`).join('')}
+    </select>`; },
 
   invIngresar(){
+    const provs=this._provs||[];
+    /* La sede a la que ENTRA la mercancía. Quien ve toda la red la escoge —así
+       la bodega principal despacha a cualquier punto—; los demás solo pueden
+       ingresar a la suya. */
+    const mia=(this.cedUser&&this.cedUser.ced)||'Feroz';
+    const todas=(this._ceds||[]).filter(c=>c.activo!==false);
+    const puedeElegir=this._esPrincipal && todas.length>1;
     this.modal(`<h3>＋ Ingresar inventario</h3>
       <div class="sub">Mercancía que llega a la bodega</div>
+      <label>¿A qué sede entra?</label>
+      ${puedeElegir
+        ? `<select id="iv_ced" class="field">${todas.map(c=>
+            `<option value="${esc(c.nombre)}" ${c.nombre===mia?'selected':''}>${esc(c.nombre_comercial||c.nombre)}${c.ciudad?' · '+esc(c.ciudad):''}</option>`).join('')}</select>`
+        : `<input class="field" value="${esc(mia)}" disabled><input type="hidden" id="iv_ced" value="${esc(mia)}">`}
       ${this._invCampos()}
-      <label>Cuántos pares entran</label><input id="iv_can" class="field" type="number" placeholder="0">
-      <label>De dónde viene</label><input id="iv_mot" class="field" placeholder="Remisión 1234 · traslado · compra">
+      <div class="hint">Lo de CED sale como <b>701 CED</b> en toda la plataforma, para que se
+        distinga de lo que el aliado compró en firme.</div>
+      <div class="row2">
+        <div><label>Cuántos pares entran</label><input id="iv_can" class="field" type="number" placeholder="0"></div>
+        <div><label>Costo por par</label><input id="iv_costo" class="field" inputmode="numeric" placeholder="Ej: 28000"></div>
+      </div>
+      <label>Proveedor</label>
+      <input id="iv_prov" class="field" list="iv_prov_dl" placeholder="Quién la fabricó o la vendió">
+      <datalist id="iv_prov_dl">${provs.map(p=>`<option value="${esc(p.nombre)}">`).join('')}
+        <option value="Planta Feroz"><option value="Botas Agroindustrial"></datalist>
+      <div class="row2">
+        <div><label>Documento</label><input id="iv_doc" class="field" placeholder="Remisión 1234 · factura"></div>
+        <div><label>Mínimo en bodega</label><input id="iv_min" class="field" type="number" placeholder="0"></div>
+      </div>
+      <div class="hint">El mínimo sirve para avisar cuándo hay que reponer antes de que falte.</div>
       <button class="btn btn-main" onclick="App.invIngresarOk()">Ingresar</button>
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
   },
   async invIngresarOk(){
     const ref=$('iv_ref').value.trim(), color=$('iv_col').value.trim(), talla=+$('iv_tal').value||0;
-    const can=+$('iv_can').value||0, mot=$('iv_mot').value.trim();
+    const can=+$('iv_can').value||0, doc=$('iv_doc').value.trim();
+    const dueno=$('iv_dueno').value, prov=$('iv_prov').value.trim();
+    const costo=+String($('iv_costo').value||'').replace(/\D/g,'')||null;
+    const min=+$('iv_min').value||0;
     if(!ref||!talla||can<=0){ alert('Referencia, talla y cantidad son obligatorios.'); return; }
-    const ok=await this._invSumar(ref,color,talla,can,'entrada',mot||'Ingreso de inventario');
+    if(!prov){ alert('Falta el proveedor.\n\nSin él no se puede saber de dónde salió la mercancía ni reclamarle a nadie.'); $('iv_prov').focus(); return; }
+    const sede=($('iv_ced')&&$('iv_ced').value)||null;
+    const ok=await this._invSumar(ref,color,talla,can,'entrada',doc||'Ingreso de inventario',
+      {dueno, proveedor:prov, costo, minimo:min, documento:doc, ced:sede});
     if(!ok) return;
-    this.cerrarModal(); this.toast('＋'+can+' pares'); this.vInventario();
+    this.cerrarModal(); this.toast('＋'+can+' pares de '+this.refVisible(ref,dueno)); this.vInventario();
   },
 
-  /* suma (o resta, si viene negativo) y deja el movimiento escrito */
-  async _invSumar(ref,color,talla,cant,tipo,motivo){
-    const mio=(this.cedUser&&this.cedUser.ced)||'Feroz';
-    const actual=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color && +r.talla===+talla);
+  /* suma (o resta, si viene negativo) y deja el movimiento escrito.
+     'extra' trae dueño, proveedor, costo, mínimo y documento cuando es una
+     entrada. El dueño hace parte del grano: los pares nuestros y los del
+     aliado son saldos distintos aunque sean la misma referencia y talla. */
+  async _invSumar(ref,color,talla,cant,tipo,motivo,extra){
+    const e = extra||{};
+    const dueno = e.dueno || 'ced';
+    /* La sede a la que entra: la que escogieron, o la mía si no eligieron. */
+    const mio = e.ced || (this.cedUser&&this.cedUser.ced) || 'Feroz';
+    const actual=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color
+                                      && +r.talla===+talla && (r.dueno||'ced')===dueno
+                                      && r.ced===mio);
     const nuevo=(+((actual&&actual.stock)||0))+cant;
-    if(nuevo<0){ alert('No alcanza: en esa talla hay '+((actual&&actual.stock)||0)+' pares.'); return false; }
-    const fila={referencia:ref, color:color, talla:talla, stock:nuevo,
-                actualizado_en:new Date().toISOString(), ced:(actual&&actual.ced)||mio};
-    const { error } = await this.sb.from('inventario').upsert(fila,{onConflict:'ced,referencia,color,talla'});
+    if(nuevo<0){ alert('No alcanza: de '+this.refVisible(ref,dueno)+' talla '+talla
+                     +' hay '+((actual&&actual.stock)||0)+' pares.'); return false; }
+    const fila={referencia:ref, color:color, talla:talla, stock:nuevo, dueno,
+                actualizado_en:new Date().toISOString(), ced:mio};
+    if(e.proveedor) fila.proveedor=e.proveedor;
+    if(e.costo)     fila.costo=e.costo;
+    if(e.minimo)    fila.minimo=e.minimo;
+    const { error } = await this.sb.from('inventario')
+      .upsert(fila,{onConflict:'ced,referencia,color,talla,dueno'});
     if(error){ alert('No se pudo guardar el inventario: '+error.message); return false; }
     await this.sb.from('inv_movimientos').insert({ referencia:ref, color:color, talla:talla, tipo:tipo,
-      cantidad:Math.abs(cant), motivo:motivo, usuario:(this.perfil&&this.perfil.nombre)||'' });
+      cantidad:Math.abs(cant), motivo:motivo, usuario:(this.perfil&&this.perfil.nombre)||'',
+      dueno, proveedor:e.proveedor||null, costo:e.costo||null, documento:e.documento||null });
     return true;
   },
 
@@ -5301,7 +5386,8 @@ const App = {
       sistema:sis, contado:con, ajustado:!!ajustar, nota:nota, usuario:(this.perfil&&this.perfil.nombre)||'' });
     if(error){ alert('Error: '+error.message); return; }
     if(ajustar && con!==sis){
-      const ok=await this._invSumar(ref,color,talla,con-sis,'ajuste','Auditoría'+(nota?' · '+nota:''));
+      const ok=await this._invSumar(ref,color,talla,con-sis,'ajuste','Auditoría'+(nota?' · '+nota:''),
+      {dueno:($('iv_dueno')&&$('iv_dueno').value)||'ced'});
       if(!ok) return;
     }
     this.cerrarModal(); this.toast(ajustar?'Auditoría guardada y saldo ajustado':'Auditoría guardada'); this.vInventario();
@@ -5333,7 +5419,8 @@ const App = {
       referencia:ref, color:color, talla:talla, pares:can, falla:falla, foto_url:foto,
       motivo:falla, notas:'Registrada desde Inventario' });
     if(error){ alert('Error: '+error.message); return; }
-    const ok=await this._invSumar(ref,color,talla,-can,'garantia','Garantía'+(falla?' · '+falla:''));
+    const ok=await this._invSumar(ref,color,talla,-can,'garantia','Garantía'+(falla?' · '+falla:''),
+      {dueno:($('iv_dueno')&&$('iv_dueno').value)||'ced'});
     if(!ok) return;
     this.cerrarModal(); this.toast('Garantía registrada · −'+can+' pares'); this.vInventario();
   },
