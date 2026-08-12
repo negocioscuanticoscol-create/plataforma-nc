@@ -2679,7 +2679,10 @@ const App = {
     const cuenta = emisor.banco
       ? `${emisor.banco} · ${emisor.tipo_cuenta||'Ahorros'} ${emisor.cuenta||''} · ${emisor.titular||emisor.nombre}`
       : C.CUENTA;
-    const txt=[`*PROFORMA ${c.numero||''}* - ${emisor.nombre||'INDUSTRIAS FEROZ SAS'}`,`Cliente: ${cl.nombre||''}${cl.nit?' NIT '+cl.nit:''}`,`${concepto} - ${pares} par(es)`];
+    const txt=[`*PROFORMA ${c.numero||''}* - ${emisor.nombre||'INDUSTRIAS FEROZ SAS'}`,`Cliente: ${cl.nombre||''}${cl.nit?' NIT '+cl.nit:''}`];
+    if(Array.isArray(c.items)&&c.items.length>1) c.items.forEach(it=>
+      txt.push(`Ref. ${it.referencia||''}${it.color?' '+it.color:''} - ${it.pares||0} par(es) x ${money(it.precio_par||0)} = ${money(it.subtotal||0)}`));
+    else txt.push(`${concepto} - ${pares} par(es)`);
     if(sub) txt.push(`Subtotal: ${money(sub)}`); if(iva) txt.push(`IVA: ${money(iva)}`);
     txt.push(`Transporte: ${fl.lbl}`,`TOTAL: ${money(tot)}`,'',`Para confirmar consigna en:`,cuenta);
     if(sedeLinea) txt.push('', `Te atiende ${sede.nombre||''}: ${sedeLinea}`);
@@ -2703,8 +2706,13 @@ const App = {
         <div class="pf-body">
           <div class="box"><b>Cliente:</b> ${esc(cl.nombre||'—')}${cl.nit?` · NIT/CC ${esc(cl.nit)}`:''}${cl.tel?`<br><b>Tel:</b> ${esc(cl.tel)}`:''}${dir?`<br><b>Entrega:</b> ${esc(dir)}`:''}</div>
           <table><thead><tr><th>Concepto</th><th style="text-align:right">Pares</th><th style="text-align:right">Precio/par</th><th style="text-align:right">Subtotal</th></tr></thead>
-            <tbody><tr><td>${esc(concepto)}</td><td style="text-align:right">${pares}</td><td style="text-align:right">${ppar?money(ppar):'—'}</td><td style="text-align:right">${money(sub)}</td></tr></tbody></table>
-          ${tallasRows?`<table><thead><tr><th>Distribución por talla</th><th style="text-align:right">Cantidad</th></tr></thead><tbody>${tallasRows}</tbody></table>`:''}
+            <tbody>${(Array.isArray(c.items)&&c.items.length>1)
+              ? c.items.map(it=>`<tr><td>${esc((it.categoria&&it.categoria!=='Calzado'?it.categoria+' ':'')+'Ref. '+(it.referencia||''))}${it.color?' · '+esc(it.color):''}</td><td style="text-align:right">${it.pares||0}</td><td style="text-align:right">${money(it.precio_par||0)}</td><td style="text-align:right">${money(it.subtotal||0)}</td></tr>`).join('')
+              : `<tr><td>${esc(concepto)}</td><td style="text-align:right">${pares}</td><td style="text-align:right">${ppar?money(ppar):'—'}</td><td style="text-align:right">${money(sub)}</td></tr>`}</tbody></table>
+          ${(Array.isArray(c.items)&&c.items.length>1)
+            ? c.items.map(it=>{ const cv=it.curva||{}; const ts=Object.keys(cv).filter(t=>+cv[t]>0).sort((x,y)=>+x-+y);
+                return ts.length?`<table><thead><tr><th>Ref. ${esc(it.referencia||'')}${it.color?' · '+esc(it.color):''} — por talla</th><th style="text-align:right">Cantidad</th></tr></thead><tbody>${ts.map(t=>`<tr><td>Talla ${esc(t)}</td><td style="text-align:right">${cv[t]} par(es)</td></tr>`).join('')}</tbody></table>`:''; }).join('')
+            : (tallasRows?`<table><thead><tr><th>Distribución por talla</th><th style="text-align:right">Cantidad</th></tr></thead><tbody>${tallasRows}</tbody></table>`:'')}
           <div class="tot"><table>
             <tr><td>Subtotal</td><td style="text-align:right">${money(sub)}</td></tr>
             <tr><td>IVA (19%)</td><td style="text-align:right">${money(iva)}</td></tr>
@@ -2851,6 +2859,8 @@ const App = {
           <div class="ec-falta" id="ec_falta">👆 Empieza a sumar pares</div>
         </div>
       </div>
+      <div id="co_anexos"></div>
+      <button class="btn btn-ghost" style="margin-bottom:12px" onclick="App.cotAnexar()">＋ Anexar otro producto</button>
       <div class="card" id="co_pie_box" style="display:none">
         <label>🎁 Muestra de pie (nono) — sin valor comercial</label>
         <div class="hint">Es un zapato suelto de muestra. No necesita curva de tallas.</div>
@@ -2865,6 +2875,7 @@ const App = {
     `);
     this._clientes = cli;
     $('co_grid').innerHTML = C.TALLAS.map(t=>`<div class="t"><span>Talla ${t}</span><input type="number" min="0" inputmode="numeric" data-talla="${t}" oninput="App.curva()"></div>`).join('');
+    this._cotAnexos=[]; this._cotPintaAnexos();   // cada cotización arranca sin anexos
     this.cotRefPrecio();   // pinta de una el precio de la referencia que salga elegida
     this.curva();
     if(editId){
@@ -3015,6 +3026,92 @@ const App = {
     /* El precio depende de la lista del cliente, así que al cambiar de empresa
        hay que recalcularlo. */
     this.cotRefPrecio(); },
+  /* ---------- PRODUCTOS ANEXADOS A LA COTIZACIÓN ----------
+     El primer producto es el de arriba, con su curva y sus contadores de caja.
+     Acá se agregan los demás: cada uno con su referencia y su propia curva de
+     tallas, porque una bota y una camisa no comparten tallaje. Los renglones
+     viven en memoria mientras se cotiza y se guardan en la columna `items`.
+     El primero se sigue escribiendo también en las columnas sueltas
+     (referencia, pares, curva, precio_par) para no romper la proforma, los
+     pedidos ni los despachos, que las leen. */
+  _cotAnexos:[],
+  cotAnexar(){
+    this._cotAnexos=this._cotAnexos||[];
+    this._cotAnexos.push({id:'ax'+(this._cotAnexoN=(this._cotAnexoN||0)+1), k:'', tallas:{}});
+    this._cotPintaAnexos();
+  },
+  cotQuitarAnexo(id){
+    this._cotAnexos=(this._cotAnexos||[]).filter(a=>a.id!==id);
+    this._cotPintaAnexos(); this.calcCot&&this.calcCot();
+  },
+  _cotPintaAnexos(){
+    const c=$('co_anexos'); if(!c) return;
+    const refs=this._refsCot||[];
+    c.innerHTML=(this._cotAnexos||[]).map((a,i)=>`
+      <div class="card" style="border-left:4px solid var(--azul)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <b style="font-size:14px">Producto ${i+2}</b>
+          <button class="btn-sm" style="background:#fde8e8;color:#b3261e;width:auto;margin:0"
+                  onclick="App.cotQuitarAnexo('${a.id}')">✕ Quitar</button>
+        </div>
+        <label>Referencia</label>
+        <select class="field" onchange="App.cotAnexoRef('${a.id}',this.value)">
+          <option value="">— escoge —</option>
+          ${refs.map(r=>`<option value="${esc(r.k)}" ${r.k===a.k?'selected':''}>${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}${r.mostrarCed&&r.ced?'  ['+esc(r.ced)+']':''}</option>`).join('')}
+        </select>
+        <div class="hint" id="${a.id}_precio"></div>
+        <label>Pares por talla</label>
+        <div class="grid-tallas">
+          ${C.TALLAS.map(t=>`<div class="t"><span>Talla ${t}</span>
+            <input type="number" min="0" inputmode="numeric" value="${a.tallas[t]||''}"
+                   oninput="App.cotAnexoTalla('${a.id}',${t},this.value)"></div>`).join('')}
+        </div>
+        <div class="hint" id="${a.id}_tot" style="font-weight:700;color:var(--verde)"></div>
+      </div>`).join('');
+    (this._cotAnexos||[]).forEach(a=>this._cotAnexoInfo(a));
+  },
+  cotAnexoRef(id,k){
+    const a=(this._cotAnexos||[]).find(x=>x.id===id); if(!a) return;
+    a.k=k; this._cotAnexoInfo(a); this.calcCot&&this.calcCot();
+  },
+  cotAnexoTalla(id,t,v){
+    const a=(this._cotAnexos||[]).find(x=>x.id===id); if(!a) return;
+    const n=+v||0; if(n>0) a.tallas[t]=n; else delete a.tallas[t];
+    this._cotAnexoInfo(a); this.calcCot&&this.calcCot();
+  },
+  /* Precio del renglón: la lista del cliente sobre la referencia elegida. */
+  _cotAnexoPrecio(a){
+    const r=(this._refsCot||[]).find(x=>x.k===a.k);
+    const cid=($('co_cliente')||{}).value;
+    const cl=(this._clientes||[]).find(c=>c.id==cid)||{};
+    const i=this.LISTAS.indexOf(cl.lista_precio||'Distribuidor');
+    const p=(r&&i>=0)?(r.precios[i]||0):0;
+    return {ref:r||null, valor:p>0?p:C.PRECIO_PAR, deLista:p>0, lista:cl.lista_precio||'Distribuidor'};
+  },
+  _cotAnexoPares(a){ return Object.values(a.tallas||{}).reduce((s,n)=>s+(+n||0),0); },
+  _cotAnexoInfo(a){
+    const pe=$(a.id+'_precio'), te=$(a.id+'_tot');
+    const p=this._cotAnexoPrecio(a), pares=this._cotAnexoPares(a);
+    if(pe) pe.innerHTML = !a.k ? '' : (p.deLista
+      ? `Precio lista <b>${esc(p.lista)}</b>: <b>${money(p.valor)}</b>/par + IVA`
+      : `<span style="color:#b45309">⚠️ Sin precio en la lista <b>${esc(p.lista)}</b>. Se usa ${money(C.PRECIO_PAR)}/par.</span>`);
+    if(te) te.textContent = pares ? pares+' par(es) · '+money(pares*p.valor) : '';
+  },
+  /* Lo que suman los productos anexados, para el total y para guardar. */
+  _cotAnexosResumen(){
+    let pares=0, sub=0; const items=[];
+    (this._cotAnexos||[]).forEach(a=>{
+      if(!a.k) return;
+      const p=this._cotAnexoPrecio(a), n=this._cotAnexoPares(a);
+      if(!n) return;
+      pares+=n; sub+=n*p.valor;
+      items.push({referencia:(p.ref&&p.ref.referencia)||'', color:(p.ref&&p.ref.color)||'',
+        ced:(p.ref&&p.ref.ced)||'', categoria:(p.ref&&p.ref.categoria)||'',
+        precio_par:p.valor, pares:n, curva:{...a.tallas}, subtotal:n*p.valor});
+    });
+    return {pares, sub, items};
+  },
+
   async guardarCotizacion(){
     const cid=$('co_cliente').value;
     const tipoMv=this._cotTipoM();
@@ -3073,7 +3170,13 @@ const App = {
        cliente. Si esa lista no tiene precio cargado, cae en el de siempre
        (la pantalla ya lo avisó en naranja al escoger la referencia). */
     const pp=this._cotPrecioPar();
-    const subtotal=cu.pares*pp.valor, iva=conIva?Math.round(subtotal*C.IVA):0;
+    /* Los productos anexados suman al subtotal y a los pares. El primero sigue
+       yendo en las columnas sueltas; todos, incluido el primero, quedan además
+       en `items` para poder reconstruir el detalle renglón por renglón. */
+    const ax=this._cotAnexosResumen();
+    const subtotal=cu.pares*pp.valor + ax.sub;
+    const paresTot=cu.pares + ax.pares;
+    const iva=conIva?Math.round(subtotal*C.IVA):0;
     /* El envío entra en el total: es plata que el cliente consigna. Los otros
        tres tipos de transporte no se le cobran, así que no suman. */
     const tKey=(($('co_transporte')||{}).value)||'al_cobro';
@@ -3086,9 +3189,17 @@ const App = {
     try{ const {data}=await this.sb.from('feroz_comisiones').select('*').eq('referencia',(cl.referencia||'701')).eq('lista',(cl.lista_precio||'Distribuidor')).maybeSingle(); rate=data; }catch(e){}
     const vNC  = cl.recomendado ? (rate?+rate.valor_par_nc_rec:900)  : (rate?+rate.valor_par_nc:1900);
     const vGPJR= cl.recomendado ? (rate?+rate.valor_par_gpjr:1000) : 0;
-    const comNC=vNC*cu.pares, comGPJR=vGPJR*cu.pares;
-    const reg={numero:num,cliente_id:cid,cliente_snap:cl,curva:cu.tallas,pares:cu.pares,cajas:cu.cajas,resto:cu.resto,
-      precio_par:pp.valor,subtotal,iva,total,tipo_doc:tipoDoc,rem_ced:remCed,flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this.user.id,
+    /* La comisión se paga por par vendido, así que suma los pares de TODOS los
+       renglones. Antes multiplicaba solo por los del primero. */
+    const comNC=vNC*paresTot, comGPJR=vGPJR*paresTot;
+    const reg={numero:num,cliente_id:cid,cliente_snap:cl,curva:cu.tallas,pares:paresTot,cajas:cu.cajas,resto:cu.resto,
+      precio_par:pp.valor,subtotal,iva,total,tipo_doc:tipoDoc,rem_ced:remCed,
+      items:[{referencia:(pp.ref&&pp.ref.referencia)||cl.referencia||'701',
+              color:(pp.ref&&pp.ref.color)||'', ced:(pp.ref&&pp.ref.ced)||'',
+              categoria:(pp.ref&&pp.ref.categoria)||'', precio_par:pp.valor,
+              pares:cu.pares, curva:cu.tallas, subtotal:cu.pares*pp.valor},
+             ...ax.items],
+flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this.user.id,
       referencia:(pp.ref&&pp.ref.referencia)||cl.referencia||'701',valor_par_nc:vNC,valor_par_gpjr:vGPJR,recomendado:!!cl.recomendado,comision_nc:comNC,comision_gpjr:comGPJR,
       // quien factura + FOTO de sus datos. Se copia, no se referencia: si mañana
       // cambia la cuenta bancaria, esta cotizacion tiene que seguir mostrando
