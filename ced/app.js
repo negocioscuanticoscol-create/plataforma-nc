@@ -2797,8 +2797,14 @@ const App = {
               const et={aliado:'🤝 Factura el aliado', empresa:'🏭 Factura directamente la empresa'}[f.tipo] || ('⚙️ '+esc(f.nombre));
               return `<option value="${f.id}" ${f.id===porDefecto?'selected':''}>${et} · ${esc(f.nombre)}</option>`;
             }).join('');
-            return (gSedes?`<optgroup label="Por el CED">${gSedes}</optgroup>`:'')
-                 + (gOtros?`<optgroup label="Otras empresas">${gOtros}</optgroup>`:'');
+            /* Remision: el CED no factura, remisiona. Tolima y Av 68 no tienen
+               empresa facturadora propia, asi que sin esto no tenian como sacar
+               el documento. Se guarda tipo_doc='remision' + la sede. */
+            const gRem=(this._ceds||[]).filter(c=>c.activo!==false).map(c=>
+              `<option value="rem:${esc(c.nombre)}">📄 REM ${esc((c.nombre_comercial||c.nombre)).toUpperCase()}${c.ciudad?' · '+esc(c.ciudad):''}</option>`).join('');
+            return (gSedes?`<optgroup label="Factura el CED">${gSedes}</optgroup>`:'')
+                 + (gOtros?`<optgroup label="Otras empresas">${gOtros}</optgroup>`:'')
+                 + (gRem?`<optgroup label="Remisión (sin factura)">${gRem}</optgroup>`:'');
           })()}
         </select>
         <div class="hint" style="margin-top:6px">Define desde el principio quién emite la factura y a qué cuenta
@@ -2808,6 +2814,10 @@ const App = {
 
       <div class="card" style="border-left:4px solid var(--verde)">
         <label style="margin:0"><b>👟 Referencia *</b></label>
+        <select class="field" id="co_cat" onchange="App.cotFiltraRef()" style="margin-top:6px">
+          <option value="">Todas las categorías</option>
+          ${this.CATEGORIAS.map(c=>`<option>${esc(c)}</option>`).join('')}
+        </select>
         <select class="field" id="co_ref" onchange="App.cotRefPrecio()" style="margin-top:6px">
           ${refsCot.length?refsCot.map(r=>`<option value="${esc(r.k)}">${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}${r.mostrarCed&&r.ced?'  ['+esc(r.ced)+']':''}</option>`).join('')
             :`<option value="701||">701</option>`}
@@ -2938,7 +2948,7 @@ const App = {
   async _cotRefs(){
     const [ri,rr]=await Promise.all([
       this.sb.from('inventario').select('ced,referencia,color'),
-      this.sb.from('ced_prov_referencias').select('ced,referencia,color,descripcion,l1,l2,l3,l4')
+      this.sb.from('ced_prov_referencias').select('ced,referencia,color,descripcion,categoria,l1,l2,l3,l4')
     ]);
     /* La SEDE entra en la llave. Sin ella, la 701 de Feroz y la 701 de Ibagué
        se fundían en una sola opción para quien ve toda la red: se perdía una de
@@ -2951,7 +2961,7 @@ const App = {
       if(!x.referencia || m[k]) return;
       const f=fichas[k]||{};
       m[k]={k, ced:x.ced||'', referencia:x.referencia, color:x.color||'',
-            descripcion:f.descripcion||'', mostrarCed:red,
+            descripcion:f.descripcion||'', categoria:f.categoria||'', mostrarCed:red,
             precios:[f.l1,f.l2,f.l3,f.l4].map(v=>+v||0)}; });
     this._refsCot=Object.values(m).sort((a,b)=>
       (a.referencia+a.color+a.ced).localeCompare(b.referencia+b.color+b.ced,'es'));
@@ -2969,6 +2979,19 @@ const App = {
     const p=(r && i>=0) ? (r.precios[i]||0) : 0;
     return {valor: p>0?p:C.PRECIO_PAR, deLista: p>0,
             lista: cl.lista_precio||'Distribuidor', ref:r||null}; },
+  /* Repinta el desplegable de referencias dejando solo las de la categoría
+     elegida. Si una referencia todavía no tiene categoría, sale siempre: es
+     preferible a que desaparezca de la lista y nadie la encuentre. */
+  cotFiltraRef(){
+    const cat=(($('co_cat')||{}).value||'');
+    const sel=$('co_ref'); if(!sel) return;
+    const lista=(this._refsCot||[]).filter(r=>!cat || !r.categoria || r.categoria===cat);
+    const antes=sel.value;
+    sel.innerHTML = lista.length
+      ? lista.map(r=>`<option value="${esc(r.k)}">${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}${r.mostrarCed&&r.ced?'  ['+esc(r.ced)+']':''}</option>`).join('')
+      : `<option value="">— no hay referencias en ${esc(cat||'esta lista')} —</option>`;
+    if(lista.some(r=>r.k===antes)) sel.value=antes;
+    this.cotRefPrecio(); },
   cotRefPrecio(){
     const e=$('co_ref_precio'); if(!e) return;
     const p=this._cotPrecioPar();
@@ -3038,8 +3061,11 @@ const App = {
     if(cu.pares<1){ alert('Arma la curva (pares por talla) o marca 🎁 Cotizar MUESTRA.'); return; }
     // Quien factura es obligatorio: cambia los datos tributarios y la cuenta de
     // consignacion, y decidirlo despues obliga a rehacer el documento.
-    const fid=($('co_factura')||{value:''}).value;
-    if(!fid){ alert('Falta indicar QUIÉN FACTURA.\n\nEs obligatorio: define los datos tributarios y la cuenta a la que consigna el cliente.'); if($('co_factura')) $('co_factura').focus(); return; }
+    let fid=($('co_factura')||{value:''}).value;
+    /* Si escogio remision, no hay facturador: se guarda la sede que remisiona. */
+    let remCed=null, tipoDoc='factura';
+    if(String(fid).startsWith('rem:')){ remCed=fid.slice(4); tipoDoc='remision'; fid=''; }
+    if(!fid && !remCed){ alert('Falta indicar QUIÉN FACTURA.\n\nEs obligatorio: define los datos tributarios y la cuenta a la que consigna el cliente.'); if($('co_factura')) $('co_factura').focus(); return; }
     const fac=(this._facts||[]).find(x=>x.id===fid)||null;
     if(!cu.libre && cu.faltan!==0 && !confirm(`Falta(n) ${cu.faltan} par(es) para completar la última caja. ¿Guardar igual?`)) return;
     const conIva=(($('co_iva')||{checked:true}).checked);
@@ -3062,7 +3088,7 @@ const App = {
     const vGPJR= cl.recomendado ? (rate?+rate.valor_par_gpjr:1000) : 0;
     const comNC=vNC*cu.pares, comGPJR=vGPJR*cu.pares;
     const reg={numero:num,cliente_id:cid,cliente_snap:cl,curva:cu.tallas,pares:cu.pares,cajas:cu.cajas,resto:cu.resto,
-      precio_par:pp.valor,subtotal,iva,total,flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this.user.id,
+      precio_par:pp.valor,subtotal,iva,total,tipo_doc:tipoDoc,rem_ced:remCed,flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this.user.id,
       referencia:(pp.ref&&pp.ref.referencia)||cl.referencia||'701',valor_par_nc:vNC,valor_par_gpjr:vGPJR,recomendado:!!cl.recomendado,comision_nc:comNC,comision_gpjr:comGPJR,
       // quien factura + FOTO de sus datos. Se copia, no se referencia: si mañana
       // cambia la cuenta bancaria, esta cotizacion tiene que seguir mostrando
@@ -5497,6 +5523,11 @@ const App = {
           <datalist id="iv_col_dl">${cols.map(c=>`<option value="${esc(c)}">`).join('')}
             <option value="negro"><option value="blanco"><option value="miel"><option value="café"></datalist></div>
       </div>
+      <div class="row2">
+        <div><label>Categoría</label>
+          <select id="iv_cat" class="field">${this.CATEGORIAS.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
+        <div></div>
+      </div>
       <label>Descripción</label>
       <input id="iv_desc" class="field" list="iv_desc_dl" placeholder="Bota caña alta en cuero graso, puntera de acero">
       <datalist id="iv_desc_dl">${descs.map(d=>`<option value="${esc(d)}">`).join('')}</datalist>
@@ -5576,6 +5607,7 @@ const App = {
     }
     const doc=$('iv_doc').value.trim(), cond=$('iv_cond').value.trim();
     const desc=(($('iv_desc')||{}).value||'').trim();
+    const categ=(($('iv_cat')||{}).value||'').trim();
     const num=id=>+String(($(id)||{}).value||'').replace(/\D/g,'')||null;
     const costo=num('iv_costo'), min=+$('iv_min').value||0;
     const sede=$('iv_ced').value;
@@ -5596,7 +5628,7 @@ const App = {
     /* color va vacío, nunca null: la llave única de la referencia es
        (ced, referencia, color, dueno) y un null rompía el upsert. */
     const cat={ ced:sede, referencia:ref, color:color||'', dueno, proveedor_id:provId,
-      descripcion:desc||null,
+      descripcion:desc||null, categoria:categ||null,
       marca:this._duenoDe(dueno).et, costo, minimo:min, condiciones:cond||null, activo:true,
       tallas:curva.map(([t])=>t).join(','), notas:prov,
       l1:num('iv_l1'), l2:num('iv_l2'), l3:num('iv_l3'), l4:num('iv_l4') };
@@ -5609,7 +5641,7 @@ const App = {
     for(const [t,c] of curva){
       const r=await this._invSumar(ref,color,t,c,'entrada',doc||'Ingreso de curva',
         {dueno, proveedor:prov, proveedor_id:provId, costo, minimo:min, documento:doc,
-         descripcion:desc, ced:sede});
+         descripcion:desc, categoria:categ, ced:sede});
       if(r) ok+=c; else break;
     }
     if(!ok) return;
@@ -5641,6 +5673,7 @@ const App = {
     if(e.proveedor)    fila.proveedor=e.proveedor;
     if(e.proveedor_id) fila.proveedor_id=e.proveedor_id;
     if(e.descripcion)  fila.descripcion=e.descripcion;
+    if(e.categoria)    fila.categoria=e.categoria;
     if(e.costo)        fila.costo=e.costo;
     if(e.minimo)       fila.minimo=e.minimo;
     const { error } = await this.sb.from('inventario')
@@ -5658,6 +5691,7 @@ const App = {
      Tareas escritas a mano, una lista por ciudad. La base ya aísla: cada sede
      ve y escribe las suyas; la casa matriz y jrcalderon ven toda la red y
      pueden asignarle un pendiente a cualquier sucursal. Ver ced_pendientes. */
+  CATEGORIAS:['Calzado','EPP','Ropa','Otros'],
   PRIOR:['Alta','Media','Baja'],
   DOW:['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],
   /* Muestra solo los campos del tipo de recordatorio elegido. El de WhatsApp
