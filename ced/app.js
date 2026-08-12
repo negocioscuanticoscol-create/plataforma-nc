@@ -312,6 +312,7 @@ const App = {
       {v:'cartera', ic:'💳', t:'Cartera'},
       {v:'comisiones', ic:'🧾', t:'Comisiones'},
       {v:'proveedores', ic:'🚚', t:'Proveedores'},
+      {v:'pendientes', ic:'✅', t:'Pendientes'},
     ];
     // hilera 3 = base de plataforma (solo admin la tiene en permitidos → solo a él le aparece)
     const ROW3=[
@@ -321,8 +322,8 @@ const App = {
       {v:'admin', ic:'👤', t:'Usuarios'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores'],
+    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','pendientes','datos','admin','permisos'];
+    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','pendientes'],
       director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario'],
       facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos','inventario'], planta:['dashboard','pedidos','planta','inventario']};
@@ -390,7 +391,7 @@ const App = {
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
-      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario}[view] || this.vDashboard).call(this);
+      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario, pendientes:this.vPendientes}[view] || this.vDashboard).call(this);
   },
   set(html){ $('main').innerHTML = this._subnav() + html; },
   enConstruccion(view){
@@ -5634,6 +5635,127 @@ const App = {
       descripcion:e.descripcion||null, ced:mio });
     return true;
   },
+
+  /* ============ PENDIENTES ============
+     Tareas escritas a mano, una lista por ciudad. La base ya aísla: cada sede
+     ve y escribe las suyas; la casa matriz y jrcalderon ven toda la red y
+     pueden asignarle un pendiente a cualquier sucursal. Ver ced_pendientes. */
+  PRIOR:['Alta','Media','Baja'],
+  async vPendientes(){
+    this.loading();
+    const { data, error } = await this.sb.from('ced_pendientes').select('*')
+      .order('hecho').order('vence',{nullsFirst:false}).order('creado_en',{ascending:false}).limit(2000);
+    if(error){
+      this.set(`<h1>✅ Pendientes</h1>
+        <div class="card" style="border-color:#f0c4c4;background:#fdecec">
+          <b>No se pudo leer la lista.</b>
+          <div style="margin-top:6px;font-size:13.5px">${esc(error.message||'')}</div>
+          <div style="margin-top:8px;font-size:13px">Si dice que <b>ced_pendientes</b> no existe, falta correr su SQL una sola vez.</div>
+        </div>`); return; }
+    this._pend=data||[];
+    if(!this._ceds||!this._ceds.length){
+      try{ const r=await this.sb.from('ced').select('*').eq('activo',true); this._ceds=r.data||[]; }catch(e){}
+    }
+    this._pPaint();
+  },
+  _pPaint(){
+    const P=this._pend||[];
+    const sedes=[...new Set(P.map(p=>p.ced).filter(Boolean))].sort();
+    const verFiltro=this._veRed() && sedes.length>1;
+    const sel=(verFiltro && this._pSede && sedes.includes(this._pSede)) ? this._pSede : '';
+    this._pSede=sel;
+    const arr = sel ? P.filter(p=>p.ced===sel) : P;
+    const hoy=new Date().toISOString().slice(0,10);
+    const abiertos=arr.filter(p=>!p.hecho), cerrados=arr.filter(p=>p.hecho);
+    const vencidos=abiertos.filter(p=>p.vence && p.vence<hoy);
+    const hoyVence=abiertos.filter(p=>p.vence===hoy);
+    const col={Alta:'#b3261e',Media:'#b45309',Baja:'#54636b'};
+    const fila=p=>{
+      const tarde=p.vence && p.vence<hoy && !p.hecho;
+      return `<div class="item" style="border-left:4px solid ${p.hecho?'#cfd6dd':(col[p.prioridad]||'#54636b')}">
+        <div class="top"><div style="min-width:0;flex:1">
+          <div class="nom" style="${p.hecho?'text-decoration:line-through;color:#8a93a6':''}">${esc(p.titulo)}</div>
+          <div class="meta">
+            ${p.responsable?'👤 '+esc(p.responsable)+' · ':''}
+            <span style="color:${col[p.prioridad]||'#54636b'};font-weight:700">${esc(p.prioridad||'Media')}</span>
+            ${p.vence?` · 📅 ${tarde?'<b style="color:#b3261e">vencido '+esc(p.vence)+'</b>':'vence '+esc(p.vence)}`:''}
+            ${(verFiltro&&!sel&&p.ced)?` · <span style="background:#eef1f5;color:#54636b;padding:1px 7px;border-radius:9px;font-weight:700">${esc(p.ced)}</span>`:''}
+          </div>
+          ${p.detalle?`<div class="meta" style="color:#5a6b7d">${esc(p.detalle)}</div>`:''}
+        </div></div>
+        <div class="acciones-item" style="gap:8px;flex-wrap:wrap">
+          <button class="btn-sm" style="background:${p.hecho?'#eef1f5':'var(--verde)'};color:${p.hecho?'#54636b':'#fff'}"
+            onclick="App.pHecho('${p.id}',${p.hecho?'false':'true'})">${p.hecho?'↩︎ Reabrir':'✓ Hecho'}</button>
+          <button class="btn-sm" style="background:#eef1f5" onclick="App.pModal('${p.id}')">✎ Editar</button>
+          <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.pDel('${p.id}')">✕</button>
+        </div></div>`; };
+    this.set(`<h1>✅ Pendientes</h1>
+      <div class="sub">${abiertos.length} sin cerrar${sel?' · sede '+esc(sel):''}</div>
+      ${verFiltro?`<div style="margin:10px 0">
+        <label style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8a93a6">Sede</label>
+        <select class="field" onchange="App.pSede(this.value)">
+          <option value="">Todas las sedes · ${P.filter(x=>!x.hecho).length}</option>
+          ${sedes.map(s=>`<option value="${esc(s)}" ${s===sel?'selected':''}>${esc(s)} · ${P.filter(x=>x.ced===s&&!x.hecho).length}</option>`).join('')}
+        </select></div>`:''}
+      <div class="kpis">
+        <div class="kpi naranja"><b>${abiertos.length}</b><span>sin cerrar</span></div>
+        <div class="kpi"><b>${hoyVence.length}</b><span>vencen hoy</span></div>
+        <div class="kpi ${vencidos.length?'rojo':''}"><b>${vencidos.length}</b><span>vencidos</span></div>
+      </div>
+      <button class="btn btn-main" style="margin-bottom:14px" onclick="App.pModal()">＋ Nuevo pendiente</button>
+      ${abiertos.length?abiertos.map(fila).join('')
+        :'<div class="card" style="text-align:center;padding:26px 16px;color:#8a93a6">Nada pendiente. Dale a <b>＋ Nuevo pendiente</b>.</div>'}
+      ${cerrados.length?`<h1 style="font-size:15px;margin-top:18px">Cerrados</h1>
+        <div class="sub">${cerrados.length} · se pueden reabrir</div>
+        ${cerrados.slice(0,50).map(fila).join('')}`:''}`);
+  },
+  pSede(v){ this._pSede=v||''; this._pPaint(); },
+  pModal(id){
+    const p=(this._pend||[]).find(x=>String(x.id)===String(id))||{};
+    const mia=(this.cedUser&&this.cedUser.ced)||this._gPrincipal||'';
+    const sedes=(this._ceds||[]).filter(c=>c.activo!==false).map(c=>c.nombre);
+    this.modal(`<h3 style="margin-bottom:10px">${id?'Editar':'Nuevo'} pendiente</h3>
+      <label>¿Qué hay que hacer?</label>
+      <input id="p_tit" value="${esc(p.titulo||'')}" placeholder="Llamar a Agrocampo por la cotización">
+      <label>Detalle</label>
+      <textarea id="p_det" rows="2" placeholder="Lo que haga falta recordar">${esc(p.detalle||'')}</textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Responsable</label><input id="p_resp" value="${esc(p.responsable||'')}" placeholder="Quién lo hace"></div>
+        <div><label>Prioridad</label><select id="p_pri">${this.PRIOR.map(x=>`<option ${((p.prioridad||'Media')===x)?'selected':''}>${x}</option>`).join('')}</select></div>
+      </div>
+      <label>¿Para cuándo?</label><input id="p_ven" type="date" value="${esc(p.vence||'')}">
+      ${(this._veRed()&&sedes.length)?`<label>Sucursal</label>
+        <select id="p_ced">${sedes.map(s=>`<option ${((p.ced||mia)===s)?'selected':''}>${esc(s)}</option>`).join('')}</select>
+        <div class="hint">Solo tú puedes asignarle un pendiente a otra ciudad; los demás quedan en la suya.</div>`:''}
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-main" style="flex:1" onclick="App.pSave('${id||''}')">Guardar</button>
+        <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
+  },
+  async pSave(id){
+    const t=($('p_tit').value||'').trim();
+    if(!t) return alert('Escribe qué hay que hacer.');
+    const b={titulo:t, detalle:($('p_det').value||'').trim(),
+      responsable:($('p_resp').value||'').trim(), prioridad:$('p_pri').value,
+      vence:$('p_ven').value||null};
+    if($('p_ced')) b.ced=$('p_ced').value;
+    if(!id) b.creado_por=(this.cedUser&&this.cedUser.usuario)||(this.perfil&&this.perfil.nombre)||'';
+    const q = id ? await this.sb.from('ced_pendientes').update(b).eq('id',id)
+                 : await this.sb.from('ced_pendientes').insert(b);
+    if(q.error) return alert('No se pudo guardar: '+q.error.message);
+    this.cerrarModal(); this.toast(id?'Pendiente actualizado ✅':'Pendiente creado ✅'); this.vPendientes(); },
+  async pHecho(id,v){
+    const b = v ? {hecho:true, hecho_en:new Date().toISOString(),
+                   hecho_por:(this.cedUser&&this.cedUser.usuario)||(this.perfil&&this.perfil.nombre)||''}
+                : {hecho:false, hecho_en:null, hecho_por:null};
+    const { error } = await this.sb.from('ced_pendientes').update(b).eq('id',id);
+    if(error) return alert('No se pudo: '+error.message);
+    this.toast(v?'Cerrado ✅':'Reabierto'); this.vPendientes(); },
+  async pDel(id){
+    const p=(this._pend||[]).find(x=>String(x.id)===String(id))||{};
+    if(!confirm('¿Borrar el pendiente "'+(p.titulo||'')+'"?')) return;
+    const { error } = await this.sb.from('ced_pendientes').delete().eq('id',id);
+    if(error) return alert('No se pudo borrar: '+error.message);
+    this.toast('Borrado'); this.vPendientes(); },
 
   invAuditoria(){
     this.modal(`<h3>🔍 Auditoría</h3>
