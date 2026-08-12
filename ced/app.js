@@ -5686,6 +5686,219 @@ const App = {
     this.go('inventario');
   },
 
+  /* suma (o resta, si viene negativo) y deja el movimiento escrito.
+     'extra' trae dueño, proveedor, costo, mínimo y documento cuando es una
+     entrada. El dueño hace parte del grano: los pares nuestros y los del
+     aliado son saldos distintos aunque sean la misma referencia y talla. */
+  async _invSumar(ref,color,talla,cant,tipo,motivo,extra){
+    const e = extra||{};
+    const dueno = e.dueno || 'ced';
+    /* La sede a la que entra: la que escogieron, o la mía si no eligieron. */
+    const mio = e.ced || (this.cedUser&&this.cedUser.ced) || 'Feroz';
+    const actual=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color
+                                      && +r.talla===+talla && (r.dueno||'ced')===dueno
+                                      && r.ced===mio);
+    const nuevo=(+((actual&&actual.stock)||0))+cant;
+    if(nuevo<0){ alert('No alcanza: de '+this.refVisible(ref,dueno)+' talla '+talla
+                     +' hay '+((actual&&actual.stock)||0)+' pares.'); return false; }
+    const fila={referencia:ref, color:color, talla:talla, stock:nuevo, dueno,
+                actualizado_en:new Date().toISOString(), ced:mio};
+    if(e.proveedor)    fila.proveedor=e.proveedor;
+    if(e.proveedor_id) fila.proveedor_id=e.proveedor_id;
+    if(e.descripcion)  fila.descripcion=e.descripcion;
+    if(e.categoria)    fila.categoria=e.categoria;
+    if(e.costo)        fila.costo=e.costo;
+    if(e.minimo)       fila.minimo=e.minimo;
+    const { error } = await this.sb.from('inventario')
+      .upsert(fila,{onConflict:'ced,referencia,color,talla,dueno'});
+    if(error){ alert('No se pudo guardar el inventario: '+error.message); return false; }
+    await this.sb.from('inv_movimientos').insert({ referencia:ref, color:color, talla:talla, tipo:tipo,
+      cantidad:Math.abs(cant), motivo:motivo, usuario:(this.perfil&&this.perfil.nombre)||'',
+      dueno, proveedor:e.proveedor||null, proveedor_id:e.proveedor_id||null,
+      costo:e.costo||null, documento:e.documento||null,
+      descripcion:e.descripcion||null, ced:mio });
+    return true;
+  },
+
+  /* ============ PENDIENTES ============
+     Tareas escritas a mano, una lista por ciudad. La base ya aísla: cada sede
+     ve y escribe las suyas; la casa matriz y jrcalderon ven toda la red y
+     pueden asignarle un pendiente a cualquier sucursal. Ver ced_pendientes. */
+  CATEGORIAS:['Calzado','EPP','Ropa','Otros'],
+  PRIOR:['Alta','Media','Baja'],
+  DOW:['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],
+  /* Muestra solo los campos del tipo de recordatorio elegido. El de WhatsApp
+     aparece para los dos, porque sin número no hay a dónde mandarlo. */
+  pRecTipo(){
+    const v=($('p_rec')||{}).value||'no';
+    const m=(id,on)=>{ const e=$(id); if(e) e.style.display=on?'block':'none'; };
+    m('p_rec_una', v==='una'); m('p_rec_rut', v==='rutina'); m('p_rec_wa', v!=='no'); },
+  /* El texto que sale por WhatsApp. Mismo formato lo mande el bot o lo mandes tú. */
+  _pTexto(p){
+    return `🔔 Recordatorio · ${p.ced||''}\n\n*${p.titulo||''}*`
+      + (p.detalle?`\n${p.detalle}`:'')
+      + (p.responsable?`\n👤 ${p.responsable}`:'')
+      + (p.vence?`\n📅 Vence ${p.vence}`:'')
+      + (p.prioridad?`\n⚡ Prioridad ${p.prioridad}`:''); },
+  pWhats(id){
+    const p=(this._pend||[]).find(x=>String(x.id)===String(id)); if(!p) return;
+    const tel=String(p.whatsapp||'').replace(/\D/g,'');
+    if(!tel) return alert('Este pendiente no tiene número de WhatsApp.\n\nÁbrelo con ✎ Editar y ponle uno.');
+    window.open('https://wa.me/57'+tel.slice(-10)+'?text='+encodeURIComponent(this._pTexto(p)),'_blank'); },
+  async vPendientes(){
+    this.loading();
+    const { data, error } = await this.sb.from('ced_pendientes').select('*')
+      .order('hecho').order('vence',{nullsFirst:false}).order('creado_en',{ascending:false}).limit(2000);
+    if(error){
+      this.set(`<h1>✅ Pendientes</h1>
+        <div class="card" style="border-color:#f0c4c4;background:#fdecec">
+          <b>No se pudo leer la lista.</b>
+          <div style="margin-top:6px;font-size:13.5px">${esc(error.message||'')}</div>
+          <div style="margin-top:8px;font-size:13px">Si dice que <b>ced_pendientes</b> no existe, falta correr su SQL una sola vez.</div>
+        </div>`); return; }
+    this._pend=data||[];
+    if(!this._ceds||!this._ceds.length){
+      try{ const r=await this.sb.from('ced').select('*').eq('activo',true); this._ceds=r.data||[]; }catch(e){}
+    }
+    this._pPaint();
+  },
+  _pPaint(){
+    const P=this._pend||[];
+    const sedes=[...new Set(P.map(p=>p.ced).filter(Boolean))].sort();
+    const verFiltro=this._veRed() && sedes.length>1;
+    const sel=(verFiltro && this._pSede && sedes.includes(this._pSede)) ? this._pSede : '';
+    this._pSede=sel;
+    const arr = sel ? P.filter(p=>p.ced===sel) : P;
+    const hoy=new Date().toISOString().slice(0,10);
+    const abiertos=arr.filter(p=>!p.hecho), cerrados=arr.filter(p=>p.hecho);
+    const vencidos=abiertos.filter(p=>p.vence && p.vence<hoy);
+    const hoyVence=abiertos.filter(p=>p.vence===hoy);
+    const col={Alta:'#b3261e',Media:'#b45309',Baja:'#54636b'};
+    const fila=p=>{
+      const tarde=p.vence && p.vence<hoy && !p.hecho;
+      return `<div class="item" style="border-left:4px solid ${p.hecho?'#cfd6dd':(col[p.prioridad]||'#54636b')}">
+        <div class="top"><div style="min-width:0;flex:1">
+          <div class="nom" style="${p.hecho?'text-decoration:line-through;color:#8a93a6':''}">${esc(p.titulo)}</div>
+          <div class="meta">
+            ${p.responsable?'👤 '+esc(p.responsable)+' · ':''}
+            <span style="color:${col[p.prioridad]||'#54636b'};font-weight:700">${esc(p.prioridad||'Media')}</span>
+            ${p.vence?` · 📅 ${tarde?'<b style="color:#b3261e">vencido '+esc(p.vence)+'</b>':'vence '+esc(p.vence)}`:''}
+            ${(verFiltro&&!sel&&p.ced)?` · <span style="background:#eef1f5;color:#54636b;padding:1px 7px;border-radius:9px;font-weight:700">${esc(p.ced)}</span>`:''}
+            ${p.recordar==='rutina'?` · 🔔 cada ${esc(this.DOW[+p.rec_dia||0])} ${esc(String(p.rec_hora||'').slice(0,5))}`
+              :p.recordar==='una'?` · 🔔 ${esc(p.rec_fecha||'')} ${esc(String(p.rec_hora||'').slice(0,5))}`:''}
+          </div>
+          ${p.detalle?`<div class="meta" style="color:#5a6b7d">${esc(p.detalle)}</div>`:''}
+        </div></div>
+        <div class="acciones-item" style="gap:8px;flex-wrap:wrap">
+          <button class="btn-sm" style="background:${p.hecho?'#eef1f5':'var(--verde)'};color:${p.hecho?'#54636b':'#fff'}"
+            onclick="App.pHecho('${p.id}',${p.hecho?'false':'true'})">${p.hecho?'↩︎ Reabrir':'✓ Hecho'}</button>
+          ${p.whatsapp?`<button class="btn-sm" style="background:#25d366;color:#fff" onclick="App.pWhats('${p.id}')">📱 Enviar</button>`:''}
+          <button class="btn-sm" style="background:#eef1f5" onclick="App.pModal('${p.id}')">✎ Editar</button>
+          <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.pDel('${p.id}')">✕</button>
+        </div></div>`; };
+    this.set(`<h1>✅ Pendientes</h1>
+      <div class="sub">${abiertos.length} sin cerrar${sel?' · sede '+esc(sel):''}</div>
+      ${verFiltro?`<div style="margin:10px 0">
+        <label style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#8a93a6">Sede</label>
+        <select class="field" onchange="App.pSede(this.value)">
+          <option value="">Todas las sedes · ${P.filter(x=>!x.hecho).length}</option>
+          ${sedes.map(s=>`<option value="${esc(s)}" ${s===sel?'selected':''}>${esc(s)} · ${P.filter(x=>x.ced===s&&!x.hecho).length}</option>`).join('')}
+        </select></div>`:''}
+      <div class="kpis">
+        <div class="kpi naranja"><b>${abiertos.length}</b><span>sin cerrar</span></div>
+        <div class="kpi"><b>${hoyVence.length}</b><span>vencen hoy</span></div>
+        <div class="kpi ${vencidos.length?'rojo':''}"><b>${vencidos.length}</b><span>vencidos</span></div>
+      </div>
+      <button class="btn btn-main" style="margin-bottom:14px" onclick="App.pModal()">＋ Nuevo pendiente</button>
+      ${abiertos.length?abiertos.map(fila).join('')
+        :'<div class="card" style="text-align:center;padding:26px 16px;color:#8a93a6">Nada pendiente. Dale a <b>＋ Nuevo pendiente</b>.</div>'}
+      ${cerrados.length?`<h1 style="font-size:15px;margin-top:18px">Cerrados</h1>
+        <div class="sub">${cerrados.length} · se pueden reabrir</div>
+        ${cerrados.slice(0,50).map(fila).join('')}`:''}`);
+  },
+  pSede(v){ this._pSede=v||''; this._pPaint(); },
+  pModal(id){
+    const p=(this._pend||[]).find(x=>String(x.id)===String(id))||{};
+    const mia=(this.cedUser&&this.cedUser.ced)||this._sedePrincipal()||'';
+    const sedes=(this._ceds||[]).filter(c=>c.activo!==false).map(c=>c.nombre);
+    this.modal(`<h3 style="margin-bottom:10px">${id?'Editar':'Nuevo'} pendiente</h3>
+      <label>¿Qué hay que hacer?</label>
+      <input id="p_tit" value="${esc(p.titulo||'')}" placeholder="Llamar a Agrocampo por la cotización">
+      <label>Detalle</label>
+      <textarea id="p_det" rows="2" placeholder="Lo que haga falta recordar">${esc(p.detalle||'')}</textarea>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+        <div><label>Responsable</label><input id="p_resp" value="${esc(p.responsable||'')}" placeholder="Quién lo hace"></div>
+        <div><label>Prioridad</label><select id="p_pri">${this.PRIOR.map(x=>`<option ${((p.prioridad||'Media')===x)?'selected':''}>${x}</option>`).join('')}</select></div>
+      </div>
+      <label>¿Para cuándo?</label><input id="p_ven" type="date" value="${esc(p.vence||'')}">
+
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">🔔 RECORDATORIO</div>
+      <select id="p_rec" onchange="App.pRecTipo()">
+        <option value="no"     ${(p.recordar||'no')==='no'?'selected':''}>Sin recordatorio</option>
+        <option value="una"    ${p.recordar==='una'?'selected':''}>Una sola vez — fecha y hora</option>
+        <option value="rutina" ${p.recordar==='rutina'?'selected':''}>Rutinario — todas las semanas</option>
+      </select>
+      <div id="p_rec_una" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+          <div><label>Fecha</label><input id="p_rfec" type="date" value="${esc(p.rec_fecha||'')}"></div>
+          <div><label>Hora</label><input id="p_rhor" type="time" value="${esc((p.rec_hora||'08:00').slice(0,5))}"></div>
+        </div>
+      </div>
+      <div id="p_rec_rut" style="display:none">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">
+          <div><label>Día</label><select id="p_rdia">${this.DOW.map((d,i)=>`<option value="${i}" ${(p.rec_dia!=null?+p.rec_dia:1)===i?'selected':''}>${d}</option>`).join('')}</select></div>
+          <div><label>Hora</label><input id="p_rhor2" type="time" value="${esc((p.rec_hora||'08:00').slice(0,5))}"></div>
+        </div>
+      </div>
+      <div id="p_rec_wa" style="display:none">
+        <label>WhatsApp a dónde se manda</label>
+        <input id="p_wa" inputmode="numeric" value="${esc(p.whatsapp||'')}" placeholder="3001234567">
+        <div class="hint">Solo el número, sin el 57. El recordatorio automático lo manda el bot;
+          con el botón 📱 de cada pendiente lo puedes enviar tú en cualquier momento.</div>
+      </div>
+      ${(this._veRed()&&sedes.length)?`<label>Sucursal</label>
+        <select id="p_ced">${sedes.map(s=>`<option ${((p.ced||mia)===s)?'selected':''}>${esc(s)}</option>`).join('')}</select>
+        <div class="hint">Solo tú puedes asignarle un pendiente a otra ciudad; los demás quedan en la suya.</div>`:''}
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-main" style="flex:1" onclick="App.pSave('${id||''}')">Guardar</button>
+        <button class="btn" onclick="App.cerrarModal()">Cancelar</button></div>`);
+    this.pRecTipo();
+  },
+  async pSave(id){
+    const t=($('p_tit').value||'').trim();
+    if(!t) return alert('Escribe qué hay que hacer.');
+    const rec=($('p_rec')||{value:'no'}).value||'no';
+    const b={titulo:t, detalle:($('p_det').value||'').trim(),
+      responsable:($('p_resp').value||'').trim(), prioridad:$('p_pri').value,
+      vence:$('p_ven').value||null,
+      recordar:rec,
+      rec_fecha: rec==='una'    ? ($('p_rfec').value||null) : null,
+      rec_dia:   rec==='rutina' ? +$('p_rdia').value : null,
+      rec_hora:  rec==='una' ? ($('p_rhor').value||null)
+               : rec==='rutina' ? ($('p_rhor2').value||null) : null,
+      whatsapp:  rec==='no' ? null : (($('p_wa')||{}).value||'').replace(/\D/g,'')||null};
+    if(rec!=='no' && !b.whatsapp) return alert('Ponle el número de WhatsApp al que se manda el recordatorio.');
+    if(rec==='una' && !b.rec_fecha) return alert('Ponle la fecha del recordatorio.');
+    if($('p_ced')) b.ced=$('p_ced').value;
+    if(!id) b.creado_por=(this.cedUser&&this.cedUser.usuario)||(this.perfil&&this.perfil.nombre)||'';
+    const q = id ? await this.sb.from('ced_pendientes').update(b).eq('id',id)
+                 : await this.sb.from('ced_pendientes').insert(b);
+    if(q.error) return alert('No se pudo guardar: '+q.error.message);
+    this.cerrarModal(); this.toast(id?'Pendiente actualizado ✅':'Pendiente creado ✅'); this.vPendientes(); },
+  async pHecho(id,v){
+    const b = v ? {hecho:true, hecho_en:new Date().toISOString(),
+                   hecho_por:(this.cedUser&&this.cedUser.usuario)||(this.perfil&&this.perfil.nombre)||''}
+                : {hecho:false, hecho_en:null, hecho_por:null};
+    const { error } = await this.sb.from('ced_pendientes').update(b).eq('id',id);
+    if(error) return alert('No se pudo: '+error.message);
+    this.toast(v?'Cerrado ✅':'Reabierto'); this.vPendientes(); },
+  async pDel(id){
+    const p=(this._pend||[]).find(x=>String(x.id)===String(id))||{};
+    if(!confirm('¿Borrar el pendiente "'+(p.titulo||'')+'"?')) return;
+    const { error } = await this.sb.from('ced_pendientes').delete().eq('id',id);
+    if(error) return alert('No se pudo borrar: '+error.message);
+    this.toast('Borrado'); this.vPendientes(); },
+
   invAuditoria(){
     this.modal(`<h3>🔍 Auditoría</h3>
       <div class="sub">Contar lo que hay de verdad y compararlo con lo que dice la app</div>
