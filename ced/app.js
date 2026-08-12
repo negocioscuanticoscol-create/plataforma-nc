@@ -2782,28 +2782,25 @@ const App = {
         <select class="field" id="co_factura" onchange="App.cotFacturaPreview()" style="margin-top:6px">
           <option value="">— Selecciona quién emite la factura —</option>
           ${(()=>{
-            /* Cada CED puede facturar con su propio RUT, así que también entran
-               a la lista. Sale preseleccionado el del CED de quien cotiza: lo
-               normal es facturar desde la ciudad donde se atendió. */
+            /* Quien factura es una EMPRESA, no un CED: en la factura va la razón
+               social, no el nombre interno de la sede. Antes salía
+               "CED Feroz · Bogotá — factura INDUSTRIAS FEROZ SAS", que mezclaba
+               las dos cosas. Ahora sale la razón social sola.
+               Sigue preseleccionada la empresa del CED de quien cotiza. */
             const sedes=(this._ceds||[]).filter(c=>c.facturador_id);
             const mia=this.miSede();
             const porDefecto = (sedes.find(c=>c.nombre===mia)||{}).facturador_id
                             || (facts||[]).find(f=>f.por_defecto)?.id || '';
-            const usados=new Set();
-            const gSedes=sedes.map(c=>{ usados.add(c.facturador_id);
-              return `<option value="${c.facturador_id}" ${c.facturador_id===porDefecto?'selected':''}>🏢 ${esc(c.nombre_comercial||c.nombre)} · ${esc(c.ciudad||'')} — factura ${esc((facts||[]).find(f=>f.id===c.facturador_id)?.nombre||'')}</option>`;
-            }).join('');
-            const gOtros=(facts||[]).filter(f=>!usados.has(f.id)).map(f=>{
-              const et={aliado:'🤝 Factura el aliado', empresa:'🏭 Factura directamente la empresa'}[f.tipo] || ('⚙️ '+esc(f.nombre));
-              return `<option value="${f.id}" ${f.id===porDefecto?'selected':''}>${et} · ${esc(f.nombre)}</option>`;
-            }).join('');
+            const gSedes=(facts||[]).map(f=>
+              `<option value="${f.id}" ${f.id===porDefecto?'selected':''}>${esc(f.nombre)}${f.nit?' · NIT '+esc(f.nit):''}</option>`
+            ).join('');
+            const gOtros='';
             /* Remision: el CED no factura, remisiona. Tolima y Av 68 no tienen
                empresa facturadora propia, asi que sin esto no tenian como sacar
                el documento. Se guarda tipo_doc='remision' + la sede. */
             const gRem=(this._ceds||[]).filter(c=>c.activo!==false).map(c=>
               `<option value="rem:${esc(c.nombre)}">📄 REM ${esc((c.nombre_comercial||c.nombre)).toUpperCase()}${c.ciudad?' · '+esc(c.ciudad):''}</option>`).join('');
-            return (gSedes?`<optgroup label="Factura el CED">${gSedes}</optgroup>`:'')
-                 + (gOtros?`<optgroup label="Otras empresas">${gOtros}</optgroup>`:'')
+            return (gSedes?`<optgroup label="Factura">${gSedes}</optgroup>`:'')
                  + (gRem?`<optgroup label="Remisión (sin factura)">${gRem}</optgroup>`:'');
           })()}
         </select>
