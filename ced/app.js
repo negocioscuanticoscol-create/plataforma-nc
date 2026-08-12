@@ -1585,8 +1585,8 @@ const App = {
     // Herramientas: es un gasto de la PRINCIPAL (plataforma, licencias, agentes).
     // Las agencias — Tolima y Av 68 — no lo pagan, asi que cargarselo les hundia
     // la utilidad neta con una plata que nunca salio de su bolsillo.
-    const _miCed=(this.cedUser&&this.cedUser.ced)||'Principal';
-    const HERR=(_miCed==='Principal')?4000000:0;
+    const _miCed=(this.cedUser&&this.cedUser.ced)||'Feroz';
+    const HERR=(_miCed==='Feroz')?4000000:0;
     const HERR_DESDE=7;   // en la Principal el gasto de herramientas empezó en JULIO (antes no hubo)
     const M={}, firstMes={};
     peds.forEach(p=>{ const m=new Date(p.creado_en).getMonth()+1; (M[m]=M[m]||{ventas:0,pares:0,cNC:0,cG:0,cli:new Set()});
@@ -2679,10 +2679,13 @@ const App = {
     // Quien puede facturar y con que nombre sale el CED de cara al cliente
     let facts=[], sede=null;
     try{ const r=await this.sb.from('ced_facturadores').select('*').eq('activo',true).order('tipo'); facts=r.data||[]; }catch(e){}
-    try{ const r=await this.sb.from('ced').select('nombre,nombre_comercial,ciudad')
-           .eq('nombre', this.miSede()||'Principal').maybeSingle(); sede=r.data||null; }catch(e){}
+    /* Se traen TODAS las sedes, no solo la mía: cada una puede facturar con su
+       propio RUT y las tres tienen que aparecer en la lista. La dirección y el
+       teléfono se necesitan para la foto que va en la proforma. */
+    try{ const r=await this.sb.from('ced').select('*').eq('activo',true); this._ceds=r.data||[]; }catch(e){}
+    sede=(this._ceds||[]).find(c=>c.nombre===(this.miSede()||'Feroz'))||null;
     this._facts=facts; this._sedeCot=sede;
-    const nomCed=(sede&&(sede.nombre_comercial||sede.nombre))||'Principal';
+    const nomCed=(sede&&(sede.nombre_comercial||sede.nombre))||'Feroz';
     this.set(`
       <h1>${editId?'✏️ Editar':'Nueva'} cotización</h1>
       <div class="sub">${esc(nomCed)} · Bota Ref. 701 · ${money(C.PRECIO_PAR)}/par + IVA</div>
@@ -2726,10 +2729,25 @@ const App = {
         <label style="margin:0"><b>🧾 ¿Quién factura? *</b></label>
         <select class="field" id="co_factura" onchange="App.cotFacturaPreview()" style="margin-top:6px">
           <option value="">— Selecciona quién emite la factura —</option>
-          ${(facts||[]).map(f=>{
-            const et={aliado:'🤝 Factura el aliado', empresa:'🏭 Factura directamente la empresa'}[f.tipo] || ('⚙️ '+esc(f.nombre));
-            return `<option value="${f.id}">${et}${f.tipo!=='otro'?' · '+esc(f.nombre):''}</option>`;
-          }).join('')}
+          ${(()=>{
+            /* Cada CED puede facturar con su propio RUT, así que también entran
+               a la lista. Sale preseleccionado el del CED de quien cotiza: lo
+               normal es facturar desde la ciudad donde se atendió. */
+            const sedes=(this._ceds||[]).filter(c=>c.facturador_id);
+            const mia=this.miSede();
+            const porDefecto = (sedes.find(c=>c.nombre===mia)||{}).facturador_id
+                            || (facts||[]).find(f=>f.por_defecto)?.id || '';
+            const usados=new Set();
+            const gSedes=sedes.map(c=>{ usados.add(c.facturador_id);
+              return `<option value="${c.facturador_id}" ${c.facturador_id===porDefecto?'selected':''}>🏢 ${esc(c.nombre_comercial||c.nombre)} · ${esc(c.ciudad||'')} — factura ${esc((facts||[]).find(f=>f.id===c.facturador_id)?.nombre||'')}</option>`;
+            }).join('');
+            const gOtros=(facts||[]).filter(f=>!usados.has(f.id)).map(f=>{
+              const et={aliado:'🤝 Factura el aliado', empresa:'🏭 Factura directamente la empresa'}[f.tipo] || ('⚙️ '+esc(f.nombre));
+              return `<option value="${f.id}" ${f.id===porDefecto?'selected':''}>${et} · ${esc(f.nombre)}</option>`;
+            }).join('');
+            return (gSedes?`<optgroup label="Por el CED">${gSedes}</optgroup>`:'')
+                 + (gOtros?`<optgroup label="Otras empresas">${gOtros}</optgroup>`:'');
+          })()}
         </select>
         <div class="hint" style="margin-top:6px">Define desde el principio quién emite la factura y a qué cuenta
           consigna el cliente. Se decide acá para no tener que rehacer el documento después.</div>
@@ -4346,7 +4364,7 @@ const App = {
       quien_paga_flete:$('pv_fle').value, descuento_pct:+$('pv_desc').value||0,
       notas:($('pv_not').value||'').trim()};
     if($('pv_act')) b.activo=$('pv_act').value==='si';
-    if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Principal';
+    if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Feroz';
     const q= id ? await this.sb.from('ced_proveedores').update(b).eq('id',id)
                 : await this.sb.from('ced_proveedores').insert(b);
     if(q.error) return alert('No se pudo guardar: '+q.error.message);
@@ -4432,7 +4450,7 @@ const App = {
       costo:v('rf_cos'), precio_sug:v('rf_pre')||v('rf_l4')||v('rf_l1'),
       l1:v('rf_l1')||null, l2:v('rf_l2')||null, l3:v('rf_l3')||null, l4:v('rf_l4')||null,
       unidad:($('rf_uni').value||'par').trim(), notas:($('rf_not').value||'').trim()};
-    if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Principal';
+    if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Feroz';
     const q= id ? await this.sb.from('ced_prov_referencias').update(b).eq('id',id)
                 : await this.sb.from('ced_prov_referencias').insert(b);
     if(q.error) return alert('No se pudo guardar: '+q.error.message);
@@ -4633,7 +4651,7 @@ const App = {
     if(b.pagado && !id) b.fecha_pago=b.fecha;
     /* el ced solo se manda si el usuario puede elegir; si no, lo pone el trigger */
     if($('g_ced')) b.ced=$('g_ced').value;
-    else if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Principal';
+    else if(!id) b.ced=(this.cedUser&&this.cedUser.ced)||'Feroz';
     if(!id) b.creado_por=(this.cedUser&&this.cedUser.usuario)||'';
     const q = id ? await this.sb.from('ced_gastos').update(b).eq('id',id)
                  : await this.sb.from('ced_gastos').insert(b);
@@ -4691,7 +4709,7 @@ const App = {
     const us=ru.data||[], ceds=rc.data||[];
     if(!this._facts) await this._cargarFacts();   // los necesita el bloque de "quién factura"
     this._us=us; this._ase=ra.error?null:(ra.data||[]);
-    this._ceds=ceds.length?ceds:[{nombre:'Principal',principal:true}];
+    this._ceds=ceds.length?ceds:[{nombre:'Feroz',principal:true}];
     if(this._cedSel && !this._ceds.some(c=>c.nombre===this._cedSel)) this._cedSel=null;
     this._cedSel ? this._vUsuariosDe(this._cedSel) : this._vCeds();
   },
@@ -4774,7 +4792,7 @@ const App = {
     const tema=(($('ase_tema')||{}).value||'').trim();
     const tipo=($('ase_tipo')||{}).value||'Presencial';
     const b={tipo,tema,inicio:new Date().toISOString(),
-      ced:(this.cedUser&&this.cedUser.ced)||'Principal',
+      ced:(this.cedUser&&this.cedUser.ced)||'Feroz',
       creado_por:(this.cedUser&&this.cedUser.usuario)||''};
     const { error }=await this.sb.from('ced_asesorias').insert(b);
     if(error) return alert('No se pudo iniciar: '+error.message);
@@ -4820,7 +4838,7 @@ const App = {
     const b={tipo:$('am_tipo').value, tema:($('am_tema').value||'').trim(),
       inicio:dIni.toISOString(), fin:dFin.toISOString(),
       nota:($('am_nota').value||'').trim(),
-      ced:(this.cedUser&&this.cedUser.ced)||'Principal',
+      ced:(this.cedUser&&this.cedUser.ced)||'Feroz',
       creado_por:(this.cedUser&&this.cedUser.usuario)||''};
     const { error }=await this.sb.from('ced_asesorias').insert(b);
     if(error) return alert('No se pudo guardar: '+error.message);
@@ -5072,7 +5090,7 @@ const App = {
   },
   usModal(id){
     const u=(this._us||[]).find(x=>x.id===id)||{};
-    const ced=u.ced||this._cedSel||'Principal';
+    const ced=u.ced||this._cedSel||'Feroz';
     this.modal(`<h3>${id?'Editar usuario':'Crear usuario'}</h3>
       <div class="sub">Para <b style="color:var(--naranja)">${esc(ced)}</b></div>
       <input type="hidden" id="u_ced" value="${esc(ced)}">
@@ -5241,7 +5259,7 @@ const App = {
 
   /* suma (o resta, si viene negativo) y deja el movimiento escrito */
   async _invSumar(ref,color,talla,cant,tipo,motivo){
-    const mio=(this.cedUser&&this.cedUser.ced)||'Principal';
+    const mio=(this.cedUser&&this.cedUser.ced)||'Feroz';
     const actual=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color && +r.talla===+talla);
     const nuevo=(+((actual&&actual.stock)||0))+cant;
     if(nuevo<0){ alert('No alcanza: en esa talla hay '+((actual&&actual.stock)||0)+' pares.'); return false; }
