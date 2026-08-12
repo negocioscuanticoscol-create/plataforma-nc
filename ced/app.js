@@ -4685,10 +4685,11 @@ const App = {
     this.loading();
     const [ru,rc,ra] = await Promise.all([
       this.sb.from('ced_usuarios').select('*').order('nombre'),
-      this.sb.from('ced').select('nombre,ciudad,principal').eq('activo',true).order('principal',{ascending:false}),
+      this.sb.from('ced').select('*').eq('activo',true).order('principal',{ascending:false}),
       this.sb.from('ced_asesorias').select('*').order('inicio',{ascending:false}).limit(2000)
     ]);
     const us=ru.data||[], ceds=rc.data||[];
+    if(!this._facts) await this._cargarFacts();   // los necesita el bloque de "quién factura"
     this._us=us; this._ase=ra.error?null:(ra.data||[]);
     this._ceds=ceds.length?ceds:[{nombre:'Principal',principal:true}];
     if(this._cedSel && !this._ceds.some(c=>c.nombre===this._cedSel)) this._cedSel=null;
@@ -4838,22 +4839,30 @@ const App = {
     this.set(`
       <h1>Usuarios</h1><div class="sub">Entra a un CED para ver y crear su gente</div>
       ${this._aseBloque()}
-      <h2 style="font-size:18px;margin:22px 0 8px">Sucursales</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:22px 0 8px">
+        <h2 style="font-size:18px;margin:0">Sucursales</h2>
+        <button class="btn-sm" style="background:var(--negro);color:#fff" onclick="App.cedForm()">➕ Nuevo CED</button>
+      </div>
       ${this._ceds.map(c=>{
         const n=us.filter(u=>u.ced===c.nombre).length;
-        return `<div class="item" style="cursor:pointer" onclick="App.cedAbrir('${esc(c.nombre)}')">
+        /* Falta lo que hace que la proforma salga bien: sin dirección ni
+           teléfono, el documento sale con los datos de la casa matriz. */
+        const falta=[!c.direccion&&'dirección', !c.telefono&&'teléfono', !c.responsable&&'responsable'].filter(Boolean);
+        return `<div class="item">
           <div class="top">
-            <div>
-              <div class="nom">${c.principal?'👑 ':'🏭 '}${esc(c.nombre)}</div>
-              <div class="meta">${esc(c.ciudad||'')}${c.principal?' · administra la red':''}</div>
+            <div style="cursor:pointer;flex:1" onclick="App.cedAbrir('${esc(c.nombre)}')">
+              <div class="nom">${c.principal?'👑 ':'🏭 '}${esc(c.nombre_comercial||c.nombre)}</div>
+              <div class="meta">${esc(c.ciudad||'')}${c.principal?' · administra la red':''}${c.responsable?' · '+esc(c.responsable):''}</div>
+              ${falta.length?`<div class="meta" style="color:#b45309">⚠️ falta ${falta.join(', ')}</div>`:''}
             </div>
-            <div style="text-align:right">
-              <div class="tot">${n}</div>
-              <div class="meta">${n===1?'persona':'personas'}</div>
+            <div style="text-align:right;display:flex;align-items:center;gap:10px">
+              <div><div class="tot">${n}</div><div class="meta">${n===1?'persona':'personas'}</div></div>
+              <button class="btn-sm" style="background:#eef1f6" onclick="event.stopPropagation();App.cedForm('${esc(c.nombre)}')">⚙️</button>
             </div>
           </div>
         </div>`;
       }).join('')}
+      ${this._facturadoresBloque()}
       <div class="card" style="border:2px solid #dc2626;background:#fef2f2;margin-top:16px">
         <div style="font-weight:800;color:#b91c1c">🔴 Cerrar sesión en TODOS los equipos</div>
         <div style="font-size:12.5px;color:#7f1d1d;margin:5px 0 9px">¿Dejaste la app abierta en un computador ajeno? Esto cierra todas las sesiones. Tú solo vuelves a entrar.</div>
@@ -4864,6 +4873,158 @@ const App = {
   },
 
   cedAbrir(nombre){ this._cedSel=nombre; this._vUsuariosDe(nombre); },
+
+  /* ============ CONFIGURACIÓN DEL CED ============
+     Lo que se llene acá es lo que sale en la proforma. Mientras esté vacío,
+     el documento muestra los datos de la casa matriz, que no es lo correcto
+     cuando quien atiende es una agencia. */
+  cedForm(nombre){
+    const c = nombre ? (this._ceds||[]).find(x=>x.nombre===nombre)||{} : {};
+    const v = s => esc(s||'');
+    const nuevo = !nombre;
+    const fs_ = this._facts||[];
+    this.modal(`
+      <h3>${nuevo?'Nuevo CED':'Configuración · '+esc(c.nombre_comercial||c.nombre)}</h3>
+      <div class="hint">Estos datos salen en la proforma del cliente.</div>
+      <div class="row2">
+        <div><label>Nombre interno *</label><input class="field" id="cd_nombre" value="${v(c.nombre)}" ${nuevo?'':'disabled'} placeholder="Ej: Feroz">
+          ${nuevo?'<div class="hint">No se puede cambiar después: amarra todas las tablas.</div>':''}</div>
+        <div><label>Nombre que se muestra</label><input class="field" id="cd_comercial" value="${v(c.nombre_comercial)}" placeholder="Ej: CED Feroz"></div>
+      </div>
+      <div class="row2">
+        <div><label>Ciudad</label><input class="field" id="cd_ciudad" value="${v(c.ciudad)}"></div>
+        <div><label>Responsable</label><input class="field" id="cd_resp" value="${v(c.responsable)}" placeholder="Quién responde por el CED"></div>
+      </div>
+      <div class="row2">
+        <div><label>Dirección</label><input class="field" id="cd_dir" value="${v(c.direccion)}"></div>
+        <div><label>Teléfono</label><input class="field" id="cd_tel" inputmode="tel" value="${v(c.telefono)}"></div>
+      </div>
+      <label>NIT / RUT</label><input class="field" id="cd_nit" value="${v(c.nit)}" placeholder="Con dígito de verificación">
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">🏦 CUENTA DEL CED</div>
+      <div class="row2">
+        <div><label>Banco</label><input class="field" id="cd_banco" value="${v(c.banco)}"></div>
+        <div><label>Tipo de cuenta</label><select class="field" id="cd_tipocta">
+          <option ${c.tipo_cuenta==='Ahorros'?'selected':''}>Ahorros</option>
+          <option ${c.tipo_cuenta==='Corriente'?'selected':''}>Corriente</option></select></div>
+      </div>
+      <div class="row2">
+        <div><label>Número de cuenta</label><input class="field" id="cd_cuenta" value="${v(c.cuenta)}"></div>
+        <div><label>Titular</label><input class="field" id="cd_titular" value="${v(c.titular)}"></div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">🧾 QUIÉN FACTURA POR DEFECTO</div>
+      <select class="field" id="cd_fact">
+        <option value="">— Se escoge en cada cotización —</option>
+        ${fs_.map(f=>`<option value="${f.id}" ${c.facturador_id===f.id?'selected':''}>${esc(f.nombre)}${f.nit?' · NIT '+esc(f.nit):''}</option>`).join('')}
+      </select>
+      <div class="hint">Si el CED casi siempre factura con la misma empresa, se deja acá y sale preseleccionada.</div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer">
+        <input type="checkbox" id="cd_principal" ${c.principal?'checked':''}> <b>Ve toda la red</b></label>
+      <div class="hint">Solo la casa matriz. Los demás CED ven únicamente lo suyo.</div>
+      <button class="btn btn-main" onclick="App.cedGuardar(${nuevo?'null':`'${esc(c.nombre)}'`})">${nuevo?'Crear CED':'Guardar'}</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>
+    `);
+  },
+  async cedGuardar(nombre){
+    const nom = nombre || ($('cd_nombre').value||'').trim();
+    if(!nom){ alert('Falta el nombre interno del CED.'); return; }
+    const b={ nombre:nom,
+      nombre_comercial:($('cd_comercial').value||'').trim()||nom,
+      ciudad:($('cd_ciudad').value||'').trim(),
+      responsable:($('cd_resp').value||'').trim(),
+      direccion:($('cd_dir').value||'').trim(),
+      telefono:($('cd_tel').value||'').trim(),
+      nit:($('cd_nit').value||'').trim(),
+      banco:($('cd_banco').value||'').trim(),
+      tipo_cuenta:$('cd_tipocta').value,
+      cuenta:($('cd_cuenta').value||'').trim(),
+      titular:($('cd_titular').value||'').trim(),
+      facturador_id:$('cd_fact').value||null,
+      principal:$('cd_principal').checked, activo:true };
+    const { error } = nombre ? await this.sb.from('ced').update(b).eq('nombre',nombre)
+                             : await this.sb.from('ced').insert(b);
+    if(error){ alert('Error: '+error.message); return; }
+    this.cerrarModal(); this.toast('CED guardado'); this.vAdmin();
+  },
+
+  /* ============ QUIÉN FACTURA ============ */
+  _facturadoresBloque(){
+    const fs_=this._facts||[];
+    return `<div style="display:flex;justify-content:space-between;align-items:center;margin:26px 0 8px">
+        <h2 style="font-size:18px;margin:0">🧾 Quién factura</h2>
+        <button class="btn-sm" style="background:var(--negro);color:#fff" onclick="App.factForm()">➕ Nuevo</button>
+      </div>
+      <div class="hint" style="margin-bottom:8px">Las empresas que pueden emitir la factura. Se escoge una en cada cotización y su cuenta es la que sale en la proforma.</div>
+      ${fs_.length?fs_.map(f=>`<div class="item"><div class="top">
+        <div style="flex:1"><div class="nom">${f.por_defecto?'⭐ ':''}${esc(f.nombre)}</div>
+          <div class="meta">${f.nit?'NIT '+esc(f.nit):'⚠️ sin NIT'}${f.ciudad?' · '+esc(f.ciudad):''}</div>
+          <div class="meta">${f.banco?esc(f.banco)+' · '+esc(f.tipo_cuenta||'')+' '+esc(f.cuenta||''):'⚠️ sin cuenta bancaria'}</div></div>
+        <button class="btn-sm" style="background:#eef1f6" onclick="App.factForm('${f.id}')">⚙️</button>
+      </div></div>`).join('')
+      :'<div class="hint">Todavía no hay ninguno.</div>'}`;
+  },
+  factForm(id){
+    const f = id ? (this._facts||[]).find(x=>x.id===id)||{} : {};
+    const v = s => esc(s||'');
+    this.modal(`
+      <h3>${id?'Editar':'Nuevo'} facturador</h3>
+      <div class="hint">Se toman del RUT y de la certificación bancaria.</div>
+      <label>Razón social *</label><input class="field" id="fc_nombre" value="${v(f.nombre)}" placeholder="Como aparece en el RUT">
+      <div class="row2">
+        <div><label>NIT *</label><input class="field" id="fc_nit" value="${v(f.nit)}" placeholder="Con dígito de verificación"></div>
+        <div><label>Tipo</label><select class="field" id="fc_tipo">
+          <option value="empresa" ${f.tipo!=='aliado'?'selected':''}>Factura directamente la empresa</option>
+          <option value="aliado" ${f.tipo==='aliado'?'selected':''}>Factura un aliado</option></select></div>
+      </div>
+      <div class="row2">
+        <div><label>Dirección</label><input class="field" id="fc_dir" value="${v(f.direccion)}"></div>
+        <div><label>Ciudad</label><input class="field" id="fc_ciudad" value="${v(f.ciudad)}"></div>
+      </div>
+      <div class="row2">
+        <div><label>Teléfono</label><input class="field" id="fc_tel" inputmode="tel" value="${v(f.telefono)}"></div>
+        <div><label>Correo</label><input class="field" id="fc_email" inputmode="email" value="${v(f.email)}"></div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">🏦 CERTIFICACIÓN BANCARIA</div>
+      <div class="row2">
+        <div><label>Banco</label><input class="field" id="fc_banco" value="${v(f.banco)}"></div>
+        <div><label>Tipo de cuenta</label><select class="field" id="fc_tipocta">
+          <option ${f.tipo_cuenta!=='Corriente'?'selected':''}>Ahorros</option>
+          <option ${f.tipo_cuenta==='Corriente'?'selected':''}>Corriente</option></select></div>
+      </div>
+      <div class="row2">
+        <div><label>Número de cuenta *</label><input class="field" id="fc_cuenta" value="${v(f.cuenta)}"></div>
+        <div><label>Titular</label><input class="field" id="fc_titular" value="${v(f.titular)}" placeholder="Si es distinto de la razón social"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer">
+        <input type="checkbox" id="fc_defecto" ${f.por_defecto?'checked':''}> Sale preseleccionado</label>
+      <button class="btn btn-main" onclick="App.factGuardar(${id?`'${id}'`:'null'})">Guardar</button>
+      ${id?`<button class="btn btn-ghost" style="color:#dc2626" onclick="App.factBorrar('${id}')">Desactivar</button>`:''}
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>
+    `);
+  },
+  async factGuardar(id){
+    const nombre=($('fc_nombre').value||'').trim(), nit=($('fc_nit').value||'').trim(), cuenta=($('fc_cuenta').value||'').trim();
+    if(!nombre||!nit||!cuenta){ alert('Faltan la razón social, el NIT o la cuenta.\nSin eso la proforma sale incompleta.'); return; }
+    const b={ nombre, nit, cuenta, tipo:$('fc_tipo').value,
+      direccion:($('fc_dir').value||'').trim(), ciudad:($('fc_ciudad').value||'').trim(),
+      telefono:($('fc_tel').value||'').trim(), email:($('fc_email').value||'').trim(),
+      banco:($('fc_banco').value||'').trim(), tipo_cuenta:$('fc_tipocta').value,
+      titular:($('fc_titular').value||'').trim()||nombre,
+      por_defecto:$('fc_defecto').checked, activo:true };
+    if(b.por_defecto) await this.sb.from('ced_facturadores').update({por_defecto:false}).neq('id','00000000-0000-0000-0000-000000000000');
+    const { error } = id ? await this.sb.from('ced_facturadores').update(b).eq('id',id)
+                         : await this.sb.from('ced_facturadores').insert(b);
+    if(error){ alert('Error: '+error.message); return; }
+    this.cerrarModal(); await this._cargarFacts(); this.vAdmin();
+  },
+  async factBorrar(id){
+    if(!confirm('¿Desactivar este facturador?\n\nNo se borra: las cotizaciones viejas siguen mostrando sus datos.')) return;
+    await this.sb.from('ced_facturadores').update({activo:false}).eq('id',id);
+    this.cerrarModal(); await this._cargarFacts(); this.vAdmin();
+  },
+  async _cargarFacts(){
+    const { data } = await this.sb.from('ced_facturadores').select('*').eq('activo',true).order('por_defecto',{ascending:false});
+    this._facts = data||[];
+  },
   cedVolver(){ this._cedSel=null; this._vCeds(); },
 
   /* paso 2 · la gente de ese CED */
