@@ -226,7 +226,11 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
      OJO: las referencias que ya no son del catálogo NO se vuelven a subir —
      si no, las que se borran reaparecen solas en cada arranque. */
   async _recon(t,cloud){ const local=this._loadLocal(t); const ids=new Set(cloud.map(x=>x&&x.id));
-    let miss=local.filter(x=>x&&x.id&&!ids.has(x.id));
+    /* Solo se resube lo que quedó marcado como pendiente. Lo que alguna vez se
+       confirmó en la nube y ya no está, es porque lo BORRARON: se deja ir. */
+    let miss=local.filter(x=>x&&x.id&&!ids.has(x.id)&&x._nosync);
+    const fantasmas=local.filter(x=>x&&x.id&&!ids.has(x.id)&&!x._nosync);
+    if(fantasmas.length) this._saveLocal(t, local.filter(x=>!fantasmas.includes(x)));
     if(t==='superior_inventario'){
       const fuera=miss.filter(x=>!this._seccion(x.referencia||x.nombre));
       if(fuera.length){ miss=miss.filter(x=>this._seccion(x.referencia||x.nombre));
@@ -249,14 +253,21 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
      precio_dist antes de correr el SQL), el servidor rechaza TODA la fila y antes
      eso se perdía en silencio. Ahora se quita esa columna y se reintenta, y se
      deja anotado para poder avisarlo en pantalla. */
-  async _put(t,row,arr){ this._saveLocal(t,arr);
+  /* Marca la fila como PENDIENTE DE SUBIR mientras no se confirme en la nube.
+     Es lo único que distingue «lo creé sin internet» de «esto ya lo borraron»:
+     sin esa marca, _recon resucitaba en cada arranque todo lo que se borrara
+     desde otro equipo, y las referencias eliminadas volvían solas. */
+  async _put(t,row,arr){
+    row._nosync=true; this._saveLocal(t,arr);
     if(!this._onl[t]) return {ok:false,motivo:'sin conexión'};
     let cuerpo={...row}, quitadas=[];
+    delete cuerpo._nosync;   // es una marca del equipo, no una columna de la base
     for(let i=0;i<6;i++){
       let r; try{ r=await fetch(this.SB+'/rest/v1/'+t+'?on_conflict=id',
         {method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},
          body:JSON.stringify(cuerpo)}); }catch(e){ return {ok:false,motivo:'sin conexión'}; }
       if(r.ok){ if(quitadas.length){ this._colFaltan=[...new Set([...(this._colFaltan||[]),...quitadas])]; }
+        delete row._nosync; this._saveLocal(t,arr);   // confirmada: ya no está pendiente
         return {ok:true,quitadas}; }
       const txt=await r.text();
       const m=txt.match(/'([a-z_]+)' column/i)||txt.match(/column "?([a-z_]+)"?/i);
