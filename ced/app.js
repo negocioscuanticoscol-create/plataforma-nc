@@ -5623,13 +5623,22 @@ const App = {
         <button class="btn btn-main" onclick="App.cerrarModal();App.invProducto()">🆕 Crear producto</button>
         <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
       return; }
-    const red=this._veRed();
+    /* Referencia y color van en casillas separadas: una referencia puede tener
+       varios colores y meterlos todos en un solo desplegable lo volvía ilegible.
+       Al escoger referencia, el color se repuebla solo con los que existen. */
+    const refs=[...new Set(prods.map(x=>x.referencia).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'es'));
     this.modal(`<h3>＋ Ingresar inventario</h3>
       <div class="sub">La curva completa de una vez</div>
-      <label>Producto *</label>
-      <select id="iv_prod" class="field" onchange="App._invProdInfo()">
-        ${prods.map(x=>`<option value="${esc(this._prodK(x))}">${esc(x.referencia)}${x.color?' · '+esc(x.color):''}${x.descripcion?' — '+esc(x.descripcion):''}${red&&x.ced?'  ['+esc(x.ced)+']':''}</option>`).join('')}
-      </select>
+      <div class="row2">
+        <div><label>Referencia *</label>
+          <select id="iv_ref" class="field" onchange="App._invColores()">
+            ${refs.map(r=>`<option>${esc(r)}</option>`).join('')}
+          </select></div>
+        <div><label>Color</label>
+          <select id="iv_col" class="field" onchange="App._invProdInfo()"></select></div>
+      </div>
+      <label>Proveedor</label>
+      <input id="iv_provtxt" class="field" readonly style="background:#f4f5f7">
       <div id="iv_prod_info" class="hint" style="margin-top:6px"></div>
 
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:14px">👟 CURVA · PARES POR TALLA</div>
@@ -5646,27 +5655,37 @@ const App = {
 
       <button class="btn btn-main" onclick="App.invIngresarOk()">Ingresar la curva</button>
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+    this._invColores();
+  },
+  /* Deja en el desplegable de color solo los que existan para esa referencia. */
+  _invColores(){
+    const ref=(($('iv_ref')||{}).value)||'', sel=$('iv_col'); if(!sel) return;
+    const red=this._veRed();
+    const opts=(this._prods||[]).filter(x=>x.referencia===ref);
+    sel.innerHTML = opts.map(x=>
+      `<option value="${esc(this._prodK(x))}">${esc(x.color||'sin color')}${red&&x.ced?'  ['+esc(x.ced)+']':''}</option>`).join('');
     this._invProdInfo();
   },
   _invCurvaTotal(){
     const t=this.TALLAS.reduce((a,x)=>a+(+($('iv_t'+x)||{}).value||0),0);
     const e=$('iv_curva_tot'); if(e) e.textContent=t+' pares en total';
   },
-  /* Recuerda de qué producto se está hablando: sede, dueño, proveedor y costo.
-     Son datos de la ficha; acá no se pueden cambiar. */
+  /* El producto elegido es el del desplegable de color: ahí va la llave completa. */
+  _invProd(){ return (this._prods||[]).find(x=>this._prodK(x)===(($('iv_col')||{}).value||'')); },
   _invProdInfo(){
-    const e=$('iv_prod_info'); if(!e) return;
-    const p=(this._prods||[]).find(x=>this._prodK(x)===($('iv_prod')||{}).value);
-    if(!p){ e.textContent=''; return; }
+    const e=$('iv_prod_info'), pt=$('iv_provtxt');
+    const p=this._invProd();
+    if(!p){ if(e) e.textContent=''; if(pt) pt.value=''; return; }
     const prov=(this._provs||[]).find(v=>v.id===p.proveedor_id);
-    e.innerHTML = `Entra a <b>${esc(p.ced||'')}</b> · ${esc(this._duenoDe(p.dueno||'ced').t)}`
-      + (prov?` · 📋 ${esc(prov.nombre)}`:'')
+    if(pt) pt.value=(prov&&prov.nombre)||'— sin proveedor —';
+    if(e) e.innerHTML = `Entra a <b>${esc(p.ced||'')}</b> · ${esc(this._duenoDe(p.dueno||'ced').t)}`
       + (p.categoria?` · ${esc(p.categoria)}`:'')
+      + (p.descripcion?` · ${esc(p.descripcion)}`:'')
       + (+p.costo?` · costo ${money(p.costo)}`:' · <span style="color:#b45309">sin costo</span>');
   },
   async invIngresarOk(){
-    const p=(this._prods||[]).find(x=>this._prodK(x)===($('iv_prod')||{}).value);
-    if(!p){ alert('Escoge el producto.'); return; }
+    const p=this._invProd();
+    if(!p){ alert('Escoge la referencia y el color.'); return; }
     const curva=this.TALLAS.map(t=>[t, +($('iv_t'+t)||{}).value||0]).filter(x=>x[1]>0);
     const total=curva.reduce((a,x)=>a+x[1],0);
     if(!total){ alert('La curva está vacía: pon los pares en al menos una talla.'); return; }
