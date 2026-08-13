@@ -1100,7 +1100,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-08-12c',
+VER:'2026-08-12d',
 ORIGENES:['banco','efectivo','prestamo'],
 SOCIOS:['FES','JVC','JJR'],   // FES = lo asume la empresa, no un socio
 CLASES_CAJA:['Cobro de cliente','Pago a proveedor','Giro al exterior','Retiro de efectivo',
@@ -1240,7 +1240,7 @@ cajaForm(id){
     <div><label>Entrada / Salida</label><select id="cj_es">
       <option value="entrada" ${v>=0?'selected':''}>Entrada</option>
       <option value="salida" ${v<0?'selected':''}>Salida</option></select></div>
-    <div><label>Valor</label><input id="cj_val" inputmode="numeric" value="${v?Math.abs(v):''}" placeholder="0"></div>
+    <div><label>Valor</label><input id="cj_val" inputmode="decimal" value="${v?Math.abs(v).toLocaleString('es-CO',{minimumFractionDigits:(Math.abs(v)%1?2:0),maximumFractionDigits:2}):''}" placeholder="0"></div>
   </div>
   <label>Detalle bancario</label>
   <input id="cj_det" value="${esc(x.detalle||'')}" placeholder="Como aparece en el extracto">
@@ -1258,9 +1258,24 @@ cajaForm(id){
     ${id?`<button class="btn rojo" onclick="App.cajaBorrar(${id})">✕</button>`:''}
   </div>`);
 },
+/* Lee una cifra escrita como sea. El punto puede ser separador de miles o coma
+   decimal segun el caso, asi que se mira el ultimo separador: si le siguen una o
+   dos cifras, es decimal; si no, es de miles. Antes se borraban todos los puntos
+   y una compra de 153.983,39 se volvia de 15.398.339. */
+_plata(t){
+  let x=String(t||'').replace(/[^0-9.,-]/g,'');
+  const neg=x.startsWith('-'); x=x.replace(/-/g,'');
+  const iP=x.lastIndexOf('.'), iC=x.lastIndexOf(',');
+  const i=Math.max(iP,iC);
+  let ent=x, dec='';
+  if(i>=0 && x.length-i-1<=2 && x.length-i-1>0){ ent=x.slice(0,i); dec=x.slice(i+1); }
+  ent=ent.replace(/[.,]/g,'');
+  const v=+(ent+(dec?'.'+dec:''))||0;
+  return neg?-v:v;
+},
 async cajaGuardar(id){
   const g=i=>($(i)?$(i).value.trim():'');
-  const val=+String(g('cj_val')).replace(/[^0-9]/g,'')||0;
+  const val=Math.abs(this._plata(g('cj_val')));
   if(!val){ alert('Ponle el valor.'); return; }
   const es=g('cj_es');
   const b={fecha:g('cj_fec')||hoy(), origen:g('cj_org'), tipo:es,
