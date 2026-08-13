@@ -747,7 +747,7 @@ vFacturacion: safe(async function(){
       return yaFact[d.id]
         ? '<span class="badge b-ok">facturada · '+esc(yaFact[d.id])+'</span>'
         : '<span class="badge b-pend">POR FACTURAR</span>'; }
-    if(d.tipo==='factura') return '<span class="badge b-ok">FACTURADA</span>';
+    if(d.tipo==='factura') return '<span class="badge b-ok">GENERADA</span>';
     return '<span class="badge b-acc">'+esc(d.estado||'ok')+'</span>'; };
   const pago=d=>{ if(d.tipo!=='factura') return '';
     const ab=abPorDoc[d.id]||0, t=+d.total||0;
@@ -769,6 +769,16 @@ vFacturacion: safe(async function(){
       <div><div class="mini">Facturado</div><b style="font-size:18px;color:var(--ok)">${money(sum(fac))}</b><div class="mini">${fac.length} facturas</div></div>
       <div><div class="mini">Por facturar</div><b style="font-size:18px;color:${pend.length?'var(--rojo)':'var(--ok)'}">${money(sum(pend))}</b><div class="mini">${pend.length} remisi${pend.length===1?'ón':'ones'}</div></div>
       ${pend.length?`<div style="grid-column:1/-1"><div class="mini">Faltan: <b>${pend.map(p=>esc(p.numero)).join(' · ')}</b></div></div>`:''}
+    </div>`; })()}
+  ${(()=>{ if(!list.length) return '';
+    const vivos=list.filter(d=>d.estado!=='anulada');
+    const t=vivos.reduce((a,d)=>a+(+d.total||0),0);
+    const sinVal=vivos.filter(d=>!(+d.total)).length;
+    const nom={cotizacion:'cotizado',remision:'remisionado',factura:'facturado',nota_credito:'en notas crédito'}[sub]||'';
+    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div><div class="mini">Valor ${nom}</div><b style="font-size:20px">${money(t)}</b>
+        <span class="mini"> · ${vivos.length} documento${vivos.length===1?'':'s'}</span></div>
+      ${sinVal?`<div class="mini" style="color:var(--rojo)">⚠️ ${sinVal} sin valor cargado</div>`:''}
     </div>`; })()}
   <div class="tools"><button class="btn" onclick="App.docForm('${sub}')">➕ Nueva ${sub.replace('_',' ')}</button></div>
   <div class="card" style="padding:0;overflow-x:auto"><table>
