@@ -1121,6 +1121,8 @@ _cajaPaint(){
   if(falta==='detalle') L=L.filter(x=>!x.detalle_fes);
   if(falta==='socio')   L=L.filter(x=>!x.socio);
   if(falta==='clase')   L=L.filter(x=>!x.clase||x.clase==='Por clasificar');
+  const claseF=this._cajaClase||'';
+  if(claseF) L=L.filter(x=>x.clase===claseF);
   const ent=L.filter(x=>+x.valor>0), sal=L.filter(x=>+x.valor<0);
   const sum=l=>l.reduce((a,x)=>a+(+x.valor||0),0);
 
@@ -1178,6 +1180,14 @@ _cajaPaint(){
       <option value="detalle" ${falta==='detalle'?'selected':''}>⚠️ Falta detalle FES (${M.filter(x=>!x.detalle_fes).length})</option>
       <option value="socio" ${falta==='socio'?'selected':''}>Falta el responsable (${M.filter(x=>!x.socio).length})</option>
       <option value="clase" ${falta==='clase'?'selected':''}>Falta clasificar (${M.filter(x=>!x.clase||x.clase==='Por clasificar').length})</option>
+    </select>
+    <select onchange="App._cajaClase=this.value;App._cajaPaint()">
+      <option value="">Toda clasificación</option>
+      ${[...new Set(M.map(x=>x.clase).filter(Boolean))].sort().map(c=>{
+        const l=M.filter(x=>x.clase===c);
+        const v=l.reduce((a,x)=>a+Math.abs(+x.valor||0),0);
+        return `<option value="${esc(c)}" ${c===(this._cajaClase||'')?'selected':''}>${esc(c)} (${l.length}) · ${money(v)}</option>`;
+      }).join('')}
     </select>
     <button class="btn" onclick="App.cajaForm()">➕ Nuevo movimiento</button>
   </div>
