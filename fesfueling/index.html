@@ -1131,7 +1131,14 @@ _cajaPaint(){
         <td class="num"><b>${money(e+s)}</b></td><td class="num">${ult&&ult.saldo?money(ult.saldo):'—'}</td>
         <td><button class="btn sm sec" onclick="App._cajaTab='caja';App._cajaMes='${m}';App._cajaPaint()">Ver movimientos</button></td></tr>`;
       }).join('')||'<tr><td colspan="7" class="empty">Sin extractos cargados</td></tr>'}</tbody></table></div>
-      <div class="card"><div class="mini">Los extractos se leen del PDF de Bancolombia. Los de 2026-06 en adelante vienen con clave: es el NIT, <b>902025524</b>.</div></div>`;
+      <div class="card">
+        <div class="mini" style="font-weight:700;margin-bottom:6px">LA CUENTA</div>
+        <div style="font-size:13.5px">Bancolombia · Ahorros persona jurídica <b>30400007742</b> · sucursal World Trade Center</div>
+        <div style="font-size:13.5px">Abierta el <b>4 de febrero de 2026</b> · estado ACTIVA</div>
+        <div style="margin-top:8px"><a class="btn sm sec" style="text-decoration:none" target="_blank"
+          href="docs/certificacion-bancaria-apertura.pdf">📄 Certificación bancaria de apertura</a></div>
+        <div class="mini" style="margin-top:8px">Los extractos se leen del PDF de Bancolombia. Los de junio en adelante vienen con clave: es el NIT, <b>902025524</b>.</div>
+      </div>`;
   } else {
     cuerpo=`<div class="card" style="padding:0;overflow-x:auto"><table>
       <thead><tr><th>Fecha</th><th>Tipo</th><th>E/S</th><th class="num">Valor</th><th>Detalle bancario</th><th>Detalle FES</th><th>Clasificación</th><th>Socio</th><th></th></tr></thead><tbody>

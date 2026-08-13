@@ -112,5 +112,11 @@
   "nombre": "inventario filtros",
   "archivo": "inventario-filtros.xlsx",
   "kb": 17
+ },
+ {
+  "id": "certificacion-bancaria-apertura",
+  "nombre": "Certificación bancaria · apertura cuenta 30400007742",
+  "archivo": "certificacion-bancaria-apertura.pdf",
+  "kb": 126
  }
 ]
