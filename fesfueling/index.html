@@ -115,7 +115,7 @@ function safe(fn,nom){ return async function(...a){ try{ await fn.apply(App,a); 
 
 const App={
 vista:'inicio',
-TABS:[['inicio','🏠 Inicio'],['busqueda','🔎 Búsqueda'],['catalogo','📦 Catálogo'],['inventario','📊 Inventario'],['compras','🛒 Compras'],['facturacion','🧾 Facturación'],['cartera','💰 Cartera'],['bancos','🏦 Bancos'],['clientes','🏢 Clientes'],['proveedores','🚚 Proveedores'],['reportes','📈 Reportes'],['importacion','🚛 Importación']],
+TABS:[['inicio','🏠 Inicio'],['busqueda','🔎 Búsqueda'],['catalogo','📦 Catálogo'],['inventario','📊 Inventario'],['compras','🛒 Compras'],['facturacion','🧾 Facturación'],['cartera','💰 Cartera'],['bancos','💵 Caja'],['clientes','🏢 Clientes'],['proveedores','🚚 Proveedores'],['reportes','📈 Reportes'],['importacion','🚛 Importación']],
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
   ({inicio:this.vInicio,busqueda:this.vBusqueda,catalogo:this.vCatalogo,inventario:this.vInventario,compras:this.vCompras,
@@ -1001,23 +1001,143 @@ async abonoGuardar(docId){
 },
 
 /* ================= BANCOS ================= */
+/* ================= CAJA =================
+   Se llamaba "Bancos" pero es mas que eso: aca entra todo el movimiento de
+   plata, venga del banco, de efectivo o de un prestamo. Dos cajones:
+     BANCOS -> la relacion de extractos, mes por mes, para abrirlos
+     CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
+   El detalle bancario casi nunca dice para que fue la plata: por eso cada
+   movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
+ORIGENES:['banco','efectivo','prestamo'],
+SOCIOS:['JVC','JJR'],
+CLASES_CAJA:['Cobro de cliente','Pago a proveedor','Giro al exterior','Retiro de efectivo',
+  'Compras con tarjeta','Traslado entre cuentas','Impuesto 4x1000','Comisiones bancarias',
+  'Rendimientos','Retefuente','Aporte de socio','Prestamo','Gasto operativo','Por clasificar'],
+async cajaMovs(){ this._cmov=await GETALL('ff_banco_mov?order=fecha.desc&limit=5000'); return this._cmov; },
+
 vBancos: safe(async function(){
-  const [bancos,movs]=await Promise.all([api('ff_bancos?order=banco'),api('ff_banco_mov?order=fecha.desc&limit=200')]);
-  const saldo=b=>{ const m=movs.filter(x=>x.banco_id===b.id); const pos=['consignacion','recaudo'];
-    return (+b.saldo_inicial||0)+m.reduce((s,x)=>s+(pos.includes(x.tipo)?+x.valor:-+x.valor),0); };
-  const bn=id=>{ const b=bancos.find(x=>x.id===id); return b?b.banco:'—'; };
-  const S={consignacion:'＋ Consignación',recaudo:'＋ Recaudo',transferencia:'－ Transferencia',pago:'－ Pago'};
-  this.set(`<h1>🏦 Bancos</h1><div class="sub2">Cuentas y movimientos</div>
-  <div class="tools"><button class="btn" onclick="App.bancoForm()">➕ Nueva cuenta</button>
-  <button class="btn navy" onclick="App.bancoMovForm()">± Registrar movimiento</button></div>
-  <div class="grid g4">${bancos.map(b=>`<div class="kpi"><div class="v">${money(saldo(b))}</div>
-  <div class="l">${esc(b.banco)} · ${esc(b.tipo_cuenta||'')} ${esc(b.numero||'')}<br>${esc(b.titular||'')}</div></div>`).join('')||'<div class="empty">Registra tu primera cuenta</div>'}</div>
-  <div class="card" style="padding:0;overflow-x:auto"><table>
-  <thead><tr><th>Fecha</th><th>Banco</th><th>Tipo</th><th class="num">Valor</th><th>Detalle</th></tr></thead><tbody>
-  ${movs.map(m=>`<tr><td>${fecha(m.fecha)}</td><td>${esc(bn(m.banco_id))}</td><td>${S[m.tipo]||esc(m.tipo)}</td>
-  <td class="num" style="color:${['consignacion','recaudo'].includes(m.tipo)?'var(--ok)':'var(--rojo)'};font-weight:700">${money(m.valor)}</td>
-  <td class="mini">${esc(m.detalle||'')}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">Sin movimientos</td></tr>'}</tbody></table></div>`);
-},'bancos'),
+  await this.cajaMovs();
+  this._cajaPaint();
+},'la caja'),
+
+_cajaPaint(){
+  const M=this._cmov||[];
+  const sub=this._cajaTab||'caja';
+  const meses=[...new Set(M.map(x=>x.mes).filter(Boolean))].sort().reverse();
+  const mes=(this._cajaMes&&meses.includes(this._cajaMes))?this._cajaMes:'';
+  const L=(mes?M.filter(x=>x.mes===mes):M);
+  const ent=L.filter(x=>+x.valor>0), sal=L.filter(x=>+x.valor<0);
+  const sum=l=>l.reduce((a,x)=>a+(+x.valor||0),0);
+
+  let cuerpo='';
+  if(sub==='bancos'){
+    /* Un renglon por mes: lo que dice el extracto y el enlace para abrirlo. */
+    cuerpo=`<div class="card" style="padding:0;overflow-x:auto"><table>
+      <thead><tr><th>Mes</th><th class="num">Movimientos</th><th class="num">Entradas</th><th class="num">Salidas</th><th class="num">Neto</th><th class="num">Saldo final</th><th></th></tr></thead><tbody>
+      ${meses.map(m=>{ const l=M.filter(x=>x.mes===m);
+        const e=sum(l.filter(x=>+x.valor>0)), s=sum(l.filter(x=>+x.valor<0));
+        const ult=l.slice().sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))).pop();
+        return `<tr><td><b>${esc(this._mesNombre(m))}</b></td><td class="num">${l.length}</td>
+        <td class="num" style="color:var(--ok)">${money(e)}</td><td class="num" style="color:var(--rojo)">${money(s)}</td>
+        <td class="num"><b>${money(e+s)}</b></td><td class="num">${ult&&ult.saldo?money(ult.saldo):'—'}</td>
+        <td><button class="btn sm sec" onclick="App._cajaTab='caja';App._cajaMes='${m}';App._cajaPaint()">Ver movimientos</button></td></tr>`;
+      }).join('')||'<tr><td colspan="7" class="empty">Sin extractos cargados</td></tr>'}</tbody></table></div>
+      <div class="card"><div class="mini">Los extractos se leen del PDF de Bancolombia. Los de 2026-06 en adelante vienen con clave: es el NIT, <b>902025524</b>.</div></div>`;
+  } else {
+    cuerpo=`<div class="card" style="padding:0;overflow-x:auto"><table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>E/S</th><th class="num">Valor</th><th>Detalle bancario</th><th>Detalle FES</th><th>Clasificación</th><th>Socio</th><th></th></tr></thead><tbody>
+      ${L.map(x=>`<tr>
+        <td>${fecha(x.fecha)}</td>
+        <td><span class="badge ${x.origen==='efectivo'?'b-acc':(x.origen==='prestamo'?'b-par':'b-gris')}">${esc(x.origen||'banco')}</span></td>
+        <td>${(+x.valor>0)?'<span style="color:var(--ok)">▲</span>':'<span style="color:var(--rojo)">▼</span>'}</td>
+        <td class="num" style="color:${(+x.valor>0)?'var(--ok)':'var(--rojo)'}"><b>${money(Math.abs(+x.valor||0))}</b></td>
+        <td class="mini">${esc(x.detalle||'')}</td>
+        <td>${x.detalle_fes?esc(x.detalle_fes):'<span class="mini" style="color:var(--rojo)">—</span>'}</td>
+        <td class="mini">${esc(x.clase||'')}</td>
+        <td>${x.socio?`<span class="badge b-acc">${esc(x.socio)}</span>`:''}</td>
+        <td><button class="btn sm sec" onclick="App.cajaForm(${x.id})">✏️</button></td></tr>`).join('')
+      ||'<tr><td colspan="9" class="empty">Sin movimientos</td></tr>'}</tbody></table></div>`;
+  }
+
+  const sinDet=M.filter(x=>!x.detalle_fes).length;
+  const porSocio={}; M.filter(x=>x.socio).forEach(x=>{ porSocio[x.socio]=(porSocio[x.socio]||0)+Math.abs(+x.valor||0); });
+  this.set(`<h1>💵 Caja</h1><div class="sub2">Todo el movimiento de plata: banco, efectivo y préstamos</div>
+  <div class="tabs2">
+    <button class="${sub==='caja'?'on':''}" onclick="App._cajaTab='caja';App._cajaPaint()">Caja (${M.length})</button>
+    <button class="${sub==='bancos'?'on':''}" onclick="App._cajaTab='bancos';App._cajaPaint()">Bancos · extractos (${meses.length})</button>
+  </div>
+  ${sub==='caja'?`<div class="tools">
+    <select onchange="App._cajaMes=this.value;App._cajaPaint()">
+      <option value="">Todos los meses</option>
+      ${meses.map(m=>`<option value="${m}" ${m===mes?'selected':''}>${esc(this._mesNombre(m))}</option>`).join('')}
+    </select>
+    <button class="btn" onclick="App.cajaForm()">➕ Nuevo movimiento</button>
+  </div>
+  <div class="grid g4">
+    <div class="kpi ok verde"><div class="v">${money(sum(ent))}</div><div class="l">Entradas (${ent.length})</div></div>
+    <div class="kpi rojo"><div class="v">${money(sum(sal))}</div><div class="l">Salidas (${sal.length})</div></div>
+    <div class="kpi"><div class="v">${money(sum(L))}</div><div class="l">Neto${mes?' de '+esc(this._mesNombre(mes)):''}</div></div>
+    ${Object.keys(porSocio).length?`<div class="kpi"><div class="v" style="font-size:15px">${Object.entries(porSocio).map(([s,v])=>esc(s)+' '+money(v)).join('<br>')}</div><div class="l">Cargos a socios</div></div>`:''}
+  </div>
+  ${sinDet?`<div class="card" style="border-color:var(--rojo)"><b style="color:var(--rojo)">${sinDet} movimientos sin detalle FES</b>
+    <div class="mini">El detalle del banco no dice para qué fue la plata. Ábrelos con ✏️ y escríbelo.</div></div>`:''}`:''}
+  ${cuerpo}`);
+},
+_mesNombre(m){
+  const N=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const p=String(m||'').split('-');
+  return p.length>1?(N[+p[1]]||m)+' '+p[0]:m;
+},
+
+cajaForm(id){
+  const x=(this._cmov||[]).find(z=>z.id===id)||{};
+  const v=+x.valor||0;
+  modal(`<h3>${id?'✏️ Movimiento':'➕ Nuevo movimiento'}</h3>
+  <div class="frm">
+    <div><label>Fecha</label><input id="cj_fec" type="date" value="${esc(x.fecha||hoy())}"></div>
+    <div><label>Tipo</label><select id="cj_org">${this.ORIGENES.map(o=>`<option ${o===(x.origen||'banco')?'selected':''}>${o}</option>`).join('')}</select></div>
+    <div><label>Entrada / Salida</label><select id="cj_es">
+      <option value="entrada" ${v>=0?'selected':''}>Entrada</option>
+      <option value="salida" ${v<0?'selected':''}>Salida</option></select></div>
+    <div><label>Valor</label><input id="cj_val" inputmode="numeric" value="${v?Math.abs(v):''}" placeholder="0"></div>
+  </div>
+  <label>Detalle bancario</label>
+  <input id="cj_det" value="${esc(x.detalle||'')}" placeholder="Como aparece en el extracto">
+  <label>Detalle FES — para qué fue de verdad</label>
+  <input id="cj_fes" value="${esc(x.detalle_fes||'')}" placeholder="Pago UPS envío válvulas, anticipo de socio…">
+  <div class="frm">
+    <div><label>Clasificación</label><select id="cj_cla">${this.CLASES_CAJA.map(c=>`<option ${c===(x.clase||'Por clasificar')?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
+    <div><label>Cargo a socio</label><select id="cj_soc">
+      <option value="">— ninguno —</option>
+      ${this.SOCIOS.map(s=>`<option ${s===(x.socio||'')?'selected':''}>${s}</option>`).join('')}</select></div>
+  </div>
+  <div class="row" style="gap:8px;margin-top:12px">
+    <button class="btn" style="flex:1" onclick="App.cajaGuardar(${id||'null'})">Guardar</button>
+    <button class="btn sec" onclick="cerrar()">Cancelar</button>
+    ${id?`<button class="btn rojo" onclick="App.cajaBorrar(${id})">✕</button>`:''}
+  </div>`);
+},
+async cajaGuardar(id){
+  const g=i=>($(i)?$(i).value.trim():'');
+  const val=+String(g('cj_val')).replace(/[^0-9]/g,'')||0;
+  if(!val){ alert('Ponle el valor.'); return; }
+  const es=g('cj_es');
+  const b={fecha:g('cj_fec')||hoy(), origen:g('cj_org'), tipo:es,
+    valor: es==='salida' ? -Math.abs(val) : Math.abs(val),
+    detalle:g('cj_det'), detalle_fes:g('cj_fes'), clase:g('cj_cla'),
+    socio:g('cj_soc')||null, mes:(g('cj_fec')||hoy()).slice(0,7), manual:true};
+  if(!id){ const bk=(this._bancos&&this._bancos[0])||null;
+    const bs=await api('ff_bancos?select=id&limit=1'); if(bs&&bs[0]) b.banco_id=bs[0].id; }
+  const r = id ? await patch('ff_banco_mov?id=eq.'+id,b) : await post('ff_banco_mov',b);
+  if(r===null){ toast('⚠️ No se pudo guardar'); return; }
+  cerrar(); toast('Guardado'); this.vBancos();
+},
+async cajaBorrar(id){
+  if(!confirm('¿Borrar este movimiento?')) return;
+  await api('ff_banco_mov?id=eq.'+id,{method:'DELETE'});
+  cerrar(); toast('Borrado'); this.vBancos();
+},
+
 bancoForm(){
   modal(`<h3>➕ Cuenta bancaria</h3><div class="frm">
   <div><label>Banco</label><input id="bk_banco"></div>
