@@ -737,13 +737,19 @@ vFacturacion: safe(async function(){
      saber que falta por facturar: es la pregunta que se hace todos los meses. */
   const yaFact={}; docs.filter(d=>d.tipo==='factura'&&d.estado!=='anulada'&&d.origen_id)
                        .forEach(d=>{ yaFact[d.origen_id]=d.numero; });
+  const yaRem={};  docs.filter(d=>d.tipo==='remision'&&d.estado!=='anulada'&&d.origen_id)
+                       .forEach(d=>{ yaRem[d.origen_id]=d.numero; });
   const tipos=[['cotizacion','Cotizaciones'],['remision','Remisiones'],['factura','Facturas'],['nota_credito','Notas crédito']];
   const list=docs.filter(d=>d.tipo===sub);
   /* Dos cosas distintas que antes iban en la misma columna y se confundian:
      ESTADO   = en que va el documento (facturada / por facturar)
      PAGO     = cuanta plata entro, que sale de los abonos del banco */
   const est=d=>{ if(d.estado==='anulada') return '<span class="badge b-gris">anulada</span>';
-    if(d.tipo==='remision'||d.tipo==='cotizacion'){
+    if(d.tipo==='cotizacion'){
+      if(yaFact[d.id]) return '<span class="badge b-ok">facturada · '+esc(yaFact[d.id])+'</span>';
+      if(yaRem[d.id])  return '<span class="badge b-acc">remisionada · '+esc(yaRem[d.id])+'</span>';
+      return '<span class="badge b-pend">POR REMISIONAR</span>'; }
+    if(d.tipo==='remision'){
       return yaFact[d.id]
         ? '<span class="badge b-ok">facturada · '+esc(yaFact[d.id])+'</span>'
         : '<span class="badge b-pend">POR FACTURAR</span>'; }
@@ -790,7 +796,8 @@ vFacturacion: safe(async function(){
   ${list.map(d=>`<tr><td><b>${esc(d.numero)}</b></td><td>${fecha(d.fecha_emision)}</td><td>${esc(this.cliNom(d.cliente_id))}</td>
   <td class="num">${money(d.total)}</td><td>${est(d)}</td>${sub==='factura'?`<td>${pago(d)}</td>`:''}
   <td><button class="btn sm sec" onclick="App.verDoc(${d.id})">👁</button>
-  ${(d.tipo==='cotizacion'||d.tipo==='remision')&&d.estado!=='anulada'&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.cotAFactura(${d.id})">→ Factura</button>`:''}
+  ${d.tipo==='cotizacion'&&d.estado!=='anulada'&&!yaRem[d.id]&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.docARemision(${d.id})">→ Remisión</button>`:''}
+  ${d.tipo==='remision'&&d.estado!=='anulada'&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.cotAFactura(${d.id})">→ Factura</button>`:''}
   ${d.estado!=='anulada'?`<button class="btn sm rojo" onclick="App.anularDoc(${d.id})">✖</button>`:''}</td></tr>`).join('')||`<tr><td colspan="${sub==='factura'?7:6}" class="empty">Nada aún en este cajón</td></tr>`}</tbody></table></div>`);
 },'facturación'),
 
@@ -864,6 +871,20 @@ async moverInvDoc(doc,signo){
     const upd={existencias:(+r.existencias||0)+q}; if(signo<0) upd.fecha_ult_venta=hoy();
     await patch('ff_referencias?id=eq.'+r.id,upd);
   }
+},
+/* Cotizacion aprobada -> remision. Es aqui donde sale la mercancia de bodega,
+   no al facturar: la factura viene despues y ya no mueve inventario. */
+async docARemision(id){
+  const rs=await api('ff_documentos?id=eq.'+id); const c=rs[0]; if(!c) return;
+  if(!confirm('¿Convertir la cotización '+(c.numero||'')+' en REMISIÓN por '+money(c.total)+'? Sale la mercancía de bodega.')) return;
+  const numero=await this.numDoc('remision');
+  const r=await post('ff_documentos',{tipo:'remision',numero,cliente_id:c.cliente_id,items:c.items,
+    subtotal:c.subtotal,descuento:c.descuento,iva:c.iva,total:c.total,estado:'ok',
+    fecha_emision:hoy(),origen_id:c.id,notas:'De '+c.numero});
+  if(r&&r[0]){ await this.moverInvDoc(r[0],-1);
+    await patch('ff_documentos?id=eq.'+id,{estado:'remisionada'});
+    toast('📦 '+numero+' creada desde '+c.numero); }
+  this._facTab='remision'; this.vFacturacion();
 },
 /* Sirve para cotizacion Y para remision: las dos se aprueban y generan factura.
    La factura queda apuntando al documento del que salio (origen_id), que es lo
