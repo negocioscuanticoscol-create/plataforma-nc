@@ -147,6 +147,12 @@ function modal(h){ $('modalbox').innerHTML=h; $('modal').classList.remove('hide'
 function cerrar(){ $('modal').classList.add('hide'); }
 $('modal').addEventListener('click',e=>{ if(e.target.id==='modal')cerrar(); });
 
+/* Las cuatro medidas estandar, escritas como se llaman de verdad. Antes iban
+   como numeros pelados ('100','120') y en inventario como 'Sencilla 100x190':
+   la misma cama aparecia dos veces en Referencias y no se cruzaban.
+   Va afuera de App porque CATALOGO_BASE la usa mientras el objeto se esta
+   armando, y ahi adentro todavia no existe. */
+const TAMS4=['Sencilla 100x190','Semidoble 120x190','Doble 140x190','Queen 160x190'];
 const App={
   SB:'https://fnayedgvamxktxfvywwl.supabase.co',
   KEY:'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',
@@ -569,10 +575,6 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
      precio de Pillow o de Resortado según lo que pida el cliente. */
   /* Sale tal cual del catálogo de producto (nido/catalogo.html):
      cinco líneas y un servicio a la medida. */
-  /* Las cuatro medidas estandar, escritas como se llaman de verdad. Antes iban
-     como numeros pelados ('100','120') y en inventario como 'Sencilla 100x190':
-     la misma cama aparecia dos veces en Referencias y no se cruzaban. */
-  TAMS4:['Sencilla 100x190','Semidoble 120x190','Doble 140x190','Queen 160x190'],
   CATALOGO_BASE:[
     // Línea 01 · pillowtop, garantía 5 años
     {sec:'Colchones', refs:[
