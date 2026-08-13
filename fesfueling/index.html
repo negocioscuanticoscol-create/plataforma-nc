@@ -1168,7 +1168,6 @@ _cajaPaint(){
   }
 
   const sinDet=M.filter(x=>!x.detalle_fes).length;
-  const claseF2=claseF;
   const porSocio={}; M.filter(x=>x.socio).forEach(x=>{ porSocio[x.socio]=(porSocio[x.socio]||0)+Math.abs(+x.valor||0); });
   this.set(`<h1>💵 Caja</h1><div class="sub2">Todo el movimiento de plata: banco, efectivo y préstamos · <span class="mini">v${this.VER}</span></div>
   <div class="tabs2">
