@@ -56,6 +56,9 @@ label{font-size:11.5px;font-weight:700;color:var(--sub);text-transform:uppercase
 .tabs2{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
 .tabs2 button{background:#e8ecf2;border:none;border-radius:8px;padding:8px 14px;font-weight:700;cursor:pointer;color:var(--tx);font-size:13px}
 .tabs2 button.on{background:var(--navy);color:#fff}
+.fchip{background:#fff;border:1.5px solid #d3d9e2;border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;color:#48505c;cursor:pointer}
+.fchip:hover{border-color:var(--navy)}
+.fchip.on{background:var(--navy);border-color:var(--navy);color:#fff}
 .mini{font-size:12px;color:var(--sub)}
 @media(max-width:640px){ main{padding:12px 8px 90px} .modal{padding:14px} }
 @media print{ nav,header,.no-print{display:none!important} body{background:#fff} .print-area{display:block} }
@@ -1097,6 +1100,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
+VER:'2026-08-12b',
 ORIGENES:['banco','efectivo','prestamo'],
 SOCIOS:['FES','JVC','JJR'],   // FES = lo asume la empresa, no un socio
 CLASES_CAJA:['Cobro de cliente','Pago a proveedor','Giro al exterior','Retiro de efectivo',
@@ -1164,33 +1168,37 @@ _cajaPaint(){
   }
 
   const sinDet=M.filter(x=>!x.detalle_fes).length;
+  const claseF2=claseF;
   const porSocio={}; M.filter(x=>x.socio).forEach(x=>{ porSocio[x.socio]=(porSocio[x.socio]||0)+Math.abs(+x.valor||0); });
-  this.set(`<h1>💵 Caja</h1><div class="sub2">Todo el movimiento de plata: banco, efectivo y préstamos</div>
+  this.set(`<h1>💵 Caja</h1><div class="sub2">Todo el movimiento de plata: banco, efectivo y préstamos · <span class="mini">v${this.VER}</span></div>
   <div class="tabs2">
     <button class="${sub==='caja'?'on':''}" onclick="App._cajaTab='caja';App._cajaPaint()">Caja (${M.length})</button>
     <button class="${sub==='bancos'?'on':''}" onclick="App._cajaTab='bancos';App._cajaPaint()">Bancos · extractos (${meses.length})</button>
   </div>
-  ${sub==='caja'?`<div class="tools">
+  ${sub==='caja'?`
+  <div class="card" style="padding:10px 12px">
+    <div class="mini" style="font-weight:700;margin-bottom:6px">FILTRAR</div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="fchip ${!falta&&!claseF&&!mes?'on':''}" onclick="App._cajaFalta='';App._cajaClase='';App._cajaMes='';App._cajaPaint()">Todos (${M.length})</button>
+      <button class="fchip ${falta==='detalle'?'on':''}" onclick="App._cajaFalta='${falta==='detalle'?'':'detalle'}';App._cajaPaint()">⚠️ Sin detalle FES (${M.filter(x=>!x.detalle_fes).length})</button>
+      <button class="fchip ${falta==='socio'?'on':''}" onclick="App._cajaFalta='${falta==='socio'?'':'socio'}';App._cajaPaint()">Sin responsable (${M.filter(x=>!x.socio).length})</button>
+      <button class="fchip ${falta==='clase'?'on':''}" onclick="App._cajaFalta='${falta==='clase'?'':'clase'}';App._cajaPaint()">Sin clasificar (${M.filter(x=>!x.clase||x.clase==='Por clasificar').length})</button>
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap">
+      ${[...new Set(M.map(x=>x.clase).filter(Boolean))].sort().map(c=>{
+        const n=M.filter(x=>x.clase===c).length;
+        return `<button class="fchip ${c===claseF?'on':''}" onclick="App._cajaClase='${c===claseF?'':esc(c)}';App._cajaPaint()">${esc(c)} (${n})</button>`;
+      }).join('')}
+    </div>
+  </div>
+  <div class="tools">
     <select onchange="App._cajaMes=this.value;App._cajaPaint()">
       <option value="">Todos los meses</option>
       ${meses.map(m=>`<option value="${m}" ${m===mes?'selected':''}>${esc(this._mesNombre(m))}</option>`).join('')}
     </select>
-    <select onchange="App._cajaFalta=this.value;App._cajaPaint()">
-      <option value="">Todos</option>
-      <option value="detalle" ${falta==='detalle'?'selected':''}>⚠️ Falta detalle FES (${M.filter(x=>!x.detalle_fes).length})</option>
-      <option value="socio" ${falta==='socio'?'selected':''}>Falta el responsable (${M.filter(x=>!x.socio).length})</option>
-      <option value="clase" ${falta==='clase'?'selected':''}>Falta clasificar (${M.filter(x=>!x.clase||x.clase==='Por clasificar').length})</option>
-    </select>
-    <select onchange="App._cajaClase=this.value;App._cajaPaint()">
-      <option value="">Toda clasificación</option>
-      ${[...new Set(M.map(x=>x.clase).filter(Boolean))].sort().map(c=>{
-        const l=M.filter(x=>x.clase===c);
-        const v=l.reduce((a,x)=>a+Math.abs(+x.valor||0),0);
-        return `<option value="${esc(c)}" ${c===(this._cajaClase||'')?'selected':''}>${esc(c)} (${l.length}) · ${money(v)}</option>`;
-      }).join('')}
-    </select>
     <button class="btn" onclick="App.cajaForm()">➕ Nuevo movimiento</button>
   </div>
+  <div class="mini" style="margin:-4px 0 10px">Viendo <b>${L.length}</b> de ${M.length} movimientos${mes?' · '+esc(this._mesNombre(mes)):''}${falta?' · falta '+(falta==='detalle'?'detalle FES':(falta==='socio'?'responsable':'clasificación')):''}${claseF?' · '+esc(claseF):''}</div>
   <div class="grid g4">
     <div class="kpi ok verde"><div class="v">${money(sum(ent))}</div><div class="l">Entradas (${ent.length})</div></div>
     <div class="kpi rojo"><div class="v">${money(sum(sal))}</div><div class="l">Salidas (${sal.length})</div></div>
