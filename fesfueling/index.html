@@ -1100,7 +1100,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-08-12k',
+VER:'2026-08-12l',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
@@ -1189,7 +1189,14 @@ _cajaPaint(){
     return p.join(' ')||money(0);
   };
   const sinDet=M.filter(x=>!x.detalle_fes).length;
-  const porSocio={}; M.filter(x=>x.socio).forEach(x=>{ porSocio[x.socio]=(porSocio[x.socio]||0)+Math.abs(+x.valor||0); });
+  /* Resumen por cargo. Se ordena por lo que salio, que es lo que interesa
+     cobrar o repartir; lo que entra solo lo tiene Bancario. */
+  const cargos=[...new Set(M.map(x=>x.socio||'(sin cargo)'))].map(c=>{
+    const l=M.filter(x=>(x.socio||'(sin cargo)')===c);
+    return {c, n:l.length,
+      e:l.filter(x=>+x.valor>0).reduce((a,x)=>a+ +x.valor,0),
+      v:l.filter(x=>+x.valor<0).reduce((a,x)=>a- +x.valor,0)};
+  }).sort((a,b)=>b.v-a.v);
   this.set(`<h1>💵 Caja</h1><div class="sub2">Todo el movimiento de plata: banco, efectivo y préstamos · <span class="mini">v${this.VER}</span></div>
   <div class="tabs2">
     <button class="${sub==='caja'?'on':''}" onclick="App._cajaTab='caja';App._cajaPaint()">Caja (${M.length})</button>
@@ -1236,8 +1243,20 @@ _cajaPaint(){
     <div class="kpi ok verde"><div class="v">${money(sum(ent))}</div><div class="l">Entradas (${ent.length})</div></div>
     <div class="kpi rojo"><div class="v">${money(sum(sal))}</div><div class="l">Salidas (${sal.length})</div></div>
     <div class="kpi"><div class="v">${money(sum(L))}</div><div class="l">Neto${mes?' de '+esc(this._mesNombre(mes)):''}</div></div>
-    ${Object.keys(porSocio).length?`<div class="kpi"><div class="v" style="font-size:15px">${Object.entries(porSocio).map(([s,v])=>esc(s)+' '+money(v)).join('<br>')}</div><div class="l">Cargos por responsable</div></div>`:''}
   </div>
+  ${cargos.length>1?`<div class="card" style="padding:0;overflow-x:auto">
+    <div class="mini" style="font-weight:700;padding:10px 12px 0">A CARGO DE QUIÉN</div>
+    <table><thead><tr><th>Cargo</th><th class="num">Movs</th><th class="num">Entró</th><th class="num">Salió</th><th></th></tr></thead><tbody>
+    ${cargos.map(g=>`<tr${g.c===socF?' style="background:#eef3fb"':''}>
+      <td><b>${esc(g.c)}</b></td><td class="num">${g.n}</td>
+      <td class="num" style="color:var(--ok)">${g.e?money(g.e):''}</td>
+      <td class="num" style="color:var(--rojo)">${g.v?money(g.v):''}</td>
+      <td><button class="btn sm sec" onclick="App._cajaSocio='${g.c===socF?'':esc(g.c)}';App._cajaPaint()">${g.c===socF?'quitar':'ver'}</button></td></tr>`).join('')}
+    <tr style="background:#f6f7f9"><td><b>TOTAL</b></td>
+      <td class="num"><b>${cargos.reduce((a,g)=>a+g.n,0)}</b></td>
+      <td class="num" style="color:var(--ok)"><b>${money(cargos.reduce((a,g)=>a+g.e,0))}</b></td>
+      <td class="num" style="color:var(--rojo)"><b>${money(cargos.reduce((a,g)=>a+g.v,0))}</b></td><td></td></tr>
+    </tbody></table></div>`:''}
   ${sinDet?`<div class="card" style="border-color:var(--rojo)">
     <div class="row" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <div><b style="color:var(--rojo)">${sinDet} movimientos sin detalle FES</b>
