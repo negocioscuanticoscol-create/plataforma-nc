@@ -569,18 +569,22 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
      precio de Pillow o de Resortado según lo que pida el cliente. */
   /* Sale tal cual del catálogo de producto (nido/catalogo.html):
      cinco líneas y un servicio a la medida. */
+  /* Las cuatro medidas estandar, escritas como se llaman de verdad. Antes iban
+     como numeros pelados ('100','120') y en inventario como 'Sencilla 100x190':
+     la misma cama aparecia dos veces en Referencias y no se cruzaban. */
+  TAMS4:['Sencilla 100x190','Semidoble 120x190','Doble 140x190','Queen 160x190'],
   CATALOGO_BASE:[
     // Línea 01 · pillowtop, garantía 5 años
     {sec:'Colchones', refs:[
-      {ref:'PILLOWTOP CASSATA',   tams:['100','120','140','160']},
-      {ref:'PILLOWTOP RESORTADO', tams:['100','120','140','160']},
+      {ref:'PILLOWTOP CASSATA',   tams:TAMS4},
+      {ref:'PILLOWTOP RESORTADO', tams:TAMS4},
       // «Crea tu colchón»: se fabrica con la medida del cliente
       {ref:'CREA TU COLCHÓN', tams:['Medida especial'], recargo:15,
        tipos:['Pillowtop Cassata','Pillowtop Resortado'],
        baseDe:{'Pillowtop Cassata':'PILLOWTOP CASSATA','Pillowtop Resortado':'PILLOWTOP RESORTADO'}}]},
     // Línea 02 · colchoneta de 17 cm en espuma D26, en todas las medidas
     {sec:'Sensaflex', refs:[
-      {ref:'SENSAFLEX D26', tams:['100','120','140','160','Medida especial'], recargo:15}]},
+      {ref:'SENSAFLEX D26', tams:TAMS4.concat(['Medida especial']), recargo:15}]},
     // Línea 03 · cuna, espuma D23
     {sec:'BabyNido', refs:[
       {ref:'COLCHÓN CUNA', tams:['130×70×15','Medida especial'], recargo:15}]},
@@ -597,7 +601,25 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     try{ const g=JSON.parse(localStorage.getItem('nido_catalogo')||'null');
       this._cat = (g&&g.length)?g:JSON.parse(JSON.stringify(this.CATALOGO_BASE)); }
     catch(e){ this._cat=JSON.parse(JSON.stringify(this.CATALOGO_BASE)); }
+    if(this._catArreglar()) this.catGuardar();
     return this._cat; },
+  /* El catalogo viejo quedo guardado en el navegador con los tamaños en numero
+     pelado. Se cambian por la medida completa y se quitan los repetidos, una
+     sola vez y sin que haya que tocar nada. */
+  _catArreglar(){
+    const EQ={'100':'Sencilla 100x190','120':'Semidoble 120x190','140':'Doble 140x190',
+              '160':'Queen 160x190','200':'King 200x200'};
+    let toco=false;
+    for(const sec of (this._cat||[])) for(const r of (sec.refs||[])){
+      const vistos=[];
+      for(const t of (r.tams||[])){
+        const n=EQ[String(t).trim()]||t;
+        if(n!==t) toco=true;
+        if(!vistos.includes(n)) vistos.push(n); else toco=true;
+      }
+      r.tams=vistos;
+    }
+    return toco; },
   catGuardar(){ localStorage.setItem('nido_catalogo',JSON.stringify(this._cat)); },
   catRestaurar(){ if(!confirm('¿Volver al catálogo original? Se pierden las secciones y referencias que hayas agregado.'))return;
     localStorage.removeItem('nido_catalogo'); this._cat=null; this.toast('Catálogo restaurado'); this.vRef(); },
