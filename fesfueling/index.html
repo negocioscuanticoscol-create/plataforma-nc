@@ -750,9 +750,11 @@ vFacturacion: safe(async function(){
       if(yaRem[d.id])  return '<span class="badge b-acc">remisionada · '+esc(yaRem[d.id])+'</span>';
       return '<span class="badge b-pend">POR REMISIONAR</span>'; }
     if(d.tipo==='remision'){
-      return yaFact[d.id]
-        ? '<span class="badge b-ok">facturada · '+esc(yaFact[d.id])+'</span>'
-        : '<span class="badge b-pend">POR FACTURAR</span>'; }
+      if(yaFact[d.id]) return '<span class="badge b-ok">facturada · '+esc(yaFact[d.id])+'</span>';
+      /* Estado final: se entrego y se cobro, pero no se va a facturar. Deja de
+         contar como pendiente en vez de quedarse en rojo para siempre. */
+      if(d.estado==='cerrada') return '<span class="badge b-acc">REMISIONADA · cerrada</span>';
+      return '<span class="badge b-pend">POR FACTURAR</span>'; }
     if(d.tipo==='factura') return '<span class="badge b-ok">GENERADA</span>';
     return '<span class="badge b-acc">'+esc(d.estado||'ok')+'</span>'; };
   const pago=d=>{ if(d.tipo!=='factura') return '';
@@ -766,7 +768,7 @@ vFacturacion: safe(async function(){
     /* Lo entregado son las remisiones MAS las cotizaciones que salieron de una
        remision: la mercancia ya salio aunque el documento se haya movido. */
     const rem=docs.filter(d=>(d.tipo==='remision'||d.tipo==='cotizacion')&&d.estado!=='anulada');
-    const pend=rem.filter(d=>!yaFact[d.id]);
+    const pend=rem.filter(d=>!yaFact[d.id]&&d.estado!=='cerrada');
     const fac=docs.filter(d=>d.tipo==='factura'&&d.estado!=='anulada');
     const sum=l=>l.reduce((a,d)=>a+(+d.total||0),0);
     if(!rem.length) return '';
@@ -806,7 +808,9 @@ vFacturacion: safe(async function(){
   <td class="num">${d.sin_valor&&!(+d.total)?'<span class="mini">sin valor comercial</span>':money(d.total)}</td><td>${est(d)}</td>${sub==='factura'?`<td>${pago(d)}</td>`:''}
   <td><button class="btn sm sec" onclick="App.verDoc(${d.id})">👁</button>
   ${d.tipo==='cotizacion'&&d.estado!=='anulada'&&!yaRem[d.id]&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.docARemision(${d.id})">→ Remisión</button>`:''}
-  ${d.tipo==='remision'&&d.estado!=='anulada'&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.cotAFactura(${d.id})">→ Factura</button>`:''}
+  ${d.tipo==='remision'&&d.estado!=='anulada'&&d.estado!=='cerrada'&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.cotAFactura(${d.id})">→ Factura</button>
+     <button class="btn sm sec" title="Se entregó y se cobró, pero no se va a facturar" onclick="App.cerrarRemision(${d.id})">⊘ Cerrar</button>`:''}
+  ${d.tipo==='remision'&&d.estado==='cerrada'?`<button class="btn sm sec" onclick="App.reabrirRemision(${d.id})">↩︎ Reabrir</button>`:''}
   ${d.estado!=='anulada'?`<button class="btn sm rojo" onclick="App.anularDoc(${d.id})">✖</button>`:''}</td></tr>`).join('')||`<tr><td colspan="${sub==='factura'?7:6}" class="empty">Nada aún en este cajón</td></tr>`}</tbody></table></div>`);
 },'facturación'),
 
@@ -883,6 +887,18 @@ async moverInvDoc(doc,signo){
 },
 /* Cotizacion aprobada -> remision. Es aqui donde sale la mercancia de bodega,
    no al facturar: la factura viene despues y ya no mueve inventario. */
+/* Cerrar una remision: se entrego, se cobro y no se va a facturar. No se anula
+   -la venta existio- pero deja de aparecer como pendiente por facturar. */
+async cerrarRemision(id){
+  if(!confirm('¿Dejar esta remisión como estado FINAL, sin factura? Deja de contar como pendiente por facturar.')) return;
+  const r=await patch('ff_documentos?id=eq.'+id,{estado:'cerrada'});
+  if(r===null){ toast('⚠️ No se pudo'); return; }
+  toast('Remisión cerrada'); this.vFacturacion();
+},
+async reabrirRemision(id){
+  await patch('ff_documentos?id=eq.'+id,{estado:'ok'});
+  toast('Reabierta'); this.vFacturacion();
+},
 async docARemision(id){
   const rs=await api('ff_documentos?id=eq.'+id); const c=rs[0]; if(!c) return;
   if(!confirm('¿Convertir la cotización '+(c.numero||'')+' en REMISIÓN por '+money(c.total)+'? Sale la mercancía de bodega.')) return;
