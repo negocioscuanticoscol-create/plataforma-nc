@@ -777,24 +777,33 @@ vFacturacion: safe(async function(){
       ${pend.length?`<div style="grid-column:1/-1;border-top:1px dashed var(--line);padding-top:8px">
         ${pend.map(p=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0">
           <span>🔴 ${esc(p.numero)} <span class="mini">${fecha(p.fecha_emision)}</span></span>
-          <b>${(+p.total)?money(p.total):'<span style="color:var(--rojo)">sin valor</span>'}</b></div>`).join('')}
+          <b>${(+p.total)?money(p.total)
+              :(p.sin_valor?'<span class="mini">sin valor comercial</span>'
+                           :'<span style="color:var(--rojo)">sin valor</span>')}</b></div>`).join('')}
       </div>`:''}
     </div>`; })()}
   ${(()=>{ if(!list.length) return '';
     const vivos=list.filter(d=>d.estado!=='anulada');
     const t=vivos.reduce((a,d)=>a+(+d.total||0),0);
-    const sinVal=vivos.filter(d=>!(+d.total)).length;
+    /* "sin valor comercial" NO es un dato faltante: es mercancia que salio de
+       muestra, garantia o reposicion. Solo se avisa de los que de verdad estan
+       incompletos. */
+    const sinVal=vivos.filter(d=>!(+d.total)&&!d.sin_valor).length;
+    const svc=vivos.filter(d=>d.sin_valor).length;
     const nom={cotizacion:'cotizado',remision:'remisionado',factura:'facturado',nota_credito:'en notas crédito'}[sub]||'';
     return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
       <div><div class="mini">Valor ${nom}</div><b style="font-size:20px">${money(t)}</b>
         <span class="mini"> · ${vivos.length} documento${vivos.length===1?'':'s'}</span></div>
-      ${sinVal?`<div class="mini" style="color:var(--rojo)">⚠️ ${sinVal} sin valor cargado</div>`:''}
+      <div style="text-align:right">
+        ${sinVal?`<div class="mini" style="color:var(--rojo)">⚠️ ${sinVal} sin valor cargado</div>`:''}
+        ${svc?`<div class="mini">${svc} sin valor comercial</div>`:''}
+      </div>
     </div>`; })()}
   <div class="tools"><button class="btn" onclick="App.docForm('${sub}')">➕ Nueva ${sub.replace('_',' ')}</button></div>
   <div class="card" style="padding:0;overflow-x:auto"><table>
   <thead><tr><th>Número</th><th>Fecha</th><th>Cliente</th><th class="num">Total</th><th>Estado</th>${sub==='factura'?'<th>Pago</th>':''}<th></th></tr></thead><tbody>
   ${list.map(d=>`<tr><td><b>${esc(d.numero)}</b></td><td>${fecha(d.fecha_emision)}</td><td>${esc(this.cliNom(d.cliente_id))}</td>
-  <td class="num">${money(d.total)}</td><td>${est(d)}</td>${sub==='factura'?`<td>${pago(d)}</td>`:''}
+  <td class="num">${d.sin_valor&&!(+d.total)?'<span class="mini">sin valor comercial</span>':money(d.total)}</td><td>${est(d)}</td>${sub==='factura'?`<td>${pago(d)}</td>`:''}
   <td><button class="btn sm sec" onclick="App.verDoc(${d.id})">👁</button>
   ${d.tipo==='cotizacion'&&d.estado!=='anulada'&&!yaRem[d.id]&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.docARemision(${d.id})">→ Remisión</button>`:''}
   ${d.tipo==='remision'&&d.estado!=='anulada'&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.cotAFactura(${d.id})">→ Factura</button>`:''}
