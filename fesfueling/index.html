@@ -1100,7 +1100,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-08-12b',
+VER:'2026-08-12c',
 ORIGENES:['banco','efectivo','prestamo'],
 SOCIOS:['FES','JVC','JJR'],   // FES = lo asume la empresa, no un socio
 CLASES_CAJA:['Cobro de cliente','Pago a proveedor','Giro al exterior','Retiro de efectivo',
@@ -1127,6 +1127,11 @@ _cajaPaint(){
   if(falta==='clase')   L=L.filter(x=>!x.clase||x.clase==='Por clasificar');
   const claseF=this._cajaClase||'';
   if(claseF) L=L.filter(x=>x.clase===claseF);
+  /* Lo que descuenta es todo lo que sale, no solo los cajeros: tambien las
+     compras con tarjeta, los giros, los impuestos y las comisiones. */
+  const es=this._cajaES||'';
+  if(es==='sale') L=L.filter(x=>+x.valor<0);
+  if(es==='entra') L=L.filter(x=>+x.valor>0);
   const ent=L.filter(x=>+x.valor>0), sal=L.filter(x=>+x.valor<0);
   const sum=l=>l.reduce((a,x)=>a+(+x.valor||0),0);
 
@@ -1178,15 +1183,22 @@ _cajaPaint(){
   <div class="card" style="padding:10px 12px">
     <div class="mini" style="font-weight:700;margin-bottom:6px">FILTRAR</div>
     <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
-      <button class="fchip ${!falta&&!claseF&&!mes?'on':''}" onclick="App._cajaFalta='';App._cajaClase='';App._cajaMes='';App._cajaPaint()">Todos (${M.length})</button>
+      <button class="fchip ${!falta&&!claseF&&!mes&&!es?'on':''}" onclick="App._cajaFalta='';App._cajaClase='';App._cajaMes='';App._cajaES='';App._cajaPaint()">Todos (${M.length})</button>
       <button class="fchip ${falta==='detalle'?'on':''}" onclick="App._cajaFalta='${falta==='detalle'?'':'detalle'}';App._cajaPaint()">⚠️ Sin detalle FES (${M.filter(x=>!x.detalle_fes).length})</button>
       <button class="fchip ${falta==='socio'?'on':''}" onclick="App._cajaFalta='${falta==='socio'?'':'socio'}';App._cajaPaint()">Sin responsable (${M.filter(x=>!x.socio).length})</button>
       <button class="fchip ${falta==='clase'?'on':''}" onclick="App._cajaFalta='${falta==='clase'?'':'clase'}';App._cajaPaint()">Sin clasificar (${M.filter(x=>!x.clase||x.clase==='Por clasificar').length})</button>
     </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      ${(()=>{ const sa=M.filter(x=>+x.valor<0), en=M.filter(x=>+x.valor>0);
+        const t=l=>l.reduce((a,x)=>a+Math.abs(+x.valor||0),0);
+        return `<button class="fchip ${es==='sale'?'on':''}" onclick="App._cajaES='${es==='sale'?'':'sale'}';App._cajaPaint()">▼ Todo lo que descuenta (${sa.length}) · ${money(t(sa))}</button>
+        <button class="fchip ${es==='entra'?'on':''}" onclick="App._cajaES='${es==='entra'?'':'entra'}';App._cajaPaint()">▲ Todo lo que entra (${en.length}) · ${money(t(en))}</button>`; })()}
+    </div>
     <div class="row" style="gap:6px;flex-wrap:wrap">
       ${[...new Set(M.map(x=>x.clase).filter(Boolean))].sort().map(c=>{
-        const n=M.filter(x=>x.clase===c).length;
-        return `<button class="fchip ${c===claseF?'on':''}" onclick="App._cajaClase='${c===claseF?'':esc(c)}';App._cajaPaint()">${esc(c)} (${n})</button>`;
+        const l=M.filter(x=>x.clase===c);
+        const v=l.reduce((a,x)=>a+Math.abs(+x.valor||0),0);
+        return `<button class="fchip ${c===claseF?'on':''}" onclick="App._cajaClase='${c===claseF?'':esc(c)}';App._cajaPaint()">${esc(c)} (${l.length}) · ${money(v)}</button>`;
       }).join('')}
     </div>
   </div>
@@ -1197,7 +1209,7 @@ _cajaPaint(){
     </select>
     <button class="btn" onclick="App.cajaForm()">➕ Nuevo movimiento</button>
   </div>
-  <div class="mini" style="margin:-4px 0 10px">Viendo <b>${L.length}</b> de ${M.length} movimientos${mes?' · '+esc(this._mesNombre(mes)):''}${falta?' · falta '+(falta==='detalle'?'detalle FES':(falta==='socio'?'responsable':'clasificación')):''}${claseF?' · '+esc(claseF):''}</div>
+  <div class="mini" style="margin:-4px 0 10px">Viendo <b>${L.length}</b> de ${M.length} movimientos${mes?' · '+esc(this._mesNombre(mes)):''}${falta?' · falta '+(falta==='detalle'?'detalle FES':(falta==='socio'?'responsable':'clasificación')):''}${claseF?' · '+esc(claseF):''}${es?' · '+(es==='sale'?'solo lo que descuenta':'solo lo que entra'):''} · suman <b>${money(L.reduce((a,x)=>a+Math.abs(+x.valor||0),0))}</b></div>
   <div class="grid g4">
     <div class="kpi ok verde"><div class="v">${money(sum(ent))}</div><div class="l">Entradas (${ent.length})</div></div>
     <div class="kpi rojo"><div class="v">${money(sum(sal))}</div><div class="l">Salidas (${sal.length})</div></div>
