@@ -1098,7 +1098,7 @@ async abonoGuardar(docId){
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
 ORIGENES:['banco','efectivo','prestamo'],
-SOCIOS:['JVC','JJR'],
+SOCIOS:['FES','JVC','JJR'],   // FES = lo asume la empresa, no un socio
 CLASES_CAJA:['Cobro de cliente','Pago a proveedor','Giro al exterior','Retiro de efectivo',
   'Compras con tarjeta','Traslado entre cuentas','Impuesto 4x1000','Comisiones bancarias',
   'Rendimientos','Retefuente','Aporte de socio','Prestamo','Gasto operativo','Por clasificar'],
@@ -1166,7 +1166,7 @@ _cajaPaint(){
     <div class="kpi ok verde"><div class="v">${money(sum(ent))}</div><div class="l">Entradas (${ent.length})</div></div>
     <div class="kpi rojo"><div class="v">${money(sum(sal))}</div><div class="l">Salidas (${sal.length})</div></div>
     <div class="kpi"><div class="v">${money(sum(L))}</div><div class="l">Neto${mes?' de '+esc(this._mesNombre(mes)):''}</div></div>
-    ${Object.keys(porSocio).length?`<div class="kpi"><div class="v" style="font-size:15px">${Object.entries(porSocio).map(([s,v])=>esc(s)+' '+money(v)).join('<br>')}</div><div class="l">Cargos a socios</div></div>`:''}
+    ${Object.keys(porSocio).length?`<div class="kpi"><div class="v" style="font-size:15px">${Object.entries(porSocio).map(([s,v])=>esc(s)+' '+money(v)).join('<br>')}</div><div class="l">Cargos por responsable</div></div>`:''}
   </div>
   ${sinDet?`<div class="card" style="border-color:var(--rojo)"><b style="color:var(--rojo)">${sinDet} movimientos sin detalle FES</b>
     <div class="mini">El detalle del banco no dice para qué fue la plata. Ábrelos con ✏️ y escríbelo.</div></div>`:''}`:''}
@@ -1196,7 +1196,7 @@ cajaForm(id){
   <input id="cj_fes" value="${esc(x.detalle_fes||'')}" placeholder="Pago UPS envío válvulas, anticipo de socio…">
   <div class="frm">
     <div><label>Clasificación</label><select id="cj_cla">${this.CLASES_CAJA.map(c=>`<option ${c===(x.clase||'Por clasificar')?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
-    <div><label>Cargo a socio</label><select id="cj_soc">
+    <div><label>Cargo a</label><select id="cj_soc">
       <option value="">— ninguno —</option>
       ${this.SOCIOS.map(s=>`<option ${s===(x.socio||'')?'selected':''}>${s}</option>`).join('')}</select></div>
   </div>
