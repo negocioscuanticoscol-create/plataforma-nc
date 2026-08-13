@@ -586,7 +586,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
        baseDe:{'Pillowtop Cassata':'PILLOWTOP CASSATA','Pillowtop Resortado':'PILLOWTOP RESORTADO'}}]},
     // Línea 02 · colchoneta de 17 cm en espuma D26, en todas las medidas
     {sec:'Sensaflex', refs:[
-      {ref:'SENSAFLEX D26', tams:TAMS4.concat(['Medida especial']), recargo:15}]},
+      {ref:'SENSAFLEX GRIS D26', tams:TAMS4.concat(['Medida especial']), recargo:15}]},
     // Línea 03 · cuna, espuma D23
     {sec:'BabyNido', refs:[
       {ref:'COLCHÓN CUNA', tams:['130×70×15','Medida especial'], recargo:15}]},
@@ -611,8 +611,12 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   _catArreglar(){
     const EQ={'100':'Sencilla 100x190','120':'Semidoble 120x190','140':'Doble 140x190',
               '160':'Queen 160x190','200':'King 200x200'};
+    /* La linea se llama igual en los dos lados o los precios no se cruzan: la
+       lista de precios dice GRIS para separarla de la rosada. */
+    const RENOM={'SENSAFLEX D26':'SENSAFLEX GRIS D26'};
     let toco=false;
     for(const sec of (this._cat||[])) for(const r of (sec.refs||[])){
+      if(RENOM[r.ref]){ r.ref=RENOM[r.ref]; toco=true; }
       const vistos=[];
       for(const t of (r.tams||[])){
         const n=EQ[String(t).trim()]||t;
