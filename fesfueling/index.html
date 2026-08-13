@@ -739,20 +739,27 @@ vFacturacion: safe(async function(){
                        .forEach(d=>{ yaFact[d.origen_id]=d.numero; });
   const tipos=[['cotizacion','Cotizaciones'],['remision','Remisiones'],['factura','Facturas'],['nota_credito','Notas crédito']];
   const list=docs.filter(d=>d.tipo===sub);
+  /* Dos cosas distintas que antes iban en la misma columna y se confundian:
+     ESTADO   = en que va el documento (facturada / por facturar)
+     PAGO     = cuanta plata entro, que sale de los abonos del banco */
   const est=d=>{ if(d.estado==='anulada') return '<span class="badge b-gris">anulada</span>';
     if(d.tipo==='remision'||d.tipo==='cotizacion'){
       return yaFact[d.id]
         ? '<span class="badge b-ok">facturada · '+esc(yaFact[d.id])+'</span>'
         : '<span class="badge b-pend">POR FACTURAR</span>'; }
-    if(d.tipo!=='factura') return '<span class="badge b-acc">'+esc(d.estado||'ok')+'</span>';
+    if(d.tipo==='factura') return '<span class="badge b-ok">FACTURADA</span>';
+    return '<span class="badge b-acc">'+esc(d.estado||'ok')+'</span>'; };
+  const pago=d=>{ if(d.tipo!=='factura') return '';
     const ab=abPorDoc[d.id]||0, t=+d.total||0;
     if(ab>=t&&t>0) return '<span class="badge b-ok">pagada</span>';
-    if(ab>0) return '<span class="badge b-par">parcial</span>';
-    return '<span class="badge b-pend">pendiente</span>'; };
+    if(ab>0) return '<span class="badge b-par">abono '+money(ab)+'<br><span style="font-weight:400">falta '+money(t-ab)+'</span></span>';
+    return '<span class="badge b-pend">sin pagar</span>'; };
   this.set(`<h1>🧾 Facturación</h1><div class="sub2">Cotización → remisión → factura → nota crédito</div>
   <div class="tabs2">${tipos.map(([v,n])=>`<button class="${v===sub?'on':''}" onclick="App._facTab='${v}';App.vFacturacion()">${n} (${docs.filter(d=>d.tipo===v).length})</button>`).join('')}</div>
   ${(()=>{
-    const rem=docs.filter(d=>d.tipo==='remision'&&d.estado!=='anulada');
+    /* Lo entregado son las remisiones MAS las cotizaciones que salieron de una
+       remision: la mercancia ya salio aunque el documento se haya movido. */
+    const rem=docs.filter(d=>(d.tipo==='remision'||d.tipo==='cotizacion')&&d.estado!=='anulada');
     const pend=rem.filter(d=>!yaFact[d.id]);
     const fac=docs.filter(d=>d.tipo==='factura'&&d.estado!=='anulada');
     const sum=l=>l.reduce((a,d)=>a+(+d.total||0),0);
@@ -765,12 +772,12 @@ vFacturacion: safe(async function(){
     </div>`; })()}
   <div class="tools"><button class="btn" onclick="App.docForm('${sub}')">➕ Nueva ${sub.replace('_',' ')}</button></div>
   <div class="card" style="padding:0;overflow-x:auto"><table>
-  <thead><tr><th>Número</th><th>Fecha</th><th>Cliente</th><th class="num">Total</th><th>Estado</th><th></th></tr></thead><tbody>
+  <thead><tr><th>Número</th><th>Fecha</th><th>Cliente</th><th class="num">Total</th><th>Estado</th>${sub==='factura'?'<th>Pago</th>':''}<th></th></tr></thead><tbody>
   ${list.map(d=>`<tr><td><b>${esc(d.numero)}</b></td><td>${fecha(d.fecha_emision)}</td><td>${esc(this.cliNom(d.cliente_id))}</td>
-  <td class="num">${money(d.total)}</td><td>${est(d)}</td>
+  <td class="num">${money(d.total)}</td><td>${est(d)}</td>${sub==='factura'?`<td>${pago(d)}</td>`:''}
   <td><button class="btn sm sec" onclick="App.verDoc(${d.id})">👁</button>
   ${(d.tipo==='cotizacion'||d.tipo==='remision')&&d.estado!=='anulada'&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.cotAFactura(${d.id})">→ Factura</button>`:''}
-  ${d.estado!=='anulada'?`<button class="btn sm rojo" onclick="App.anularDoc(${d.id})">✖</button>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Nada aún en este cajón</td></tr>'}</tbody></table></div>`);
+  ${d.estado!=='anulada'?`<button class="btn sm rojo" onclick="App.anularDoc(${d.id})">✖</button>`:''}</td></tr>`).join('')||`<tr><td colspan="${sub==='factura'?7:6}" class="empty">Nada aún en este cajón</td></tr>`}</tbody></table></div>`);
 },'facturación'),
 
 docForm(tipo){
