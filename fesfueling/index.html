@@ -978,27 +978,88 @@ verDoc(id){
 },
 
 /* ================= CARTERA ================= */
+/* ================= CARTERA · estado de cuenta =================
+   Todo lo que se le ha entregado al cliente contra todo lo que ha pagado.
+   La regla para no contar dos veces: un negocio se cuenta UNA sola vez, por el
+   documento mas avanzado que tenga. Si la cotizacion ya es remision, cuenta la
+   remision; si la remision ya es factura, cuenta la factura. */
 vCartera: safe(async function(){
-  const [docs]=await Promise.all([this.docs(),this.clientes(),this.abonos()]);
-  const fact=docs.filter(d=>d.tipo==='factura'&&d.estado!=='anulada');
-  const abPorDoc={}; (this._abo||[]).forEach(a=>abPorDoc[a.documento_id]=(abPorDoc[a.documento_id]||0)+(+a.valor||0));
-  const rows=fact.map(d=>{ const ab=abPorDoc[d.id]||0, s=Math.max(0,(+d.total||0)-ab);
-    const mora=d.fecha_vencimiento&&d.fecha_vencimiento<hoy()&&s>0? Math.floor((new Date(hoy())-new Date(d.fecha_vencimiento))/86400000):0;
-    return {...d,abonado:ab,saldo:s,mora}; }).filter(r=>r.saldo>0).sort((a,b)=>b.mora-a.mora);
-  const totS=rows.reduce((s,r)=>s+r.saldo,0), totV=rows.filter(r=>r.mora>0).reduce((s,r)=>s+r.saldo,0);
-  this.set(`<h1>💰 Cartera</h1><div class="sub2">Facturas con saldo pendiente</div>
+  const [docs]=await Promise.all([this.docs(),this.clientes(),this.abonos(),this.cajaMovs()]);
+  const vivos=docs.filter(d=>d.estado!=='anulada');
+
+  // de que documento salio cada uno, para saber cual quedo superado
+  const superado={};
+  vivos.forEach(d=>{ if(d.origen_id) superado[d.origen_id]=d.numero; });
+
+  const cuenta=vivos.filter(d=>{
+    if(superado[d.id]) return false;            // ya hay uno mas avanzado
+    if(d.tipo==='nota_credito') return false;
+    return ['factura','remision','cotizacion'].includes(d.tipo);
+  }).sort((a,b)=>String(a.fecha_emision).localeCompare(String(b.fecha_emision)));
+
+  // los pagos salen del extracto, no de abonos digitados a mano
+  const pagos=(this._cmov||[]).filter(x=>x.clase==='Cobro de cliente')
+    .sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
+
+  const totGen=cuenta.reduce((a,d)=>a+(+d.total||0),0);
+  const totPag=pagos.reduce((a,p)=>a+(+p.valor||0),0);
+  const saldo=totGen-totPag;
+
+  const ETIQ={factura:'🧾 Factura', remision:'📦 Remisión', cotizacion:'📋 Cotización'};
+  const estado=d=>{
+    if(d.tipo==='factura') return '<span class="badge b-ok">generada</span>';
+    if(d.tipo==='remision') return d.estado==='cerrada'
+      ? '<span class="badge b-ok">generada (REM)</span>'
+      : '<span class="badge b-pend">sin facturar</span>';
+    return '<span class="badge b-pend">sin remisionar</span>';
+  };
+
+  // un solo movimiento por linea, en orden de fecha, con el saldo corriendo
+  const lineas=[
+    ...cuenta.map(d=>({f:d.fecha_emision, t:'cargo', v:+d.total||0,
+      q:`${ETIQ[d.tipo]} ${d.numero}`, e:estado(d), n:d.notas||''})),
+    ...pagos.map(p=>({f:p.fecha, t:'abono', v:-(+p.valor||0),
+      q:'💵 Pago recibido', e:`<span class="badge b-acc">${esc(p.origen||'banco')}</span>`,
+      n:p.detalle_fes||p.detalle||''})),
+  ].sort((a,b)=>String(a.f).localeCompare(String(b.f)));
+  let corr=0;
+
+  this.set(`<h1>💰 Cartera · estado de cuenta</h1>
+  <div class="sub2">${esc((this._cli&&this._cli[0]&&this._cli[0].empresa)||'Cliente')} · todo lo entregado contra todo lo pagado</div>
   <div class="grid g4">
-    <div class="kpi"><div class="v">${money(totS)}</div><div class="l">Cartera total (${rows.length} facturas)</div></div>
-    <div class="kpi rojo"><div class="v">${money(totV)}</div><div class="l">Vencida (${rows.filter(r=>r.mora>0).length})</div></div>
-    <div class="kpi ok verde"><div class="v">${money(totS-totV)}</div><div class="l">Por vencer</div></div>
+    <div class="kpi"><div class="v">${money(totGen)}</div><div class="l">Entregado (${cuenta.length} documentos)</div></div>
+    <div class="kpi ok verde"><div class="v">${money(totPag)}</div><div class="l">Pagado (${pagos.length} consignaciones)</div></div>
+    <div class="kpi ${saldo>0?'rojo':'ok verde'}"><div class="v">${money(Math.abs(saldo))}</div>
+      <div class="l">${saldo>0?'Nos deben':(saldo<0?'Pagó de más — anticipo':'Al día')}</div></div>
   </div>
+
+  <div class="card">
+    <div class="mini" style="font-weight:700;margin-bottom:6px">CÓMO SE COMPONE LO ENTREGADO</div>
+    ${['factura','remision','cotizacion'].map(t=>{
+      const l=cuenta.filter(d=>d.tipo===t); if(!l.length) return '';
+      const v=l.reduce((a,d)=>a+(+d.total||0),0);
+      return `<div class="row" style="justify-content:space-between;font-size:13px;padding:3px 0">
+        <span>${ETIQ[t]} · ${l.length} — ${esc(l.map(d=>d.numero).join(', '))}</span><b>${money(v)}</b></div>`;
+    }).join('')}
+    <div class="mini" style="margin-top:6px">Cada negocio se cuenta una sola vez: si la cotización ya se remisionó o se facturó, solo cuenta el documento final.</div>
+  </div>
+
   <div class="card" style="padding:0;overflow-x:auto"><table>
-  <thead><tr><th>Factura</th><th>Cliente</th><th class="num">Valor</th><th class="num">Abonos</th><th class="num">Saldo</th><th>Vence</th><th class="num">Mora</th><th></th></tr></thead><tbody>
-  ${rows.map(r=>`<tr><td><b>${esc(r.numero)}</b></td><td>${esc(this.cliNom(r.cliente_id))}</td>
-  <td class="num">${money(r.total)}</td><td class="num">${money(r.abonado)}</td><td class="num"><b>${money(r.saldo)}</b></td>
-  <td>${fecha(r.fecha_vencimiento)}</td><td class="num ${r.mora>0?'low':''}">${r.mora>0?r.mora+' días':'—'}</td>
-  <td><button class="btn sm ok" onclick="App.abonoForm(${r.id},${r.saldo})">💵 Abonar</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">🎉 No hay cartera pendiente</td></tr>'}</tbody></table></div>`);
+  <thead><tr><th>Fecha</th><th>Documento</th><th>Estado</th><th>Detalle</th><th class="num">Cargo</th><th class="num">Abono</th><th class="num">Saldo</th></tr></thead><tbody>
+  ${lineas.map(x=>{ corr+=x.v; return `<tr>
+    <td>${fecha(x.f)}</td><td><b>${x.q}</b></td><td>${x.e}</td>
+    <td class="mini">${esc(String(x.n).slice(0,46))}</td>
+    <td class="num">${x.v>0?money(x.v):''}</td>
+    <td class="num" style="color:var(--ok)">${x.v<0?money(-x.v):''}</td>
+    <td class="num"><b>${money(corr)}</b></td></tr>`; }).join('')
+  ||'<tr><td colspan="7" class="empty">Sin movimientos</td></tr>'}
+  <tr style="background:#f6f7f9"><td colspan="4"><b>SALDO</b></td>
+    <td class="num"><b>${money(totGen)}</b></td>
+    <td class="num" style="color:var(--ok)"><b>${money(totPag)}</b></td>
+    <td class="num"><b style="color:${saldo>0?'var(--rojo)':'var(--ok)'}">${money(saldo)}</b></td></tr>
+  </tbody></table></div>`);
 },'la cartera'),
+
 
 async abonoForm(docId,saldo){
   const bancos=await api('ff_bancos?order=banco');
