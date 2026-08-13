@@ -1100,7 +1100,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-08-12g',
+VER:'2026-08-12h',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
@@ -1135,6 +1135,10 @@ _cajaPaint(){
   const es=this._cajaES||'';
   if(es==='sale') L=L.filter(x=>+x.valor<0);
   if(es==='entra') L=L.filter(x=>+x.valor>0);
+  /* A quien se le carga. '(sin cargo)' es un valor propio: son los que todavia
+     no se le han imputado a nadie, y hay que poder verlos igual que los demas. */
+  const socF=this._cajaSocio||'';
+  if(socF) L=L.filter(x=>(x.socio||'(sin cargo)')===socF);
   const ent=L.filter(x=>+x.valor>0), sal=L.filter(x=>+x.valor<0);
   const sum=l=>l.reduce((a,x)=>a+(+x.valor||0),0);
 
@@ -1186,7 +1190,7 @@ _cajaPaint(){
   <div class="card" style="padding:10px 12px">
     <div class="mini" style="font-weight:700;margin-bottom:6px">FILTRAR</div>
     <div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">
-      <button class="fchip ${!falta&&!claseF&&!mes&&!es?'on':''}" onclick="App._cajaFalta='';App._cajaClase='';App._cajaMes='';App._cajaES='';App._cajaPaint()">Todos (${M.length})</button>
+      <button class="fchip ${!falta&&!claseF&&!mes&&!es&&!socF?'on':''}" onclick="App._cajaFalta='';App._cajaClase='';App._cajaMes='';App._cajaES='';App._cajaSocio='';App._cajaPaint()">Todos (${M.length})</button>
       <button class="fchip ${falta==='detalle'?'on':''}" onclick="App._cajaFalta='${falta==='detalle'?'':'detalle'}';App._cajaPaint()">⚠️ Sin detalle FES (${M.filter(x=>!x.detalle_fes).length})</button>
       <button class="fchip ${falta==='socio'?'on':''}" onclick="App._cajaFalta='${falta==='socio'?'':'socio'}';App._cajaPaint()">Sin responsable (${M.filter(x=>!x.socio).length})</button>
       <button class="fchip ${falta==='clase'?'on':''}" onclick="App._cajaFalta='${falta==='clase'?'':'clase'}';App._cajaPaint()">Sin clasificar (${M.filter(x=>!x.clase||x.clase==='Por clasificar').length})</button>
@@ -1204,6 +1208,14 @@ _cajaPaint(){
         return `<button class="fchip ${c===claseF?'on':''}" onclick="App._cajaClase='${c===claseF?'':esc(c)}';App._cajaPaint()">${esc(c)} (${l.length}) · ${money(v)}</button>`;
       }).join('')}
     </div>
+    <div class="mini" style="font-weight:700;margin:10px 0 6px">CARGO A</div>
+    <div class="row" style="gap:6px;flex-wrap:wrap">
+      ${[...new Set(M.map(x=>x.socio||'(sin cargo)'))].sort().map(c=>{
+        const l=M.filter(x=>(x.socio||'(sin cargo)')===c);
+        const v=l.reduce((a,x)=>a+Math.abs(+x.valor||0),0);
+        return `<button class="fchip ${c===socF?'on':''}" onclick="App._cajaSocio='${c===socF?'':esc(c)}';App._cajaPaint()">${esc(c)} (${l.length}) · ${money(v)}</button>`;
+      }).join('')}
+    </div>
   </div>
   <div class="tools">
     <select onchange="App._cajaMes=this.value;App._cajaPaint()">
@@ -1212,7 +1224,7 @@ _cajaPaint(){
     </select>
     <button class="btn" onclick="App.cajaForm()">➕ Nuevo movimiento</button>
   </div>
-  <div class="mini" style="margin:-4px 0 10px">Viendo <b>${L.length}</b> de ${M.length} movimientos${mes?' · '+esc(this._mesNombre(mes)):''}${falta?' · falta '+(falta==='detalle'?'detalle FES':(falta==='socio'?'responsable':'clasificación')):''}${claseF?' · '+esc(claseF):''}${es?' · '+(es==='sale'?'solo lo que descuenta':'solo lo que entra'):''} · suman <b>${money(L.reduce((a,x)=>a+Math.abs(+x.valor||0),0))}</b></div>
+  <div class="mini" style="margin:-4px 0 10px">Viendo <b>${L.length}</b> de ${M.length} movimientos${mes?' · '+esc(this._mesNombre(mes)):''}${falta?' · falta '+(falta==='detalle'?'detalle FES':(falta==='socio'?'responsable':'clasificación')):''}${claseF?' · '+esc(claseF):''}${es?' · '+(es==='sale'?'solo lo que descuenta':'solo lo que entra'):''}${socF?' · cargo '+esc(socF):''} · suman <b>${money(L.reduce((a,x)=>a+Math.abs(+x.valor||0),0))}</b></div>
   <div class="grid g4">
     <div class="kpi ok verde"><div class="v">${money(sum(ent))}</div><div class="l">Entradas (${ent.length})</div></div>
     <div class="kpi rojo"><div class="v">${money(sum(sal))}</div><div class="l">Salidas (${sal.length})</div></div>
