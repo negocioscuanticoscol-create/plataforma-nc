@@ -765,10 +765,14 @@ vFacturacion: safe(async function(){
     const sum=l=>l.reduce((a,d)=>a+(+d.total||0),0);
     if(!rem.length) return '';
     return `<div class="card" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
-      <div><div class="mini">Remisionado</div><b style="font-size:18px">${money(sum(rem))}</b><div class="mini">${rem.length} remisiones</div></div>
-      <div><div class="mini">Facturado</div><b style="font-size:18px;color:var(--ok)">${money(sum(fac))}</b><div class="mini">${fac.length} facturas</div></div>
-      <div><div class="mini">Por facturar</div><b style="font-size:18px;color:${pend.length?'var(--rojo)':'var(--ok)'}">${money(sum(pend))}</b><div class="mini">${pend.length} remisi${pend.length===1?'ón':'ones'}</div></div>
-      ${pend.length?`<div style="grid-column:1/-1"><div class="mini">Faltan: <b>${pend.map(p=>esc(p.numero)).join(' · ')}</b></div></div>`:''}
+      <div><div class="mini">Entregado</div><b style="font-size:18px">${money(sum(rem))}</b><div class="mini">${rem.length} documento${rem.length===1?'':'s'}</div></div>
+      <div><div class="mini">Facturado</div><b style="font-size:18px;color:var(--ok)">${money(sum(fac))}</b><div class="mini">${fac.length} factura${fac.length===1?'':'s'}</div></div>
+      <div><div class="mini">Por facturar</div><b style="font-size:18px;color:${pend.length?'var(--rojo)':'var(--ok)'}">${money(sum(pend))}</b><div class="mini">${pend.length} sin facturar</div></div>
+      ${pend.length?`<div style="grid-column:1/-1;border-top:1px dashed var(--line);padding-top:8px">
+        ${pend.map(p=>`<div class="row" style="justify-content:space-between;font-size:12.5px;padding:2px 0">
+          <span>🔴 ${esc(p.numero)} <span class="mini">${fecha(p.fecha_emision)}</span></span>
+          <b>${(+p.total)?money(p.total):'<span style="color:var(--rojo)">sin valor</span>'}</b></div>`).join('')}
+      </div>`:''}
     </div>`; })()}
   ${(()=>{ if(!list.length) return '';
     const vivos=list.filter(d=>d.estado!=='anulada');
