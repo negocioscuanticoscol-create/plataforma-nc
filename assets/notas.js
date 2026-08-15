@@ -93,6 +93,8 @@
     var pend = notas.filter(function (n) { return n.estado === 'pendiente'; }).length;
     var b = document.getElementById('nt-btn');
     if (b) b.innerHTML = '📝' + (pend ? '<b>' + pend + '</b>' : '');
+    var t = document.getElementById('nt-tab');
+    if (t) t.innerHTML = '📝 Notas' + (pend ? ' (' + pend + ')' : '');
     var cont = document.getElementById('nt-list');
     if (!cont) return;
     document.getElementById('nt-tp').className = tab === 'pendiente' ? 'on' : '';
@@ -123,6 +125,29 @@
       });
   }
 
+  /* La pestaña en la barra de arriba. Todas las apps tienen un <nav id="nav">, y
+     casi todas lo repintan al cambiar de vista: por eso se vigila y se vuelve a
+     poner sola en vez de ponerla una sola vez. */
+  function pestana() {
+    var nav = document.getElementById('nav');
+    if (!nav) return;
+    function poner() {
+      if (document.getElementById('nt-tab')) return;
+      var hermano = nav.querySelector('button, a');
+      var t = document.createElement('button');
+      t.id = 'nt-tab';
+      t.type = 'button';
+      if (hermano) t.className = hermano.className.replace(/on/g, '').trim();
+      t.innerHTML = '📝 Notas';
+      t.onclick = function (e) { e.preventDefault(); Notas.abrir(); };
+      nav.appendChild(t);
+    }
+    poner();
+    try {
+      new MutationObserver(function () { poner(); }).observe(nav, { childList: true });
+    } catch (e) { setInterval(poner, 1500); }
+  }
+
   var Notas = {
     /* Las apps sin login no tienen cómo saber quién entró. Para esas, el bloc se
        desbloquea una sola vez entrando con ?notas=1 y queda guardado en ese
@@ -143,6 +168,7 @@
       var b = document.createElement('button');
       b.id = 'nt-btn'; b.title = 'Mis pendientes de esta app'; b.innerHTML = '📝';
       b.onclick = Notas.abrir; document.body.appendChild(b);
+      pestana();
       cargar();
     },
     abrir: function () {
