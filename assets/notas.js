@@ -22,7 +22,7 @@
   var KEY = 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
   var H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
 
-  var app = null, notas = [], tab = 'pendiente', abierto = false;
+  var app = null, notas = [], tab = 'pendiente', abierto = false, editando = 0;
 
   function api(path, opt) {
     opt = opt || {};
@@ -44,6 +44,12 @@
     if (dd === 0) return 'hoy';
     if (dd === 1) return 'ayer';
     return d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' });
+  }
+  /* Cuanto lleva esperando una nota que sigue abierta. */
+  function llevan(desde) {
+    var n = Math.round((Date.now() - new Date(desde)) / 86400000);
+    if (n <= 0) return 'abierta hoy';
+    return n === 1 ? 'lleva 1 día' : 'lleva ' + n + ' días';
   }
   function dias(a, b) {
     if (!a || !b) return '';
@@ -86,6 +92,14 @@
     '.nt-del{background:none;border:none;color:#c9ced6;cursor:pointer;font-size:15px;padding:0 2px;flex:none}' +
     '.nt-del:hover{color:#c0392b}' +
     '.nt-vacio{color:#9aa4b0;text-align:center;padding:34px 10px;font-size:13.5px}' +
+    '.nt-t{cursor:text}' +
+    '.nt-ed textarea{width:100%;border:1px solid #1f2937;border-radius:8px;padding:8px 10px;' +
+    'font:inherit;resize:vertical;min-height:64px}' +
+    '.nt-bts{display:flex;gap:7px;margin-top:7px}' +
+    '.nt-ok{background:#1f2937;color:#fff;border:none;border-radius:7px;padding:6px 13px;' +
+    'cursor:pointer;font-weight:700;font-size:12.5px}' +
+    '.nt-can{background:#f1f3f6;color:#4b5563;border:none;border-radius:7px;padding:6px 13px;' +
+    'cursor:pointer;font-weight:700;font-size:12.5px}' +
     '@media(max-width:560px){#nt-box{width:100%}}';
 
   function pinta() {
@@ -107,15 +121,30 @@
     }
     cont.innerHTML = L.map(function (n) {
       var ok = n.estado === 'resuelto';
+      /* Siempre se muestra cuando empezo; si ya cerro, tambien cuando y cuanto
+         tomo. Eso es lo que despues deja ver que se quedo estancado. */
       var pie = ok
-        ? 'escrita ' + fecha(n.creado_en) + ' · cerrada ' + fecha(n.resuelto_en) + ' · ' + dias(n.creado_en, n.resuelto_en)
-        : 'escrita ' + fecha(n.creado_en);
+        ? 'inicio ' + fecha(n.creado_en) + ' · fin ' + fecha(n.resuelto_en) + ' · ' + dias(n.creado_en, n.resuelto_en)
+        : 'inicio ' + fecha(n.creado_en) + ' · ' + llevan(n.creado_en);
+      if (editando === n.id) {
+        return '<div class="nt-it nt-ed">' +
+          '<span class="nt-n">' + n.num + '</span>' +
+          '<div class="nt-t"><textarea id="nt-e' + n.id + '">' + esc(n.texto) + '</textarea>' +
+          '<div class="nt-bts"><button class="nt-ok" onclick="Notas.guardar(' + n.id + ')">Guardar</button>' +
+          '<button class="nt-can" onclick="Notas.editar(0)">Cancelar</button></div></div></div>';
+      }
       return '<div class="nt-it' + (ok ? ' ok' : '') + '">' +
         '<input type="checkbox"' + (ok ? ' checked' : '') + ' onchange="Notas.marcar(' + n.id + ',this.checked)">' +
         '<span class="nt-n">' + n.num + '</span>' +
-        '<span class="nt-t">' + esc(n.texto) + '<i>' + pie + '</i></span>' +
+        '<span class="nt-t" title="Clic para editar" onclick="Notas.editar(' + n.id + ')">' +
+          esc(n.texto) + '<i>' + pie + '</i></span>' +
+        '<button class="nt-del" title="Editar" onclick="Notas.editar(' + n.id + ')">✏️</button>' +
         '<button class="nt-del" title="Borrar" onclick="Notas.borrar(' + n.id + ')">✕</button></div>';
     }).join('');
+    if (editando) {
+      var e = document.getElementById('nt-e' + editando);
+      if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); }
+    }
   }
 
   function cargar() {
@@ -195,6 +224,7 @@
       t.focus();
     },
     cerrar: function () {
+      editando = 0;
       var c = document.getElementById('nt-cap');
       if (c) c.remove();
       abierto = false;
@@ -212,6 +242,16 @@
     marcar: function (id, listo) {
       var b = { estado: listo ? 'resuelto' : 'pendiente', resuelto_en: listo ? new Date().toISOString() : null };
       api('nc_notas?id=eq.' + id, { method: 'PATCH', body: JSON.stringify(b) }).then(cargar);
+    },
+    editar: function (id) { editando = +id || 0; pinta(); },
+    guardar: function (id) {
+      var e = document.getElementById('nt-e' + id), v = (e && e.value || '').trim();
+      if (!v) { alert('La nota no puede quedar vacía.'); return; }
+      var n = notas.filter(function (x) { return x.id === id; })[0];
+      editando = 0;
+      if (n && n.texto === v) { pinta(); return; }   // no toco nada
+      if (n) n.texto = v; pinta();
+      api('nc_notas?id=eq.' + id, { method: 'PATCH', body: JSON.stringify({ texto: v }) }).then(cargar);
     },
     borrar: function (id) {
       if (!confirm('¿Borrar esta nota?')) return;
