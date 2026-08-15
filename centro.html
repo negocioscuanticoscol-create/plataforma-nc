@@ -74,6 +74,31 @@ h1{font-size:22px;margin-bottom:2px}
 .neto .nl{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.06em}
 .neto .nv{font-size:30px;font-weight:800;margin-top:3px}
 @media(max-width:560px){nav{top:56px}}
+/* El stack: cada cosa muestra en qué nivel está, de 0 a 5. Se lee de un vistazo
+   cuánto le falta a cada negocio para estar montado de verdad. */
+.stgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
+.stneg{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.stneg h3{margin:0;padding:12px 15px;font-size:15px;display:flex;justify-content:space-between;
+  align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+.stneg h3 small{font-weight:400;color:var(--sub);font-size:12px}
+.stit{display:flex;gap:10px;align-items:flex-start;padding:9px 15px;border-bottom:1px solid var(--line)}
+.stit:last-child{border-bottom:none}
+.stit .cat{font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--sub);
+  min-width:78px;padding-top:3px;flex:none}
+.stit .nom{flex:1;font-size:13.5px;line-height:1.35}
+.stit .nom i{display:block;font-style:normal;color:var(--sub);font-size:11.5px;margin-top:1px}
+.stit .nom b{font-weight:600}
+.niv{display:flex;gap:2px;flex:none;padding-top:4px}
+.niv span{width:7px;height:7px;border-radius:2px;background:var(--line)}
+.niv.n0 span:nth-child(-n+0),.niv.n1 span:nth-child(-n+1),.niv.n2 span:nth-child(-n+2),
+.niv.n3 span:nth-child(-n+3),.niv.n4 span:nth-child(-n+4),.niv.n5 span:nth-child(-n+5){background:currentColor}
+.niv.n0{color:#7d8590}.niv.n1{color:#d1554d}.niv.n2{color:#d98324}
+.niv.n3{color:#c9a227}.niv.n4{color:#4f9cd8}.niv.n5{color:#2f9e6e}
+.stleg{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--sub);margin:10px 0 18px}
+.stleg span{display:flex;align-items:center;gap:5px}
+.stleg i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.barra{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:7px}
+.barra div{height:100%;background:#2f9e6e;border-radius:3px}
 </style>
 </head>
 <body>
@@ -103,13 +128,13 @@ const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'
 
 const App={
 vista:'resumen',
-TABS:[['resumen','📊 Resumen'],['clientes','🏢 Clientes'],['marketing','📣 Marketing'],['financiero','💰 Financiero'],['agentes','🤖 Agentes']],
+TABS:[['resumen','📊 Resumen'],['stack','🧰 Stack'],['clientes','🏢 Clientes'],['marketing','📣 Marketing'],['financiero','💰 Financiero'],['agentes','🤖 Agentes']],
 /* las apps del ecosistema · las periféricas leen nc_clientes para saber a quién sirven */
 APPS:{app:'📱 App propia',callprospector:'📞 CallProspector',marcador:'☎️ Marcador',
       reservas:'📅 Reservas',bot:'🤖 Bot WhatsApp',pauta:'📣 Pauta'},
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({resumen:this.vResumen,clientes:this.vClientes,marketing:this.vMarketing,financiero:this.vFinanciero,agentes:this.vAgentes}[v]||this.vResumen).call(this); },
+  ({resumen:this.vResumen,stack:this.vStack,clientes:this.vClientes,marketing:this.vMarketing,financiero:this.vFinanciero,agentes:this.vAgentes}[v]||this.vResumen).call(this); },
 
 async vFinanciero(){
   const lineas=await api('nc_finanzas?order=orden&limit=500');
@@ -309,6 +334,38 @@ async cliApp(id,k){
   c.apps=apps; this.vClientes();
 },
 
+async vStack(){
+  const d=await api('nc_stack?select=*&order=negocio,orden,id');
+  if(!d||!d.length){ $('main').innerHTML='<div class="empty">Todavía no hay nada en el stack.</div>'; return; }
+  const NIV=['no existe','identificado','en trámite','creado','configurado','funcionando'];
+  const negs=[...new Set(d.map(x=>x.negocio))];
+  /* El puntaje es qué tan montado está el negocio: la suma de niveles sobre el
+     máximo posible. Sirve para ver de un vistazo dónde falta trabajo. */
+  const punt=n=>{ const l=d.filter(x=>x.negocio===n);
+    return Math.round(l.reduce((a,x)=>a+ +x.nivel,0)/(l.length*5)*100); };
+  const item=x=>`<div class="stit">
+      <span class="cat">${esc(x.categoria)}</span>
+      <span class="nom"><b>${esc(x.nombre)}</b>
+        ${x.identificador?`<i>${esc(x.identificador)}</i>`:''}
+        ${x.notas?`<i>${esc(x.notas)}</i>`:''}</span>
+      <span class="niv n${+x.nivel}" title="${NIV[+x.nivel]||''}">
+        <span></span><span></span><span></span><span></span><span></span></span>
+    </div>`;
+  const listo=d.filter(x=>+x.nivel===5).length, cero=d.filter(x=>+x.nivel===0).length;
+  $('main').innerHTML=`<h1>🧰 Stack · qué tenemos y en qué va</h1>
+    <div class="sub">${d.length} cosas registradas · ${listo} funcionando · ${cero} sin arrancar.
+      Cada punto es un nivel: entre más verde, más montado.</div>
+    <div class="stleg">
+      ${NIV.map((t,i)=>`<span><i style="background:${['#7d8590','#d1554d','#d98324','#c9a227','#4f9cd8','#2f9e6e'][i]}"></i>${i} · ${t}</span>`).join('')}
+    </div>
+    <div class="stgrid">${negs.map(n=>{
+      const l=d.filter(x=>x.negocio===n), p=punt(n);
+      return `<div class="stneg">
+        <h3>${esc(n)} <small>${p}% montado · ${l.length} cosas</small></h3>
+        <div style="padding:0 15px"><div class="barra"><div style="width:${p}%"></div></div></div>
+        ${l.map(item).join('')}
+      </div>`;}).join('')}</div>`;
+},
 vAgentes(){
   const ag=[
    ['🤖 Valentina (Smart)','Vende el kit por WhatsApp, detecta pagos, reengancha','on'],
