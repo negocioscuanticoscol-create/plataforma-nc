@@ -74,6 +74,31 @@ h1{font-size:22px;margin-bottom:2px}
 .neto .nl{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.06em}
 .neto .nv{font-size:30px;font-weight:800;margin-top:3px}
 @media(max-width:560px){nav{top:56px}}
+/* Las matrices: los negocios en columnas y lo que se les aplica en filas.
+   Se lee de un vistazo que le falta a cada uno y que se repite entre todos. */
+.mwrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+table.mx{border-collapse:separate;border-spacing:0;width:100%;min-width:720px;font-size:13px}
+table.mx th,table.mx td{padding:9px 11px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap}
+table.mx thead th{position:sticky;top:0;background:var(--panel);z-index:2;font-size:10.5px;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--sub);font-weight:700}
+table.mx tbody tr:last-child td{border-bottom:none}
+table.mx .it{text-align:left;position:sticky;left:0;background:var(--panel);z-index:1;min-width:230px;
+  border-right:1px solid var(--line)}
+table.mx thead .it{z-index:3}
+table.mx .it b{font-weight:600;display:block}
+table.mx .it i{font-style:normal;color:var(--sub);font-size:11px;display:block;margin-top:1px;
+  white-space:normal;max-width:280px;line-height:1.35}
+.cel{display:inline-block;min-width:64px;padding:3px 9px;border-radius:6px;font-size:11px;
+  font-weight:700;cursor:pointer;border:1px solid transparent;user-select:none}
+.cel:hover{border-color:var(--sub)}
+.v-medida,.v-si,.v-alto{background:#12351f;color:#5fd39a}
+.v-aplica,.v-medio{background:#3a2c10;color:#e0b551}
+.v-bajo{background:#3d1f1c;color:#e08579}
+.v-no,.v-{background:transparent;color:#5c6570;border:1px dashed var(--line)}
+.mleg{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--sub);margin:8px 0 14px;align-items:center}
+.mleg span{display:flex;align-items:center;gap:6px}
+.costo{font-variant-numeric:tabular-nums}
+.mtot td{background:var(--bg);font-weight:700}
 /* El stack: cada cosa muestra en qué nivel está, de 0 a 5. Se lee de un vistazo
    cuánto le falta a cada negocio para estar montado de verdad. */
 .stgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
@@ -128,13 +153,13 @@ const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'
 
 const App={
 vista:'resumen',
-TABS:[['resumen','📊 Resumen'],['stack','🧰 Stack'],['clientes','🏢 Clientes'],['marketing','📣 Marketing'],['financiero','💰 Financiero'],['agentes','🤖 Agentes']],
+TABS:[['resumen','📊 Resumen'],['agentes','🤖 Agentes'],['herram','🧰 Herramientas'],['redes','📱 Redes'],['financiero','💰 Financiero']],
 /* las apps del ecosistema · las periféricas leen nc_clientes para saber a quién sirven */
 APPS:{app:'📱 App propia',callprospector:'📞 CallProspector',marcador:'☎️ Marcador',
       reservas:'📅 Reservas',bot:'🤖 Bot WhatsApp',pauta:'📣 Pauta'},
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({resumen:this.vResumen,stack:this.vStack,clientes:this.vClientes,marketing:this.vMarketing,financiero:this.vFinanciero,agentes:this.vAgentes}[v]||this.vResumen).call(this); },
+  ({resumen:this.vResumen,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero}[v]||this.vResumen).call(this); },
 
 async vFinanciero(){
   const lineas=await api('nc_finanzas?order=orden&limit=500');
@@ -334,51 +359,103 @@ async cliApp(id,k){
   c.apps=apps; this.vClientes();
 },
 
-async vStack(){
-  const d=await api('nc_stack?select=*&order=negocio,orden,id');
-  if(!d||!d.length){ $('main').innerHTML='<div class="empty">Todavía no hay nada en el stack.</div>'; return; }
-  const NIV=['no existe','identificado','en trámite','creado','configurado','funcionando'];
-  const negs=[...new Set(d.map(x=>x.negocio))];
-  /* El puntaje es qué tan montado está el negocio: la suma de niveles sobre el
-     máximo posible. Sirve para ver de un vistazo dónde falta trabajo. */
-  const punt=n=>{ const l=d.filter(x=>x.negocio===n);
-    return Math.round(l.reduce((a,x)=>a+ +x.nivel,0)/(l.length*5)*100); };
-  const item=x=>`<div class="stit">
-      <span class="cat">${esc(x.categoria)}</span>
-      <span class="nom"><b>${esc(x.nombre)}</b>
-        ${x.identificador?`<i>${esc(x.identificador)}</i>`:''}
-        ${x.notas?`<i>${esc(x.notas)}</i>`:''}</span>
-      <span class="niv n${+x.nivel}" title="${NIV[+x.nivel]||''}">
-        <span></span><span></span><span></span><span></span><span></span></span>
-    </div>`;
-  const listo=d.filter(x=>+x.nivel===5).length, cero=d.filter(x=>+x.nivel===0).length;
-  $('main').innerHTML=`<h1>🧰 Stack · qué tenemos y en qué va</h1>
-    <div class="sub">${d.length} cosas registradas · ${listo} funcionando · ${cero} sin arrancar.
-      Cada punto es un nivel: entre más verde, más montado.</div>
-    <div class="stleg">
-      ${NIV.map((t,i)=>`<span><i style="background:${['#7d8590','#d1554d','#d98324','#c9a227','#4f9cd8','#2f9e6e'][i]}"></i>${i} · ${t}</span>`).join('')}
-    </div>
-    <div class="stgrid">${negs.map(n=>{
-      const l=d.filter(x=>x.negocio===n), p=punt(n);
-      return `<div class="stneg">
-        <h3>${esc(n)} <small>${p}% montado · ${l.length} cosas</small></h3>
-        <div style="padding:0 15px"><div class="barra"><div style="width:${p}%"></div></div></div>
-        ${l.map(item).join('')}
-      </div>`;}).join('')}</div>`;
+/* ---------- LAS TRES MATRICES ----------
+   Una sola funcion las pinta todas: cambia la clase de item y los valores que
+   puede tomar cada casilla. Al hacer clic, la casilla rota al siguiente valor y
+   se guarda sola. */
+VALORES:{ agente:['no','medida','aplica'], herramienta:['no','si'], red:['no','bajo','medio','alto'] },
+async _matriz(){
+  if(this._mx) return this._mx;
+  const [neg,items,cas]=await Promise.all([
+    api('nc_negocio?select=*&activo=is.true&order=orden'),
+    api('nc_item?select=*&order=clase,orden'),
+    api('nc_matriz?select=*')]);
+  const val={}; cas.forEach(c=>val[c.negocio_id+'|'+c.item_id]=c.valor);
+  this._mx={neg,items,val}; return this._mx;
 },
-vAgentes(){
-  const ag=[
-   ['🤖 Valentina (Smart)','Vende el kit por WhatsApp, detecta pagos, reengancha','on'],
-   ['🛡️ Sofía (Feroz)','Capta distribuidores, pide ciudad+empresa, handoff al gerente','on'],
-   ['📊 Analista de Pauta','Cada mañana 8am: qué anuncio deja/quita + alertas','on'],
-   ['💰 Detector de pagos','Comprobante → alerta + cotización del kit automática','on'],
-   ['🔁 Recompra +15 días','Guía registrada → reenganche de recompra','on'],
-   ['✍️ Agente de Contenido','Calendario + arma posts por marca','off'],
-   ['💬 Agente de Engagement','Comentario → DM → bot de venta','off'],
-   ['👔 Gerente de Marketing','Junta todo y da una sola lectura diaria','off'],
-  ];
-  $('main').innerHTML=`<h1>🤖 Agentes</h1><div class="sub">El equipo de IA de NC · verde = activo · morado = por montar.</div>
-    <div class="aglist">${ag.map(([n,d,st])=>`<div class="ag"><div><div class="an">${esc(n)}</div><div class="ad">${esc(d)}</div></div><span class="chip ${st}">${st==='on'?'● activo':'por montar'}</span></div>`).join('')}</div>`;
+async mxSet(negId,itemId,clase){
+  const {val}=this._mx, k=negId+'|'+itemId, opc=this.VALORES[clase];
+  const i=opc.indexOf(val[k]||'no'), nuevo=opc[(i+1)%opc.length];
+  val[k]=nuevo;
+  await api('nc_matriz?on_conflict=negocio_id,item_id',{method:'POST',
+    body:JSON.stringify({negocio_id:negId,item_id:itemId,valor:nuevo,actualizado:new Date().toISOString()}),
+    headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'}});
+  ({agente:this.vAgentes,herramienta:this.vHerram,red:this.vRedes}[clase]).call(this);
+},
+_tabla(clase,pie){
+  const {neg,items,val}=this._mx;
+  const L=items.filter(x=>x.clase===clase);
+  const cel=(n,it)=>{ const v=val[n.id+'|'+it.id]||'no';
+    return '<td><span class="cel v-'+v+'" onclick="App.mxSet(\''+n.id+'\',\''+it.id+'\',\''+clase+'\')">'+(v==='no'?'—':v)+'</span></td>'; };
+  const tit={agente:'Agente',red:'Red',herramienta:'Herramienta'}[clase];
+  return '<div class="mwrap"><table class="mx"><thead><tr><th class="it">'+tit+'</th>'
+    +neg.map(n=>'<th>'+esc(n.nombre)+'</th>').join('')+'</tr></thead><tbody>'
+    +L.map(it=>'<tr><td class="it"><b>'+esc(it.nombre)+'</b>'
+       +(it.detalle?'<i>'+esc(it.detalle)+'</i>':'')
+       +(it.estado==='por montar'?'<i style="color:#e0b551">por montar</i>':'')
+       +'</td>'+neg.map(n=>cel(n,it)).join('')+'</tr>').join('')
+    +(pie||'')+'</tbody></table></div>';
+},
+async vAgentes(){
+  await this._matriz();
+  const {neg,items,val}=this._mx;
+  const L=items.filter(x=>x.clase==='agente');
+  const and=L.filter(x=>x.estado==='andando').length;
+  const usos=Object.keys(val).filter(k=>val[k]!=='no'&&L.some(i=>i.id===k.split('|')[1])).length;
+  $('main').innerHTML='<h1>🤖 Agentes</h1>'
+   +'<div class="sub">'+L.length+' agentes · <b>'+and+' dando resultados</b> · '+usos+' aplicaciones. '
+   +'Haz clic en una casilla para cambiarla.</div>'
+   +'<div class="card" style="margin-bottom:14px;border-left:3px solid #e0b551">'
+   +'<b>Hoy ninguno está dando resultados.</b>'
+   +'<div style="color:var(--sub);font-size:12.5px;margin-top:4px">Cada agente hay que hacerlo a la medida '
+   +'del negocio: el mismo no sirve para dos. Por eso todas las casillas dicen <i>medida</i> y ninguna '
+   +'<i>aplica</i>. Valentina y Sofía existen y corren, pero no han producido ventas.</div></div>'
+   +'<div class="mleg">'
+   +'<span><span class="cel v-medida">medida</span> hecho a la medida de ese negocio</span>'
+   +'<span><span class="cel v-aplica">aplica</span> el mismo sirve tal cual (hoy: ninguno)</span>'
+   +'<span><span class="cel v-no">—</span> no aplica</span></div>'
+   +this._tabla('agente');
+},
+async vHerram(){
+  await this._matriz();
+  const {neg,items,val}=this._mx;
+  const L=items.filter(x=>x.clase==='herramienta');
+  /* El costo de una herramienta se reparte entre los negocios que la usan: asi
+     se sabe cuanto cuesta sostener a cada uno. */
+  const porNeg={}; let total=0;
+  L.forEach(it=>{ const usan=neg.filter(n=>(val[n.id+'|'+it.id]||'no')!=='no');
+    total+=+it.costo_mes||0;
+    if(usan.length){ const c=(+it.costo_mes||0)/usan.length;
+      usan.forEach(n=>porNeg[n.id]=(porNeg[n.id]||0)+c); } });
+  const pie='<tr class="mtot"><td class="it">Cuesta al mes</td>'
+    +neg.map(n=>'<td class="costo">'+(porNeg[n.id]?money(Math.round(porNeg[n.id])):'—')+'</td>').join('')+'</tr>';
+  $('main').innerHTML='<h1>🧰 Herramientas</h1>'
+   +'<div class="sub">'+L.length+' herramientas · '+money(total)+' al mes en total. '
+   +'El costo de cada una se reparte entre los negocios que la usan.</div>'
+   +(total===0?'<div class="card" style="margin-bottom:14px;border-left:3px solid #e0b551">'
+     +'<b>Falta poner cuánto cuesta cada herramienta.</b><div style="color:var(--sub);font-size:12.5px;margin-top:4px">'
+     +'Están todas en cero, así que el reparto por negocio sale vacío. Pásame los valores mensuales '
+     +'y esta fila se llena sola.</div></div>':'')
+   +'<div class="mleg"><span><span class="cel v-si">si</span> la usa</span>'
+   +'<span><span class="cel v-no">—</span> no la usa</span></div>'
+   +this._tabla('herramienta',pie);
+},
+async vRedes(){
+  await this._matriz();
+  const {neg,items,val}=this._mx;
+  const L=items.filter(x=>x.clase==='red');
+  const punt={alto:3,medio:2,bajo:1,no:0};
+  const pie='<tr class="mtot"><td class="it">Qué tan montado</td>'
+    +neg.map(n=>{ const p=L.reduce((a,it)=>a+(punt[val[n.id+'|'+it.id]||'no']||0),0);
+      return '<td class="costo">'+Math.round(p/(L.length*3)*100)+'%</td>'; }).join('')+'</tr>';
+  $('main').innerHTML='<h1>📱 Redes</h1>'
+   +'<div class="sub">Cómo está cada red en cada negocio. Haz clic para cambiarla.</div>'
+   +'<div class="mleg">'
+   +'<span><span class="cel v-alto">alto</span> publica seguido, con pauta y midiendo</span>'
+   +'<span><span class="cel v-medio">medio</span> perfil completo, publica y contesta</span>'
+   +'<span><span class="cel v-bajo">bajo</span> existe pero abandonada o incompleta</span>'
+   +'<span><span class="cel v-no">—</span> no existe</span></div>'
+   +this._tabla('red',pie);
 },
 };
 App.nav(); App.go('resumen');
