@@ -1100,7 +1100,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-08-14a',
+VER:'2026-08-15a',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
@@ -1425,11 +1425,13 @@ vProveedores: safe(async function(){
   this.set(`<h1>🚚 Proveedores</h1><div class="sub2">${prov.length} proveedores</div>
   <div class="tools"><button class="btn" onclick="App.provForm()">➕ Nuevo proveedor</button></div>
   <div class="card" style="padding:0;overflow-x:auto"><table>
-  <thead><tr><th>Razón social</th><th>NIT</th><th>Contacto</th><th>Ciudad/País</th><th>Marcas</th><th>Entrega</th><th></th></tr></thead><tbody>
-  ${prov.map(p=>`<tr><td><b>${esc(p.razon_social)}</b><div class="mini">${esc(p.nombre_comercial||'')}</div></td>
-  <td>${esc(p.nit||'')}</td><td>${esc(p.contacto||'')}<div class="mini">${esc(p.celular||'')} ${esc(p.correo||'')}</div></td>
+  <thead><tr><th>Razón social</th><th>Rol</th><th>Se compra por</th><th>Contacto</th><th>Ciudad/País</th><th>Marcas</th><th>Entrega</th><th></th></tr></thead><tbody>
+  ${prov.map(p=>`<tr><td><b>${esc(p.razon_social)}</b><div class="mini">${esc(p.nombre_comercial||'')} ${esc(p.nit||'')}</div></td>
+  <td>${p.rol==='intermediario'?'<span class="badge b-acc">intermediario</span>':(p.rol?`<span class="badge b-gris">${esc(p.rol)}</span>`:'')}</td>
+  <td class="mini">${esc(p.intermediario||'')}</td>
+  <td>${esc(p.contacto||'')}<div class="mini">${esc(p.celular||'')} ${esc(p.correo||'')}</div></td>
   <td>${esc(p.ciudad||'')} ${esc(p.pais||'')}</td><td>${esc(p.marcas||'')}</td><td>${esc(p.tiempo_entrega||'')}</td>
-  <td><button class="btn sm sec" onclick="App.provForm(${p.id})">✏️</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty">Registra tu primer proveedor</td></tr>'}</tbody></table></div>`);
+  <td><button class="btn sm sec" onclick="App.provForm(${p.id})">✏️</button></td></tr>`).join('')||'<tr><td colspan="8" class="empty">Registra tu primer proveedor</td></tr>'}</tbody></table></div>`);
 },'proveedores'),
 provForm(id){
   const p=(this._prov||[]).find(x=>x.id===id)||{};
@@ -1438,7 +1440,13 @@ provForm(id){
   ${F('razon_social','Razón social')}${F('nit','NIT')}${F('nombre_comercial','Nombre comercial')}${F('contacto','Contacto')}
   ${F('cargo','Cargo')}${F('celular','Celular')}${F('whatsapp','WhatsApp')}${F('correo','Correo')}
   ${F('web','Página web')}${F('direccion','Dirección')}${F('ciudad','Ciudad')}${F('pais','País')}
-  ${F('marcas','Marcas que representa')}${F('condiciones_pago','Condiciones de pago')}${F('moneda','Moneda')}${F('tiempo_entrega','Tiempo de entrega')}</div>
+  ${F('marcas','Marcas que representa')}${F('condiciones_pago','Condiciones de pago')}${F('moneda','Moneda')}${F('tiempo_entrega','Tiempo de entrega')}
+  <div><label>Rol</label><select id="pf_rol">${['fabricante','intermediario','agente aduanero','distribuidor','servicios']
+    .map(o=>`<option ${o===(p.rol||'fabricante')?'selected':''}>${o}</option>`).join('')}</select></div>
+  <div><label>Se compra a través de</label><input id="pf_intermediario" value="${esc(p.intermediario||'')}"
+    placeholder="Ej: MI ASIA INTERNATIONAL TRADING"></div></div>
+  <div class="mini" style="margin:-4px 0 8px">El fabricante es quien hace la mercancía; el intermediario es quien la
+  consigue y la despacha. Separarlos importa: al intermediario se le paga, pero el precio y la calidad los pone la fábrica.</div>
   <label>Observaciones</label><textarea id="pf_observaciones" rows="2">${esc(p.observaciones||'')}</textarea>
   <div style="display:flex;gap:8px;margin-top:14px">
   <button class="btn" style="flex:1" onclick="App.provGuardar(${id||'null'})">💾 Guardar</button>
@@ -1446,7 +1454,7 @@ provForm(id){
 },
 async provGuardar(id){
   const v=k=>$('pf_'+k).value.trim();
-  const b={}; ['razon_social','nit','nombre_comercial','contacto','cargo','celular','whatsapp','correo','web','direccion','ciudad','pais','marcas','condiciones_pago','moneda','tiempo_entrega','observaciones'].forEach(k=>b[k]=v(k));
+  const b={}; ['razon_social','nit','nombre_comercial','contacto','cargo','celular','whatsapp','correo','web','direccion','ciudad','pais','marcas','condiciones_pago','moneda','tiempo_entrega','observaciones','rol','intermediario'].forEach(k=>b[k]=v(k));
   if(!b.razon_social){ toast('Falta la razón social'); return; }
   id? await patch('ff_proveedores?id=eq.'+id,b) : await post('ff_proveedores',b);
   cerrar(); toast('🚚 Proveedor guardado'); this.vProveedores();
