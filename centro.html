@@ -184,12 +184,12 @@ async vFinanciero(){
   const rowGas=l=>`<div class="finrow"><div class="fc"><b>${esc(l.concepto)}</b>${l.nota?`<div class="fn">${esc(l.nota)}</div>`:''}</div>
     <div class="finm">📅 <input type="number" min="1" max="31" placeholder="día" style="width:56px" value="${l.dia_pago||''}" onchange="App.finUpd(${l.id},'dia_pago',this.value)">
       <span class="pfx">$</span><input type="number" value="${+l.monto||0}" onchange="App.finUpd(${l.id},'monto',this.value)"><button class="finx" onclick="App.finDel(${l.id})">✕</button></div></div>`;
-  const auto=(nom,det,val)=>`<div class="finrow"><div class="fc"><b>${nom}</b><span class="finbadge auto">AUTO</span>${det?`<div class="fn">${det}</div>`:''}</div><div class="finm"><b>${money(val)}</b></div></div>`;
+  const auto=(nom,det,val)=>`<div class="finrow"><div class="fc"><b>${nom}</b><span class="finbadge auto">AUTO</span>${det?`<div class="fn">${det}</div>`:''}</div><div class="finm"><b>${'$'+nm(val)}</b></div></div>`;
   $('main').innerHTML=`<h1>💰 Financiero · cómo vamos</h1>
     <div class="sub">Comisiones que traen las apps + gastos con su día de pago. Para cuadrar el flujo de caja.</div>
     <div class="neto"><div class="nl">Cómo vamos este mes (ingresos − gastos)</div>
-      <div class="nv" style="color:${neto>=0?'var(--ok)':'var(--rosa)'}">${money(neto)}</div>
-      <div style="font-size:12.5px;color:var(--sub);margin-top:6px">Ingresos ${money(totIng)} · Gastos ${money(totGas)} · Por cobrar ${money(porCobrar)}</div></div>
+      <div class="nv" style="color:${neto>=0?'var(--ok)':'var(--rosa)'}">${'$'+nm(neto)}</div>
+      <div style="font-size:12.5px;color:var(--sub);margin-top:6px">Ingresos ${'$'+nm(totIng)} · Gastos ${'$'+nm(totGas)} · Por cobrar ${'$'+nm(porCobrar)}</div></div>
     <div class="finsec"><h3>📈 Ingresos / Comisiones — ¿entró la plata?</h3>
       ${auto('Comisión Smart',(sc.ventas||0)+' ventas este mes',comSmart)}
       ${auto('Comisión Feroz',(fc.pedidos||0)+' pedido(s) con comisión',comFeroz)}
@@ -391,8 +391,9 @@ _tabla(clase,pie){
   const TRM=3128.65;
   const precio=it=>{ const c=(+it.costo_mes||0)+(+it.costo_usd||0)*TRM;
     if(!it.confirmado) return '<i style="color:#e0b551">falta saber cuánto cuesta</i>';
-    return c? '<i style="color:#5fd39a">'+money(Math.round(c))+' al mes'
+    return c? '<i style="color:#5fd39a">'+'$'+nm(c)+' al mes'
       +(+it.costo_usd? ' · USD '+it.costo_usd:'')+'</i>' : '<i>gratis</i>'; };
+  return '<div class="mwrap"><table class="mx"><thead><tr><th class="it">'+tit+'</th>'
     +neg.map(n=>'<th>'+esc(n.nombre)+'</th>').join('')+'</tr></thead><tbody>'
     +L.map(it=>'<tr><td class="it"><b>'+esc(it.nombre)+'</b>'
        +(it.detalle?'<i>'+esc(it.detalle)+'</i>':'')
@@ -436,9 +437,9 @@ async vHerram(){
     if(usan.length&&cop){ const c=cop/usan.length;
       usan.forEach(n=>porNeg[n.id]=(porNeg[n.id]||0)+c); } });
   const pie='<tr class="mtot"><td class="it">Cuesta al mes</td>'
-    +neg.map(n=>'<td class="costo">'+(porNeg[n.id]?money(Math.round(porNeg[n.id])):'—')+'</td>').join('')+'</tr>';
+    +neg.map(n=>'<td class="costo">'+(porNeg[n.id]?'$'+nm(porNeg[n.id]):'—')+'</td>').join('')+'</tr>';
   $('main').innerHTML='<h1>🧰 Herramientas</h1>'
-   +'<div class="sub">'+L.length+' herramientas · '+money(total)+' al mes en total. '
+   +'<div class="sub">'+L.length+' herramientas · '+'$'+nm(total)+' al mes en total. '
    +'El costo de cada una se reparte entre los negocios que la usan.</div>'
    +(faltan?'<div class="card" style="margin-bottom:14px;border-left:3px solid #e0b551">'
      +'<b>De '+faltan+' herramientas no sabemos cuánto cuestan.</b><div style="color:var(--sub);font-size:12.5px;margin-top:4px">'
