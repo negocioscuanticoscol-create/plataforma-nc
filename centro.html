@@ -388,11 +388,16 @@ _tabla(clase,pie){
   const cel=(n,it)=>{ const v=val[n.id+'|'+it.id]||'no';
     return '<td><span class="cel v-'+v+'" onclick="App.mxSet(\''+n.id+'\',\''+it.id+'\',\''+clase+'\')">'+(v==='no'?'—':v)+'</span></td>'; };
   const tit={agente:'Agente',red:'Red',herramienta:'Herramienta'}[clase];
-  return '<div class="mwrap"><table class="mx"><thead><tr><th class="it">'+tit+'</th>'
+  const TRM=3128.65;
+  const precio=it=>{ const c=(+it.costo_mes||0)+(+it.costo_usd||0)*TRM;
+    if(!it.confirmado) return '<i style="color:#e0b551">falta saber cuánto cuesta</i>';
+    return c? '<i style="color:#5fd39a">'+money(Math.round(c))+' al mes'
+      +(+it.costo_usd? ' · USD '+it.costo_usd:'')+'</i>' : '<i>gratis</i>'; };
     +neg.map(n=>'<th>'+esc(n.nombre)+'</th>').join('')+'</tr></thead><tbody>'
     +L.map(it=>'<tr><td class="it"><b>'+esc(it.nombre)+'</b>'
        +(it.detalle?'<i>'+esc(it.detalle)+'</i>':'')
-       +(it.estado==='por montar'?'<i style="color:#e0b551">por montar</i>':'')
+       +(clase==='herramienta'?precio(it):'')
+       +(it.estado==='por montar'&&clase!=='herramienta'?'<i style="color:#e0b551">por montar</i>':'')
        +'</td>'+neg.map(n=>cel(n,it)).join('')+'</tr>').join('')
     +(pie||'')+'</tbody></table></div>';
 },
@@ -422,20 +427,23 @@ async vHerram(){
   const L=items.filter(x=>x.clase==='herramienta');
   /* El costo de una herramienta se reparte entre los negocios que la usan: asi
      se sabe cuanto cuesta sostener a cada uno. */
-  const porNeg={}; let total=0;
+  /* El costo puede venir en pesos o en dolares: se pasa todo a pesos con la TRM. */
+  const TRM=3128.65, enCop=it=>(+it.costo_mes||0)+(+it.costo_usd||0)*TRM;
+  const porNeg={}; let total=0, faltan=0;
   L.forEach(it=>{ const usan=neg.filter(n=>(val[n.id+'|'+it.id]||'no')!=='no');
-    total+=+it.costo_mes||0;
-    if(usan.length){ const c=(+it.costo_mes||0)/usan.length;
+    const cop=enCop(it); total+=cop;
+    if(!it.confirmado) faltan++;
+    if(usan.length&&cop){ const c=cop/usan.length;
       usan.forEach(n=>porNeg[n.id]=(porNeg[n.id]||0)+c); } });
   const pie='<tr class="mtot"><td class="it">Cuesta al mes</td>'
     +neg.map(n=>'<td class="costo">'+(porNeg[n.id]?money(Math.round(porNeg[n.id])):'—')+'</td>').join('')+'</tr>';
   $('main').innerHTML='<h1>🧰 Herramientas</h1>'
    +'<div class="sub">'+L.length+' herramientas · '+money(total)+' al mes en total. '
    +'El costo de cada una se reparte entre los negocios que la usan.</div>'
-   +(total===0?'<div class="card" style="margin-bottom:14px;border-left:3px solid #e0b551">'
-     +'<b>Falta poner cuánto cuesta cada herramienta.</b><div style="color:var(--sub);font-size:12.5px;margin-top:4px">'
-     +'Están todas en cero, así que el reparto por negocio sale vacío. Pásame los valores mensuales '
-     +'y esta fila se llena sola.</div></div>':'')
+   +(faltan?'<div class="card" style="margin-bottom:14px;border-left:3px solid #e0b551">'
+     +'<b>De '+faltan+' herramientas no sabemos cuánto cuestan.</b><div style="color:var(--sub);font-size:12.5px;margin-top:4px">'
+     +'Están en cero, así que el reparto por negocio sale corto. Las de abajo en ámbar son esas: '
+     +'Railway es la más urgente, porque ahí corre n8n.</div></div>':'')
    +'<div class="mleg"><span><span class="cel v-si">si</span> la usa</span>'
    +'<span><span class="cel v-no">—</span> no la usa</span></div>'
    +this._tabla('herramienta',pie);
