@@ -1666,3 +1666,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   if(r&&App.ROLES[r]){ App.rol=r; App._start(); }
   else { setTimeout(()=>{const e=$('lg');if(e)e.focus();},80); } })();
 </script>
+
+<!-- Bloc de notas: los pendientes de José en esta app. Solo aparece para él. -->
+<script src="../assets/notas.js"></script>
+<script>try{Notas.montar('nido',App.rol==='admin')}catch(e){}</script>
