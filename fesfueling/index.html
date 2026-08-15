@@ -258,16 +258,73 @@ _bqPaint(){
    Sirve para dos cosas: saber si a uno le estan cobrando de mas, y tener un techo
    de precio cuando toca cotizarle a un cliente sin haber comprado todavia. */
 TRM_REF:3128.65,
+/* Los catalogos de Estados Unidos estan en ingles y los productos de Busqueda
+   en español: buscar "valvula" en un catalogo que dice VALVE no encuentra nada.
+   Esta tabla traduce antes de buscar. Sale de las palabras que de verdad usan
+   los dos catalogos, no de un diccionario general. */
+EN:{
+ valvula:'valve', valvulas:'valve', filtro:'filter', filtros:'filter',
+ cartucho:'cartridge', cartuchos:'cartridge', separador:'separator', separadores:'separator',
+ coalescente:'coalescer', manguera:'hose', mangueras:'hose', boquilla:'nozzle', boquillas:'nozzle',
+ pistola:'nozzle', acople:'coupler', acoples:'coupler', acoplamiento:'coupler',
+ empaquetadura:'gasket', empaquetaduras:'gasket', empaque:'gasket', empaques:'packing',
+ sello:'seal', sellos:'seal', oring:'ring', anillo:'ring', anillos:'ring',
+ manometro:'gauge', medidor:'meter', medidores:'meter', contador:'meter',
+ bomba:'pump', bombas:'pump', carrete:'reel', carretes:'reel',
+ tapa:'cap', tapas:'cap', adaptador:'adapter', adaptadores:'adapter',
+ codo:'elbow', brida:'flange', bridas:'flange', abrazadera:'clamp', pinza:'clamp',
+ precinto:'seal', precintos:'seal', membrana:'membrane', membranas:'membrane',
+ detector:'detector', deteccion:'detector', agua:'water', muestreo:'sampling',
+ muestreador:'sampler', probeta:'jar', vaso:'jar', resorte:'spring', resortes:'spring',
+ interruptor:'switch', interuptor:'switch', cable:'cable', sensor:'sensor',
+ sirena:'alarm', alarma:'alarm', nivel:'level', tanque:'tank', tanques:'tank',
+ camion:'truck', cisterna:'tanker', combustible:'fuel', diesel:'diesel',
+ aire:'air', presion:'pressure', flujo:'flow', caudal:'flow', temperatura:'temperature',
+ tierra:'grounding', puesta:'grounding', manija:'handle', manilla:'handle',
+ hombre:'deadman', muerto:'deadman', rejilla:'strainer', colador:'strainer',
+ niple:'nipple', tuberia:'pipe', tubo:'pipe', giratoria:'swivel', giratorio:'swivel',
+ union:'swivel', reparacion:'repair', kit:'kit', juego:'kit', juegos:'kit',
+ hidraulico:'hydraulic', hidraulica:'hydraulic', electrico:'electric', electrica:'electric',
+ neumatico:'pneumatic', manual:'manual', acero:'steel', inoxidable:'stainless',
+ aluminio:'aluminum', bronce:'brass', caucho:'rubber', polvo:'dust',
+ extintor:'extinguisher', bandeja:'tray', balde:'bucket', embudo:'funnel',
+ escalera:'ladder', barandas:'rail', valvulita:'valve', husillo:'spindle',
+ cuerpo:'housing', carcasa:'housing', tapon:'plug', varilla:'rod', varillas:'rod',
+ hidrometro:'hydrometer', densimetro:'hydrometer', termometro:'thermometer',
+ computador:'computer', panel:'panel', bomba_manual:'hand pump', llave:'wrench',
+ monitor:'monitor', kits:'kit', repuesto:'parts', repuestos:'parts', parte:'parts',
+ /* Como estan escritos de verdad en la lista, con sus errores de dedo. */
+ hydrometro:'hydrometer', carrrete:'reel', empsaquetadura:'gasket', ciosterna:'tanker',
+ dectetor:'detector', presure:'pressure', fuelling:'refueling', pinzas:'clamp',
+ aviones:'aircraft', avion:'aircraft', componentes:'parts', camiones:'truck',
+ mangera:'hose', valbula:'valve', filto:'filter', boquila:'nozzle', acopl:'coupler'
+},
+/* Palabras que no aportan nada a la busqueda. */
+VACIAS:['para','con','del','las','los','una','por','sin','que','tipo','marca','nombrar','item','logo'],
+_aIngles(q){
+  const w=String(q||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .split(/[^a-z0-9./-]+/).filter(Boolean);
+  const out=[], push=t=>{ if(t && !out.includes(t)) out.push(t); };
+  /* 1. lo que se puede traducir del español */
+  w.forEach(x=>push(this.EN[x]));
+  /* 2. lo que ya venia en ingles o es una marca: se busca tal cual. Antes se
+        botaba, y por eso "Dead man" o "Venturi" no encontraban nada. */
+  w.forEach(x=>{ if(!this.EN[x] && x.length>=4 && !this.VACIAS.includes(x) && !/^\d+$/.test(x)) push(x); });
+  /* 3. lo que parece numero de parte */
+  w.forEach(x=>{ if(/\d/.test(x) && x.length>=4) push(x); });
+  return out.slice(0,5);
+},
+
 async mkBuscar(id, texto){
   const x=(this._busq||[]).find(b=>b.id===id);
   const q=(texto!=null?texto:(x?x.nombre:'')||'').trim();
   if(!q){ toast('Escribe qué buscar'); return; }
   /* Se buscan las palabras largas: "Válvula de bola 1/2" encuentra poco, pero
      "valvula" y "bola" por separado encuentran lo que hay. */
-  const pal=q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
-    .split(/[^a-z0-9./-]+/).filter(w=>w.length>=4).slice(0,3);
-  const cond=pal.length? 'or=('+pal.map(w=>`nombre.ilike.*${encodeURIComponent(w)}*`).join(',')+')'
-                       : 'nombre.ilike.*'+encodeURIComponent(q)+'*';
+  const pal=this._aIngles(q);
+  const cond=pal.length
+    ? 'or=('+pal.map(w=>`nombre.ilike.*${encodeURIComponent(w)}*,part_number.ilike.*${encodeURIComponent(w)}*`).join(',')+')'
+    : 'nombre.ilike.*'+encodeURIComponent(q)+'*';
   const r=await api('ff_mercado?'+cond+'&select=*&order=precio_usd.asc.nullslast&limit=40')||[];
   const trm=this.TRM_REF;
   /* Becker no publica precio sin cuenta: esas filas van sin cifra, pero sirven
@@ -289,7 +346,8 @@ async mkBuscar(id, texto){
     la última columna suma un 35% estimado de flete y nacionalización. El IVA no se cuenta porque se recupera.</div>
     <input id="mk_q" value="${esc(q)}" placeholder="Buscar otra cosa"
       onkeydown="if(event.key==='Enter')App.mkBuscar('${esc(id||'')}',this.value)">
-    <div class="mini" style="margin:4px 0 10px">Enter para buscar de nuevo</div>
+    <div class="mini" style="margin:4px 0 10px">Enter para buscar de nuevo · se buscó por
+    <b>${pal.length?pal.map(esc).join(', '):esc(q)}</b>${pal.length?' (traducido del español)':''}</div>
     ${r.length?`<div class="tabla" style="max-height:52vh;overflow:auto"><table>
       <thead><tr><th></th><th>Producto</th><th class="num">Lista</th><th class="num">En pesos</th><th class="num">Puesto acá</th></tr></thead>
       <tbody>${r.map(fila).join('')}</tbody></table></div>`
@@ -1145,7 +1203,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-08-15c',
+VER:'2026-08-15e',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
