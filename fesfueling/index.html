@@ -244,12 +244,53 @@ _bqPaint(){
                  ${x.estado==='creado'
                     ? `<button class="btn" style="padding:6px 10px" title="Ver y corregir el costo" onclick="App.bqRef('${esc(x.id)}')">✎ Costos</button>`
                     : `<button class="btn" style="padding:6px 10px" onclick="App.bqRef('${esc(x.id)}')">＋ Costos</button>`}
+                 <button class="btn gh" style="padding:6px 9px" title="Buscar este producto en el catálogo de Estados Unidos"
+                         onclick="App.mkBuscar('${esc(x.id)}')">🌎</button>
                  <button class="btn gh" style="padding:6px 9px;color:#b3261e" title="Anular: sale de la lista pero no se borra"
                          onclick="App.bqAnular('${esc(x.id)}',true)">⃠</button>`}
           </div>
         </div>`).join('')
       :'<div class="empty">Nada con ese filtro.</div>'}
     </div>`);
+},
+/* ---------- PRECIO DE REFERENCIA DE ESTADOS UNIDOS ----------
+   ff_mercado tiene el catalogo publico de apsaviation.com con precio en dolares.
+   Sirve para dos cosas: saber si a uno le estan cobrando de mas, y tener un techo
+   de precio cuando toca cotizarle a un cliente sin haber comprado todavia. */
+TRM_REF:3128.65,
+async mkBuscar(id, texto){
+  const x=(this._busq||[]).find(b=>b.id===id);
+  const q=(texto!=null?texto:(x?x.nombre:'')||'').trim();
+  if(!q){ toast('Escribe qué buscar'); return; }
+  /* Se buscan las palabras largas: "Válvula de bola 1/2" encuentra poco, pero
+     "valvula" y "bola" por separado encuentran lo que hay. */
+  const pal=q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .split(/[^a-z0-9./-]+/).filter(w=>w.length>=4).slice(0,3);
+  const cond=pal.length? 'or=('+pal.map(w=>`nombre.ilike.*${encodeURIComponent(w)}*`).join(',')+')'
+                       : 'nombre.ilike.*'+encodeURIComponent(q)+'*';
+  const r=await api('ff_mercado?'+cond+'&select=*&order=precio_usd&limit=40')||[];
+  const trm=this.TRM_REF;
+  const fila=m=>{
+    const cop=(+m.precio_usd||0)*trm;
+    return `<tr>
+      <td style="width:44px">${m.foto?`<img src="${esc(m.foto)}" style="width:40px;height:40px;object-fit:contain;background:#f6f7f9;border-radius:5px">`:''}</td>
+      <td><a href="${esc(m.url)}" target="_blank" style="font-weight:600;color:var(--navy)">${esc(m.nombre)}</a>
+        <div class="mini">${esc(m.marca||'')}${m.part_number?' · '+esc(m.part_number):''}</div></td>
+      <td class="num">USD ${(+m.precio_usd).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td class="num">${money(cop)}</td>
+      <td class="num"><b>${money(cop*1.35)}</b></td></tr>`;
+  };
+  modal(`<h3>🌎 Precio en Estados Unidos</h3>
+    <div class="mini" style="margin-bottom:8px">Catálogo de apsaviation.com · TRM ${money(trm).replace('$','')} ·
+    la última columna suma un 35% estimado de flete y nacionalización. El IVA no se cuenta porque se recupera.</div>
+    <input id="mk_q" value="${esc(q)}" placeholder="Buscar otra cosa"
+      onkeydown="if(event.key==='Enter')App.mkBuscar('${esc(id||'')}',this.value)">
+    <div class="mini" style="margin:4px 0 10px">Enter para buscar de nuevo</div>
+    ${r.length?`<div class="tabla" style="max-height:52vh;overflow:auto"><table>
+      <thead><tr><th></th><th>Producto</th><th class="num">Lista</th><th class="num">En pesos</th><th class="num">Puesto acá</th></tr></thead>
+      <tbody>${r.map(fila).join('')}</tbody></table></div>`
+     :'<div class="empty">No aparece nada con esas palabras. Prueba con el nombre en inglés o con el número de parte.</div>'}
+    <button class="btn gh full" style="margin-top:12px" onclick="cerrar()">Cerrar</button>`);
 },
 bqAbrir(id){
   const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
@@ -1100,7 +1141,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-08-15a',
+VER:'2026-08-15b',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
