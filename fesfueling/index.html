@@ -268,20 +268,24 @@ async mkBuscar(id, texto){
     .split(/[^a-z0-9./-]+/).filter(w=>w.length>=4).slice(0,3);
   const cond=pal.length? 'or=('+pal.map(w=>`nombre.ilike.*${encodeURIComponent(w)}*`).join(',')+')'
                        : 'nombre.ilike.*'+encodeURIComponent(q)+'*';
-  const r=await api('ff_mercado?'+cond+'&select=*&order=precio_usd&limit=40')||[];
+  const r=await api('ff_mercado?'+cond+'&select=*&order=precio_usd.asc.nullslast&limit=40')||[];
   const trm=this.TRM_REF;
+  /* Becker no publica precio sin cuenta: esas filas van sin cifra, pero sirven
+     porque dan el numero de parte con el que despues se cotiza. */
   const fila=m=>{
-    const cop=(+m.precio_usd||0)*trm;
+    const p=+m.precio_usd||0, cop=p*trm;
     return `<tr>
       <td style="width:44px">${m.foto?`<img src="${esc(m.foto)}" style="width:40px;height:40px;object-fit:contain;background:#f6f7f9;border-radius:5px">`:''}</td>
       <td><a href="${esc(m.url)}" target="_blank" style="font-weight:600;color:var(--navy)">${esc(m.nombre)}</a>
-        <div class="mini">${esc(m.marca||'')}${m.part_number?' · '+esc(m.part_number):''}</div></td>
-      <td class="num">USD ${(+m.precio_usd).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-      <td class="num">${money(cop)}</td>
-      <td class="num"><b>${money(cop*1.35)}</b></td></tr>`;
+        <div class="mini">${esc(m.marca||'')}${m.part_number?' · <b>'+esc(m.part_number)+'</b>':''}
+        · ${esc(String(m.fuente||'').replace('.com',''))}</div></td>
+      ${p?`<td class="num">USD ${p.toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+        <td class="num">${money(cop)}</td><td class="num"><b>${money(cop*1.35)}</b></td>`
+       :`<td class="num mini" colspan="3" style="text-align:right;color:var(--muted)">sin precio publicado</td>`}
+      </tr>`;
   };
   modal(`<h3>🌎 Precio en Estados Unidos</h3>
-    <div class="mini" style="margin-bottom:8px">Catálogo de apsaviation.com · TRM ${money(trm).replace('$','')} ·
+    <div class="mini" style="margin-bottom:8px">Catálogos de apsaviation.com y beckeraviation.com · TRM ${money(trm).replace('$','')} ·
     la última columna suma un 35% estimado de flete y nacionalización. El IVA no se cuenta porque se recupera.</div>
     <input id="mk_q" value="${esc(q)}" placeholder="Buscar otra cosa"
       onkeydown="if(event.key==='Enter')App.mkBuscar('${esc(id||'')}',this.value)">
@@ -1141,7 +1145,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-08-15b',
+VER:'2026-08-15c',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
