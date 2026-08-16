@@ -99,6 +99,31 @@ table.mx .it i{font-style:normal;color:var(--sub);font-size:11px;display:block;m
 .mleg span{display:flex;align-items:center;gap:6px}
 .costo{font-variant-numeric:tabular-nums}
 .mtot td{background:var(--bg);font-weight:700}
+/* La ficha: los datos de identidad de un negocio, en grupos.
+   Lo que falta se ve tan claro como lo que está. */
+.fchips{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+.fchip{padding:6px 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
+  color:var(--sub);font-size:12.5px;cursor:pointer;font-weight:600}
+.fchip.on{background:var(--acc);border-color:var(--acc);color:#0b0e11}
+.fchip b{font-weight:700}
+.fchip i{font-style:normal;opacity:.65;margin-left:5px;font-size:11px}
+.fgrupo{margin:0 0 18px}
+.fgrupo>h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--sub);
+  margin:0 0 8px;font-weight:700}
+.flista{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden}
+.frow{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);
+  cursor:pointer}
+.frow:last-child{border-bottom:none}
+.frow:hover{background:var(--bg)}
+.frow>.k{flex:0 0 190px;color:var(--sub);font-size:12.5px}
+.frow>.v{flex:1;font-size:13.5px;word-break:break-all}
+.frow>.v.falta{color:#5c6570;font-style:italic}
+.frow>.v i{font-style:normal;display:block;color:var(--sub);font-size:11.5px;margin-top:2px}
+.frow>.go{flex:0 0 auto;color:var(--sub);font-size:15px;opacity:0;text-decoration:none}
+.frow:hover>.go{opacity:1}
+.fbar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin:6px 0 18px;max-width:420px}
+.fbar>i{display:block;height:100%;background:var(--ok);border-radius:999px}
+@media(max-width:560px){.frow{flex-wrap:wrap;gap:2px}.frow>.k{flex:1 0 100%}}
 /* El stack: cada cosa muestra en qué nivel está, de 0 a 5. Se lee de un vistazo
    cuánto le falta a cada negocio para estar montado de verdad. */
 .stgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
@@ -145,7 +170,7 @@ async function api(pth,o={}){ try{ const hdr={...H,...(o.headers||{})};
   if(o.count){ hdr.Prefer='count=exact'; hdr.Range='0-0'; }
   const r=await fetch(SB+'/rest/v1/'+pth,{...o,headers:hdr}); if(o.count){ return +((r.headers.get('content-range')||'0/0').split('/')[1])||0; } const t=await r.text(); if(!r.ok){ console.warn(pth,t.slice(0,120)); return o.method?null:[]; } const d=t?JSON.parse(t):[]; return d; }catch(e){ console.warn(e); return o.method?null:[]; } }
 const patch=(pth,b)=>api(pth,{method:'PATCH',body:JSON.stringify(b),headers:{...H,Prefer:'return=minimal'}});
-const post=(pth,b)=>api(pth,{method:'POST',body:JSON.stringify(b),headers:{...H,Prefer:'return=minimal'}});
+const post=(pth,b)=>api(pth,{method:'POST',body:JSON.stringify(b),headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'}});
 function toast(m){ const t=document.createElement('div'); t.className='toast'; t.textContent=m; $('toast').appendChild(t); setTimeout(()=>t.remove(),2200); }
 function mesISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01'; }
 
@@ -153,13 +178,13 @@ const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'
 
 const App={
 vista:'resumen',
-TABS:[['resumen','📊 Resumen'],['agentes','🤖 Agentes'],['herram','🧰 Herramientas'],['redes','📱 Redes'],['financiero','💰 Financiero']],
+TABS:[['resumen','📊 Resumen'],['cuentas','🪪 Cuentas'],['agentes','🤖 Agentes'],['herram','🧰 Herramientas'],['redes','📱 Redes'],['financiero','💰 Financiero']],
 /* las apps del ecosistema · las periféricas leen nc_clientes para saber a quién sirven */
 APPS:{app:'📱 App propia',callprospector:'📞 CallProspector',marcador:'☎️ Marcador',
       reservas:'📅 Reservas',bot:'🤖 Bot WhatsApp',pauta:'📣 Pauta'},
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({resumen:this.vResumen,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero}[v]||this.vResumen).call(this); },
+  ({resumen:this.vResumen,cuentas:this.vCuentas,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero}[v]||this.vResumen).call(this); },
 
 async vFinanciero(){
   const lineas=await api('nc_finanzas?order=orden&limit=500');
@@ -448,6 +473,98 @@ async vHerram(){
    +'<div class="mleg"><span><span class="cel v-si">si</span> la usa</span>'
    +'<span><span class="cel v-no">—</span> no la usa</span></div>'
    +this._tabla('herramienta',pie);
+},
+/* ---------- LA FICHA DE CADA NEGOCIO ----------
+   Correos, números, handles y dominios. Lo que hoy vive en la cabeza de José y
+   en pedazos de chat. NO van contraseñas: la llave que lee esta tabla está
+   dentro del HTML, o sea que cualquiera que abra el código ve la tabla. */
+CAMPOS:[
+ ['Identidad',[
+   ['razon_social','Razón social'],['nit','NIT'],
+   ['direccion','Dirección'],['ciudad','Ciudad'],
+   ['telefono','Teléfono'],['representante','Representante legal']]],
+ ['Correo y Google',[
+   ['email','Correo principal'],['google','Cuenta de Google'],
+   ['drive','Carpeta en Drive']]],
+ ['WhatsApp',[
+   ['wa_basico','WhatsApp Business (app)'],
+   ['wa_api','WhatsApp API (número)'],
+   ['wa_id','ID del número en la API']]],
+ ['Redes',[
+   ['facebook','Página de Facebook'],['instagram','Instagram'],
+   ['tiktok','TikTok'],['youtube','YouTube']]],
+ ['Meta',[
+   ['meta_portafolio','Portafolio (ID)'],
+   ['meta_cuenta_pub','Cuenta publicitaria'],
+   ['meta_pixel','Píxel'],
+   ['fb_perfil_dueno','Perfil dueño del portafolio']]],
+ ['Web y dominio',[
+   ['sitio','Sitio web'],['dominio','Dominio'],
+   ['registrador','Dónde está el dominio'],['vence','Vence el dominio']]],
+],
+_totCampos(){ return this.CAMPOS.reduce((a,g)=>a+g[1].length,0); },
+/* Un enlace directo cuando el dato sirve para ir a alguna parte */
+_link(campo,v){
+  if(!v) return '';
+  const u=String(v).trim();
+  if(campo==='email'||campo==='google') return 'mailto:'+u;
+  if(campo==='sitio') return /^https?:/.test(u)?u:'https://'+u;
+  if(campo==='dominio') return 'https://'+u.replace(/^https?:\/\//,'');
+  if(campo==='instagram') return 'https://instagram.com/'+u.replace(/^@|^.*instagram\.com\//,'');
+  if(campo==='tiktok') return 'https://tiktok.com/@'+u.replace(/^@|^.*tiktok\.com\/@?/,'');
+  if(campo==='facebook') return /^https?:/.test(u)?u:'https://facebook.com/'+u.replace(/^@/,'');
+  if(campo==='wa_basico'||campo==='wa_api') return 'https://wa.me/'+u.replace(/[^0-9]/g,'');
+  if(campo==='drive') return /^https?:/.test(u)?u:'';
+  return '';
+},
+async vCuentas(){
+  const [neg,fichas]=await Promise.all([
+    api('nc_negocio?select=id,nombre&activo=is.true&order=orden'),
+    api('nc_ficha?select=*')]);
+  this._neg=neg;
+  this._fic={}; fichas.forEach(f=>this._fic[f.negocio_id+'|'+f.campo]=f.valor||'');
+  if(!neg.some(n=>n.id===this._fneg)) this._fneg=neg[0]&&neg[0].id;
+  this.pintaFicha();
+},
+pintaFicha(){
+  const neg=this._neg, fic=this._fic, id=this._fneg, tot=this._totCampos();
+  const llenos=n=>this.CAMPOS.reduce((a,g)=>a+g[1].filter(([c])=>fic[n+'|'+c]).length,0);
+  const n=llenos(id), pct=Math.round(n/tot*100);
+  const chips=neg.map(x=>'<button class="fchip'+(x.id===id?' on':'')+'" onclick="App.fSel(\''+x.id+'\')">'
+    +'<b>'+esc(x.nombre)+'</b><i>'+llenos(x.id)+'/'+tot+'</i></button>').join('');
+  const grupos=this.CAMPOS.map(([tit,cs])=>
+    '<div class="fgrupo"><h3>'+tit+'</h3><div class="flista">'
+    +cs.map(([c,et])=>{ const v=fic[id+'|'+c]||'', l=this._link(c,v);
+       return '<div class="frow" onclick="App.fEdit(\''+c+'\',\''+esc(et).replace(/'/g,"\\'")+'\')">'
+        +'<div class="k">'+esc(et)+'</div>'
+        +'<div class="v'+(v?'':' falta')+'">'+(v?esc(v):'falta')+'</div>'
+        +(l?'<a class="go" href="'+esc(l)+'" target="_blank" rel="noopener" onclick="event.stopPropagation()">↗</a>':'<span class="go">✏️</span>')
+        +'</div>'; }).join('')
+    +'</div></div>').join('');
+  $('main').innerHTML='<h1>🪪 Cuentas</h1>'
+   +'<div class="sub">Los correos, números y cuentas de cada negocio, en un solo lugar. '
+   +'Haz clic en cualquier línea para escribirla.</div>'
+   +'<div class="card" style="margin-bottom:14px;border-left:3px solid #e0b551">'
+   +'<b>Acá no van contraseñas.</b><div style="color:var(--sub);font-size:12.5px;margin-top:4px">'
+   +'La llave que lee esta tabla está dentro del HTML de la app, así que quien abra el código '
+   +'puede leerla. Nombres de cuenta, correos y números no son secreto; las claves sí. '
+   +'Esas van en tu gestor de contraseñas.</div></div>'
+   +'<div class="fchips">'+chips+'</div>'
+   +'<div style="font-size:12.5px;color:var(--sub)"><b style="color:var(--tx)">'+n+' de '+tot+'</b> datos puestos · falta '+(tot-n)+'</div>'
+   +'<div class="fbar"><i style="width:'+pct+'%"></i></div>'
+   +grupos;
+},
+fSel(id){ this._fneg=id; this.pintaFicha(); },
+async fEdit(campo,etiqueta){
+  const id=this._fneg, k=id+'|'+campo, antes=this._fic[k]||'';
+  const v=prompt(etiqueta+':',antes);
+  if(v===null) return;
+  const nuevo=v.trim();
+  if(nuevo===antes) return;
+  this._fic[k]=nuevo; this.pintaFicha();
+  await post('nc_ficha?on_conflict=negocio_id,campo',
+    {negocio_id:id,campo,valor:nuevo||null,actualizado:new Date().toISOString()});
+  toast(nuevo?'Guardado':'Borrado');
 },
 async vRedes(){
   await this._matriz();
