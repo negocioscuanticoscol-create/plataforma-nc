@@ -1,7 +1,17 @@
+<!doctype html>
+<html lang="es">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nido Colchones · Catálogo de producto</title>
-<meta name="description" content="Catálogo de producto de Nido Colchones: pillowtop, Sensaflex, BabyNido, camas de mascota y Nido Truck.">
+<title>Nido Colchones · Fábrica de colchones en Bogotá</title>
+<meta name="description" content="Fábrica de colchones en Bogotá: pillowtop, Sensaflex, BabyNido, camas para mascota y colchones para camión. Fabricamos a la medida. Garantía de 5 años. Envíos a todo el país.">
+<link rel="canonical" href="https://negocioscuanticoscol-create.github.io/plataforma-nc/nido/catalogo.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Nido Colchones · Fábrica de colchones en Bogotá">
+<meta property="og:description" content="Pillowtop, Sensaflex, colchones para camión y fabricación a la medida. Garantía de 5 años. Envíos a todo el país.">
+<meta property="og:url" content="https://negocioscuanticoscol-create.github.io/plataforma-nc/nido/catalogo.html">
+<meta property="og:image" content="https://negocioscuanticoscol-create.github.io/plataforma-nc/nido/catalogo/nido-catalogo-p1.jpg">
+<meta property="og:locale" content="es_CO">
 <style>
   :root{
     --navy:#144357; --navy2:#0e3243; --gold:#bca890; --gold2:#d9c8b6;
@@ -25,19 +35,68 @@
     font-weight:700;font-size:13px;text-decoration:none;border:none;cursor:pointer;
     font-family:inherit;white-space:nowrap}
   .btn.gh{background:transparent;border:1px solid rgba(217,200,182,.45);color:#e7dfd2}
+
+  /* La entrada: quién es Nido, en dos frases, antes de cualquier producto. */
+  .intro{background:var(--navy2);color:#e9e2d6;padding:34px 0 38px}
+  .in{max-width:1000px;margin:0 auto;padding:0 18px}
+  .intro h1{font-family:Georgia,serif;font-size:clamp(26px,4.4vw,40px);line-height:1.14;
+    font-weight:400;color:#fff;text-wrap:balance;max-width:17ch}
+  .intro p{margin-top:13px;max-width:56ch;color:#c8bfb2;font-size:15.5px}
+  .sellos{display:flex;gap:9px;flex-wrap:wrap;margin-top:20px}
+  .sello{border:1px solid rgba(217,200,182,.34);border-radius:999px;padding:6px 13px;
+    font-size:12px;color:var(--gold2);letter-spacing:.02em}
+
   main{max-width:1000px;margin:0 auto;padding:22px 18px 70px}
   .pag{background:var(--card);border:1px solid var(--line);border-radius:12px;
     overflow:hidden;box-shadow:var(--sh);margin-bottom:18px}
   .pag img{width:100%;height:auto;display:block}
-  .pie{max-width:1000px;margin:0 auto;padding:0 18px 40px;font-size:12.5px;color:var(--mut)}
+
+  section{max-width:1000px;margin:0 auto;padding:0 18px 44px}
+  section h2{font-family:Georgia,serif;font-size:25px;font-weight:400;margin-bottom:4px}
+  section .sub{color:var(--mut);font-size:13.5px;margin-bottom:18px}
+
+  /* Precios: una tabla por referencia. Cuatro medidas estándar, y la de camión aparte. */
+  .tw{background:var(--card);border:1px solid var(--line);border-radius:12px;
+    box-shadow:var(--sh);overflow-x:auto}
+  table{border-collapse:collapse;width:100%;min-width:520px;font-size:14px}
+  th,td{padding:12px 16px;text-align:right;border-bottom:1px solid var(--line);
+    font-variant-numeric:tabular-nums}
+  th:first-child,td:first-child{text-align:left}
+  thead th{background:var(--crema);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+    color:#6d7f89;font-weight:700;white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  td.ref b{display:block;font-weight:700}
+  td.ref i{font-style:normal;color:var(--mut);font-size:12px}
+
+  .rej{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px}
+  .rz{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:17px 18px;
+    box-shadow:var(--sh)}
+  .rz b{display:block;font-family:Georgia,serif;font-size:17px;font-weight:400;margin-bottom:5px}
+  .rz span{color:var(--mut);font-size:13.5px}
+
+  .cont{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:14px}
+  .cx{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:17px 18px;
+    box-shadow:var(--sh)}
+  .cx h3{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#6d7f89;
+    margin-bottom:8px}
+  .cx p{font-size:14.5px;line-height:1.55}
+  .cx a{color:var(--navy);font-weight:600}
+
+  .cta{background:var(--navy);color:#fff;border-radius:14px;padding:26px 24px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .cta div{font-family:Georgia,serif;font-size:20px;max-width:26ch}
+
+  .pie{max-width:1000px;margin:0 auto;padding:0 18px 46px;font-size:12.5px;color:var(--mut)}
   .pie b{color:var(--ink)}
   @media print{
-    header,.acc,.pie{display:none}
+    header .acc,.intro .sellos,.cta,.pie{display:none}
     body{background:#fff}
     main{max-width:none;padding:0}
     .pag{border:none;border-radius:0;box-shadow:none;margin:0;page-break-after:always}
   }
 </style>
+</head>
+<body>
 
 <header><div class="hd">
   <div class="brand">
@@ -45,11 +104,23 @@
     <div><div class="t1">NIDO</div><div class="t2">Colchones</div></div>
   </div>
   <div class="acc">
-    <a class="btn" href="https://wa.me/573134856744?text=Hola,%20vi%20el%20cat%C3%A1logo%20de%20Nido%20Colchones"
+    <a class="btn" href="https://wa.me/573167985666?text=Hola,%20vi%20la%20p%C3%A1gina%20de%20Nido%20Colchones"
        target="_blank" rel="noopener">Escribir por WhatsApp</a>
     <button class="btn gh" onclick="window.print()">Imprimir / PDF</button>
   </div>
 </div></header>
+
+<div class="intro"><div class="in">
+  <h1>Fábrica de colchones en Bogotá</h1>
+  <p>Fabricamos pillowtop, espuma Sensaflex, colchones para camión y camas para mascota.
+     Si la medida que necesita no existe, la hacemos.</p>
+  <div class="sellos">
+    <span class="sello">Garantía de 5 años</span>
+    <span class="sello">Fabricación a la medida</span>
+    <span class="sello">Venta directa de fábrica</span>
+    <span class="sello">Envíos a todo el país</span>
+  </div>
+</div></div>
 
 <main>
   <div class="pag"><img src="catalogo/nido-catalogo-p1.jpg" alt="Colchones: Pillowtop Cassata y Pillowtop Resortado" loading="eager"></div>
@@ -60,8 +131,74 @@
   <div class="pag"><img src="catalogo/nido-catalogo-p6.jpg" alt="Nido Truck: formas y cotas de los cuatro moldes" loading="lazy"></div>
 </main>
 
+<section>
+  <h2>Precios por medida</h2>
+  <div class="sub">Valores por unidad, en pesos colombianos.</div>
+  <div class="tw"><table>
+    <thead><tr>
+      <th>Referencia</th>
+      <th>Sencilla<br>100&times;190</th>
+      <th>Semidoble<br>120&times;190</th>
+      <th>Doble<br>140&times;190</th>
+      <th>Queen<br>160&times;190</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td class="ref"><b>Pillowtop Resortado</b><i>Resortes con acolchado pillow top</i></td>
+        <td>$850.000</td><td>$950.000</td><td>$990.000</td><td>$1.150.000</td>
+      </tr>
+      <tr>
+        <td class="ref"><b>Pillowtop Cassata</b><i>Acolchado pillow top</i></td>
+        <td>$750.000</td><td>$850.000</td><td>$950.000</td><td>$1.050.000</td>
+      </tr>
+      <tr>
+        <td class="ref"><b>Sensaflex Gris D26</b><i>Espuma de alta densidad · 15 cm</i></td>
+        <td>$380.000</td><td>$400.000</td><td>$420.000</td><td>$500.000</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Lo que se hace por pedido</h2>
+  <div class="sub">Estas líneas se cotizan según la medida y el material.</div>
+  <div class="rej">
+    <div class="rz"><b>Nido Truck</b><span>Colchones para cabina de camión.
+      Cuatro moldes según el modelo. Desde $295.000.</span></div>
+    <div class="rz"><b>A la medida</b><span>Cualquier ancho, largo o alto.
+      Camas especiales, sofá cama, literas.</span></div>
+    <div class="rz"><b>BabyNido</b><span>Colchones para cuna y corral.</span></div>
+    <div class="rz"><b>Nido Mascotas</b><span>Camas anti-fluido y en jacquard,
+      en cinco tallas.</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Dónde estamos</h2>
+  <div class="sub">Fábrica y punto de venta. Se atiende sin cita.</div>
+  <div class="cont">
+    <div class="cx"><h3>Dirección</h3><p>Calle 57C Sur # 89A&#8209;40<br>Barrio El Bosque<br>Bogotá D.C., Colombia</p></div>
+    <div class="cx"><h3>Horario</h3><p>Lunes a viernes<br>8:00 a.m. – 5:30 p.m.<br>Sábados 8:00 a.m. – 1:00 p.m.</p></div>
+    <div class="cx"><h3>Contacto</h3><p>
+      <a href="https://wa.me/573167985666" target="_blank" rel="noopener">WhatsApp 316 798 5666</a><br>
+      <a href="tel:+573167985666">Llamar al 316 798 5666</a><br>
+      <a href="mailto:fabricadecolchonesnido@gmail.com">fabricadecolchonesnido@gmail.com</a></p></div>
+  </div>
+</section>
+
+<section>
+  <div class="cta">
+    <div>Dígame la medida y le paso el precio.</div>
+    <a class="btn" href="https://wa.me/573167985666?text=Hola,%20quiero%20cotizar%20un%20colch%C3%B3n"
+       target="_blank" rel="noopener">Escribir por WhatsApp</a>
+  </div>
+</section>
+
 <div class="pie">
   Medidas aproximadas y sujetas a tolerancia de fabricación. Precios sujetos a cambios sin previo aviso.
   FVR, Fotón y Kenworth se citan como referencia de cabina: <b>Nido no está afiliada a esas marcas</b>
   ni cuenta con su respaldo.
 </div>
+
+</body>
+</html>
