@@ -530,7 +530,8 @@ CAMPOS:[
  ['Web y dominio',[
    ['sitio','Sitio web'],['dominio','Dominio'],
    ['registrador','Dónde está el dominio'],['vence','Vence el dominio'],
-   ['catalogo','Catálogo de productos'],['maps','Ficha en Google Maps']]],
+   ['catalogo','Catálogo de productos'],['maps','Ficha en Google Maps'],
+   ['qr','Código QR']]],
 ],
 _totCampos(){ return this.CAMPOS.reduce((a,g)=>a+g[1].length,0); },
 /* Un enlace directo cuando el dato sirve para ir a alguna parte */
@@ -544,7 +545,7 @@ _link(campo,v){
   if(campo==='tiktok') return 'https://tiktok.com/@'+u.replace(/^@|^.*tiktok\.com\/@?/,'');
   if(campo==='facebook') return /^https?:/.test(u)?u:'https://facebook.com/'+u.replace(/^@/,'');
   if(campo==='wa_basico'||campo==='wa_api') return 'https://wa.me/'+u.replace(/[^0-9]/g,'');
-  if(campo==='drive') return /^https?:/.test(u)?u:'';
+  if(campo==='drive'||campo==='qr') return /^https?:/.test(u)?u:'';
   return '';
 },
 /* La ficha la miran dos pestañas: Cuentas y Redes. Se carga una sola vez. */
@@ -577,6 +578,7 @@ MONTAJE:[
  ['medio_pago',       'Medio de pago cargado'],
  ['meta_pixel',       'Píxel instalado'],
  ['maps',             'Ficha en Google Maps'],
+ ['qr',               'Código QR'],
 ],
 _montaje(){
   const {_neg:neg,_fic:fic}=this;
