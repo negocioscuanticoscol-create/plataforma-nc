@@ -131,6 +131,21 @@ table.mx .it i{font-style:normal;color:var(--sub);font-size:11px;display:block;m
   font-weight:700;cursor:pointer;border:1px dashed var(--line);color:#5c6570;user-select:none}
 .mont.ok{background:#12351f;color:#5fd39a;border:1px solid transparent}
 .mont:hover{border-color:var(--sub)}
+/* La tabla de conversión: qué exige cada nivel en cada red. */
+.rubbtn{background:var(--panel);border:1px solid var(--line);color:var(--tx);border-radius:8px;
+  padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:14px;
+  font-family:inherit}
+.rubbtn:hover{border-color:var(--sub)}
+.rubbtn.on{background:var(--acc);border-color:var(--acc);color:#0b0e11}
+.rubwrap{margin-bottom:20px}
+.rubnota{font-size:12.5px;color:var(--sub);margin-bottom:12px;padding-left:2px}
+.rub{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:15px 17px;
+  margin-bottom:12px}
+.rub>h3{font-size:14px;margin-bottom:11px}
+.rubg{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:15px}
+.rubc>ul{margin:8px 0 0;padding-left:17px}
+.rubc li{font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:3px}
+.rubc .cel{cursor:default}
 /* El stack: cada cosa muestra en qué nivel está, de 0 a 5. Se lee de un vistazo
    cuánto le falta a cada negocio para estar montado de verdad. */
 .stgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
@@ -616,6 +631,57 @@ async fEdit(campo,etiqueta){
     {negocio_id:id,campo,valor:nuevo||null,actualizado:new Date().toISOString()});
   toast(nuevo?'Guardado':'Borrado');
 },
+/* ---------- LA TABLA DE CONVERSIÓN ----------
+   Sin esto, "bajo/medio/alto" es a ojo y cada día se califica distinto. Cada
+   nivel exige todo lo del anterior más lo suyo: no se salta. */
+RUBRICA:{
+ 'rd-fb':{n:'Facebook',
+   bajo:['Existe, pero sin logo ni portada','Sin datos de contacto ni horario',
+         'Dirección larga (facebook.com/profile.php?id=…)','Sin publicar hace más de un mes'],
+   medio:['Logo, portada y nombre de usuario corto','Información completa: dirección, teléfono, horario, sitio web',
+          'Botón de acción apuntando a WhatsApp','Publica al menos una vez por semana','Contesta los mensajes'],
+   alto:['Pauta corriendo','Píxel instalado y midiendo','Publica tres o más veces por semana',
+         'Contesta en menos de una hora','Catálogo de productos conectado']},
+ 'rd-ig':{n:'Instagram',
+   bajo:['Cuenta personal o a medio llenar','Menos de nueve publicaciones','Sin biografía ni enlace',
+         'No está enlazada a la página de Facebook'],
+   medio:['Cuenta de empresa, enlazada a la página','Biografía con enlace al sitio o al WhatsApp',
+          'Feed con doce o más publicaciones','Historias al menos una vez por semana'],
+   alto:['Reels seguido, no solo fotos','Pauta corriendo','Contesta los mensajes directos',
+         'Seguidores reales creciendo, no comprados']},
+ 'rd-wa':{n:'WhatsApp',
+   bajo:['Número personal, sin perfil de empresa','Sin horario ni catálogo','Se contesta cuando se puede'],
+   medio:['WhatsApp Business con perfil completo','Catálogo cargado con precios',
+          'Respuestas rápidas para lo que más preguntan','Mensaje de ausencia fuera del horario'],
+   alto:['API conectada, no solo la app','Agente o bot contestando de primero',
+         'Plantillas aprobadas por Meta','Se mide cuántos escriben y cuántos compran']},
+ 'rd-tt':{n:'TikTok',
+   bajo:['Cuenta creada sin contenido','Sin biografía ni enlace'],
+   medio:['Cuenta de empresa','Publica al menos una vez por semana','Biografía con enlace'],
+   alto:['Tres o más videos por semana','Pauta corriendo','Videos con tracción, no solo publicados']},
+ 'rd-yt':{n:'YouTube',
+   bajo:['Canal creado, sin videos ni banner'],
+   medio:['Canal con marca y descripción','Cinco o más videos','Enlaces al sitio y al WhatsApp'],
+   alto:['Publica todos los meses','Shorts además de videos largos','Los videos se usan en la pauta']},
+ 'rd-web':{n:'Sitio web',
+   bajo:['Dominio comprado pero sin página','O página sin datos de contacto','Sin https'],
+   medio:['Dominio propio con https','Productos con precios','Dirección, horario y WhatsApp visibles'],
+   alto:['Dominio verificado en Meta','Píxel instalado','Catálogo conectado a Meta',
+         'Se mide cuánta gente escribe desde la página']},
+},
+verRub(){ this._rub=!this._rub; return this.vRedes(); },
+_rubrica(){
+  if(!this._rub) return '';
+  const bloque=(k,r)=>'<div class="rub"><h3>'+esc(r.n)+'</h3><div class="rubg">'
+    +[['bajo',r.bajo],['medio',r.medio],['alto',r.alto]].map(([niv,li])=>
+      '<div class="rubc"><span class="cel v-'+niv+'">'+niv+'</span><ul>'
+      +li.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>').join('')
+    +'</div></div>';
+  return '<div class="rubwrap">'
+    +'<div class="rubnota">Cada nivel exige todo lo del anterior, más lo suyo. '
+    +'Si le falta una sola cosa del nivel, todavía no está en ese nivel.</div>'
+    +Object.keys(this.RUBRICA).map(k=>bloque(k,this.RUBRICA[k])).join('')+'</div>';
+},
 async vRedes(){
   await this._matriz();
   const {neg,items,val}=this._mx;
@@ -626,6 +692,8 @@ async vRedes(){
       return '<td class="costo">'+Math.round(p/(L.length*3)*100)+'%</td>'; }).join('')+'</tr>';
   $('main').innerHTML='<h1>📱 Redes</h1>'
    +'<div class="sub">Cómo está cada red en cada negocio. Haz clic para cambiarla.</div>'
+   +'<button class="rubbtn'+(this._rub?' on':'')+'" onclick="App.verRub()">📐 Variables de puntuación</button>'
+   +this._rubrica()
    +'<div class="mleg">'
    +'<span><span class="cel v-alto">alto</span> publica seguido, con pauta y midiendo</span>'
    +'<span><span class="cel v-medio">medio</span> perfil completo, publica y contesta</span>'
