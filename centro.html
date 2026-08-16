@@ -543,13 +543,18 @@ _link(campo,v){
   if(campo==='drive') return /^https?:/.test(u)?u:'';
   return '';
 },
-async vCuentas(){
+/* La ficha la miran dos pestañas: Cuentas y Redes. Se carga una sola vez. */
+async _cargarFicha(){
+  if(this._fic) return;
   const [neg,fichas]=await Promise.all([
     api('nc_negocio?select=id,nombre&activo=is.true&order=orden'),
     api('nc_ficha?select=*')]);
   this._neg=neg;
   this._fic={}; fichas.forEach(f=>this._fic[f.negocio_id+'|'+f.campo]=f.valor||'');
   if(!neg.some(n=>n.id===this._fneg)) this._fneg=neg[0]&&neg[0].id;
+},
+async vCuentas(){
+  await this._cargarFicha();
   this.pintaFicha();
 },
 /* Los ocho pasos para dejar un negocio andando. Cada uno se da por hecho cuando
@@ -577,7 +582,7 @@ _montaje(){
   const {_neg:neg,_fic:fic}=this;
   const cel=(n,c)=>{ const hay=!!fic[n.id+'|'+c];
     return '<td><span class="mont'+(hay?' ok':'')+'" title="'+(hay?esc(fic[n.id+'|'+c]):'falta')+'" '
-      +'onclick="App.fSel(\''+n.id+'\')">'+(hay?'✓':'')+'</span></td>'; };
+      +'onclick="App.irFicha(\''+n.id+'\')">'+(hay?'✓':'')+'</span></td>'; };
   const pie='<tr class="mtot"><td class="it">Montado</td>'
     +neg.map(n=>{ const k=this.MONTAJE.filter(([c])=>fic[n.id+'|'+c]).length;
       return '<td>'+Math.round(k/this.MONTAJE.length*100)+'%</td>'; }).join('')+'</tr>';
@@ -620,6 +625,7 @@ pintaFicha(){
    +grupos;
 },
 fSel(id){ this._fneg=id; this.pintaFicha(); },
+irFicha(id){ this._fneg=id; this.go('cuentas'); },
 async fEdit(campo,etiqueta){
   const id=this._fneg, k=id+'|'+campo, antes=this._fic[k]||'';
   const v=prompt(etiqueta+':',antes);
@@ -684,6 +690,7 @@ _rubrica(){
 },
 async vRedes(){
   await this._matriz();
+  await this._cargarFicha();
   const {neg,items,val}=this._mx;
   const L=items.filter(x=>x.clase==='red');
   const punt={alto:3,medio:2,bajo:1,no:0};
@@ -694,6 +701,11 @@ async vRedes(){
    +'<div class="sub">Cómo está cada red en cada negocio. Haz clic para cambiarla.</div>'
    +'<button class="rubbtn'+(this._rub?' on':'')+'" onclick="App.verRub()">📐 Variables de puntuación</button>'
    +this._rubrica()
+   +'<h2 class="fh2">Lo que debe tener el negocio</h2>'
+   +'<div class="fsub">Los pasos del montaje. Un paso se da por hecho cuando su dato está '
+   +'en la ficha, en la pestaña Cuentas.</div>'
+   +this._montaje()
+   +'<h2 class="fh2">Cómo está cada red</h2>'
    +'<div class="mleg">'
    +'<span><span class="cel v-alto">alto</span> publica seguido, con pauta y midiendo</span>'
    +'<span><span class="cel v-medio">medio</span> perfil completo, publica y contesta</span>'
