@@ -493,7 +493,7 @@ CAMPOS:[
    ['horario','Horario de atención']]],
  ['Correo y Google',[
    ['email','Correo principal'],['google','Cuenta de Google'],
-   ['drive','Carpeta en Drive']]],
+   ['email_dominio','Correo con dominio propio'],['drive','Carpeta en Drive']]],
  ['WhatsApp',[
    ['wa_basico','WhatsApp Business (app)'],
    ['wa_api','WhatsApp API (número)'],
@@ -505,10 +505,13 @@ CAMPOS:[
    ['meta_portafolio','Portafolio (ID)'],
    ['meta_cuenta_pub','Cuenta publicitaria'],
    ['meta_pixel','Píxel'],
+   ['dominio_verificado','Dominio verificado en Meta'],
+   ['medio_pago','Medio de pago cargado'],
    ['fb_perfil_dueno','Perfil dueño del portafolio']]],
  ['Web y dominio',[
    ['sitio','Sitio web'],['dominio','Dominio'],
-   ['registrador','Dónde está el dominio'],['vence','Vence el dominio']]],
+   ['registrador','Dónde está el dominio'],['vence','Vence el dominio'],
+   ['catalogo','Catálogo de productos'],['maps','Ficha en Google Maps']]],
 ],
 _totCampos(){ return this.CAMPOS.reduce((a,g)=>a+g[1].length,0); },
 /* Un enlace directo cuando el dato sirve para ir a alguna parte */
@@ -538,14 +541,22 @@ async vCuentas(){
    su campo de la ficha tiene algo: así la matriz nunca miente ni hay que
    mantenerla a mano. */
 MONTAJE:[
- ['google',         'Cuenta de Google'],
- ['dominio',        'Dominio propio'],
- ['sitio',          'Página web'],
- ['meta_portafolio','Portafolio de Meta'],
- ['wa_api',         'WhatsApp API'],
- ['facebook',       'Página de Facebook'],
- ['instagram',      'Instagram'],
- ['wa_basico',      'WhatsApp Business'],
+ ['google',           'Cuenta de Google'],
+ ['dominio',          'Dominio propio'],
+ ['sitio',            'Página web'],
+ ['catalogo',         'Catálogo de productos'],
+ ['email_dominio',    'Correo con dominio propio'],
+ ['meta_portafolio',  'Portafolio de Meta'],
+ ['dominio_verificado','Dominio verificado en Meta'],
+ ['meta_cuenta_pub',  'Cuenta publicitaria'],
+ ['medio_pago',       'Medio de pago cargado'],
+ ['meta_pixel',       'Píxel instalado'],
+ ['facebook',         'Página de Facebook'],
+ ['instagram',        'Instagram'],
+ ['tiktok',           'TikTok'],
+ ['wa_basico',        'WhatsApp Business'],
+ ['wa_api',           'WhatsApp API'],
+ ['maps',             'Ficha en Google Maps'],
 ],
 _montaje(){
   const {_neg:neg,_fic:fic}=this;
