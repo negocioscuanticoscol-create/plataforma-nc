@@ -124,6 +124,13 @@ table.mx .it i{font-style:normal;color:var(--sub);font-size:11px;display:block;m
 .fbar{height:6px;border-radius:999px;background:var(--line);overflow:hidden;margin:6px 0 18px;max-width:420px}
 .fbar>i{display:block;height:100%;background:var(--ok);border-radius:999px}
 @media(max-width:560px){.frow{flex-wrap:wrap;gap:2px}.frow>.k{flex:1 0 100%}}
+.fh2{font-size:14px;font-weight:700;margin:22px 0 3px}
+.fh2:first-of-type{margin-top:6px}
+.fsub{font-size:12.5px;color:var(--sub);margin-bottom:10px}
+.mont{display:inline-block;min-width:34px;padding:3px 9px;border-radius:6px;font-size:12px;
+  font-weight:700;cursor:pointer;border:1px dashed var(--line);color:#5c6570;user-select:none}
+.mont.ok{background:#12351f;color:#5fd39a;border:1px solid transparent}
+.mont:hover{border-color:var(--sub)}
 /* El stack: cada cosa muestra en qué nivel está, de 0 a 5. Se lee de un vistazo
    cuánto le falta a cada negocio para estar montado de verdad. */
 .stgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
@@ -527,6 +534,33 @@ async vCuentas(){
   if(!neg.some(n=>n.id===this._fneg)) this._fneg=neg[0]&&neg[0].id;
   this.pintaFicha();
 },
+/* Los ocho pasos para dejar un negocio andando. Cada uno se da por hecho cuando
+   su campo de la ficha tiene algo: así la matriz nunca miente ni hay que
+   mantenerla a mano. */
+MONTAJE:[
+ ['google',         'Cuenta de Google'],
+ ['dominio',        'Dominio propio'],
+ ['sitio',          'Página web'],
+ ['meta_portafolio','Portafolio de Meta'],
+ ['wa_api',         'WhatsApp API'],
+ ['facebook',       'Página de Facebook'],
+ ['instagram',      'Instagram'],
+ ['wa_basico',      'WhatsApp Business'],
+],
+_montaje(){
+  const {_neg:neg,_fic:fic}=this;
+  const cel=(n,c)=>{ const hay=!!fic[n.id+'|'+c];
+    return '<td><span class="mont'+(hay?' ok':'')+'" title="'+(hay?esc(fic[n.id+'|'+c]):'falta')+'" '
+      +'onclick="App.fSel(\''+n.id+'\')">'+(hay?'✓':'')+'</span></td>'; };
+  const pie='<tr class="mtot"><td class="it">Montado</td>'
+    +neg.map(n=>{ const k=this.MONTAJE.filter(([c])=>fic[n.id+'|'+c]).length;
+      return '<td>'+Math.round(k/this.MONTAJE.length*100)+'%</td>'; }).join('')+'</tr>';
+  return '<div class="mwrap"><table class="mx"><thead><tr><th class="it">Paso</th>'
+    +neg.map(n=>'<th>'+esc(n.nombre)+'</th>').join('')+'</tr></thead><tbody>'
+    +this.MONTAJE.map(([c,et])=>'<tr><td class="it"><b>'+esc(et)+'</b></td>'
+       +neg.map(n=>cel(n,c)).join('')+'</tr>').join('')
+    +pie+'</tbody></table></div>';
+},
 pintaFicha(){
   const neg=this._neg, fic=this._fic, id=this._fneg, tot=this._totCampos();
   const llenos=n=>this.CAMPOS.reduce((a,g)=>a+g[1].filter(([c])=>fic[n+'|'+c]).length,0);
@@ -550,6 +584,10 @@ pintaFicha(){
    +'La llave que lee esta tabla está dentro del HTML de la app, así que quien abra el código '
    +'puede leerla. Nombres de cuenta, correos y números no son secreto; las claves sí. '
    +'Esas van en tu gestor de contraseñas.</div></div>'
+   +'<h2 class="fh2">Cómo va el montaje</h2>'
+   +'<div class="fsub">Un paso se da por hecho cuando su dato está en la ficha. Haz clic en una columna para abrir ese negocio.</div>'
+   +this._montaje()
+   +'<h2 class="fh2">La ficha de cada negocio</h2>'
    +'<div class="fchips">'+chips+'</div>'
    +'<div style="font-size:12.5px;color:var(--sub)"><b style="color:var(--tx)">'+n+' de '+tot+'</b> datos puestos · falta '+(tot-n)+'</div>'
    +'<div class="fbar"><i style="width:'+pct+'%"></i></div>'
