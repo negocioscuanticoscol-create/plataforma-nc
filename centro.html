@@ -146,6 +146,10 @@ table.mx .it i{font-style:normal;color:var(--sub);font-size:11px;display:block;m
 .rubc>ul{margin:8px 0 0;padding-left:17px}
 .rubc li{font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:3px}
 .rubc .cel{cursor:default}
+.rubc li{cursor:pointer;border-radius:4px;padding:1px 4px;margin-left:-4px}
+.rubc li:hover{background:var(--bg);color:var(--tx)}
+.rubc li.add{list-style:none;margin-left:-17px;color:var(--acc);font-weight:600;opacity:.75}
+.rubc li.add:hover{opacity:1;background:transparent}
 /* El stack: cada cosa muestra en qué nivel está, de 0 a 5. Se lee de un vistazo
    cuánto le falta a cada negocio para estar montado de verdad. */
 .stgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(330px,1fr))}
@@ -638,55 +642,55 @@ async fEdit(campo,etiqueta){
   toast(nuevo?'Guardado':'Borrado');
 },
 /* ---------- LA TABLA DE CONVERSIÓN ----------
-   Sin esto, "bajo/medio/alto" es a ojo y cada día se califica distinto. Cada
-   nivel exige todo lo del anterior más lo suyo: no se salta. */
-RUBRICA:{
- 'rd-fb':{n:'Facebook',
-   bajo:['Existe, pero sin logo ni portada','Sin datos de contacto ni horario',
-         'Dirección larga (facebook.com/profile.php?id=…)','Sin publicar hace más de un mes'],
-   medio:['Logo, portada y nombre de usuario corto','Información completa: dirección, teléfono, horario, sitio web',
-          'Botón de acción apuntando a WhatsApp','Publica al menos una vez por semana','Contesta los mensajes'],
-   alto:['Pauta corriendo','Píxel instalado y midiendo','Publica tres o más veces por semana',
-         'Contesta en menos de una hora','Catálogo de productos conectado']},
- 'rd-ig':{n:'Instagram',
-   bajo:['Cuenta personal o a medio llenar','Menos de nueve publicaciones','Sin biografía ni enlace',
-         'No está enlazada a la página de Facebook'],
-   medio:['Cuenta de empresa, enlazada a la página','Biografía con enlace al sitio o al WhatsApp',
-          'Feed con doce o más publicaciones','Historias al menos una vez por semana'],
-   alto:['Reels seguido, no solo fotos','Pauta corriendo','Contesta los mensajes directos',
-         'Seguidores reales creciendo, no comprados']},
- 'rd-wa':{n:'WhatsApp',
-   bajo:['Número personal, sin perfil de empresa','Sin horario ni catálogo','Se contesta cuando se puede'],
-   medio:['WhatsApp Business con perfil completo','Catálogo cargado con precios',
-          'Respuestas rápidas para lo que más preguntan','Mensaje de ausencia fuera del horario'],
-   alto:['API conectada, no solo la app','Agente o bot contestando de primero',
-         'Plantillas aprobadas por Meta','Se mide cuántos escriben y cuántos compran']},
- 'rd-tt':{n:'TikTok',
-   bajo:['Cuenta creada sin contenido','Sin biografía ni enlace'],
-   medio:['Cuenta de empresa','Publica al menos una vez por semana','Biografía con enlace'],
-   alto:['Tres o más videos por semana','Pauta corriendo','Videos con tracción, no solo publicados']},
- 'rd-yt':{n:'YouTube',
-   bajo:['Canal creado, sin videos ni banner'],
-   medio:['Canal con marca y descripción','Cinco o más videos','Enlaces al sitio y al WhatsApp'],
-   alto:['Publica todos los meses','Shorts además de videos largos','Los videos se usan en la pauta']},
- 'rd-web':{n:'Sitio web',
-   bajo:['Dominio comprado pero sin página','O página sin datos de contacto','Sin https'],
-   medio:['Dominio propio con https','Productos con precios','Dirección, horario y WhatsApp visibles'],
-   alto:['Dominio verificado en Meta','Píxel instalado','Catálogo conectado a Meta',
-         'Se mide cuánta gente escribe desde la página']},
+   Qué exige cada nivel en cada red. Vive en nc_rubrica y se edita desde acá:
+   los criterios cambian con el tiempo y una lista clavada en el código se muere. */
+REDES:[['rd-fb','Facebook'],['rd-ig','Instagram'],['rd-wa','WhatsApp'],
+       ['rd-tt','TikTok'],['rd-yt','YouTube'],['rd-web','Sitio web']],
+NIVELES:['bajo','medio','alto'],
+async verRub(){
+  this._rub=!this._rub;
+  if(this._rub && !this._crit) this._crit=await api('nc_rubrica?select=*&order=red,orden,id');
+  return this.vRedes();
 },
-verRub(){ this._rub=!this._rub; return this.vRedes(); },
 _rubrica(){
   if(!this._rub) return '';
-  const bloque=(k,r)=>'<div class="rub"><h3>'+esc(r.n)+'</h3><div class="rubg">'
-    +[['bajo',r.bajo],['medio',r.medio],['alto',r.alto]].map(([niv,li])=>
-      '<div class="rubc"><span class="cel v-'+niv+'">'+niv+'</span><ul>'
-      +li.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>').join('')
+  const cr=this._crit||[];
+  const bloque=([k,nom])=>'<div class="rub"><h3>'+esc(nom)+'</h3><div class="rubg">'
+    +this.NIVELES.map(niv=>{
+      const li=cr.filter(c=>c.red===k&&c.nivel===niv);
+      return '<div class="rubc"><span class="cel v-'+niv+'">'+niv+'</span><ul>'
+       +li.map(c=>'<li onclick="App.critEdit('+c.id+')">'+esc(c.texto)+'</li>').join('')
+       +'<li class="add" onclick="App.critAdd(\''+k+'\',\''+niv+'\')">+ agregar</li>'
+       +'</ul></div>'; }).join('')
     +'</div></div>';
   return '<div class="rubwrap">'
     +'<div class="rubnota">Cada nivel exige todo lo del anterior, más lo suyo. '
-    +'Si le falta una sola cosa del nivel, todavía no está en ese nivel.</div>'
-    +Object.keys(this.RUBRICA).map(k=>bloque(k,this.RUBRICA[k])).join('')+'</div>';
+    +'Si le falta una sola cosa del nivel, todavía no está en ese nivel. '
+    +'<b>Haz clic en un criterio para cambiarlo</b>, o déjalo vacío para borrarlo.</div>'
+    +this.REDES.map(bloque).join('')+'</div>';
+},
+async critEdit(id){
+  const c=(this._crit||[]).find(x=>x.id===id); if(!c) return;
+  const v=prompt('Criterio:',c.texto);
+  if(v===null) return;
+  const t=v.trim();
+  if(t===c.texto) return;
+  if(!t){ this._crit=this._crit.filter(x=>x.id!==id); await this.vRedes();
+    await api('nc_rubrica?id=eq.'+id,{method:'DELETE',headers:{...H,Prefer:'return=minimal'}});
+    toast('Borrado'); return; }
+  c.texto=t; await this.vRedes();
+  await patch('nc_rubrica?id=eq.'+id,{texto:t}); toast('Guardado');
+},
+async critAdd(red,nivel){
+  const v=prompt('Nuevo criterio para '+nivel+':','');
+  if(!v||!v.trim()) return;
+  const t=v.trim();
+  const li=(this._crit||[]).filter(c=>c.red===red&&c.nivel===nivel);
+  const orden=(li.length?+li[li.length-1].orden||0:0)+10;
+  const r=await api('nc_rubrica',{method:'POST',body:JSON.stringify({red,nivel,texto:t,orden}),
+    headers:{...H,Prefer:'return=representation'}});
+  if(r&&r[0]) this._crit.push(r[0]);
+  await this.vRedes(); toast('Agregado');
 },
 async vRedes(){
   await this._matriz();
