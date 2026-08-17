@@ -101,6 +101,39 @@ table.mx .it i{font-style:normal;color:var(--sub);font-size:11px;display:block;m
 .mtot td{background:var(--bg);font-weight:700}
 /* La ficha: los datos de identidad de un negocio, en grupos.
    Lo que falta se ve tan claro como lo que está. */
+/* ---------- PAUTA: una tarjeta por anuncio ---------- */
+.pbar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:16px}
+.pkpi{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:10px 15px;min-width:112px}
+.pkpi b{display:block;font-size:19px;font-weight:800;line-height:1.25}
+.pkpi i{font-style:normal;font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.07em}
+.pkpi.edit{cursor:pointer;border-style:dashed}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:13px}
+.pcard{background:var(--card);border:1px solid var(--line);border-radius:13px;overflow:hidden;display:flex;flex-direction:column}
+.pcard.v-ganador{border-color:var(--ok)}
+.pcard.v-bajar{border-color:var(--rosa)}
+.pcard.v-vigilar{border-color:var(--acc2)}
+.pthumb{position:relative;aspect-ratio:1/1;background:#0a0d13;display:flex;align-items:center;justify-content:center}
+.pthumb img{width:100%;height:100%;object-fit:cover;display:block}
+.pthumb .sinimg{color:var(--faint);font-size:30px}
+/* el play deja claro de un vistazo cuáles son video y cuáles imagen */
+.pplay{position:absolute;left:8px;bottom:8px;background:rgba(0,0,0,.62);border-radius:7px;
+  padding:2px 8px;font-size:11px;font-weight:700;letter-spacing:.04em}
+.pver{position:absolute;right:8px;top:8px;border-radius:999px;padding:3px 11px;font-size:11px;
+  font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#0b0e11}
+.pver.ganador{background:var(--ok)} .pver.bien{background:var(--azul)}
+.pver.vigilar{background:var(--acc2)} .pver.bajar{background:var(--rosa);color:#fff}
+.pver.sin_datos,.pver.sin_meta{background:var(--faint);color:#fff}
+.pbody{padding:11px 13px 13px;display:flex;flex-direction:column;gap:9px;flex:1}
+.pnom{font-weight:700;font-size:13.5px;line-height:1.3}
+.pcamp{font-size:11.5px;color:var(--faint)}
+.pnums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line);padding:9px 0}
+.pnums div{text-align:center}
+.pnums b{display:block;font-size:13.5px;font-weight:800}
+.pnums i{font-style:normal;font-size:9.5px;color:var(--sub);text-transform:uppercase;letter-spacing:.05em}
+.pnota{font-size:12.5px;color:var(--sub);line-height:1.5}
+.psube{color:var(--rosa);font-weight:800} .pbaja{color:var(--ok);font-weight:800}
+.papag{opacity:.5}
 .fchips{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 16px}
 .fchip{padding:6px 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
   color:var(--sub);font-size:12.5px;cursor:pointer;font-weight:600}
@@ -204,13 +237,13 @@ const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'
 
 const App={
 vista:'resumen',
-TABS:[['resumen','📊 Resumen'],['cuentas','🪪 Cuentas'],['agentes','🤖 Agentes'],['herram','🧰 Herramientas'],['redes','📱 Redes'],['financiero','💰 Financiero']],
+TABS:[['resumen','📊 Resumen'],['pauta','📣 Pauta'],['cuentas','🪪 Cuentas'],['agentes','🤖 Agentes'],['herram','🧰 Herramientas'],['redes','📱 Redes'],['financiero','💰 Financiero']],
 /* las apps del ecosistema · las periféricas leen nc_clientes para saber a quién sirven */
 APPS:{app:'📱 App propia',callprospector:'📞 CallProspector',marcador:'☎️ Marcador',
       reservas:'📅 Reservas',bot:'🤖 Bot WhatsApp',pauta:'📣 Pauta'},
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({resumen:this.vResumen,cuentas:this.vCuentas,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero}[v]||this.vResumen).call(this); },
+  ({resumen:this.vResumen,pauta:this.vPauta,cuentas:this.vCuentas,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero}[v]||this.vResumen).call(this); },
 
 async vFinanciero(){
   const lineas=await api('nc_finanzas?order=orden&limit=500');
@@ -547,6 +580,103 @@ _link(campo,v){
   if(campo==='wa_basico'||campo==='wa_api') return 'https://wa.me/'+u.replace(/[^0-9]/g,'');
   if(campo==='drive'||campo==='qr') return /^https?:/.test(u)?u:'';
   return '';
+},
+/* ---------- PAUTA ----------
+   Cada anuncio con su miniatura y sus números. Los datos NO salen de Meta: los deja
+   el recolector en nc_pauta_lectura tres veces al día (8am, 12m, 5pm). El token de
+   Meta no puede vivir acá porque este HTML se publica. */
+VERD:{bajar:['bajar',0],vigilar:['vigilar',1],ganador:['ganador',2],bien:['bien',3],
+      sin_datos:['sin datos',4],sin_meta:['sin meta',5]},
+_pneg:null,
+async vPauta(){
+  const [filas,negs,objs]=await Promise.all([
+    api('nc_pauta_hoy?select=*'),
+    api('nc_negocio?select=id,nombre&activo=is.true&order=orden'),
+    api('nc_pauta_objetivo?select=*')]);
+  this._pf=filas; this._pn=negs; this._po={}; objs.forEach(o=>this._po[o.negocio_id]=o.costo_objetivo);
+  /* Se listan los negocios que tienen pauta montada, aunque todavía no hayan gastado:
+     así se ve que a Nido y Kruh les falta arrancar, en vez de que desaparezcan. */
+  const conPauta=new Set([...filas.map(f=>f.negocio_id),...objs.map(o=>o.negocio_id)]);
+  this._plista=negs.filter(n=>conPauta.has(n.id));
+  if(!this._plista.some(n=>n.id===this._pneg)) this._pneg=(this._plista[0]||{}).id;
+  this.pintaPauta();
+},
+pintaPauta(){
+  const id=this._pneg, mias=this._pf.filter(f=>f.negocio_id===id), obj=this._po[id];
+  const chips=this._plista.map(n=>{
+    const k=this._pf.filter(f=>f.negocio_id===n.id).length;
+    return `<button class="fchip${n.id===id?' on':''}" onclick="App.pSel('${n.id}')">`
+      +`<b>${esc(n.nombre)}</b><i>${k}</i></button>`;}).join('');
+
+  const gasto=mias.reduce((a,f)=>a+(+f.gasto||0),0);
+  const res=mias.reduce((a,f)=>a+(+f.resultados||0),0);
+  const prom=res?gasto/res:0;
+  const rojos=mias.filter(f=>f.veredicto==='bajar').length;
+  const plata=mias.filter(f=>f.veredicto==='bajar').reduce((a,f)=>a+(+f.gasto||0),0);
+  const ult=mias.map(f=>f.momento).sort().pop();
+
+  const barra='<div class="pbar">'
+   +`<div class="pkpi"><b>$${nm(gasto)}</b><i>gastado</i></div>`
+   +`<div class="pkpi"><b>${nm(res)}</b><i>resultados</i></div>`
+   +`<div class="pkpi"><b>$${nm(prom)}</b><i>costo real</i></div>`
+   +`<div class="pkpi edit" onclick="App.pMeta('${id}')"><b>${obj?'$'+nm(obj):'—'}</b><i>meta ✏️</i></div>`
+   +(rojos?`<div class="pkpi"><b style="color:var(--rosa)">$${nm(plata)}</b><i>en ${rojos} para bajar</i></div>`:'')
+   +'</div>';
+
+  if(!mias.length){
+    $('main').innerHTML='<h1>📣 Pauta</h1>'+this._psub(ult)+'<div class="fchips">'+chips+'</div>'
+     +'<div class="card">Este negocio todavía no tiene anuncios corriendo. Apenas prendas el primero, '
+     +'aparece acá solo en la siguiente lectura.</div>'; return; }
+
+  const V=this.VERD;
+  mias.sort((a,b)=>(V[a.veredicto]||V.sin_meta)[1]-(V[b.veredicto]||V.sin_meta)[1] || (+b.gasto||0)-(+a.gasto||0));
+  $('main').innerHTML='<h1>📣 Pauta</h1>'+this._psub(ult)
+   +'<div class="fchips">'+chips+'</div>'+barra
+   +'<div class="pgrid">'+mias.map(f=>this._ptarjeta(f)).join('')+'</div>';
+},
+_psub(ult){
+  const c=ult?new Date(ult).toLocaleString('es-CO',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'nunca';
+  return `<div class="sub">Cada anuncio con su video y sus números. Se revisa a las <b>8am, 12m y 5pm</b>. `
+    +`Última lectura: <b>${esc(c)}</b>. Los veredictos comparan contra la meta de costo por resultado del negocio.</div>`;
+},
+_ptarjeta(f){
+  const V=this.VERD, v=f.veredicto||'sin_meta', et=(V[v]||V.sin_meta)[0];
+  const cr=+f.costo_resultado||0, ant=+f.costo_anterior||0;
+  /* La flecha vale más que el número suelto: un anuncio "aceptable" que viene subiendo
+     se está muriendo, y el promedio no lo muestra. */
+  let fl='';
+  if(cr&&ant){ const d=(cr-ant)/ant*100;
+    if(d>=15) fl=` <span class="psube">↑${Math.round(d)}%</span>`;
+    else if(d<=-15) fl=` <span class="pbaja">↓${Math.round(-d)}%</span>`; }
+  const apagado=/PAUSED|ARCHIVED|DELETED/.test(f.estado||'');
+  const img=f.miniatura
+    ? `<img src="${esc(f.miniatura)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'sinimg',textContent:'🖼️'}))">`
+    : '<div class="sinimg">🖼️</div>';
+  return `<div class="pcard v-${v}${apagado?' papag':''}">`
+   +`<div class="pthumb">${img}<span class="pver ${v}">${et}</span>`
+   +(f.tipo==='VIDEO'?'<span class="pplay">▶ video</span>':'<span class="pplay">🖼 imagen</span>')+'</div>'
+   +'<div class="pbody">'
+   +`<div><div class="pnom">${esc(f.nombre||'Sin nombre')}</div>`
+   +`<div class="pcamp">${esc(f.campana||'')}${apagado?' · apagado':''}</div></div>`
+   +'<div class="pnums">'
+   +`<div><b>$${nm(f.gasto)}</b><i>gasto</i></div>`
+   +`<div><b>${nm(f.resultados)}</b><i>result.</i></div>`
+   +`<div><b>${cr?'$'+nm(cr):'—'}${fl}</b><i>c/u</i></div>`
+   +`<div><b>${(+f.frecuencia||0).toFixed(1)}</b><i>frec.</i></div>`
+   +'</div>'
+   +`<div class="pnota">${esc(f.nota||'')}</div>`
+   +'</div></div>';
+},
+pSel(id){ this._pneg=id; this.pintaPauta(); },
+async pMeta(id){
+  const v=prompt('¿Cuánto es lo máximo que estás dispuesto a pagar por un resultado en este negocio? (en pesos)',
+                 this._po[id]||'');
+  if(v===null) return;
+  const n=+String(v).replace(/[^0-9]/g,'')||null;
+  this._po[id]=n; this.pintaPauta();
+  await post('nc_pauta_objetivo?on_conflict=negocio_id',
+    {negocio_id:id,costo_objetivo:n,actualizado:new Date().toISOString()});
+  toast(n?'Meta guardada · se aplica en la próxima lectura':'Meta borrada');
 },
 /* La ficha la miran dos pestañas: Cuentas y Redes. Se carga una sola vez. */
 async _cargarFicha(){
