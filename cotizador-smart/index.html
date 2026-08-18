@@ -110,6 +110,7 @@ a{text-decoration:none;color:inherit}
 .cqleft{display:flex;align-items:center;gap:5px}
 .cdot-t{width:12px;height:12px;border-radius:50%;background:linear-gradient(135deg,#fff 50%,#ccc 50%);border:1px solid #ccc;flex-shrink:0}
 .cdot-b{width:12px;height:12px;border-radius:50%;background:#fff;border:1.5px solid #bbb;flex-shrink:0}
+.cdot-n{width:12px;height:12px;border-radius:50%;background:#23262b;border:1px solid #111;flex-shrink:0}
 .clabel{font-size:11px;font-weight:600;color:var(--t2)}
 .cqright{display:flex;align-items:center;gap:5px}
 .qinp{width:68px;background:white;border:1.5px solid var(--bd2);border-radius:8px;color:var(--dark);font-family:'IBM Plex Mono',monospace;font-size:16px;font-weight:500;padding:6px 8px;outline:none;text-align:center;-webkit-appearance:none}
@@ -472,10 +473,10 @@ const CAT = {
     {id:'f180',  oz:'6 oz', v:'180 ml', d:'Ø95×45',   pk:1056, col:['transparente','blanco'],       t:[851,786,729,681,638]},
     {id:'f240',  oz:'8 oz', v:'240 ml', d:'Ø95×54',    pk:480, col:['transparente','blanco'],       t:[802,741,687,642,601]},
     {id:'f365',  oz:'12.5 oz', v:'365 ml', d:'Ø97×82',    pk:600, col:['blanco','transparente'],       t:[1069,987,916,855,801]},
-    {id:'f520',  oz:'17.5 oz', v:'520 ml', d:'Ø95×116',   pk:575, col:['transparente','blanco'],       t:[1190,1099,1019,952,892]},
+    {id:'f520',  oz:'17.5 oz', v:'520 ml', d:'Ø95×116',   pk:575, col:['transparente','blanco','negro'], t:[1190,1099,1019,952,892]},
     {id:'f565',  oz:'19 oz', v:'565 ml', d:'Ø118×80',   pk:435, col:['transparente','blanco'],       t:[1255,1158,1075,1003,940]},
     {id:'f1001', oz:'34 oz', v:'1.000 ml',d:'Ø122×126', pk:308, col:['transparente','blanco'],       t:[1847,1706,1583,1478,1385]},
-    {id:'f1180', oz:'40 oz', v:'1.180 ml',d:'Ø133×131', pk:242, col:['transparente','blanco'],       t:[2626,2425,2251,2101,1969]}
+    {id:'f1180', oz:'40 oz', v:'1.180 ml',d:'Ø133×131', pk:242, col:['transparente','blanco','negro'], t:[2626,2425,2251,2101,1969]}
   ],
   pm: [
     {id:'pm330',  oz:'11 oz', v:'330 ml PET',   d:'Ø66.5×144', pk:2717, col:['transparente'],       t:[1066,984,913,852,799]},
@@ -486,11 +487,16 @@ const CAT = {
     {id:'f275',  oz:'9.5 oz', v:'275 ml',               d:'Ø95×72',       pk:720, col:['transparente','blanco'],  t:[931,860,798,745,698]},
     {id:'f285',  oz:'9.5 oz', v:'285 ml',               d:'Ø120×94×40',   pk:660, col:['blanco'],                 t:[951,878,815,760,713]},
     {id:'f400',  oz:'13.5 oz', v:'400 ml',               d:'Ø120×94×52',   pk:640, col:['transparente'],           t:[1028,949,881,822,771]},
-    {id:'f801',  oz:'27 oz', v:'801 ml',               d:'Ø125×94×126',  pk:414, col:['transparente'],           t:[1658,1530,1420,1326,1243]},
+    {id:'f801',  oz:'27 oz', v:'801 ml',               d:'Ø125×94×126',  pk:414, col:['transparente','blanco'],  t:[1658,1530,1420,1326,1243]},
     {id:'f1500c',oz:'50.5 oz', v:'Flexipack 1500 ml',    d:'Ø151×135 mm',  pk:189, col:['transparente'],           t:[2730,2534,2365,2217,2081]},
     {id:'f192',  v:'ITF 193×127mm Freeze', d:'193×127×65 mm',pk:300, col:['transparente'],           t:[1988,1835,1703,1591,1491]}
   ]
 };
+
+/* Los colores se manejaban con un if binario blanco/transparente. Al entrar el negro,
+   se pintaba y se escribía como "Transparente" en la cotización. Ahora van por tabla. */
+const COLNOM = {transparente:'Transparente', blanco:'Blanco', negro:'Negro'};
+const COLDOT = {transparente:'t', blanco:'b', negro:'n'};
 
 const KIT_PRECIO = 60000;
 const KIT_L2     = 60000;
@@ -678,8 +684,8 @@ function buildGridSorted(){
     if(!colorsDisp.length) return '';   // sin stock en ningún color → no se muestra
     const colorRows=colorsDisp.map(color=>{
       const cid=prod.id+'_'+color;
-      const dot=color==='blanco'?'<div class="cdot-b"></div>':'<div class="cdot-t"></div>';
-      const clabel=color==='blanco'?'Blanco':'Transparente';
+      const dot='<div class="cdot-'+(COLDOT[color]||'t')+'"></div>';
+      const clabel=COLNOM[color]||'Transparente';
       return `<div class="cqrow">
         <div class="cqleft">${dot}<span class="clabel">${clabel}</span>
           <span class="sbadge s-load" id="sb-${cid}" style="font-size:9px;padding:1px 5px;margin-left:3px">...</span>
@@ -949,7 +955,7 @@ function calcComision(sel){
 
 async function registrarEnSheets(estadoCot, irAPedidos){
   const sel=getSel(); const IVA=0.19; let subBase=0;
-  const productos=sel.map(s=>{ const precio=precioLinea(s); const subtotal=s.qty*precio; subBase+=subtotal; const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; return { ref:group+' '+s.prod.v, color:s.color==='blanco'?'Blanco':'Transparente', qty:s.qty, precio, subtotal }; });
+  const productos=sel.map(s=>{ const precio=precioLinea(s); const subtotal=s.qty*precio; subBase+=subtotal; const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; return { ref:group+' '+s.prod.v, color:COLNOM[s.color]||'Transparente', qty:s.qty, precio, subtotal }; });
   const iva=Math.round(subBase*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
   const fleteCalc = getFleteDisplay() ? 0 : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
