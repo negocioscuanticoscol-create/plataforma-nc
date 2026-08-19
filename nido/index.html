@@ -356,16 +356,27 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   _liqCom(p){ if(p.comision!=null&&p.comision!=='') return +p.comision||0;
     return this._liqTipo(p)==='Distribuidor'
       ? this._lpn('com_distribuidor',20000):this._lpn('com_publico',50000); },
-  /* Una sola cuenta por pedido; todo lo demás son sumas de esto. El transporte entra
-     por la DIFERENCIA: lo que le cobramos al cliente menos lo que nos costó. Si lo
-     pusimos nosotros el número es negativo y baja la utilidad, que es lo correcto. */
+  /* El transporte por sus dos lados: valor_transporte es lo que NOS cuesta (así se usó
+     siempre en esta app) y transp_cobrado lo que se le cobra al cliente. Solo la
+     DIFERENCIA toca la utilidad.
+     Cuando no hay número de lo cobrado —los pedidos de antes no tenían ese campo—
+     manda el MODO, que es lo que de verdad describe el trato:
+       cobrado  → se le pasa al cliente: entra y sale, la utilidad ni se entera
+       mitades  → se parte, la mitad la ponemos nosotros
+       incluido → va dentro del precio: lo asumimos entero
+       cliente  → le paga directo al transportador: no nos toca ni el costo */
+  _liqTransp(p){
+    const cos=+p.valor_transporte||0, mo=p.transp_modo||'cobrado';
+    if(mo==='cliente') return {cos:0,cob:0,res:0};
+    let cob=+p.transp_cobrado||0;
+    if(!cob){ if(mo==='cobrado') cob=cos; else if(mo==='mitades') cob=cos/2; }
+    return {cos,cob,res:cob-cos}; },
+  /* Una sola cuenta por pedido; todo lo demás son sumas de esto. */
   _liqCalc(p){
     const venta=+p.total||0, pct=this._lpn('iva_pct',19);
     const base=p.iva?venta/(1+pct/100):venta, iva=venta-base;
     const costo=this._liqCosto(p);
-    /* OJO con estos dos: valor_transporte es lo que NOS CUESTA (asi se usó siempre en
-       esta app), y transp_cobrado es lo que se le cobra al cliente. El costo RESTA. */
-    const tCos=+p.valor_transporte||0, tCob=+p.transp_cobrado||0, tRes=tCob-tCos;
+    const t=this._liqTransp(p), tCos=t.cos, tCob=t.cob, tRes=t.res;
     const com=this._liqCom(p), util=base-costo+tRes, rep=util-com;
     return {venta,base,iva,costo,tCob,tCos,tRes,com,util,rep,mitad:rep/2,tipo:this._liqTipo(p)}; },
   _liqPeds(){ const mes=this._liqMes||'';
