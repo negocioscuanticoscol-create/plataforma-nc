@@ -259,7 +259,7 @@ const MATCAT={
   'Calzado'         :['Cuero','Forro','Suela','Plantilla','Cordones','Pegante','Hilo'],
   'Confección'      :['Tela','Forro','Entretela','Cremallera','Botones','Hilo'],
 };
-const UNIDS=['unidad','metro','decímetro','par','juego','gramo','pliego'];
+const UNIDS=['unidad','metro','decímetro','pie','par','juego','gramo','pliego'];
 let COSPROD=null, COSITEMS=[], COSBASE=[];
 async function vCostos(){
   CAT=await get('zarrat_catalogo?order=nombre.asc&limit=300');
