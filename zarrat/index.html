@@ -127,14 +127,106 @@ const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,
 const del=(t,q)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'DELETE',headers:H});
 
 const TABS=[['pend','🏗️ Estructuración'],['gastos','💰 Gastos'],['clientes','👥 Clientes'],['medidas','📐 Medidas'],
-            ['catalogo','🖼️ Catálogo'],['prov','🚚 Proveedores'],['costos','🧵 Costos'],['cotiz','📋 Cotizaciones'],['pedidos','🧾 Pedidos'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
+            ['catalogo','🖼️ Catálogo'],['prov','🚚 Proveedores'],['costos','🧵 Costos'],['cotiz','📋 Cotizaciones'],['pedidos','🧾 Pedidos'],['horas','⏱️ Horas'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
 let TAB='pend', CLI=[], PRENDAS=[], CAT=[];
 $('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('');
 function go(t){
   TAB=t; TABS.forEach(([v])=>{const b=$('t_'+v); if(b)b.className=(v===t?'on':'');});
-  const V={pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,prov:vProv,costos:vCostos,cotiz:vCotiz,pedidos:vPedidos,ventas:vVentas,crm:vCrm}[t];
+  const V={pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,prov:vProv,costos:vCostos,cotiz:vCotiz,pedidos:vPedidos,horas:vHoras,ventas:vVentas,crm:vCrm}[t];
   if(V) safe(V,t)();
 }
+
+/* ═══════ HORAS · lo que NC le trabaja a este cliente ═══════
+   No es el trabajo del taller: es el tiempo que le metemos nosotros a esta app. Se
+   guarda en nc_hora con negocio_id, así que acá se ve lo de Zarrat y en el Centro de
+   Mando se ve el consolidado de todos los clientes sin volver a registrar nada.
+   Sin esto no se sabe cuál cliente sale caro ni cuánto cobrarle al siguiente. */
+const NEG_ID='zarrat';
+let USRS=[], HRS=[], HMES='';
+const hhmm=m=>{ m=Math.round(+m||0); const h=Math.floor(m/60); return h?h+'h '+(m%60)+'m':(m%60)+'m'; };
+function minsDe(i,f){ if(!i||!f) return 0;
+  const [a,b]=i.split(':').map(Number), [c,d]=f.split(':').map(Number);
+  let m=(c*60+d)-(a*60+b); if(m<0) m+=1440;   // pasó de medianoche
+  return m; }
+async function vHoras(){
+  USRS=await get('nc_usuario?activo=is.true&order=nombre.asc');
+  HRS=await get('nc_hora?negocio_id=eq.'+NEG_ID+'&order=fecha.desc&limit=800');
+  const meses=[...new Set(HRS.map(x=>String(x.fecha||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  if(HMES&&!meses.includes(HMES)) HMES='';
+  const vis=HMES?HRS.filter(x=>String(x.fecha||'').slice(0,7)===HMES):HRS;
+  const tot=vis.reduce((s,x)=>s+(+x.minutos||0),0);
+  const plata=vis.reduce((s,x)=>{ const u=USRS.find(y=>y.id===x.usuario_id);
+    return s+(+x.minutos||0)/60*(+(u&&u.tarifa_hora)||0); },0);
+  const porU={}; vis.forEach(x=>{ porU[x.usuario_id]=(porU[x.usuario_id]||0)+(+x.minutos||0); });
+  const hoy=new Date().toISOString().slice(0,10);
+  $('main').innerHTML=`<h1>Horas</h1>
+    <div class="sub">El tiempo que NC le trabaja a Zarrat. En el Centro de Mando se ve junto al de los demás clientes.</div>
+    <div class="card">
+      <div class="g3"><div><label>Quién</label><select id="h_u">${USRS.map(u=>`<option value="${u.id}">${esc(u.nombre)}</option>`).join('')}</select></div>
+        <div><label>Fecha</label><input type="date" id="h_f" value="${hoy}"></div>
+        <div><label>Qué se hizo</label><input id="h_t" placeholder="Ej: pestaña de costos"></div></div>
+      <div class="g3"><div><label>Empezó</label><input type="time" id="h_i" onchange="hCalc()"></div>
+        <div><label>Terminó</label><input type="time" id="h_ff" onchange="hCalc()"></div>
+        <div><label>Minutos</label><input type="number" id="h_m" placeholder="se calcula solo"></div></div>
+      <div class="hint" id="h_prev"></div>
+      <button class="btn acc full" onclick="hAdd()">+ Registrar tiempo</button>
+    </div>
+    <div class="card">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <select onchange="hMes(this.value)" style="max-width:190px">
+          <option value=""${!HMES?' selected':''}>Todo</option>
+          ${meses.map(x=>`<option value="${x}"${HMES===x?' selected':''}>${x}</option>`).join('')}</select>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:22px;font-weight:800;color:var(--acc)">${hhmm(tot)}</div>
+          ${plata?`<div class="hint">${$$(plata)} a las tarifas cargadas</div>`:''}</div>
+      </div>
+      ${Object.keys(porU).length?Object.entries(porU).sort((a,b)=>b[1]-a[1]).map(([uid,mm])=>{
+        const u=USRS.find(y=>y.id===+uid)||{nombre:'(usuario borrado)'};
+        return `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13.5px">
+          <span>${esc(u.nombre)}</span><b>${hhmm(mm)}</b></div>`;}).join(''):''}
+    </div>
+    ${vis.length?vis.map(x=>{ const u=USRS.find(y=>y.id===x.usuario_id)||{};
+      return `<div class="item"><div><div class="nm">${esc(x.tarea||'sin descripción')}</div>
+      <div class="mt">${esc(u.nombre||'—')} · 📅 ${esc(x.fecha||'')}${x.inicio?' · '+String(x.inicio).slice(0,5)+'→'+String(x.fin||'').slice(0,5):''}</div></div>
+      <div style="text-align:right"><div class="nm">${hhmm(x.minutos)}</div>
+        <button class="btn sm gh" style="margin-top:5px" onclick="hDel(${x.id})">✕</button></div></div>`;}).join('')
+      :'<div class="empty">Sin tiempo registrado todavía.</div>'}
+    <div class="card">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:7px">QUIÉNES TRABAJAN</div>
+      ${USRS.map(u=>`<div style="display:grid;grid-template-columns:1fr 130px 120px auto;gap:6px;align-items:center;margin-bottom:5px">
+        <input value="${esc(u.nombre)}" onchange="uSet(${u.id},'nombre',this.value)">
+        <input value="${esc(u.rol||'')}" placeholder="rol" onchange="uSet(${u.id},'rol',this.value)">
+        <input type="number" value="${+u.tarifa_hora||0}" title="Tarifa por hora" onchange="uSet(${u.id},'tarifa_hora',this.value)">
+        <button class="btn gh" style="padding:4px 9px" onclick="uDel(${u.id})">✕</button></div>`).join('')}
+      <div style="display:grid;grid-template-columns:1fr 130px 120px auto;gap:6px;margin-top:8px">
+        <input id="u_n" placeholder="Nombre"><input id="u_r" placeholder="Rol">
+        <input id="u_t" type="number" placeholder="Tarifa/hora">
+        <button class="btn gh" onclick="uAdd()">+ persona</button></div>
+      <div class="hint">La tarifa es opcional: en cero solo se mide el tiempo.</div>
+    </div>`;
+}
+function hMes(v){ HMES=v; vHoras(); }
+function hCalc(){ const i=($('h_i')||{}).value, f=($('h_ff')||{}).value, m=minsDe(i,f);
+  if(m&&$('h_m')) $('h_m').value=m;
+  if($('h_prev')) $('h_prev').textContent=m?'Son '+hhmm(m):''; }
+async function hAdd(){
+  const u=($('h_u')||{}).value; if(!u){ alert('Primero agrega una persona abajo'); return; }
+  const i=($('h_i')||{}).value||null, f=($('h_ff')||{}).value||null;
+  const m=+($('h_m')||{}).value||minsDe(i,f);
+  if(!m){ alert('Pon las horas o los minutos'); return; }
+  await post('nc_hora',{usuario_id:+u,negocio_id:NEG_ID,fecha:$('h_f').value||new Date().toISOString().slice(0,10),
+    inicio:i,fin:f,minutos:m,tarea:($('h_t').value||'').trim()||null},'return=minimal');
+  vHoras();
+}
+async function hDel(id){ if(!confirm('¿Borrar este registro de tiempo?'))return;
+  await del('nc_hora','id=eq.'+id); vHoras(); }
+async function uAdd(){ const n=($('u_n').value||'').trim(); if(!n){ alert('Falta el nombre'); return; }
+  await post('nc_usuario',{nombre:n,rol:($('u_r').value||'').trim()||null,
+    tarifa_hora:+$('u_t').value||0,activo:true},'return=minimal'); vHoras(); }
+async function uSet(id,campo,v){ const b={}; b[campo]=campo==='tarifa_hora'?(+v||0):v;
+  await patch('nc_usuario','id=eq.'+id,b); vHoras(); }
+async function uDel(id){ if(!confirm('¿Quitar a esta persona? Sus horas quedan registradas.'))return;
+  await patch('nc_usuario','id=eq.'+id,{activo:false}); vHoras(); }
 
 /* ═══════ PEDIDOS · la cotización que se volvió compromiso ═══════
    La cotización es una propuesta; el pedido es lo que hay que entregar. Se convierte
