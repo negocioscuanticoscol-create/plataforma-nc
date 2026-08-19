@@ -207,7 +207,7 @@ const App={
     if(e){ e.style.display='block'; e.textContent='✓ '+(c.nombre||'')+' — ya está en el directorio'; e.style.color='var(--ok)'; } },
   ESTPROG:['pendiente','en proceso','terminado','entregado'],
   rol:'', view:'dash',
-  _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],_lin:[],_loc:[],_vend:[],_gas:[],_lqp:{},
+  _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],_lin:[],_loc:[],_vend:[],_gas:[],_lqp:{},_items:[],_pedIt:[],
 
   _H(){ return {apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':'application/json'}; },
   _loadLocal(k){ try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return [];} },
@@ -261,6 +261,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     this._vend=await this._fetch('superior_vendedores');
     /* Liquidación: los gastos y los parámetros (comisiones, IVA, nombres). Sin esto
        la pestaña no puede calcular nada, así que se traen con lo demás. */
+    this._items=await this._fetch('superior_ped_items');
     this._gas=await this._fetch('superior_gastos');
     const par=await this._fetch('superior_liq_param');
     this._lqp={}; (par||[]).forEach(x=>this._lqp[x.clave]=x.valor);
@@ -348,7 +349,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const ref=String(p.referencia||'');
     const inv=(this._inv||[]).find(x=>((x.referencia||'')+' · '+(x.tamano||''))===ref)
            || (this._inv||[]).find(x=>(x.referencia||'')===ref.split(' · ')[0]);
-    return inv?(+inv.costo||0):0; },
+    return (inv?(+inv.costo||0):0)+this._pedItemsCosto(p.id); },
   /* Solo hay dos formas de vender: de fábrica (precio público) y distribuidor. */
   _liqTipo(p){ if(p.tipo_venta) return p.tipo_venta;
     const c=(this._cli||[]).find(x=>x.id===p.cliente_id)||{};
@@ -1530,6 +1531,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       // El tamaño viaja en el propio <option>: la programación lo necesita
       // aunque la referencia todavía no esté cargada con precio.
       return `<option value="${it?it.id:'__nuevo__'}" data-lab="${this.esc(lab)}" data-pre="${pre}"
+        data-pdi="${it?(+it.precio_dist||0):0}"
         data-tam="${this.esc(it?(it.tamano||''):(tam||''))}" data-mat="${this.esc(it?(it.material||''):'')}"
         ${sel===lab?'selected':''}>${this.esc(lab)}${pre>0?'':' · sin precio'}</option>`; };
     /* Salen TODAS las referencias del catálogo, tengan o no precio cargado.
@@ -1559,7 +1561,56 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     if(!n) return '';
     return `<div class="hint" style="color:var(--warn);margin-top:5px">Faltan <b>${n}</b> referencias
       por cargar en Referencias; hasta que tengan costo y precio no se pueden pedir.</div>`; },
+  /* Artículos extra de un pedido. Los pedidos de antes no tienen ninguno y siguen
+     funcionando igual: su total ES el precio de la referencia principal. */
+  _pedItemsDe(id){ return (this._items||[]).filter(x=>x.pedido_id===id)
+    .sort((a,b)=>(+a.orden||0)-(+b.orden||0)); },
+  _pedItemsTot(id){ return this._pedItemsDe(id)
+    .reduce((s,x)=>s+(+x.cantidad||0)*(+x.precio_unit||0),0); },
+  _pedItemsCosto(id){ return this._pedItemsDe(id)
+    .reduce((s,x)=>s+(+x.cantidad||0)*(+x.costo_unit||0),0); },
+  /* Lo que vale la referencia principal: el total del pedido menos lo que suman los extras. */
+  _pedPrinc(p){ const d=Math.min(99,+p.descuento_pct||0);
+    const bruto=(+p.total||0)/(1-d/100);
+    return Math.round(bruto-this._pedItemsTot(p.id)); },
+  pedItemAdd(){ (this._pedIt=this._pedIt||[]).push({referencia:'',cantidad:1,precio_unit:0,costo_unit:0});
+    this.pedItemPinta(); },
+  pedItemDel(i){ this._pedIt.splice(i,1); this.pedItemPinta(); },
+  pedItemSet(i,campo,v){ this._pedIt[i][campo]=campo==='referencia'?v:(+v||0);
+    /* Si la referencia está en el inventario, se trae su precio público y su costo:
+       nadie tiene que acordarse de memoria de cuánto vale una almohada. */
+    if(campo==='referencia'){
+      const inv=(this._inv||[]).find(x=>((x.referencia||'')+(x.tamano?' · '+x.tamano:'')).trim()===v.trim());
+      if(inv){ this._pedIt[i].precio_unit=+inv.precio||0; this._pedIt[i].costo_unit=+inv.costo||0;
+        this.pedItemPinta(); return; } }
+    this.pedItemCalc(); },
+  pedItemPinta(){ const c=$('pi_lista'); if(!c) return;
+    c.innerHTML=(this._pedIt||[]).map((x,i)=>`<div style="display:grid;
+      grid-template-columns:1fr 52px 92px auto;gap:5px;align-items:center;margin-bottom:5px">
+      <input list="l_items" placeholder="Almohada, base, otro colchón…" value="${this.esc(x.referencia||'')}"
+        onchange="App.pedItemSet(${i},'referencia',this.value)">
+      <input type="number" min="1" value="${x.cantidad||1}" title="Cantidad"
+        oninput="App.pedItemSet(${i},'cantidad',this.value)">
+      <input type="number" value="${x.precio_unit||0}" title="Precio por unidad"
+        oninput="App.pedItemSet(${i},'precio_unit',this.value)">
+      <button type="button" class="mini" onclick="App.pedItemDel(${i})">✕</button></div>`).join('')
+      ||'<div class="hint" style="margin:0 0 6px">Solo lleva la referencia de arriba.</div>';
+    this.pedItemCalc(); },
+  /* Bruto = principal + extras. El descuento se aplica sobre TODO el pedido, y lo que
+     se guarda en 'total' es ya el valor con descuento: lo que el cliente paga. */
+  _pedBruto(){ const pr=+(($('p_tot')||{}).value)||0;
+    return pr+(this._pedIt||[]).reduce((s,x)=>s+(+x.cantidad||0)*(+x.precio_unit||0),0); },
+  _pedDescPct(){ return Math.min(100,Math.max(0,+(($('p_desc')||{}).value)||0)); },
+  pedItemCalc(){ const e=$('pi_total'); if(!e) return;
+    const pr=+(($('p_tot')||{}).value)||0, br=this._pedBruto(), d=this._pedDescPct();
+    const ex=br-pr, des=br*d/100, fin=br-des;
+    let h='';
+    if(ex) h+=`Referencia principal ${this.money(pr)} + otros ${this.money(ex)} = ${this.money(br)}<br>`;
+    if(d)  h+=`<span style="color:var(--bad)">− descuento ${d}% (${this.money(des)})</span><br>`;
+    h+=`<span style="font-size:16px">TOTAL DEL PEDIDO ${this.money(fin)}</span>`;
+    e.innerHTML=h; },
   pedModal(id){ const p=this._ped.find(x=>x.id===id)||{};
+    this._pedIt=this._pedItemsDe(id).map(x=>({...x}));
     const cAct=(this._cli||[]).find(x=>x.id===p.cliente_id)||{};   // datos del cliente del pedido
     modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Tomar'} pedido</h3>
       <label>Referencia</label>
@@ -1567,7 +1618,25 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <option value="__medida__" ${p.referencia==='A la medida'?'selected':''}>📐 A la medida (personalizado)</option>
         ${this._opcionesPedido(p)}</select>
       ${this._faltanCargar()}
-      <label>Total</label><input id="p_tot" type="number" value="${p.total||0}">
+      <div class="g2"><div><label>Precio de esa referencia</label>
+        <input id="p_tot" type="number" value="${this._pedPrinc(p)}" oninput="App.pedItemCalc()">
+        <div class="hint" id="p_lista"></div></div>
+      <div><label>Descuento (%)</label>
+        <input id="p_desc" type="number" min="0" max="100" value="${p.descuento_pct||0}" oninput="App.pedItemCalc()">
+        <div class="hint">Se aplica sobre el valor de todo el pedido.</div></div></div>
+      <!-- Un pedido puede llevar mas de una cosa: el colchon y ademas una almohada, o
+           dos colchones. La referencia de arriba es la principal -de ella cuelgan la
+           proforma y la programacion-; lo demas se suma aca. -->
+      <div style="border:1px solid var(--line2);border-radius:10px;padding:10px;margin-top:10px">
+        <div style="font-weight:700;color:var(--navy);font-size:12px;margin-bottom:7px">🛏️ Otros artículos del pedido</div>
+        <div id="pi_lista"></div>
+        <button type="button" class="btn2" onclick="App.pedItemAdd()">＋ agregar artículo</button>
+        <datalist id="l_items">${[...new Set((this._inv||[]).map(x=>
+          ((x.referencia||'')+(x.tamano?' · '+x.tamano:'')).trim()).filter(Boolean))]
+          .map(v=>`<option value="${this.esc(v)}">`).join('')}</datalist>
+        <div id="pi_total" style="margin-top:9px;padding-top:8px;border-top:1px solid var(--line2);
+          font-weight:800;color:var(--navy)"></div>
+      </div>
       <div id="pd_medida" style="display:${p.referencia==='A la medida'?'block':'none'};border:1px dashed var(--gold);border-radius:10px;padding:10px;margin-top:8px;background:var(--goldsoft)">
         <div style="font-weight:700;color:var(--warn);font-size:12px;margin-bottom:6px">📐 La medida del cliente</div>
         <div class="g3">
@@ -1616,7 +1685,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <label>Nombre / Razón social</label><input id="p_nom" value="${this.esc(p.cliente||cAct.nombre||'')}">
         <div class="g2"><div><label>Dirección</label><input id="p_dir" value="${this.esc(cAct.direccion||'')}"></div>
         <div><label>Ciudad</label><input id="p_ciu" value="${this.esc(cAct.ciudad||'')}"></div></div>
-        <div class="g2"><div><label>Tipo</label><select id="p_tcli">${this.TIPOS.map(t=>`<option ${cAct.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+        <div class="g2"><div><label>Tipo</label><select id="p_tcli" onchange="App.pedPrecioLista()">${this.TIPOS.map(t=>`<option ${cAct.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
         <div><label>¿De dónde llegó?</label><select id="p_org">${this.ORIGEN.map(t=>`<option ${cAct.origen===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
         <div class="hint">Con el teléfono se busca en el directorio. Si no está, se registra solo al guardar el pedido.</div>
       </div>
@@ -1638,7 +1707,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <div class="hint">Marcado: se le saca el ${this._lp('iva_pct','19')}% al precio y va para la DIAN.
           Sin marcar: ese ${this._lp('iva_pct','19')}% queda para nosotros.</div></div>
       <div><label>Forma de pago</label><select id="p_pag">${this.PAGO.map(t=>`<option ${p.forma_pago===t?'selected':''}>${t}</option>`).join('')}</select></div>
-      <button class="btn gold full" onclick="App.pedSave('${id||''}')">Guardar pedido</button>`); },
+      <button class="btn gold full" onclick="App.pedSave('${id||''}')">Guardar pedido</button>`);
+    this.pedItemPinta(); },
   /* El bloque de medidas sale con «A la medida» y también cuando la referencia
      elegida del catálogo es una casilla de medida especial. */
   pedRefPick(){ const s=$('p_ref'),o=s.options[s.selectedIndex];
@@ -1654,7 +1724,20 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     if(!o||!o.value||!$('p_tot')) return;
     // Si la referencia no tiene precio cargado, el total se pone en cero para
     // que se escriba a conciencia y no quede el de la referencia anterior.
-    $('p_tot').value = +(o.dataset.pre)>0 ? o.dataset.pre : 0; },
+    this.pedPrecioLista(); },
+  /* Un distribuidor NO paga precio publico. El precio sale de la lista que le toca
+     al cliente, y si se cambia el tipo de cliente se vuelve a calcular. */
+  pedPrecioLista(){ const s=$('p_ref'); if(!s||!$('p_tot')) return;
+    const o=s.options[s.selectedIndex]; if(!o||!o.dataset) return;
+    const dist=((($('p_tcli')||{}).value)||'')==='Distribuidor';
+    const pub=+o.dataset.pre||0, pdi=+o.dataset.pdi||0;
+    const v=dist?(pdi||pub):pub;
+    $('p_tot').value=v>0?v:0;
+    const av=$('p_lista');
+    if(av) av.innerHTML=v>0?(dist
+      ?`Lista <b>DISTRIBUIDOR</b>${pdi?'':' · sin precio de distribuidor cargado, se usa el publico'}`
+      :'Lista <b>PUBLICO</b>'):'';
+    this.pedItemCalc(); },
 
   /* Con el ancho y el largo se busca el tamaño estándar más parecido de esa
      referencia y se le suma su recargo. El total se llena solo, pero se puede
@@ -1715,13 +1798,27 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const rs=$('p_ref'),ro=rs.options[rs.selectedIndex]; const medida=rs.value==='__medida__';
     let refLab=''; if(medida)refLab='A la medida'; else if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
     if(!refLab){alert('Selecciona una referencia');return;}
-    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,vendedor_id:vId,vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',tipo_transporte:$('p_tra').value,valor_transporte:+($('p_tratot')||{}).value||0,transp_modo:($('p_tramod')||{}).value||null,transp_cobrado:+($('p_tracob')||{}).value||0,iva:!!($('p_iva')||{}).checked,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,vendedor_id:vId,vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',tipo_transporte:$('p_tra').value,valor_transporte:+($('p_tratot')||{}).value||0,transp_modo:($('p_tramod')||{}).value||null,transp_cobrado:+($('p_tracob')||{}).value||0,iva:!!($('p_iva')||{}).checked,forma_pago:$('p_pag').value,total:Math.round(this._pedBruto()*(1-this._pedDescPct()/100)),descuento_pct:this._pedDescPct(),estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     // Se conservan las gestiones ya marcadas; si es nuevo, queda «Tomado» con la hora
     const ant=this._ped.find(x=>x.id===id);
     row.hitos=(ant&&ant.hitos)?ant.hitos:{nuevo:row.creado_en};
     const i=this._ped.findIndex(x=>x.id===row.id); if(i>=0)this._ped[i]=row; else this._ped.unshift(row);
     await this._put('superior_pedidos',this._codPedido(row),this._ped);
+    await this._pedItemsSave(row.id);
     cerrar(); this.toast(id?'Pedido actualizado':'Pedido guardado'); this.go('ped'); },
+  /* Los extras se reescriben enteros: se borran los del pedido y se suben los que
+     quedaron en pantalla. Son pocos y asi no hay que rastrear cual se edito. */
+  async _pedItemsSave(pid){
+    const nuevos=(this._pedIt||[]).filter(x=>(x.referencia||'').trim())
+      .map((x,i)=>({id:'ix'+Date.now()+'_'+i,pedido_id:pid,referencia:(x.referencia||'').trim(),
+        cantidad:+x.cantidad||1,precio_unit:+x.precio_unit||0,costo_unit:+x.costo_unit||0,orden:i}));
+    try{
+      await fetch(this.SB+'/rest/v1/superior_ped_items?pedido_id=eq.'+encodeURIComponent(pid),
+        {method:'DELETE',headers:this._H()});
+      if(nuevos.length) await fetch(this.SB+'/rest/v1/superior_ped_items',
+        {method:'POST',headers:{...this._H(),Prefer:'return=minimal'},body:JSON.stringify(nuevos)});
+    }catch(e){}
+    this._items=(this._items||[]).filter(x=>x.pedido_id!==pid).concat(nuevos); },
   /* ---------- PROFORMA ----------
      Una sola hoja que sirve para las dos manos: arriba lo que el cliente
      necesita ver (qué lleva, cuánto vale, cómo se lo mandan) y abajo lo que
