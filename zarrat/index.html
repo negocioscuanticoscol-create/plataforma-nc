@@ -169,12 +169,23 @@ async function vProv(){
         <select onchange="matSet(${m.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===m.unidad?'selected':''}>${u}</option>`).join('')}</select>
         <input type="number" value="${+m.valor_unit||0}" title="Valor por unidad" onchange="matSet(${m.id},'valor_unit',this.value)">
         <input value="${esc(m.ref_prov||'')}" placeholder="ref. del prov." onchange="matSet(${m.id},'ref_prov',this.value)">
-        <button class="btn gh" style="padding:4px 9px" onclick="matDel(${m.id})">✕</button></div>`).join('')
+        <button class="btn gh" style="padding:4px 9px" onclick="matDel(${m.id})">✕</button>
+        ${m.notas?`<div style="grid-column:1/-1;font-size:11.5px;color:var(--mut);margin:-2px 0 4px 2px">${esc(m.notas)}</div>`:''}
+        </div>`).join('')
         :'<div class="hint">Todavía no tiene materiales cargados.</div>'}
-      <div style="display:grid;grid-template-columns:1fr 150px auto;gap:6px;margin-top:8px">
-        <input id="mn_${v.id}" placeholder="Nombre del material">
-        <select id="mc_${v.id}">${Object.keys(MATCAT).map(k=>`<option>${k}</option>`).join('')}</select>
-        <button class="btn gh" onclick="matAdd(${v.id})">+ material</button></div>
+      <!-- El material se crea COMPLETO: si toca crearlo y despues editarlo fila por
+           fila, se queda a medias con el precio en cero. -->
+      <div style="border:1px dashed var(--line);border-radius:9px;padding:10px;margin-top:10px;background:#faf7f1">
+        <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--mut);margin-bottom:7px">
+          NUEVO MATERIAL DE ${esc((v.nombre||'').toUpperCase())}</div>
+        <div class="g2"><div><label>Material</label><input id="mn_${v.id}" placeholder="Ej: Cuero natural graso"></div>
+          <div><label>Para qué categoría</label><select id="mc_${v.id}">${Object.keys(MATCAT).map(k=>`<option>${k}</option>`).join('')}</select></div></div>
+        <div class="g3"><div><label>Unidad</label><select id="mu_${v.id}">${UNIDS.map(u=>`<option ${u==='unidad'?'selected':''}>${u}</option>`).join('')}</select></div>
+          <div><label>Valor por unidad</label><input id="mv_${v.id}" type="number" placeholder="0"></div>
+          <div><label>Referencia del proveedor</label><input id="mr_${v.id}" placeholder="Con qué código lo pide él"></div></div>
+        <label>Notas</label><input id="mo_${v.id}" placeholder="Color, calibre, mínimo de compra…">
+        <button class="btn acc full" onclick="matAdd(${v.id})">+ Agregar material</button>
+      </div>
     </div>`).join(''):'<div class="card"><div class="hint">Todavía no hay proveedores. Agrega el primero arriba.</div></div>'}`;
 }
 async function provAdd(){
@@ -191,9 +202,13 @@ async function provDel(id){
   await del('zarrat_proveedores','id=eq.'+id); vProv();
 }
 async function matAdd(pid){
-  const e=$('mn_'+pid), nom=(e.value||'').trim(); if(!nom){ alert('Ponle nombre al material'); return; }
+  const nom=(($('mn_'+pid)||{}).value||'').trim(); if(!nom){ alert('Ponle nombre al material'); return; }
+  const val=+(($('mv_'+pid)||{}).value)||0;
+  if(!val&&!confirm('Este material va sin precio. ¿Guardarlo así?')) return;
   await post('zarrat_materiales',{nombre:nom,categoria:$('mc_'+pid).value,proveedor_id:pid,
-    unidad:'unidad',valor_unit:0,activo:true},'return=minimal');
+    unidad:($('mu_'+pid)||{}).value||'unidad',valor_unit:val,
+    ref_prov:(($('mr_'+pid)||{}).value||'').trim()||null,
+    notas:(($('mo_'+pid)||{}).value||'').trim()||null,activo:true},'return=minimal');
   vProv();
 }
 async function matSet(id,campo,v){
