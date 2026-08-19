@@ -127,14 +127,107 @@ const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,
 const del=(t,q)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'DELETE',headers:H});
 
 const TABS=[['pend','🏗️ Estructuración'],['gastos','💰 Gastos'],['clientes','👥 Clientes'],['medidas','📐 Medidas'],
-            ['catalogo','🖼️ Catálogo'],['prov','🚚 Proveedores'],['costos','🧵 Costos'],['cotiz','📋 Cotizaciones'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
+            ['catalogo','🖼️ Catálogo'],['prov','🚚 Proveedores'],['costos','🧵 Costos'],['cotiz','📋 Cotizaciones'],['pedidos','🧾 Pedidos'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
 let TAB='pend', CLI=[], PRENDAS=[], CAT=[];
 $('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('');
 function go(t){
   TAB=t; TABS.forEach(([v])=>{const b=$('t_'+v); if(b)b.className=(v===t?'on':'');});
-  const V={pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,prov:vProv,costos:vCostos,cotiz:vCotiz,ventas:vVentas,crm:vCrm}[t];
+  const V={pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,prov:vProv,costos:vCostos,cotiz:vCotiz,pedidos:vPedidos,ventas:vVentas,crm:vCrm}[t];
   if(V) safe(V,t)();
 }
+
+/* ═══════ PEDIDOS · la cotización que se volvió compromiso ═══════
+   La cotización es una propuesta; el pedido es lo que hay que entregar. Se convierte
+   sin volver a escribir nada y ahí mismo va la programación: a qué hora se arranca y
+   a qué hora tiene que estar listo. Anular no borra: el pedido se queda con su motivo
+   y deja de contar, porque saber qué se cayó y por qué vale más que la lista limpia. */
+const ESTPED=['nuevo','en proceso','terminado','entregado'];
+let PEDS=[], PEDEDIT=null;
+const dtLocal=iso=>{ if(!iso) return ''; const d=new Date(iso), p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); };
+const dtTxt=iso=>{ if(!iso) return '—'; try{ return new Date(iso).toLocaleString('es-CO',
+  {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '—'; } };
+/* Cuánto trabajo hay entre arrancar y entregar. Sirve para cotizar el siguiente igual. */
+const dur=(a,b)=>{ if(!a||!b) return ''; const h=(new Date(b)-new Date(a))/3.6e6;
+  if(h<=0) return ''; return h<24?h.toFixed(1)+' h':(h/24).toFixed(1)+' días'; };
+async function aPedido(cid){
+  const c=(await get('zarrat_cotizaciones?id=eq.'+cid))[0]; if(!c){ alert('No encontré la cotización'); return; }
+  const ya=await get('zarrat_pedidos?cotizacion_id=eq.'+cid+'&anulado=is.false');
+  if(ya.length&&!confirm('Esta cotización ya tiene un pedido. ¿Crear otro?')) return;
+  await post('zarrat_pedidos',{folio:c.folio,cotizacion_id:c.id,cliente_id:c.cliente_id,
+    cliente_nombre:c.cliente_nombre,tipo:c.tipo,items:c.items||[],total:+c.total||0,
+    costo_interno:+c.costo_interno||0,estado:'nuevo',notas:c.notas||null},'return=minimal');
+  await patch('zarrat_cotizaciones','id=eq.'+cid,{estado:'vendida'});
+  go('pedidos');
+}
+async function vPedidos(){
+  PEDS=await get('zarrat_pedidos?order=creado_en.desc&limit=300');
+  if(PEDEDIT&&!PEDS.some(x=>x.id===PEDEDIT)) PEDEDIT=null;
+  const vivos=PEDS.filter(x=>!x.anulado);
+  const tot=vivos.reduce((s,x)=>s+(+x.total||0),0);
+  const cost=vivos.reduce((s,x)=>s+(+x.costo_interno||0),0);
+  const porEst=e=>vivos.filter(x=>(x.estado||'nuevo')===e).length;
+  $('main').innerHTML=`<h1>Pedidos</h1>
+    <div class="sub">${vivos.length} vivos · ${PEDS.length-vivos.length} anulados · lo que hay comprometido y para cuándo</div>
+    <div class="card"><div class="g3">
+      <div><div class="hint">COMPROMETIDO</div><div style="font-size:19px;font-weight:800;color:var(--acc)">${$$(tot)}</div></div>
+      <div><div class="hint">COSTO</div><div style="font-size:19px;font-weight:800">${$$(cost)}</div></div>
+      <div><div class="hint">DEJA</div><div style="font-size:19px;font-weight:800;color:var(--ok)">${$$(tot-cost)}</div></div>
+    </div>
+    <div class="hint" style="margin-top:8px">${ESTPED.map(e=>`${esc(e)}: <b>${porEst(e)}</b>`).join(' · ')}</div></div>
+    ${PEDS.length?PEDS.map(x=>pedFila(x)).join(''):'<div class="empty">Sin pedidos todavía. Se crean desde Cotizaciones con el botón «→ Pedido».</div>'}`;
+}
+function pedFila(x){
+  const anu=!!x.anulado, ed=PEDEDIT===x.id;
+  const d=dur(x.hora_inicio,x.hora_fin);
+  const tarde=!anu&&x.hora_fin&&new Date(x.hora_fin)<new Date()&&x.estado!=='entregado'&&x.estado!=='terminado';
+  return `<div class="item" style="display:block${anu?';opacity:.55;border-left:4px solid var(--bad)':(tarde?';border-left:4px solid var(--warn)':'')}">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
+      <div style="min-width:0">
+        <div class="nm"${anu?' style="text-decoration:line-through"':''}>${esc(x.cliente_nombre||'—')}
+          <span class="tag ${x.estado==='entregado'?'a':''}">${esc(x.estado||'nuevo')}</span>
+          ${tarde?'<span class="tag" style="background:#f6e6d8;color:var(--warn)">se pasó la hora</span>':''}</div>
+        <div class="mt">${esc(x.folio||'')} · ${esc(x.tipo||'')} · 📅 ${(x.creado_en||'').slice(0,10)}</div>
+        <div class="mt">${(x.items||[]).map(i=>esc(i.n)+' '+$$(i.v)).join(' · ')||'sin ítems'}</div>
+        <div class="mt">🕒 arranca ${dtTxt(x.hora_inicio)} → entrega ${dtTxt(x.hora_fin)}${d?' · <b>'+d+'</b>':''}</div>
+        ${anu?`<div class="mt" style="color:var(--bad);font-weight:700">ANULADO${x.anulado_por?' por '+esc(x.anulado_por):''}${
+          x.anulado_en?' · '+String(x.anulado_en).slice(0,10):''}${x.anulado_nota?' — '+esc(x.anulado_nota):''}</div>`:''}
+      </div>
+      <div style="text-align:right;flex:none"><div class="nm" style="color:var(--acc)"${anu?' style="text-decoration:line-through"':''}>${$$(x.total)}</div>
+        ${anu?`<button class="btn sm gh" style="margin-top:5px" onclick="pedReact(${x.id})">reactivar</button>`
+             :`<button class="btn sm gh" style="margin-top:5px" onclick="pedEdit(${ed?'null':x.id})">${ed?'cerrar':'✎ editar'}</button>`}</div>
+    </div>
+    ${ed?`<div style="border:1px dashed var(--acc);border-radius:9px;padding:11px;margin-top:10px;background:#faf7f1">
+      <div class="g3">
+        <div><label>Estado</label><select id="pd_e_${x.id}">${ESTPED.map(e=>`<option ${e===(x.estado||'nuevo')?'selected':''}>${e}</option>`).join('')}</select></div>
+        <div><label>Arranca</label><input type="datetime-local" id="pd_i_${x.id}" value="${dtLocal(x.hora_inicio)}"></div>
+        <div><label>Debe estar listo</label><input type="datetime-local" id="pd_f_${x.id}" value="${dtLocal(x.hora_fin)}"></div></div>
+      <label>Notas</label><input id="pd_n_${x.id}" value="${esc(x.notas||'')}" placeholder="Detalles del trabajo, quién lo hace…">
+      <div style="display:flex;gap:8px;margin-top:11px">
+        <button class="btn acc" onclick="pedSave(${x.id})">Guardar</button>
+        <button class="btn gh" onclick="pedEdit(null)">Cancelar</button>
+        <button class="btn gh" style="margin-left:auto;color:var(--bad)" onclick="pedAnular(${x.id})">Anular pedido</button></div>
+    </div>`:''}</div>`;
+}
+function pedEdit(id){ PEDEDIT=(id===null||id==='null')?null:id; vPedidos(); }
+async function pedSave(id){
+  const v=k=>(($('pd_'+k+'_'+id)||{}).value||'').trim();
+  const iso=t=>t?new Date(t).toISOString():null;
+  await patch('zarrat_pedidos','id=eq.'+id,{estado:v('e'),hora_inicio:iso(v('i')),
+    hora_fin:iso(v('f')),notas:v('n')||null});
+  PEDEDIT=null; vPedidos();
+}
+async function pedAnular(id){
+  const m=prompt('¿Por qué se anula este pedido?\n(el cliente desistió, no pagó, se cambió el diseño…)','');
+  if(m===null) return;
+  if(!String(m).trim()){ alert('Escribe por qué se anula.'); return; }
+  await patch('zarrat_pedidos','id=eq.'+id,{anulado:true,anulado_en:new Date().toISOString(),
+    anulado_nota:String(m).trim(),anulado_por:'Zarrat'});
+  PEDEDIT=null; vPedidos();
+}
+async function pedReact(id){ if(!confirm('¿Reactivar? Vuelve a contar en los totales.'))return;
+  await patch('zarrat_pedidos','id=eq.'+id,{anulado:false,anulado_en:null,anulado_nota:null,anulado_por:null});
+  vPedidos(); }
 
 /* ═══════ PROVEEDORES · de aquí nace el material ═══════
    Un material escrito suelto dentro de un costo se pierde: nadie sabe a quién se le
@@ -838,6 +931,7 @@ async function vCotiz(){
     <div class="mt">🧵 ${$$(x.costo_tela)} · ✂️ ${$$(x.costo_mo)} · 🏭 ${$$(x.costo_interno)} → <b style="color:var(--ok)">margen ${$$(mc)} (${pct}%)</b></div></div>
     <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.total)}</div>
       ${x.estado!=='vendida'?`<button class="btn sm acc" style="margin-top:5px" onclick="aVenta(${x.id})">→ Venta</button>`:''}
+      <button class="btn sm gh" style="margin-top:5px" onclick="aPedido(${x.id})">→ Pedido</button>
       <button class="btn sm gh" style="margin-top:5px" onclick="delRow('zarrat_cotizaciones',${x.id},vCotiz)">✕</button></div></div>`;}).join('')
     :'<div class="empty">Sin cotizaciones.</div>'}`;
   ITEMS=[]; COSTOS=BASE_COSTOS.map(x=>({...x}));   // ✦ salen solos con la plantilla guardada
