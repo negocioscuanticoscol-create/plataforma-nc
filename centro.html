@@ -134,7 +134,15 @@ table.mx .it i{font-style:normal;color:var(--sub);font-size:11px;display:block;m
 .pnota{font-size:12.5px;color:var(--sub);line-height:1.5}
 .psube{color:var(--rosa);font-weight:800} .pbaja{color:var(--ok);font-weight:800}
 .papag{opacity:.5}
+/* Marcado para bajar: se ve distinto aunque el veredicto diga otra cosa, porque es
+   una decision tuya y manda sobre la opinion del semaforo. */
+.pcard.pmarc{border-color:var(--rosa);box-shadow:inset 0 0 0 1px var(--rosa)}
+.pbtn{margin-top:10px;width:100%;padding:7px 8px;border-radius:9px;border:1px solid var(--line);
+  background:var(--panel);color:var(--sub);font-size:12px;font-weight:700;cursor:pointer}
+.pbtn:hover{border-color:var(--rosa);color:var(--rosa)}
+.pbtn.on{background:var(--rosa);border-color:var(--rosa);color:#0b0e11}
 .fchips{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+.fchips.fsub{margin:-9px 0 15px}
 .fchip{padding:6px 13px;border-radius:999px;border:1px solid var(--line);background:var(--panel);
   color:var(--sub);font-size:12.5px;cursor:pointer;font-weight:600}
 .fchip.on{background:var(--acc);border-color:var(--acc);color:#0b0e11}
@@ -588,6 +596,13 @@ _link(campo,v){
 VERD:{bajar:['bajar',0],vigilar:['vigilar',1],ganador:['ganador',2],bien:['bien',3],
       sin_datos:['sin datos',4],sin_meta:['sin meta',5]},
 _pneg:null,
+/* Cajones de estado. Arranca en "vigentes" a proposito: lo que esta corriendo hoy es
+   lo unico sobre lo que se puede actuar. Lo apagado se mira cuando se busca historia. */
+_pest:'vig',
+PCAJ:[['vig','Vigentes',  f=>!/PAUSED|ARCHIVED|DELETED/.test(f.estado||'')],
+      ['apa','Apagados',  f=>/PAUSED|ARCHIVED|DELETED/.test(f.estado||'')],
+      ['baj','Para bajar',f=>f.decision==='bajar'],
+      ['tod','Todos',     ()=>true]],
 async vPauta(){
   const [filas,negs,objs]=await Promise.all([
     api('nc_pauta_hoy?select=*'),
@@ -602,11 +617,18 @@ async vPauta(){
   this.pintaPauta();
 },
 pintaPauta(){
-  const id=this._pneg, mias=this._pf.filter(f=>f.negocio_id===id), obj=this._po[id];
+  const id=this._pneg, todas=this._pf.filter(f=>f.negocio_id===id), obj=this._po[id];
   const chips=this._plista.map(n=>{
     const k=this._pf.filter(f=>f.negocio_id===n.id).length;
     return `<button class="fchip${n.id===id?' on':''}" onclick="App.pSel('${n.id}')">`
       +`<b>${esc(n.nombre)}</b><i>${k}</i></button>`;}).join('');
+  /* Los contadores se cuentan sobre TODAS las del negocio, no sobre lo ya filtrado:
+     si cambiaran al moverse de cajon no servirian para decidir a cual entrar. */
+  const cajones='<div class="fchips fsub">'+this.PCAJ.map(([k,t,fn])=>
+    `<button class="fchip${this._pest===k?' on':''}" onclick="App.pEst('${k}')">`
+     +`<b>${t}</b><i>${todas.filter(fn).length}</i></button>`).join('')+'</div>';
+  const cj=this.PCAJ.find(c=>c[0]===this._pest)||this.PCAJ[3];
+  const mias=todas.filter(cj[2]);
 
   const gasto=mias.reduce((a,f)=>a+(+f.gasto||0),0);
   const res=mias.reduce((a,f)=>a+(+f.resultados||0),0);
@@ -624,14 +646,17 @@ pintaPauta(){
    +'</div>';
 
   if(!mias.length){
+    const vacio=todas.length
+      ? `No hay anuncios en <b>${cj[1].toLowerCase()}</b> para este negocio. Mira los otros cajones.`
+      : 'Este negocio todavía no tiene anuncios corriendo. Apenas prendas el primero, '
+        +'aparece acá solo en la siguiente lectura.';
     $('main').innerHTML='<h1>📣 Pauta</h1>'+this._psub(ult)+'<div class="fchips">'+chips+'</div>'
-     +'<div class="card">Este negocio todavía no tiene anuncios corriendo. Apenas prendas el primero, '
-     +'aparece acá solo en la siguiente lectura.</div>'; return; }
+     +cajones+'<div class="card">'+vacio+'</div>'; return; }
 
   const V=this.VERD;
   mias.sort((a,b)=>(V[a.veredicto]||V.sin_meta)[1]-(V[b.veredicto]||V.sin_meta)[1] || (+b.gasto||0)-(+a.gasto||0));
   $('main').innerHTML='<h1>📣 Pauta</h1>'+this._psub(ult)
-   +'<div class="fchips">'+chips+'</div>'+barra
+   +'<div class="fchips">'+chips+'</div>'+cajones+barra
    +'<div class="pgrid">'+mias.map(f=>this._ptarjeta(f)).join('')+'</div>';
 },
 _psub(ult){
@@ -652,7 +677,8 @@ _ptarjeta(f){
   const img=f.miniatura
     ? `<img src="${esc(f.miniatura)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'sinimg',textContent:'🖼️'}))">`
     : '<div class="sinimg">🖼️</div>';
-  return `<div class="pcard v-${v}${apagado?' papag':''}">`
+  const marc=f.decision==='bajar';
+  return `<div class="pcard v-${v}${apagado?' papag':''}${marc?' pmarc':''}">`
    +`<div class="pthumb">${img}<span class="pver ${v}">${et}</span>`
    +(f.tipo==='VIDEO'?'<span class="pplay">▶ video</span>':'<span class="pplay">🖼 imagen</span>')+'</div>'
    +'<div class="pbody">'
@@ -665,9 +691,22 @@ _ptarjeta(f){
    +`<div><b>${(+f.frecuencia||0).toFixed(1)}</b><i>frec.</i></div>`
    +'</div>'
    +`<div class="pnota">${esc(f.nota||'')}</div>`
+   /* El boton NO apaga nada en Meta: el navegador no habla con Meta (el token no puede
+      vivir en este archivo, que se publica). Deja la decision escrita y marcada. */
+   +`<button class="pbtn${marc?' on':''}" onclick="App.pBajar('${f.id}')">`
+   +(marc?'✓ marcado para bajar':'⬇ bajar este')+'</button>'
    +'</div></div>';
 },
 pSel(id){ this._pneg=id; this.pintaPauta(); },
+pEst(k){ this._pest=k; this.pintaPauta(); },
+async pBajar(id){
+  const f=this._pf.find(x=>x.id===id); if(!f) return;
+  const n=f.decision==='bajar'?null:'bajar';
+  f.decision=n; f.decidido_en=n?new Date().toISOString():null;
+  this.pintaPauta();
+  await patch('nc_pauta_anuncio?id=eq.'+id,{decision:n,decidido_en:f.decidido_en});
+  toast(n?'Marcado para bajar · apágalo en Ads Manager':'Ya no está marcado');
+},
 async pMeta(id){
   const v=prompt('¿Cuánto es lo máximo que estás dispuesto a pagar por un resultado en este negocio? (en pesos)',
                  this._po[id]||'');

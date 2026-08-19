@@ -95,6 +95,12 @@
     border-color:rgba(217,200,182,.3);color:#fff}
   #login input::placeholder{color:#9fb5bf;letter-spacing:1px}
   #login input:focus{border-color:var(--gold2);background:rgba(255,253,248,.1)}
+  .btn2{padding:9px 14px;border:1px solid var(--line2);border-radius:9px;background:#fff;
+    color:var(--navy);font-weight:700;font-size:13px;cursor:pointer;font-family:inherit}
+  .btn2:hover{background:var(--goldsoft)}
+  .mini{padding:3px 9px;border:1px solid var(--line2);border-radius:7px;background:#fff;
+    color:var(--mut);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}
+  .mini:hover{color:var(--navy);border-color:var(--navy)}
   #login .btn{margin-top:12px}
   #login .err{color:#ffb0a6;font-size:13px;margin-top:10px;display:none}
   #login .pie{margin-top:20px;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#7d9aa8}
@@ -201,7 +207,7 @@ const App={
     if(e){ e.style.display='block'; e.textContent='✓ '+(c.nombre||'')+' — ya está en el directorio'; e.style.color='var(--ok)'; } },
   ESTPROG:['pendiente','en proceso','terminado','entregado'],
   rol:'', view:'dash',
-  _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],_lin:[],_loc:[],_vend:[],
+  _online:false,_onl:{}, _cli:[],_inv:[],_ped:[],_prog:[],_leads:[],_lin:[],_loc:[],_vend:[],_gas:[],_lqp:{},
 
   _H(){ return {apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':'application/json'}; },
   _loadLocal(k){ try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return [];} },
@@ -253,6 +259,11 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     this._lin=await this._fetch('superior_lineas');
     this._loc=await this._fetch('superior_locales');
     this._vend=await this._fetch('superior_vendedores');
+    /* Liquidación: los gastos y los parámetros (comisiones, IVA, nombres). Sin esto
+       la pestaña no puede calcular nada, así que se traen con lo demás. */
+    this._gas=await this._fetch('superior_gastos');
+    const par=await this._fetch('superior_liq_param');
+    this._lqp={}; (par||[]).forEach(x=>this._lqp[x.clave]=x.valor);
     this._online=Object.values(this._onl).some(Boolean);
   },
   /* Guarda en la nube. Si una columna todavía no existe en la base (por ejemplo
@@ -299,6 +310,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     await this._chequearColumnas();   // hay que saberlo ANTES de guardar nada
     this.pintarNav(); this.go('dash'); },
   pintarNav(){ const T=[['dash','Dashboard'],['ref','Referencias'],['cat','Catálogo'],['cli','Cliente'],['crm','CRM'],['ped','Pedidos']];
+    /* Liquidación va detrás de 'data': ahí se ve el reparto entre socios y lo que se
+       le debe a la vendedora. Diana (rol ventas) no la ve. */
+    if(this.puede('data')) T.push(['liq','Liquidación']);
     if(this.puede('usuarios')) T.push(['usuarios','Usuarios y accesos']);
     $('nav').innerHTML=T.map(([v,t])=>`<button data-v="${v}" onclick="App.go('${v}')">${t}</button>`).join('');
     /* Línea DATA: la información de los almacenes. Se abre en OTRA PESTAÑA del
@@ -316,9 +330,225 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     /* 'equipo' ya no está en el menú, pero se deja en el enrutador: el selector
        de Vendedor del pedido se alimenta de ahí, así que la pantalla sigue
        alcanzable desde Pedidos mientras se use ese campo. */
-    ({dash:this.vDash,ref:this.vRef,cat:this.vCat,cli:this.vCli,equipo:this.vEquipo,crm:this.vCrm,ped:this.vPed,prog:this.vProg,usuarios:this.vUsuarios}[v]||this.vDash).call(this); },
+    ({dash:this.vDash,ref:this.vRef,cat:this.vCat,cli:this.vCli,equipo:this.vEquipo,crm:this.vCrm,ped:this.vPed,prog:this.vProg,liq:this.vLiq,usuarios:this.vUsuarios}[v]||this.vDash).call(this); },
 
   /* ---------- USUARIOS Y ACCESOS ---------- */
+  /* ---------- LIQUIDACIÓN ----------
+     Qué deja cada venta y cómo se reparte. La regla, acordada el 19 ago 2026:
+       utilidad = venta (sin IVA si se discrimina) − costo + resultado del transporte
+       de ahí sale la comisión de la vendedora, y lo que sobra se parte mitad y mitad.
+     El pedido guarda su costo y su comisión CONGELADOS al liquidarse: si mañana sube
+     el costo, la liquidación de ayer no se puede mover sola. */
+  LIQTRA:[['incluido','Incluido en el precio'],['mitades','Por mitades'],
+          ['cobrado','Se cobra aparte'],['cliente','Lo paga el cliente directo']],
+  _lp(k,d){ const v=this._lqp[k]; return (v===undefined||v==='')?d:v; },
+  _lpn(k,d){ return +this._lp(k,d)||0; },
+  _liqCosto(p){
+    if(p.costo_cong!=null&&p.costo_cong!=='') return +p.costo_cong||0;
+    const ref=String(p.referencia||'');
+    const inv=(this._inv||[]).find(x=>((x.referencia||'')+' · '+(x.tamano||''))===ref)
+           || (this._inv||[]).find(x=>(x.referencia||'')===ref.split(' · ')[0]);
+    return inv?(+inv.costo||0):0; },
+  /* Solo hay dos formas de vender: de fábrica (precio público) y distribuidor. */
+  _liqTipo(p){ if(p.tipo_venta) return p.tipo_venta;
+    const c=(this._cli||[]).find(x=>x.id===p.cliente_id)||{};
+    return c.tipo==='Distribuidor'?'Distribuidor':'Fábrica'; },
+  _liqCom(p){ if(p.comision!=null&&p.comision!=='') return +p.comision||0;
+    return this._liqTipo(p)==='Distribuidor'
+      ? this._lpn('com_distribuidor',20000):this._lpn('com_publico',50000); },
+  /* Una sola cuenta por pedido; todo lo demás son sumas de esto. El transporte entra
+     por la DIFERENCIA: lo que le cobramos al cliente menos lo que nos costó. Si lo
+     pusimos nosotros el número es negativo y baja la utilidad, que es lo correcto. */
+  _liqCalc(p){
+    const venta=+p.total||0, pct=this._lpn('iva_pct',19);
+    const base=p.iva?venta/(1+pct/100):venta, iva=venta-base;
+    const costo=this._liqCosto(p);
+    const tCob=+p.valor_transporte||0, tCos=+p.transp_costo||0, tRes=tCob-tCos;
+    const com=this._liqCom(p), util=base-costo+tRes, rep=util-com;
+    return {venta,base,iva,costo,tCob,tCos,tRes,com,util,rep,mitad:rep/2,tipo:this._liqTipo(p)}; },
+  _liqPeds(){ const mes=this._liqMes||'';
+    return (this._ped||[]).filter(p=>!mes||String(p.creado_en||'').slice(0,7)===mes)
+      .sort((a,b)=>String(b.creado_en||'').localeCompare(String(a.creado_en||''))); },
+  async vLiq(){
+    const m=this.money.bind(this), A=this._lp('socio_a','JVC'), B=this._lp('socio_b','Gloria');
+    const VEN=this._lp('vendedora','Diana');
+    const peds=this._liqPeds();
+    const T={venta:0,iva:0,costo:0,com:0,rep:0,tRes:0};
+    peds.forEach(p=>{ const c=this._liqCalc(p);
+      T.venta+=c.venta; T.iva+=c.iva; T.costo+=c.costo; T.com+=c.com; T.rep+=c.rep; T.tRes+=c.tRes; });
+    const gas=this._gas||[];
+    const inv=gas.filter(g=>g.tipo==='inversion').reduce((a,g)=>a+(+g.monto||0),0);
+    const otros=gas.filter(g=>g.tipo!=='inversion'&&g.tipo!=='pauta').reduce((a,g)=>a+(+g.monto||0),0);
+    const pautaMan=gas.filter(g=>g.tipo==='pauta').reduce((a,g)=>a+(+g.monto||0),0);
+    const pauta=(this._liqPauta||0)+pautaMan;
+    const neto=T.rep-pauta-otros;              // antes de tocar la inversión
+    const porRecup=Math.max(0,inv-Math.max(0,neto));
+    const libre=neto-Math.min(inv,Math.max(0,neto));
+    const meses=[...new Set((this._ped||[]).map(p=>String(p.creado_en||'').slice(0,7)).filter(Boolean))].sort().reverse();
+    const col=v=>v>0?'var(--ok)':(v<0?'var(--bad)':'var(--mut)');
+    const G='grid-template-columns:.85fr 1.25fr .75fr .9fr .85fr .85fr .85fr .9fr .9fr auto';
+
+    this.set(`<h1 class="serif">Liquidación</h1>
+      <div class="hint" style="margin-bottom:10px">La utilidad de cada venta, la comisión de <b>${this.esc(VEN)}</b>
+        y el reparto entre <b>${this.esc(A)}</b> y <b>${this.esc(B)}</b>. Los gastos de pauta e inversión se
+        descuentan del total, no de cada pedido.</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <select onchange="App.liqMes(this.value)" style="max-width:190px">
+          <option value=""${!this._liqMes?' selected':''}>Todos los meses</option>
+          ${meses.map(x=>`<option value="${x}"${this._liqMes===x?' selected':''}>${x}</option>`).join('')}
+        </select>
+        <button class="btn2" onclick="App.liqCSV()">⬇ Sacar todo (CSV)</button>
+        <button class="btn2" onclick="App.liqParams()">⚙️ Parámetros</button>
+      </div>
+      <div class="kpis">
+        <div class="kpi dark"><b>${m(T.venta)}</b><span>Vendido · ${peds.length} pedido(s)</span></div>
+        <div class="kpi"><b>${m(T.costo)}</b><span>Costo</span></div>
+        <div class="kpi"><b style="color:${col(-T.iva)}">${m(T.iva)}</b><span>IVA discriminado</span></div>
+        <div class="kpi"><b style="color:${col(T.tRes)}">${m(T.tRes)}</b><span>Transporte (neto)</span></div>
+        <div class="kpi"><b>${m(T.com)}</b><span>Comisión ${this.esc(VEN)}</span></div>
+        <div class="kpi"><b style="color:${col(T.rep)}">${m(T.rep)}</b><span>Utilidad repartible</span></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <b style="color:var(--navy)">Cuenta del período</b>
+        <div style="margin-top:8px;font-size:13px;line-height:1.9">
+          <div>Utilidad repartible <b>${m(T.rep)}</b></div>
+          <div>− Pauta <b style="color:var(--bad)">${m(pauta)}</b>
+            <span class="dim">${this._liqPauta?'(gasto real de Meta, leído del tablero)':'(sin lectura de Meta todavía)'}</span></div>
+          ${otros?`<div>− Otros gastos <b style="color:var(--bad)">${m(otros)}</b></div>`:''}
+          <div style="border-top:1px solid var(--line2);padding-top:6px;margin-top:6px">
+            = Neto <b style="color:${col(neto)}">${m(neto)}</b></div>
+          <div>− Inversión por recuperar <b style="color:var(--bad)">${m(Math.min(inv,Math.max(0,neto)))}</b>
+            <span class="dim">de ${m(inv)} · faltan ${m(porRecup)}</span></div>
+          <div style="border-top:2px solid var(--navy);padding-top:6px;margin-top:6px;font-size:15px">
+            <b>Queda por repartir ${m(libre)}</b></div>
+          <div style="margin-top:4px">${this.esc(A)} <b>${m(libre/2)}</b> · ${this.esc(B)} <b>${m(libre/2)}</b></div>
+          <div style="margin-top:6px;color:var(--gold)"><b>Por pagarle a ${this.esc(VEN)}: ${m(T.com)}</b></div>
+        </div>
+      </div>
+      <h1 style="font-size:18px;margin-top:18px">Pedidos</h1>
+      <div style="font-size:9.5px;color:var(--mut);display:grid;${G};gap:6px;padding:0 2px 5px;
+        font-weight:700;text-transform:uppercase;letter-spacing:.03em;line-height:1.2">
+        <span>Fecha</span><span>Cliente / referencia</span><span>Tipo</span>
+        <span style="text-align:right">Venta</span><span style="text-align:center">IVA</span>
+        <span style="text-align:right">Costo</span><span style="text-align:right">Transp.</span>
+        <span style="text-align:right">Comisión</span><span style="text-align:right">Repartible</span><span></span></div>
+      ${peds.length?peds.map(p=>{ const c=this._liqCalc(p);
+        return `<div class="card" style="display:grid;${G};gap:6px;align-items:center;padding:9px 10px;margin-bottom:5px">
+          <span style="font-size:11.5px;color:var(--mut)">${String(p.creado_en||'').slice(0,10)}</span>
+          <span style="font-size:12px;line-height:1.3"><b>${this.esc(p.cliente||'—')}</b><br>
+            <span style="color:var(--mut)">${this.esc(p.referencia||'—')}</span></span>
+          <span><span class="chip ${c.tipo==='Distribuidor'?'tipo':'ok'}">${c.tipo}</span></span>
+          <span style="text-align:right;font-weight:700">${m(c.venta)}</span>
+          <span style="text-align:center"><input type="checkbox" ${p.iva?'checked':''}
+            onchange="App.liqIva('${p.id}',this.checked)" title="Discriminar IVA del precio"></span>
+          <span style="text-align:right;color:${c.costo?'inherit':'var(--bad)'}">${c.costo?m(c.costo):'sin costo'}</span>
+          <span style="text-align:right;color:${col(c.tRes)}">${c.tRes?m(c.tRes):'—'}</span>
+          <span style="text-align:right">${m(c.com)}</span>
+          <span style="text-align:right;font-weight:800;color:${col(c.rep)}">${m(c.rep)}</span>
+          <span><button class="mini" onclick="App.liqDet('${p.id}')">ver</button></span>
+        </div>`;}).join(''):'<div class="empty">Sin pedidos en este período.</div>'}
+      <h1 style="font-size:18px;margin-top:18px">Inversión y gastos</h1>
+      <div class="hint" style="margin-bottom:8px">Lo invertido se recupera del neto antes de repartir.
+        La pauta se lee sola del tablero de Meta; acá solo se agrega lo que no pasa por ahí.</div>
+      ${gas.map(g=>`<div class="card" style="display:grid;grid-template-columns:auto 1fr auto auto;gap:8px;
+        align-items:center;padding:8px 10px;margin-bottom:5px">
+        <span class="chip ${g.tipo==='inversion'?'tipo':(g.tipo==='pauta'?'ok':'')}">${this.esc(g.tipo)}</span>
+        <span style="font-size:12.5px">${this.esc(g.concepto)}${g.nota?` <span class="dim">· ${this.esc(g.nota)}</span>`:''}</span>
+        <b>${m(g.monto)}</b>
+        <button class="mini" onclick="App.liqGasDel('${g.id}')">✕</button></div>`).join('')}
+      <button class="btn2" onclick="App.liqGasNew()">＋ Agregar gasto</button>`);
+    /* La pauta se lee del mismo tablero del Centro de Mando: si ya la estamos midiendo
+       ahí, no tiene sentido volver a escribirla a mano acá. */
+    if(this._liqPauta===undefined){ this._liqPauta=0;
+      try{ const r=await fetch(this.SB+'/rest/v1/nc_pauta_hoy?select=gasto&negocio_id=eq.nido',{headers:this._H()});
+        if(r.ok){ const d=await r.json();
+          this._liqPauta=(d||[]).reduce((a,x)=>a+(+x.gasto||0),0);
+          if(this._liqPauta&&this.view==='liq') this.vLiq(); } }catch(e){} } },
+  liqMes(v){ this._liqMes=v; this.vLiq(); },
+  async liqIva(id,val){ const p=(this._ped||[]).find(x=>x.id===id); if(!p)return;
+    p.iva=!!val; await this._put('superior_pedidos',this._codPedido(p),this._ped); this.vLiq(); },
+  liqDet(id){ const p=(this._ped||[]).find(x=>x.id===id); if(!p)return;
+    const c=this._liqCalc(p), m=this.money.bind(this);
+    const A=this._lp('socio_a','JVC'), B=this._lp('socio_b','Gloria');
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${this.esc(p.cliente||'—')}</h3>
+      <div style="font-size:12.5px;color:var(--mut);margin-bottom:10px">${this.esc(p.referencia||'')}</div>
+      <div style="font-size:13px;line-height:2">
+        <div>Venta <b>${m(c.venta)}</b></div>
+        ${p.iva?`<div>− IVA ${this._lp('iva_pct','19')}% <b style="color:var(--bad)">${m(c.iva)}</b>
+          <span class="dim">se lo lleva la DIAN</span></div>
+          <div>= Base <b>${m(c.base)}</b></div>`
+         :`<div class="dim">Sin IVA discriminado: ese ${this._lp('iva_pct','19')}% queda para nosotros</div>`}
+        <div>− Costo <b style="color:var(--bad)">${m(c.costo)}</b></div>
+        <div>Transporte: cobrado ${m(c.tCob)} − costó ${m(c.tCos)} =
+          <b style="color:${c.tRes<0?'var(--bad)':'var(--ok)'}">${m(c.tRes)}</b></div>
+        <div style="border-top:1px solid var(--line2);padding-top:5px;margin-top:5px">
+          = Utilidad <b>${m(c.util)}</b></div>
+        <div>− Comisión ${this.esc(this._lp('vendedora','Diana'))} <b style="color:var(--bad)">${m(c.com)}</b></div>
+        <div style="border-top:2px solid var(--navy);padding-top:5px;margin-top:5px;font-size:15px">
+          <b>Repartible ${m(c.rep)}</b></div>
+        <div>${this.esc(A)} <b>${m(c.mitad)}</b> · ${this.esc(B)} <b>${m(c.mitad)}</b></div>
+      </div>
+      <div style="margin-top:12px"><button class="btn" onclick="cerrar()">Cerrar</button></div>`); },
+  liqParams(){ const P=[['com_publico','Comisión venta de fábrica'],['com_distribuidor','Comisión venta distribuidor'],
+      ['iva_pct','IVA %'],['socio_a','Socio A'],['socio_b','Socio B'],['vendedora','Vendedora'],
+      ['rec_cassata','Recargo Cassata (distribuidor = costo + esto)'],
+      ['rec_sensaflex','Recargo Pillow resortado Sensaflex']];
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:10px">Parámetros de liquidación</h3>
+      ${P.map(([k,t])=>`<div style="margin-bottom:8px"><label>${t}</label>
+        <input id="lp_${k}" value="${this.esc(this._lp(k,''))}"></div>`).join('')}
+      <div class="hint">Cambiarlos NO recalcula lo ya liquidado: los pedidos guardan su comisión.</div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn" onclick="App.liqParamsSave()">Guardar</button>
+        <button class="btn2" onclick="cerrar()">Cancelar</button></div>`); },
+  async liqParamsSave(){
+    const K=['com_publico','com_distribuidor','iva_pct','socio_a','socio_b','vendedora','rec_cassata','rec_sensaflex'];
+    for(const k of K){ const e=$('lp_'+k); if(!e)continue; this._lqp[k]=e.value;
+      await fetch(this.SB+'/rest/v1/superior_liq_param?on_conflict=clave',
+        {method:'POST',headers:{...this._H(),'Content-Type':'application/json',
+         Prefer:'resolution=merge-duplicates,return=minimal'},
+         body:JSON.stringify({clave:k,valor:e.value})}); }
+    cerrar(); this.toast('Parámetros guardados'); this.vLiq(); },
+  liqGasNew(){ modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:10px">Nuevo gasto</h3>
+      <div><label>Concepto</label><input id="gx_con"></div>
+      <div class="g2" style="margin-top:8px">
+        <div><label>Monto</label><input id="gx_mon" type="number" value="0"></div>
+        <div><label>Tipo</label><select id="gx_tip">
+          <option value="inversion">Inversión (se recupera)</option>
+          <option value="operativo" selected>Operativo</option>
+          <option value="pauta">Pauta</option></select></div></div>
+      <div style="margin-top:8px"><label>Nota</label><input id="gx_not"></div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn" onclick="App.liqGasSave()">Guardar</button>
+        <button class="btn2" onclick="cerrar()">Cancelar</button></div>`); },
+  async liqGasSave(){ const con=($('gx_con').value||'').trim();
+    if(!con){ alert('Falta el concepto'); return; }
+    const row={id:'g'+Date.now(),fecha:new Date().toISOString().slice(0,10),concepto:con,
+      monto:+$('gx_mon').value||0,tipo:$('gx_tip').value,nota:($('gx_not').value||'').trim()||null};
+    this._gas.unshift(row);
+    await fetch(this.SB+'/rest/v1/superior_gastos',{method:'POST',
+      headers:{...this._H(),'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify(row)});
+    cerrar(); this.toast('Gasto guardado'); this.vLiq(); },
+  async liqGasDel(id){ if(!confirm('¿Quitar este gasto?'))return;
+    this._gas=this._gas.filter(x=>x.id!==id);
+    await fetch(this.SB+'/rest/v1/superior_gastos?id=eq.'+id,{method:'DELETE',headers:this._H()});
+    this.vLiq(); },
+  /* «Sacar todo»: la misma cuenta que se ve en pantalla, en CSV, para llevarla a Excel
+     o mandársela a un contador sin que tenga que entrar a la app. */
+  liqCSV(){ const A=this._lp('socio_a','JVC'), B=this._lp('socio_b','Gloria');
+    const H=['Fecha','Cliente','Referencia','Tipo','Venta','IVA','Base','Costo',
+             'Transporte cobrado','Transporte costo','Transporte neto','Comision','Utilidad','Repartible',A,B];
+    const f=n=>String(Math.round(+n||0));
+    const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+    const filas=this._liqPeds().map(p=>{ const c=this._liqCalc(p);
+      return [q(String(p.creado_en||'').slice(0,10)),q(p.cliente),q(p.referencia),q(c.tipo),
+        f(c.venta),f(c.iva),f(c.base),f(c.costo),f(c.tCob),f(c.tCos),f(c.tRes),
+        f(c.com),f(c.util),f(c.rep),f(c.mitad),f(c.mitad)].join(';');});
+    const csv='﻿'+H.map(q).join(';')+'\n'+filas.join('\n');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a.download='liquidacion-nido-'+(this._liqMes||'todo')+'.csv'; a.click();
+    this.toast('CSV descargado'); },
   vUsuarios(){
     if(!this.puede('usuarios')) return this.set('<div class="empty">Esta pantalla es solo del administrador.</div>');
     const fijos=Object.entries(this.PASS).map(([clave,rol])=>({clave,rol,fijo:true}));
@@ -1370,7 +1600,20 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       <select id="p_vend"><option value="">— sin vendedor —</option>${this._vend.map(v=>`<option value="${v.id}" ${p.vendedor_id===v.id?'selected':''}>${this.esc(v.nombre)}${v.local_nombre?' · '+this.esc(v.local_nombre):''}</option>`).join('')}</select>
       <div class="g2"><div><label>Tipo de transporte</label><select id="p_tra">${this.TRANSPORTE.map(t=>`<option ${p.tipo_transporte===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><label>Valor del transporte</label><input id="p_tratot" type="number" value="${p.valor_transporte||0}">
-        <div class="hint">Lo que cuesta llevarlo. No suma al total del pedido.</div></div></div>
+        <div class="hint">Lo que se le COBRA al cliente. No suma al total del pedido.</div></div></div>
+      <!-- El transporte tiene dos lados y hay que verlos por separado: lo que cobramos
+           y lo que nos costó. La utilidad se mueve con la diferencia. -->
+      <div class="g2"><div><label>¿Cómo va el transporte?</label>
+        <select id="p_tramod" onchange="App.pedTraModo()">${this.LIQTRA.map(([k,t])=>
+          `<option value="${k}" ${(p.transp_modo||this._lp('transp_modo_def','cobrado'))===k?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label>Lo que NOS costó</label><input id="p_tracos" type="number" value="${p.transp_costo||0}">
+        <div class="hint">Lo que cobró la fábrica o el transportador. Si es más de lo que
+          cobramos, la diferencia sale de nuestra utilidad.</div></div></div>
+      <div><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="p_iva" ${p.iva?'checked':''} style="width:auto;margin:0">
+        Discriminar IVA del precio</label>
+        <div class="hint">Marcado: se le saca el ${this._lp('iva_pct','19')}% al precio y va para la DIAN.
+          Sin marcar: ese ${this._lp('iva_pct','19')}% queda para nosotros.</div></div>
       <div><label>Forma de pago</label><select id="p_pag">${this.PAGO.map(t=>`<option ${p.forma_pago===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <button class="btn gold full" onclick="App.pedSave('${id||''}')">Guardar pedido</button>`); },
   /* El bloque de medidas sale con «A la medida» y también cuando la referencia
@@ -1435,13 +1678,19 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     this._cli.unshift(c); await this._put('superior_clientes',c,this._cli);
     this.toast('👤 '+nom+' quedó en el directorio');
     return c; },
+  /* El modo solo rellena lo que se le cobra al cliente; el número que manda en la
+     liquidación sigue siendo la diferencia contra lo que nos costó. */
+  pedTraModo(){ const mo=($('p_tramod')||{}).value, cos=+($('p_tracos')||{}).value||0, e=$('p_tratot');
+    if(!e) return;
+    if(mo==='incluido'||mo==='cliente') e.value=0;
+    else if(mo==='mitades') e.value=Math.round(cos/2); },
   async pedSave(id){ const cliObj=await this._cliDesdePedido(); if(!cliObj)return;
     const cliId=cliObj.id, cliNom=cliObj.nombre||'';
     const vId=$('p_vend')?$('p_vend').value:''; const vObj=this._vend.find(x=>x.id===vId)||{};
     const rs=$('p_ref'),ro=rs.options[rs.selectedIndex]; const medida=rs.value==='__medida__';
     let refLab=''; if(medida)refLab='A la medida'; else if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
     if(!refLab){alert('Selecciona una referencia');return;}
-    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,vendedor_id:vId,vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',tipo_transporte:$('p_tra').value,valor_transporte:+($('p_tratot')||{}).value||0,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,vendedor_id:vId,vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',tipo_transporte:$('p_tra').value,valor_transporte:+($('p_tratot')||{}).value||0,transp_modo:($('p_tramod')||{}).value||null,transp_costo:+($('p_tracos')||{}).value||0,iva:!!($('p_iva')||{}).checked,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     // Se conservan las gestiones ya marcadas; si es nuevo, queda «Tomado» con la hora
     const ant=this._ped.find(x=>x.id===id);
     row.hitos=(ant&&ant.hitos)?ant.hitos:{nuevo:row.creado_en};
