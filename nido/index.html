@@ -1880,7 +1880,14 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const fecha=f.getDate()+'/'+(f.getMonth()+1)+'/'+f.getFullYear();
     const m=this.money.bind(this), e=this.esc.bind(this);
     const tel=(c.telefono||'').replace(/\D/g,'');
-    const transporte=+p.valor_transporte||0;
+    /* La proforma es lo que el cliente ve: aca el transporte es lo que EL paga, no lo
+       que nos cuesta a nosotros, y sí suma al total. */
+    const tr=this._liqTransp(p), transporte=tr.cob;
+    const modoTxt=(this.LIQTRA.find(x=>x[0]===(p.transp_modo||'cobrado'))||['','']) [1];
+    const cant=+p.cantidad||1, uni=this._pedPrinc(p);
+    const extras=this._pedItemsDe(p.id);
+    const desc=+p.descuento_pct||0;
+    const bruto=Math.round((+p.total||0)/(1-Math.min(99,desc)/100));
 
     const fila=(t,v)=>v?`<tr><td class="k">${e(t)}</td><td>${e(v)}</td></tr>`:'';
     const prod=[
@@ -1931,7 +1938,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
 </style>
 <div class="barra">
   <button class="btn" onclick="window.print()">Imprimir / PDF</button>
-  ${tel?`<a class="btn gh" target="_blank" href="https://wa.me/57${tel}?text=${encodeURIComponent('Hola '+(c.nombre||'')+', le envío la proforma '+num+' de Nido Colchones por '+this.money(p.total))}">Enviar al cliente</a>`:''}
+  ${tel?`<a class="btn gh" target="_blank" href="https://wa.me/57${tel}?text=${encodeURIComponent('Hola '+(c.nombre||'')+', le envío la proforma '+num+' de Nido Colchones por '+this.money((+p.total||0)+transporte))}">Enviar al cliente</a>`:''}
   <button class="btn gh" onclick="var d=document.getElementById('prod');d.classList.toggle('oculta');this.textContent=d.classList.contains('oculta')?'Mostrar datos de producción':'Ocultar para el cliente'">Ocultar para el cliente</button>
 </div>
 
@@ -1957,12 +1964,19 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   <section>
     <h2>Pedido</h2>
     <table class="items">
-      <tr><th>Referencia</th><th class="n">Cantidad</th><th class="n">Valor</th></tr>
-      <tr><td>${e(ref)}</td><td class="n">1</td><td class="n">${m(p.total)}</td></tr>
+      <tr><th>Referencia</th><th class="n">Cantidad</th><th class="n">Valor unit.</th><th class="n">Valor</th></tr>
+      <tr><td>${e(ref)}</td><td class="n">${cant}</td><td class="n">${m(uni)}</td><td class="n">${m(uni*cant)}</td></tr>
+      ${extras.map(x=>`<tr><td>${e(x.referencia||'')}</td><td class="n">${+x.cantidad||1}</td>
+        <td class="n">${m(x.precio_unit)}</td>
+        <td class="n">${m((+x.cantidad||1)*(+x.precio_unit||0))}</td></tr>`).join('')}
     </table>
     <table class="tot">
-      <tr><td>Producto</td><td class="n">${m(p.total)}</td></tr>
-      ${transporte?`<tr><td>Transporte (${e(p.tipo_transporte||'')})</td><td class="n">${m(transporte)}</td></tr>`:''}
+      ${desc?`<tr><td>Subtotal</td><td class="n">${m(bruto)}</td></tr>
+        <tr><td>Descuento ${desc}%</td><td class="n">− ${m(bruto-(+p.total||0))}</td></tr>`:''}
+      <tr><td>Producto${extras.length?'s':''}</td><td class="n">${m(p.total)}</td></tr>
+      ${transporte?`<tr><td>Transporte · ${e(modoTxt)}${p.tipo_transporte?' ('+e(p.tipo_transporte)+')':''}</td>
+        <td class="n">${m(transporte)}</td></tr>`
+       :`<tr><td>Transporte · ${e(modoTxt)}</td><td class="n">sin costo para usted</td></tr>`}
       <tr class="grande"><td>Total</td><td class="n">${m((+p.total||0)+transporte)}</td></tr>
     </table>
     <table style="margin-top:12px">
