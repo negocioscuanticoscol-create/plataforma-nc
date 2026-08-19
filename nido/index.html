@@ -379,8 +379,10 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const t=this._liqTransp(p), tCos=t.cos, tCob=t.cob, tRes=t.res;
     const com=this._liqCom(p), util=base-costo+tRes, rep=util-com;
     return {venta,base,iva,costo,tCob,tCos,tRes,com,util,rep,mitad:rep/2,tipo:this._liqTipo(p)}; },
+  /* Los anulados no entran: no se vendieron, no dejan utilidad y no se comisionan. */
   _liqPeds(){ const mes=this._liqMes||'';
-    return (this._ped||[]).filter(p=>!mes||String(p.creado_en||'').slice(0,7)===mes)
+    return (this._ped||[]).filter(p=>!p.anulado)
+      .filter(p=>!mes||String(p.creado_en||'').slice(0,7)===mes)
       .sort((a,b)=>String(b.creado_en||'').localeCompare(String(a.creado_en||''))); },
   async vLiq(){
     const m=this.money.bind(this), A=this._lp('socio_a','JVC'), B=this._lp('socio_b','Gloria');
@@ -1424,11 +1426,13 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const arr=[...(this._ped||[])].sort((a,b)=>
       String(b.creado_en||'').localeCompare(String(a.creado_en||'')));
     const f=this._pedCajon||'todos';
-    const cuenta={}, plata={};
-    arr.forEach(p=>{ const k=(this._est(p)).k;
+    /* Los anulados se siguen VIENDO en la lista —para poder reactivarlos y para saber
+       qué se cayó— pero no suman en los cajones ni en el total. */
+    const cuenta={}, plata={}, act=arr.filter(p=>!p.anulado);
+    act.forEach(p=>{ const k=(this._est(p)).k;
       cuenta[k]=(cuenta[k]||0)+1; plata[k]=(plata[k]||0)+(+p.total||0); });
     const vis=f==='todos'?arr:arr.filter(p=>this._est(p).k===f);
-    const total=arr.reduce((s,p)=>s+(+p.total||0),0);
+    const total=act.reduce((s,p)=>s+(+p.total||0),0);
 
     const cajon=(k,t,e,n,$$)=>`<div onclick="App.pedCajon('${k}')"
       style="flex:1;min-width:132px;padding:11px 12px;border-radius:11px;cursor:pointer;text-align:center;
@@ -1455,16 +1459,23 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         const sig=this.ESTPED.find(x=>!h[x.k]);
         const cerrado=this.ESTPED.every(x=>h[x.k]);
         const desde=h.nuevo, hasta=h[this.ESTPED[this.ESTPED.length-1].k];
-        return `<div class="item"><div class="top"><div style="min-width:0;flex:1">
-        <div class="nm">${this.esc(p.referencia||'—')} · ${this.esc(p.cliente||'—')}</div>
+        const anu=!!p.anulado;
+        return `<div class="item"${anu?' style="opacity:.55;border-left:4px solid var(--bad)"':''}><div class="top"><div style="min-width:0;flex:1">
+        <div class="nm"${anu?' style="text-decoration:line-through"':''}>${this.esc(p.referencia||'—')} · ${this.esc(p.cliente||'—')}</div>
+        ${anu?`<div class="mt" style="color:var(--bad);font-weight:700">ANULADO${
+          p.anulado_por?' por '+this.esc(p.anulado_por):''}${
+          p.anulado_en?' · '+String(p.anulado_en).slice(0,10):''}${
+          p.anulado_nota?' — '+this.esc(p.anulado_nota):''}</div>`:''}
         <div class="mt">🚚 ${this.esc(p.tipo_transporte||'—')} · 💳 ${this.esc(p.forma_pago||'—')}${
           p.vendedor?' · 🧑‍💼 '+this.esc(p.vendedor):''}</div></div>
-        <div style="text-align:right;flex:none"><div class="nm">${this.money(p.total)}</div>
+        <div style="text-align:right;flex:none"><div class="nm"${anu?' style="text-decoration:line-through"':''}>${this.money(p.total)}</div>
         <div class="row" style="gap:8px;margin-top:4px;justify-content:flex-end;align-items:center">
-          ${this.puede('editarPed')?`<a onclick="App.pedModal('${p.id}')" title="Editar este pedido"
+          ${anu?`<a onclick="App.pedReactivar('${p.id}')" title="Vuelve a contar" style="cursor:pointer;color:var(--ok);font-weight:700;font-size:12px">reactivar</a>
+            ${this.puede('usuarios')?`<a onclick="App.pedDel('${p.id}')" title="Borrar definitivamente" style="cursor:pointer;color:var(--bad)">✕</a>`:''}`
+          :`${this.puede('editarPed')?`<a onclick="App.pedModal('${p.id}')" title="Editar este pedido"
              style="cursor:pointer;color:var(--navy);font-size:15px">✎</a>`:''}
           <a onclick="App.pedProforma('${p.id}')" title="Ver la proforma" style="cursor:pointer;color:var(--gold);font-weight:700;font-size:12px">proforma</a>
-          <a onclick="App.pedDel('${p.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div></div></div>
+          <a onclick="App.pedAnular('${p.id}')" title="Anular: queda registrado pero no cuenta" style="cursor:pointer;color:var(--bad);font-weight:700;font-size:12px">anular</a>`}</div></div></div>
 
         <div style="margin-top:9px;border-top:1px solid var(--line2);padding-top:8px">
           <div class="row" style="gap:5px;flex-wrap:wrap;align-items:stretch">
@@ -1833,7 +1844,42 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const w=window.open('', 'proforma_'+p.id);
     if(!w){ alert('El navegador bloqueó la ventana. Permite las ventanas emergentes para ver la proforma.'); return; }
     w.document.open(); w.document.write(html); w.document.close(); },
-  async pedDel(id){ if(!confirm('¿Eliminar pedido?'))return; this._ped=this._ped.filter(x=>x.id!==id); await this._del('superior_pedidos',id,this._ped); this.vPed(); },
+  /* Anular NO es borrar. El pedido se queda con su historia y el motivo de por qué se
+     cayó —eso vale para saber qué se está perdiendo y por qué—, pero deja de contar
+     en la liquidación y en los totales. Borrar de verdad solo se ofrece sobre uno ya
+     anulado, y solo al administrador. */
+  /* Pide la explicación y nada más: ni clave ni confirmación doble. Pero la explicación
+     sí es obligatoria — un pedido anulado sin motivo no le sirve a nadie después. */
+  pedAnular(id){ const p=this._ped.find(x=>x.id===id); if(!p)return;
+    modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:6px">Anular pedido</h3>
+      <div style="font-size:12.5px;color:var(--mut);margin-bottom:10px">
+        ${this.esc(p.referencia||'—')} · ${this.esc(p.cliente||'—')} · <b>${this.money(p.total)}</b></div>
+      <label>¿Por qué se anula?</label>
+      <textarea id="an_mot" rows="3" placeholder="El cliente desistió · se equivocó la referencia · no pagó · lo pidió por otro lado…"></textarea>
+      <div class="hint">Queda guardado con la fecha y quién lo anuló. El pedido no se borra:
+        deja de contar en la liquidación y se puede reactivar.</div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn" onclick="App.pedAnularOk('${p.id}')">Anular</button>
+        <button class="btn2" onclick="cerrar()">Cancelar</button></div>`);
+    setTimeout(()=>{ const t=$('an_mot'); if(t)t.focus(); },50); },
+  async pedAnularOk(id){ const p=this._ped.find(x=>x.id===id); if(!p)return;
+    const m=(($('an_mot')||{}).value||'').trim();
+    if(!m){ alert('Escribe por qué se anula.'); const t=$('an_mot'); if(t)t.focus(); return; }
+    cerrar();
+    p.anulado=true; p.anulado_en=new Date().toISOString();
+    p.anulado_por=(this.ROLES[this.rol]||{}).quien||(this.ROLES[this.rol]||{}).nombre||this.rol;
+    p.anulado_nota=(m||'').trim()||null;
+    await this._put('superior_pedidos',this._codPedido(p),this._ped);
+    this.toast('Pedido anulado · ya no cuenta en la liquidación'); this.vPed(); },
+  async pedReactivar(id){ const p=this._ped.find(x=>x.id===id); if(!p)return;
+    if(!confirm('¿Reactivar este pedido? Vuelve a contar en la liquidación.'))return;
+    p.anulado=false; p.anulado_en=null; p.anulado_por=null; p.anulado_nota=null;
+    await this._put('superior_pedidos',this._codPedido(p),this._ped);
+    this.toast('Pedido reactivado'); this.vPed(); },
+  async pedDel(id){ const p=this._ped.find(x=>x.id===id);
+    if(p&&!p.anulado){ return this.pedAnular(id); }   // nunca se borra de una
+    if(!confirm('¿Borrar definitivamente este pedido? Se pierde el registro y no se puede deshacer.'))return;
+    this._ped=this._ped.filter(x=>x.id!==id); await this._del('superior_pedidos',id,this._ped); this.vPed(); },
   pedProgramar(id){ const p=this._ped.find(x=>x.id===id); if(!p)return; this.progModal('',{pedido_id:id,cliente:p.cliente,local_num:(this._cli.find(x=>x.id===p.cliente_id)||{}).local_num||'',referencia:p.referencia}); },
 
   /* ---------- PROGRAMACIÓN ---------- */
