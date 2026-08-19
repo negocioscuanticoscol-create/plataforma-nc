@@ -127,14 +127,113 @@ const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,
 const del=(t,q)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'DELETE',headers:H});
 
 const TABS=[['pend','🏗️ Estructuración'],['gastos','💰 Gastos'],['clientes','👥 Clientes'],['medidas','📐 Medidas'],
-            ['catalogo','🖼️ Catálogo'],['cotiz','📋 Cotizaciones'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
+            ['catalogo','🖼️ Catálogo'],['costos','🧵 Costos'],['cotiz','📋 Cotizaciones'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
 let TAB='pend', CLI=[], PRENDAS=[], CAT=[];
 $('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('');
 function go(t){
   TAB=t; TABS.forEach(([v])=>{const b=$('t_'+v); if(b)b.className=(v===t?'on':'');});
-  const V={pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,cotiz:vCotiz,ventas:vVentas,crm:vCrm}[t];
+  const V={pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,costos:vCostos,cotiz:vCotiz,ventas:vVentas,crm:vCrm}[t];
   if(V) safe(V,t)();
 }
+
+/* ═══════ COSTOS · la hoja de costo de lo que se manda a hacer ═══════
+   Esto NO es la prenda a la medida (esa se cotiza con las medidas del cliente). Es lo
+   que se produce por referencia: maletas, calzado, marroquinería. El producto es el
+   MISMO del catálogo -ahí vive su valor de venta- y aquí se le abre el despiece:
+   cada materia prima y cada paso de mano de obra, con valor unitario y cantidad.
+   Según la categoría salen los materiales que esa categoría suele llevar, para no
+   arrancar de una hoja en blanco. Se pueden borrar y agregar los que sean. */
+const MATCAT={
+  'Maletas y bolsos':['Cuero','Lona','Forro (tela)','Cremallera','Argollas','Medias lunas','Hilo','Herrajes'],
+  'Marroquinería'   :['Cuero','Forro','Broches','Hilo','Tinta de cantos','Herrajes'],
+  'Calzado'         :['Cuero','Forro','Suela','Plantilla','Cordones','Pegante','Hilo'],
+  'Confección'      :['Tela','Forro','Entretela','Cremallera','Botones','Hilo'],
+};
+const UNIDS=['unidad','metro','decímetro','par','juego','gramo','pliego'];
+let COSPROD=null, COSITEMS=[], COSBASE=[];
+async function vCostos(){
+  CAT=await get('zarrat_catalogo?order=nombre.asc&limit=300');
+  COSBASE=await get('zarrat_costos_base?activo=is.true&order=orden.asc');
+  if(COSPROD&&!CAT.some(x=>x.id===COSPROD)) COSPROD=null;
+  COSITEMS=COSPROD?await get('zarrat_costo_item?catalogo_id=eq.'+COSPROD+'&order=orden.asc'):[];
+  const p=CAT.find(x=>x.id===COSPROD);
+  $('main').innerHTML=`<h1>Costos</h1>
+    <div class="sub">Qué lleva cada producto y cuánto cuesta hacerlo. El valor de venta se pone en Catálogo.</div>
+    <div class="card">
+      <div class="g3">
+        <div><label>Producto</label><select id="c_sel" onchange="costoSel(this.value)">
+          <option value="">— elige un producto —</option>
+          ${CAT.map(x=>`<option value="${x.id}" ${x.id===COSPROD?'selected':''}>${esc(x.nombre)}${x.categoria?' · '+esc(x.categoria):''}</option>`).join('')}
+        </select></div>
+        <div><label>…o crea uno nuevo</label><input id="c_nom" placeholder="Ej: Maleta Andes"></div>
+        <div><label>Categoría</label><select id="c_cat">${Object.keys(MATCAT).map(k=>`<option>${k}</option>`).join('')}</select></div>
+      </div>
+      <button class="btn acc full" onclick="costoNuevo()">+ Crear producto y armar su costo</button>
+      <div class="hint">Al crearlo queda también en el Catálogo, donde se le pone el valor de venta y la foto.</div>
+    </div>
+    ${p?costoHoja(p):'<div class="card"><div class="hint">Elige un producto arriba para ver o armar su hoja de costos.</div></div>'}`;
+}
+function costoHoja(p){
+  const mat=COSITEMS.filter(x=>x.grupo==='material'), mo=COSITEMS.filter(x=>x.grupo==='mano_obra');
+  const sum=a=>a.reduce((s,x)=>s+(+x.valor_unit||0)*(+x.cantidad||0),0);
+  const cm=sum(mat), co=sum(mo), tot=cm+co, venta=+p.valor||0;
+  const marg=venta?((venta-tot)/venta*100):0;
+  const sug=(MATCAT[p.categoria]||[]).filter(x=>!mat.some(y=>y.nombre===x));
+  const fila=x=>`<div style="display:grid;grid-template-columns:1fr 92px 92px 70px 88px auto;gap:6px;align-items:center;margin-bottom:5px">
+    <input value="${esc(x.nombre||'')}" onchange="costoSet(${x.id},'nombre',this.value)">
+    <select onchange="costoSet(${x.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===x.unidad?'selected':''}>${u}</option>`).join('')}</select>
+    <input type="number" value="${+x.valor_unit||0}" title="Valor unitario" onchange="costoSet(${x.id},'valor_unit',this.value)">
+    <input type="number" step="0.01" value="${+x.cantidad||1}" title="Cantidad" onchange="costoSet(${x.id},'cantidad',this.value)">
+    <b style="text-align:right">${$$((+x.valor_unit||0)*(+x.cantidad||0))}</b>
+    <button class="btn gh" style="padding:4px 9px" onclick="costoDel(${x.id})">✕</button></div>`;
+  const cab=`<div style="display:grid;grid-template-columns:1fr 92px 92px 70px 88px auto;gap:6px;
+    font-size:9.5px;color:var(--mut);font-weight:700;text-transform:uppercase;padding:0 2px 4px">
+    <span>Material</span><span>Unidad</span><span>Vr. unit.</span><span>Cant.</span><span style="text-align:right">Total</span><span></span></div>`;
+  return `<div class="card">
+    <h2 style="margin:0 0 2px">${esc(p.nombre)}</h2>
+    <div class="hint" style="margin-bottom:10px">${esc(p.categoria||'sin categoría')}</div>
+    <div style="font-weight:800;color:var(--acc);font-size:12px;letter-spacing:.06em;margin:6px 0 7px">MATERIA PRIMA</div>
+    ${mat.length?cab+mat.map(fila).join(''):'<div class="hint">Todavía sin materiales.</div>'}
+    ${sug.length?`<div style="margin:8px 0 4px;font-size:11.5px;color:var(--mut)">De ${esc(p.categoria)} suelen ir:
+      ${sug.map(nsug=>`<button class="btn gh" style="padding:3px 9px;margin:2px 3px 0 0;font-size:11.5px"
+        onclick="costoAdd('material',this.dataset.n)" data-n="${esc(nsug)}">+ ${esc(nsug)}</button>`).join('')}</div>`:''}
+    <button class="btn gh" style="margin-top:6px" onclick="costoAdd('material','')">+ otro material</button>
+    <div style="font-weight:800;color:var(--acc);font-size:12px;letter-spacing:.06em;margin:16px 0 7px">MANO DE OBRA</div>
+    ${mo.length?cab.replace('Material','Paso')+mo.map(fila).join(''):'<div class="hint">Todavía sin mano de obra.</div>'}
+    ${COSBASE.filter(b=>!mo.some(y=>y.nombre===b.concepto)).map(b=>
+      `<button class="btn gh" style="padding:3px 9px;margin:4px 3px 0 0;font-size:11.5px"
+        onclick="costoAdd('mano_obra',this.dataset.n,this.dataset.v)" data-n="${esc(b.concepto)}" data-v="${+b.valor||0}">+ ${esc(b.concepto)} ${$$(b.valor)}</button>`).join('')}
+    <button class="btn gh" style="margin-top:6px" onclick="costoAdd('mano_obra','')">+ otro paso</button>
+    <div style="border-top:2px solid var(--line);margin-top:16px;padding-top:11px;font-size:14px;line-height:2">
+      <div>Materia prima <b>${$$(cm)}</b></div>
+      <div>Mano de obra <b>${$$(co)}</b></div>
+      <div style="font-size:17px;color:var(--acc)"><b>COSTO TOTAL ${$$(tot)}</b></div>
+      ${venta?`<div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">
+        Valor de venta <b>${$$(venta)}</b> → deja <b style="color:${venta-tot>0?'var(--ok)':'var(--bad)'}">${$$(venta-tot)}</b>
+        · margen <b style="color:${marg>=50?'var(--ok)':(marg>=30?'var(--acc)':'var(--bad)')}">${marg.toFixed(0)}%</b></div>`
+      :`<div class="hint" style="margin-top:8px">Sin valor de venta todavía. Se pone en la pestaña Catálogo.</div>`}
+    </div></div>`;
+}
+async function costoNuevo(){
+  const nom=($('c_nom').value||'').trim(); if(!nom){ alert('Ponle nombre al producto'); return; }
+  const cat=$('c_cat').value;
+  const r=await post('zarrat_catalogo',{nombre:nom,categoria:cat,valor:0,activo:true,
+    fecha_creacion:new Date().toISOString().slice(0,10)});
+  const nuevo=Array.isArray(r)?r[0]:r; COSPROD=nuevo&&nuevo.id; vCostos();
+}
+function costoSel(id){ COSPROD=id?+id:null; vCostos(); }
+async function costoAdd(grupo,nombre,valor){
+  if(!COSPROD){ alert('Elige primero un producto'); return; }
+  await post('zarrat_costo_item',{catalogo_id:COSPROD,grupo:grupo,nombre:nombre||'',
+    unidad:grupo==='material'?'unidad':'unidad',valor_unit:+valor||0,cantidad:1,
+    orden:COSITEMS.length},'return=minimal');
+  vCostos();
+}
+async function costoSet(id,campo,v){
+  const b={}; b[campo]=(campo==='nombre'||campo==='unidad')?v:(+v||0);
+  await patch('zarrat_costo_item','id=eq.'+id,b); vCostos();
+}
+async function costoDel(id){ await del('zarrat_costo_item','id=eq.'+id); vCostos(); }
 
 /* ═══════ 1 · ESTRUCTURACIÓN ═══════ */
 const CATS=['Pendientes','Investigación','Directorio proveedores','Herramientas'];
