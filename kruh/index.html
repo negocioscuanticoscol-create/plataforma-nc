@@ -133,7 +133,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios'],['horas','⏱️ Horas']],
   view:'dashboard',
   _savingPedido:false,
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
@@ -382,8 +382,101 @@ const App={
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
     this.view=v; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios,horas:this.vHoras}[v]||this.vDashboard).call(this); },
   set(h){ const m=$('main'); m.className=''; m.style.cssText=''; m.innerHTML=h; },
+  /* ---------- HORAS ----------
+     El tiempo que NC le trabaja a Kruh. No es la jornada de la panadería: es lo que
+     le metemos nosotros a esta app. Va a nc_hora con negocio_id, la misma tabla que
+     usan las demás apps, así que el Centro de Mando suma todo sin registrar dos veces.
+     Sin esto no se sabe cuál cliente sale caro ni cuánto cobrarle al siguiente. */
+  NEGID:'kruh', _hmes:'',
+  _hhmm(m){ m=Math.round(+m||0); const h=Math.floor(m/60); return h?h+'h '+(m%60)+'m':(m%60)+'m'; },
+  _hmins(i,f){ if(!i||!f) return 0;
+    const [a,b]=i.split(':').map(Number), [c,d]=f.split(':').map(Number);
+    let m=(c*60+d)-(a*60+b); if(m<0) m+=1440;   // pasó de medianoche
+    return m; },
+  async vHoras(){
+    const [us,hs]=await Promise.all([
+      GET('nc_usuario?activo=is.true&order=nombre.asc'),
+      GETALL('nc_hora?negocio_id=eq.'+this.NEGID+'&order=fecha.desc')]);
+    this._hu=us; this._hh=hs; this.pintaHoras();
+  },
+  pintaHoras(){
+    const us=this._hu||[], hs=this._hh||[], hm=this._hhmm.bind(this);
+    const meses=[...new Set(hs.map(x=>String(x.fecha||'').slice(0,7)).filter(Boolean))].sort().reverse();
+    if(this._hmes&&!meses.includes(this._hmes)) this._hmes='';
+    const vis=this._hmes?hs.filter(x=>String(x.fecha||'').slice(0,7)===this._hmes):hs;
+    const tot=vis.reduce((s,x)=>s+(+x.minutos||0),0);
+    const tar=id=>{ const u=us.find(y=>y.id===id); return +(u&&u.tarifa_hora)||0; };
+    const plata=vis.reduce((s,x)=>s+(+x.minutos||0)/60*tar(x.usuario_id),0);
+    const porU={}; vis.forEach(x=>{ porU[x.usuario_id]=(porU[x.usuario_id]||0)+(+x.minutos||0); });
+    const hoy=new Date().toISOString().slice(0,10);
+    this.set(`<h1>Horas</h1>
+      <div class="sub">El tiempo que NC le trabaja a Kruh. En el Centro de Mando se ve junto al de los demás clientes.</div>
+      <div class="card">
+        <div class="g3"><div><label>Quién</label><select id="h_u">${us.map(u=>`<option value="${u.id}">${esc(u.nombre)}</option>`).join('')}</select></div>
+          <div><label>Fecha</label><input type="date" id="h_f" value="${hoy}"></div>
+          <div><label>Qué se hizo</label><input id="h_t" placeholder="Ej: cuadre de inventario"></div></div>
+        <div class="g3"><div><label>Empezó</label><input type="time" id="h_i" onchange="App.hCalc()"></div>
+          <div><label>Terminó</label><input type="time" id="h_ff" onchange="App.hCalc()"></div>
+          <div><label>Minutos</label><input type="number" id="h_m" placeholder="se calcula solo"></div></div>
+        <div class="hint" id="h_prev"></div>
+        <button class="btn full" onclick="App.hAdd()">+ Registrar tiempo</button>
+      </div>
+      <div class="card">
+        <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+          <select onchange="App.hMes(this.value)" style="max-width:180px">
+            <option value=""${!this._hmes?' selected':''}>Todo</option>
+            ${meses.map(x=>`<option value="${x}"${this._hmes===x?' selected':''}>${x}</option>`).join('')}</select>
+          <div style="margin-left:auto;text-align:right">
+            <div style="font-size:22px;font-weight:800">${hm(tot)}</div>
+            ${plata?`<div class="hint">${money(plata)} a las tarifas cargadas</div>`:''}</div></div>
+        ${Object.entries(porU).sort((a,b)=>b[1]-a[1]).map(([uid,mm])=>{
+          const u=us.find(y=>y.id===+uid)||{nombre:'(usuario borrado)'};
+          return `<div class="row" style="justify-content:space-between;padding:4px 0"><span>${esc(u.nombre)}</span><b>${hm(mm)}</b></div>`;}).join('')}
+      </div>
+      ${vis.length?vis.map(x=>{ const u=us.find(y=>y.id===x.usuario_id)||{};
+        return `<div class="card" style="padding:9px 12px;margin-bottom:5px">
+          <div class="row" style="justify-content:space-between;gap:10px">
+          <div style="min-width:0"><b>${esc(x.tarea||'sin descripción')}</b>
+            <div class="hint">${esc(u.nombre||'—')} · ${esc(x.fecha||'')}${x.inicio?' · '+String(x.inicio).slice(0,5)+'→'+String(x.fin||'').slice(0,5):''}</div></div>
+          <div style="text-align:right;flex:none"><b>${hm(x.minutos)}</b>
+            <div><a onclick="App.hDel(${x.id})" style="cursor:pointer;color:var(--bad);font-size:12px">quitar</a></div></div>
+          </div></div>`;}).join(''):'<div class="card"><div class="hint">Sin tiempo registrado todavía.</div></div>'}
+      <div class="card">
+        <div class="hint" style="font-weight:700;letter-spacing:.06em;margin-bottom:7px">QUIÉNES TRABAJAN</div>
+        ${us.map(u=>`<div class="row" style="gap:6px;margin-bottom:5px">
+          <input value="${esc(u.nombre)}" onchange="App.uSet(${u.id},'nombre',this.value)" style="flex:1">
+          <input value="${esc(u.rol||'')}" placeholder="rol" onchange="App.uSet(${u.id},'rol',this.value)" style="width:130px">
+          <input type="number" value="${+u.tarifa_hora||0}" title="Tarifa por hora" onchange="App.uSet(${u.id},'tarifa_hora',this.value)" style="width:110px">
+        </div>`).join('')}
+        <div class="row" style="gap:6px;margin-top:8px">
+          <input id="u_n" placeholder="Nombre" style="flex:1"><input id="u_r" placeholder="Rol" style="width:130px">
+          <input id="u_t" type="number" placeholder="Tarifa/hora" style="width:110px">
+          <button class="btn" onclick="App.uAdd()">+ persona</button></div>
+        <div class="hint">La tarifa es opcional: en cero solo se mide el tiempo. Esta lista es de NC y la comparten todas las apps.</div>
+      </div>`);
+  },
+  hMes(v){ this._hmes=v; this.pintaHoras(); },
+  hCalc(){ const i=($('h_i')||{}).value, f=($('h_ff')||{}).value, m=this._hmins(i,f);
+    if(m&&$('h_m')) $('h_m').value=m;
+    if($('h_prev')) $('h_prev').textContent=m?'Son '+this._hhmm(m):''; },
+  async hAdd(){
+    const u=($('h_u')||{}).value; if(!u){ toast('Primero agrega una persona abajo'); return; }
+    const i=($('h_i')||{}).value||null, f=($('h_ff')||{}).value||null;
+    const m=+($('h_m')||{}).value||this._hmins(i,f);
+    if(!m){ toast('Pon las horas o los minutos'); return; }
+    await POST('nc_hora',{usuario_id:+u,negocio_id:this.NEGID,fecha:$('h_f').value||new Date().toISOString().slice(0,10),
+      inicio:i,fin:f,minutos:m,tarea:($('h_t').value||'').trim()||null});
+    toast('Tiempo registrado'); this.vHoras();
+  },
+  async hDel(id){ if(!confirm('¿Borrar este registro de tiempo?'))return;
+    await DEL('nc_hora?id=eq.'+id); this.vHoras(); },
+  async uAdd(){ const n=($('u_n').value||'').trim(); if(!n){ toast('Falta el nombre'); return; }
+    await POST('nc_usuario',{nombre:n,rol:($('u_r').value||'').trim()||null,
+      tarifa_hora:+$('u_t').value||0,activo:true}); this.vHoras(); },
+  async uSet(id,campo,v){ const b={}; b[campo]=campo==='tarifa_hora'?(+v||0):v;
+    await PATCH('nc_usuario?id=eq.'+id,b); this.vHoras(); },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
   /* ===================== RECETAS = HOJA DE COSTOS ===================== */
