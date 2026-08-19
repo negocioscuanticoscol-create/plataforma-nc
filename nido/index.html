@@ -363,7 +363,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const venta=+p.total||0, pct=this._lpn('iva_pct',19);
     const base=p.iva?venta/(1+pct/100):venta, iva=venta-base;
     const costo=this._liqCosto(p);
-    const tCob=+p.valor_transporte||0, tCos=+p.transp_costo||0, tRes=tCob-tCos;
+    /* OJO con estos dos: valor_transporte es lo que NOS CUESTA (asi se usó siempre en
+       esta app), y transp_cobrado es lo que se le cobra al cliente. El costo RESTA. */
+    const tCos=+p.valor_transporte||0, tCob=+p.transp_cobrado||0, tRes=tCob-tCos;
     const com=this._liqCom(p), util=base-costo+tRes, rep=util-com;
     return {venta,base,iva,costo,tCob,tCos,tRes,com,util,rep,mitad:rep/2,tipo:this._liqTipo(p)}; },
   _liqPeds(){ const mes=this._liqMes||'';
@@ -1599,16 +1601,15 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       <label>Vendedor <a onclick="cerrar();App.go('equipo')" style="cursor:pointer;color:var(--gold);font-weight:600;text-transform:none;letter-spacing:0">· administrar</a></label>
       <select id="p_vend"><option value="">— sin vendedor —</option>${this._vend.map(v=>`<option value="${v.id}" ${p.vendedor_id===v.id?'selected':''}>${this.esc(v.nombre)}${v.local_nombre?' · '+this.esc(v.local_nombre):''}</option>`).join('')}</select>
       <div class="g2"><div><label>Tipo de transporte</label><select id="p_tra">${this.TRANSPORTE.map(t=>`<option ${p.tipo_transporte===t?'selected':''}>${t}</option>`).join('')}</select></div>
-      <div><label>Valor del transporte</label><input id="p_tratot" type="number" value="${p.valor_transporte||0}">
-        <div class="hint">Lo que se le COBRA al cliente. No suma al total del pedido.</div></div></div>
-      <!-- El transporte tiene dos lados y hay que verlos por separado: lo que cobramos
-           y lo que nos costó. La utilidad se mueve con la diferencia. -->
+      <div><label>Valor del transporte</label><input id="p_tratot" type="number" value="${p.valor_transporte||0}" oninput="App.pedTraModo()">
+        <div class="hint">Lo que NOS cuesta llevarlo. No suma al total del pedido.</div></div></div>
+      <!-- El transporte tiene dos lados: lo que nos cuesta (arriba) y lo que se le cobra
+           al cliente (abajo). La utilidad se mueve con la DIFERENCIA, no con uno solo. -->
       <div class="g2"><div><label>¿Cómo va el transporte?</label>
         <select id="p_tramod" onchange="App.pedTraModo()">${this.LIQTRA.map(([k,t])=>
           `<option value="${k}" ${(p.transp_modo||this._lp('transp_modo_def','cobrado'))===k?'selected':''}>${t}</option>`).join('')}</select></div>
-      <div><label>Lo que NOS costó</label><input id="p_tracos" type="number" value="${p.transp_costo||0}">
-        <div class="hint">Lo que cobró la fábrica o el transportador. Si es más de lo que
-          cobramos, la diferencia sale de nuestra utilidad.</div></div></div>
+      <div><label>Lo que se le COBRA al cliente</label><input id="p_tracob" type="number" value="${p.transp_cobrado||0}">
+        <div class="hint">Si es menos de lo que nos cuesta, la diferencia sale de nuestra utilidad.</div></div></div>
       <div><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">
         <input type="checkbox" id="p_iva" ${p.iva?'checked':''} style="width:auto;margin:0">
         Discriminar IVA del precio</label>
@@ -1680,17 +1681,19 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     return c; },
   /* El modo solo rellena lo que se le cobra al cliente; el número que manda en la
      liquidación sigue siendo la diferencia contra lo que nos costó. */
-  pedTraModo(){ const mo=($('p_tramod')||{}).value, cos=+($('p_tracos')||{}).value||0, e=$('p_tratot');
+  pedTraModo(){ const mo=($('p_tramod')||{}).value, cos=+($('p_tratot')||{}).value||0, e=$('p_tracob');
     if(!e) return;
-    if(mo==='incluido'||mo==='cliente') e.value=0;
-    else if(mo==='mitades') e.value=Math.round(cos/2); },
+    if(mo==='incluido') e.value=0;               // lo asumimos entero
+    else if(mo==='mitades') e.value=Math.round(cos/2);
+    else if(mo==='cliente'){ e.value=0; const c=$('p_tratot'); if(c)c.value=0; }  // ni cuesta ni se cobra
+    else if(mo==='cobrado'&&!+e.value) e.value=cos; },                            // se le pasa el costo
   async pedSave(id){ const cliObj=await this._cliDesdePedido(); if(!cliObj)return;
     const cliId=cliObj.id, cliNom=cliObj.nombre||'';
     const vId=$('p_vend')?$('p_vend').value:''; const vObj=this._vend.find(x=>x.id===vId)||{};
     const rs=$('p_ref'),ro=rs.options[rs.selectedIndex]; const medida=rs.value==='__medida__';
     let refLab=''; if(medida)refLab='A la medida'; else if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
     if(!refLab){alert('Selecciona una referencia');return;}
-    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,vendedor_id:vId,vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',tipo_transporte:$('p_tra').value,valor_transporte:+($('p_tratot')||{}).value||0,transp_modo:($('p_tramod')||{}).value||null,transp_costo:+($('p_tracos')||{}).value||0,iva:!!($('p_iva')||{}).checked,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,vendedor_id:vId,vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',tipo_transporte:$('p_tra').value,valor_transporte:+($('p_tratot')||{}).value||0,transp_modo:($('p_tramod')||{}).value||null,transp_cobrado:+($('p_tracob')||{}).value||0,iva:!!($('p_iva')||{}).checked,forma_pago:$('p_pag').value,total:+$('p_tot').value||0,estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     // Se conservan las gestiones ya marcadas; si es nuevo, queda «Tomado» con la hora
     const ant=this._ped.find(x=>x.id===id);
     row.hitos=(ant&&ant.hitos)?ant.hitos:{nuevo:row.creado_en};
