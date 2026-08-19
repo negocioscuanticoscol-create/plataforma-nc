@@ -245,13 +245,13 @@ const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'
 
 const App={
 vista:'resumen',
-TABS:[['resumen','📊 Resumen'],['pauta','📣 Pauta'],['cuentas','🪪 Cuentas'],['agentes','🤖 Agentes'],['herram','🧰 Herramientas'],['redes','📱 Redes'],['financiero','💰 Financiero']],
+TABS:[['resumen','📊 Resumen'],['pauta','📣 Pauta'],['horas','⏱️ Horas'],['cuentas','🪪 Cuentas'],['agentes','🤖 Agentes'],['herram','🧰 Herramientas'],['redes','📱 Redes'],['financiero','💰 Financiero']],
 /* las apps del ecosistema · las periféricas leen nc_clientes para saber a quién sirven */
 APPS:{app:'📱 App propia',callprospector:'📞 CallProspector',marcador:'☎️ Marcador',
       reservas:'📅 Reservas',bot:'🤖 Bot WhatsApp',pauta:'📣 Pauta'},
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({resumen:this.vResumen,pauta:this.vPauta,cuentas:this.vCuentas,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero}[v]||this.vResumen).call(this); },
+  ({resumen:this.vResumen,pauta:this.vPauta,horas:this.vHoras,cuentas:this.vCuentas,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero}[v]||this.vResumen).call(this); },
 
 async vFinanciero(){
   const lineas=await api('nc_finanzas?order=orden&limit=500');
@@ -589,6 +589,66 @@ _link(campo,v){
   if(campo==='drive'||campo==='qr') return /^https?:/.test(u)?u:'';
   return '';
 },
+/* ---------- HORAS ----------
+   Cuánto tiempo le mete NC a cada cliente. Cada app registra lo suyo en nc_hora con
+   su negocio_id; acá se suma todo sin volver a escribir nada. Es la única forma de
+   saber cuál cliente sale caro y cuánto cobrarle al siguiente por algo parecido. */
+_hmes:'',
+async vHoras(){
+  const [hrs,usr,negs]=await Promise.all([
+    api('nc_hora?select=*&order=fecha.desc&limit=2000'),
+    api('nc_usuario?select=*'),
+    api('nc_negocio?select=id,nombre&order=orden')]);
+  this._hh=hrs; this._hu=usr; this._hn={}; negs.forEach(x=>this._hn[x.id]=x.nombre);
+  this.pintaHoras();
+},
+pintaHoras(){
+  const hrs=this._hh||[], usr=this._hu||[], nom=id=>this._hn[id]||id;
+  const meses=[...new Set(hrs.map(x=>String(x.fecha||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  const mes=this._hmes;
+  const vis=mes?hrs.filter(x=>String(x.fecha||'').slice(0,7)===mes):hrs;
+  const hm=m=>{ m=Math.round(+m||0); const h=Math.floor(m/60); return h?h+'h '+(m%60)+'m':(m%60)+'m'; };
+  const tot=vis.reduce((s,x)=>s+(+x.minutos||0),0);
+  const tarifa=id=>{ const u=usr.find(y=>y.id===id); return +(u&&u.tarifa_hora)||0; };
+  const plata=vis.reduce((s,x)=>s+(+x.minutos||0)/60*tarifa(x.usuario_id),0);
+  const porN={}, porU={};
+  vis.forEach(x=>{ porN[x.negocio_id]=(porN[x.negocio_id]||0)+(+x.minutos||0);
+                   porU[x.usuario_id]=(porU[x.usuario_id]||0)+(+x.minutos||0); });
+  const orden=Object.entries(porN).sort((a,b)=>b[1]-a[1]);
+  const max=orden.length?orden[0][1]:1;
+  $('main').innerHTML='<h1>⏱️ Horas</h1>'
+   +'<div class="sub">El tiempo que NC le mete a cada cliente. Cada app registra lo suyo; acá se suma todo.</div>'
+   +'<div class="fchips">'
+   +`<button class="fchip${!mes?' on':''}" onclick="App.hMes('')"><b>Todo</b></button>`
+   +meses.map(m2=>`<button class="fchip${mes===m2?' on':''}" onclick="App.hMes('${m2}')"><b>${m2}</b></button>`).join('')
+   +'</div>'
+   +'<div class="pbar">'
+   +`<div class="pkpi"><b>${hm(tot)}</b><i>en total</i></div>`
+   +`<div class="pkpi"><b>${orden.length}</b><i>clientes atendidos</i></div>`
+   +(plata?`<div class="pkpi"><b>$${nm(plata)}</b><i>a las tarifas cargadas</i></div>`:'')
+   +'</div>'
+   +(orden.length?'<div class="card">'+orden.map(([id,m3])=>
+     `<div style="margin-bottom:10px">
+       <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:3px">
+         <b>${esc(nom(id))}</b><b style="color:var(--acc)">${hm(m3)}</b></div>
+       <div style="height:7px;background:var(--panel);border-radius:99px;overflow:hidden">
+         <div style="height:100%;width:${Math.max(2,m3/max*100)}%;background:var(--acc);border-radius:99px"></div></div>
+     </div>`).join('')+'</div>'
+    :'<div class="card">Todavía nadie ha registrado tiempo. Se registra dentro de la app de cada cliente, en su pestaña de Horas.</div>')
+   +(Object.keys(porU).length?'<h1 style="font-size:17px;margin-top:18px">Por persona</h1><div class="card">'
+     +Object.entries(porU).sort((a,b)=>b[1]-a[1]).map(([uid,m4])=>{
+       const u=usr.find(y=>y.id===+uid)||{nombre:'(sin usuario)'};
+       return `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13.5px">
+         <span>${esc(u.nombre)}${u.rol?' · <span style="color:var(--sub)">'+esc(u.rol)+'</span>':''}</span>
+         <b>${hm(m4)}</b></div>`;}).join('')+'</div>':'')
+   +(vis.length?'<h1 style="font-size:17px;margin-top:18px">Lo último</h1>'
+     +vis.slice(0,25).map(x=>{ const u=usr.find(y=>y.id===x.usuario_id)||{};
+       return `<div class="card" style="padding:9px 12px;margin-bottom:5px;display:flex;justify-content:space-between;gap:10px">
+         <div style="min-width:0"><b>${esc(x.tarea||'sin descripción')}</b>
+           <div style="font-size:12px;color:var(--sub)">${esc(nom(x.negocio_id))} · ${esc(u.nombre||'—')} · ${esc(x.fecha||'')}</div></div>
+         <b style="flex:none">${hm(x.minutos)}</b></div>`;}).join(''):'');
+},
+hMes(m){ this._hmes=m; this.pintaHoras(); },
 /* ---------- PAUTA ----------
    Cada anuncio con su miniatura y sus números. Los datos NO salen de Meta: los deja
    el recolector en nc_pauta_lectura tres veces al día (8am, 12m, 5pm). El token de
