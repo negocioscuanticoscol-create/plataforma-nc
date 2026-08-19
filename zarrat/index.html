@@ -184,11 +184,17 @@ async function vProv(){
           <button class="btn gh sm" onclick="provEdit(${v.id})">✎ editar</button>
           <button class="btn gh sm" onclick="provDel(${v.id})">✕</button></div></div>`}
       <div style="font-weight:800;color:var(--acc);font-size:11.5px;letter-spacing:.06em;margin:12px 0 6px">MATERIALES QUE VENDE</div>
-      ${mp(v.id).length?mp(v.id).map(m=>`<div style="display:grid;grid-template-columns:1fr 110px 100px 100px auto;gap:6px;align-items:center;margin-bottom:5px">
+      ${mp(v.id).length?`<div style="display:grid;grid-template-columns:1.2fr 78px 78px 96px 96px 92px 92px auto;gap:5px;
+        font-size:9px;color:var(--mut);font-weight:700;text-transform:uppercase;padding:0 2px 3px">
+        <span>Material</span><span>Calibre</span><span>Color</span><span>Ref. nuestra</span>
+        <span>Unidad</span><span>Valor</span><span>Ref. prov.</span><span></span></div>`+mp(v.id).map(m=>`<div style="display:grid;grid-template-columns:1.2fr 78px 78px 96px 96px 92px 92px auto;gap:5px;align-items:center;margin-bottom:5px">
         <input value="${esc(m.nombre)}" onchange="matSet(${m.id},'nombre',this.value)">
+        <input value="${esc(m.calibre||'')}" placeholder="—" onchange="matSet(${m.id},'calibre',this.value)">
+        <input value="${esc(m.color||'')}" placeholder="—" onchange="matSet(${m.id},'color',this.value)">
+        <input value="${esc(m.referencia||'')}" placeholder="—" onchange="matSet(${m.id},'referencia',this.value)">
         <select onchange="matSet(${m.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===m.unidad?'selected':''}>${u}</option>`).join('')}</select>
         <input type="number" value="${+m.valor_unit||0}" title="Valor por unidad" onchange="matSet(${m.id},'valor_unit',this.value)">
-        <input value="${esc(m.ref_prov||'')}" placeholder="ref. del prov." onchange="matSet(${m.id},'ref_prov',this.value)">
+        <input value="${esc(m.ref_prov||'')}" placeholder="—" onchange="matSet(${m.id},'ref_prov',this.value)">
         <button class="btn gh" style="padding:4px 9px" onclick="matDel(${m.id})">✕</button>
         ${m.notas?`<div style="grid-column:1/-1;font-size:11.5px;color:var(--mut);margin:-2px 0 4px 2px">${esc(m.notas)}</div>`:''}
         </div>`).join('')
@@ -199,7 +205,10 @@ async function vProv(){
         <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--mut);margin-bottom:7px">
           NUEVO MATERIAL DE ${esc((v.nombre||'').toUpperCase())}</div>
         <div class="g2"><div><label>Material</label><input id="mn_${v.id}" placeholder="Ej: Cuero natural graso"></div>
-          <div><label>Para qué categoría</label><select id="mc_${v.id}">${Object.keys(MATCAT).map(k=>`<option>${k}</option>`).join('')}</select></div></div>
+          <div><label>Tipo de material</label><select id="mc_${v.id}">${CATMAT.map(k=>`<option>${k}</option>`).join('')}</select></div></div>
+        <div class="g3"><div><label>Calibre</label><input id="mca_${v.id}" placeholder="Ej: 1.4 mm"></div>
+          <div><label>Color</label><input id="mco_${v.id}" placeholder="Ej: Miel"></div>
+          <div><label>Referencia del material</label><input id="mrf_${v.id}" placeholder="La nuestra"></div></div>
         <div class="g3"><div><label>Unidad</label><select id="mu_${v.id}">${UNIDS.map(u=>`<option ${u==='unidad'?'selected':''}>${u}</option>`).join('')}</select></div>
           <div><label>Valor por unidad</label><input id="mv_${v.id}" type="number" placeholder="0"></div>
           <div><label>Referencia del proveedor</label><input id="mr_${v.id}" placeholder="Con qué código lo pide él"></div></div>
@@ -233,10 +242,11 @@ async function matAdd(pid){
   const nom=(($('mn_'+pid)||{}).value||'').trim(); if(!nom){ alert('Ponle nombre al material'); return; }
   const val=+(($('mv_'+pid)||{}).value)||0;
   if(!val&&!confirm('Este material va sin precio. ¿Guardarlo así?')) return;
+  const t=k=>(($('m'+k+'_'+pid)||{}).value||'').trim()||null;
   await post('zarrat_materiales',{nombre:nom,categoria:$('mc_'+pid).value,proveedor_id:pid,
     unidad:($('mu_'+pid)||{}).value||'unidad',valor_unit:val,
-    ref_prov:(($('mr_'+pid)||{}).value||'').trim()||null,
-    notas:(($('mo_'+pid)||{}).value||'').trim()||null,activo:true},'return=minimal');
+    calibre:t('ca'),color:t('co'),referencia:t('rf'),ref_prov:t('r'),notas:t('o'),
+    activo:true},'return=minimal');
   vProv();
 }
 async function matSet(id,campo,v){
@@ -259,7 +269,11 @@ const MATCAT={
   'Calzado'         :['Cuero','Forro','Suela','Plantilla','Cordones','Pegante','Hilo'],
   'Confección'      :['Tela','Forro','Entretela','Cremallera','Botones','Hilo'],
 };
-const UNIDS=['unidad','metro','decímetro','pie','par','juego','gramo','pliego'];
+const UNIDS=['unidad','metro','decímetro','pie','pie cuadrado','par','juego','gramo','pliego'];
+/* La categoria del MATERIAL es el tipo de material, no el producto que se va a hacer:
+   un proveedor vende cueros y otro herrajes, y en la hoja de costos se busca asi. */
+const CATMAT=['Cueros','Telas y forros','Herrajes','Cremalleras','Suelas y plantillas',
+              'Hilos','Pegantes y químicos','Empaque','Otros'];
 let COSPROD=null, COSITEMS=[], COSBASE=[];
 async function vCostos(){
   CAT=await get('zarrat_catalogo?order=nombre.asc&limit=300');
@@ -306,12 +320,18 @@ function costoHoja(p){
     <div class="hint" style="margin-bottom:10px">${esc(p.categoria||'sin categoría')}</div>
     <div style="font-weight:800;color:var(--acc);font-size:12px;letter-spacing:.06em;margin:6px 0 7px">MATERIA PRIMA</div>
     ${mat.length?cab+mat.map(fila).join(''):'<div class="hint">Todavía sin materiales.</div>'}
-    ${(()=>{ const disp=MATS.filter(m=>!p.categoria||!m.categoria||m.categoria===p.categoria);
-      return disp.length?`<div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px">
+    ${(()=>{ if(!MATS.length) return '';
+      /* Agrupado por tipo de material -cueros, herrajes, telas- que es como se busca:
+         'necesito un cuero', no 'necesito algo de la categoria maletas'. */
+      const grupos={}; MATS.forEach(m=>{ (grupos[m.categoria||'Otros']=grupos[m.categoria||'Otros']||[]).push(m); });
+      const et=m=>{ const v=PROV.find(x=>x.id===m.proveedor_id);
+        return [m.nombre,m.calibre,m.color].filter(Boolean).join(' · ')
+          +' — '+$$(m.valor_unit)+'/'+(m.unidad||'un')+(v?' · '+v.nombre:''); };
+      return `<div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px">
         <select id="c_mat"><option value="">— traer un material de proveedores —</option>
-          ${disp.map(m=>{ const v=PROV.find(x=>x.id===m.proveedor_id);
-            return `<option value="${m.id}">${esc(m.nombre)} · ${$$(m.valor_unit)}/${esc(m.unidad||'un')}${v?' · '+esc(v.nombre):''}</option>`;}).join('')}
-        </select><button class="btn gh" onclick="costoDelMaestro()">+ agregar</button></div>`:''; })()}
+          ${Object.keys(grupos).sort().map(g=>`<optgroup label="${esc(g)}">${
+            grupos[g].map(m=>`<option value="${m.id}">${esc(et(m))}</option>`).join('')}</optgroup>`).join('')}
+        </select><button class="btn gh" onclick="costoDelMaestro()">+ agregar</button></div>`; })()}
     ${sug.length?`<div style="margin:8px 0 4px;font-size:11.5px;color:var(--mut)">De ${esc(p.categoria)} suelen ir:
       ${sug.map(nsug=>`<button class="btn gh" style="padding:3px 9px;margin:2px 3px 0 0;font-size:11.5px"
         onclick="costoAdd('material',this.dataset.n)" data-n="${esc(nsug)}">+ ${esc(nsug)}</button>`).join('')}</div>`:''}
@@ -351,7 +371,8 @@ async function costoAdd(grupo,nombre,valor){
 async function costoDelMaestro(){
   const sel=$('c_mat'), id=sel&&sel.value; if(!id){ alert('Elige un material'); return; }
   const m=MATS.find(x=>x.id===+id); if(!m) return;
-  await post('zarrat_costo_item',{catalogo_id:COSPROD,grupo:'material',nombre:m.nombre,
+  const nom=[m.nombre,m.calibre,m.color].filter(Boolean).join(' · ');
+  await post('zarrat_costo_item',{catalogo_id:COSPROD,grupo:'material',nombre:nom,
     unidad:m.unidad||'unidad',valor_unit:+m.valor_unit||0,cantidad:1,material_id:m.id,
     orden:COSITEMS.length},'return=minimal');
   vCostos();
@@ -366,7 +387,7 @@ async function costoSet(id,campo,v){
     const nom=String(v||'').trim();
     if(nom&&!MATS.some(m=>(m.nombre||'').toLowerCase()===nom.toLowerCase())){
       const p=CAT.find(x=>x.id===COSPROD)||{};
-      const r=await post('zarrat_materiales',{nombre:nom,categoria:p.categoria||null,
+      const r=await post('zarrat_materiales',{nombre:nom,categoria:'Otros',
         unidad:it.unidad||'unidad',valor_unit:+it.valor_unit||0,activo:true});
       const nm=Array.isArray(r)?r[0]:r;
       if(nm&&nm.id) await patch('zarrat_costo_item','id=eq.'+id,{material_id:nm.id});
