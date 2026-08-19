@@ -1584,7 +1584,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       const inv=(this._inv||[]).find(y=>((y.referencia||'')+(y.tamano?' · '+y.tamano:'')).trim()===(x.referencia||'').trim());
       if(inv){ x.precio_unit=dist?(+inv.precio_dist||+inv.precio||0):(+inv.precio||0);
                x.costo_unit=+inv.costo||0; } });
-    this.pedItemPinta(); },
+    this.pedItemPinta(); this.pedTraPinta(); },
   pedItemAdd(){ (this._pedIt=this._pedIt||[]).push({referencia:'',cantidad:1,precio_unit:0,costo_unit:0});
     this.pedItemPinta(); },
   pedItemDel(i){ this._pedIt.splice(i,1); this.pedItemPinta(); },
@@ -1726,15 +1726,16 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       <label>Vendedor <a onclick="cerrar();App.go('equipo')" style="cursor:pointer;color:var(--gold);font-weight:600;text-transform:none;letter-spacing:0">· administrar</a></label>
       <select id="p_vend"><option value="">— sin vendedor —</option>${this._vend.map(v=>`<option value="${v.id}" ${p.vendedor_id===v.id?'selected':''}>${this.esc(v.nombre)}${v.local_nombre?' · '+this.esc(v.local_nombre):''}</option>`).join('')}</select>
       <div class="g2"><div><label>Tipo de transporte</label><select id="p_tra">${this.TRANSPORTE.map(t=>`<option ${p.tipo_transporte===t?'selected':''}>${t}</option>`).join('')}</select></div>
-      <div><label>Valor del transporte</label><input id="p_tratot" type="number" value="${p.valor_transporte||0}" oninput="App.pedTraModo()">
-        <div class="hint">Lo que NOS cuesta llevarlo. No suma al total del pedido.</div></div></div>
+      <div><label>¿Cuánto cuesta el flete?</label><input id="p_tratot" type="number" value="${p.valor_transporte||0}" oninput="App.pedTraModo()">
+        <div class="hint">El valor total de llevarlo. No suma al total del pedido.</div></div></div>
       <!-- El transporte tiene dos lados: lo que nos cuesta (arriba) y lo que se le cobra
            al cliente (abajo). La utilidad se mueve con la DIFERENCIA, no con uno solo. -->
       <div class="g2"><div><label>¿Cómo va el transporte?</label>
         <select id="p_tramod" onchange="App.pedTraModo()">${this.LIQTRA.map(([k,t])=>
           `<option value="${k}" ${(p.transp_modo||this._lp('transp_modo_def','cobrado'))===k?'selected':''}>${t}</option>`).join('')}</select></div>
-      <div><label>Lo que se le COBRA al cliente</label><input id="p_tracob" type="number" value="${p.transp_cobrado||0}">
-        <div class="hint">Si es menos de lo que nos cuesta, la diferencia sale de nuestra utilidad.</div></div></div>
+      <div><label>De eso, paga el cliente</label><input id="p_tracob" type="number" value="${p.transp_cobrado||0}" oninput="App.pedTraPinta()">
+        <div class="hint">Se llena solo según cómo va. Se puede escribir encima.</div></div></div>
+      <div id="p_trares" style="margin:2px 0 10px;font-size:12.5px;font-weight:700"></div>
       <div><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">
         <input type="checkbox" id="p_iva" ${p.iva?'checked':''} style="width:auto;margin:0">
         Discriminar IVA del precio</label>
@@ -1820,12 +1821,23 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     return c; },
   /* El modo solo rellena lo que se le cobra al cliente; el número que manda en la
      liquidación sigue siendo la diferencia contra lo que nos costó. */
+  /* El flete vale una sola cifra; el modo dice como se reparte. Antes habia que
+     escribir los dos numeros y era facil poner el total en la casilla equivocada. */
   pedTraModo(){ const mo=($('p_tramod')||{}).value, cos=+($('p_tratot')||{}).value||0, e=$('p_tracob');
     if(!e) return;
-    if(mo==='incluido') e.value=0;               // lo asumimos entero
-    else if(mo==='mitades') e.value=Math.round(cos/2);
-    else if(mo==='cliente'){ e.value=0; const c=$('p_tratot'); if(c)c.value=0; }  // ni cuesta ni se cobra
-    else if(mo==='cobrado'&&!+e.value) e.value=cos; },                            // se le pasa el costo
+    if(mo==='incluido') e.value=0;                       // lo asumimos entero
+    else if(mo==='mitades') e.value=Math.round(cos/2);   // mitad y mitad
+    else if(mo==='cliente'){ e.value=0; const c=$('p_tratot'); if(c)c.value=0; }
+    else if(mo==='cobrado') e.value=cos;                 // se le pasa completo
+    this.pedTraPinta(); },
+  pedTraPinta(){ const e=$('p_trares'); if(!e) return;
+    const cos=+($('p_tratot')||{}).value||0, cob=+($('p_tracob')||{}).value||0;
+    if(!cos&&!cob){ e.innerHTML=''; return; }
+    const noso=cos-cob;
+    e.innerHTML=`Flete ${this.money(cos)} → el cliente paga <b>${this.money(cob)}</b> · `
+      +(noso>0?`<span style="color:var(--bad)">nosotros ponemos ${this.money(noso)}</span> (sale de la utilidad)`
+       :noso<0?`<span style="color:var(--ok)">nos quedan ${this.money(-noso)} de más</span>`
+       :`<span style="color:var(--ok)">no nos cuesta nada</span>`); },
   async pedSave(id){ const cliObj=await this._cliDesdePedido(); if(!cliObj)return;
     const cliId=cliObj.id, cliNom=cliObj.nombre||'';
     const vId=$('p_vend')?$('p_vend').value:''; const vObj=this._vend.find(x=>x.id===vId)||{};
