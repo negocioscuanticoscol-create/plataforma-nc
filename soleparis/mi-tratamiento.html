@@ -109,6 +109,9 @@
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+/* Marca de version a la vista: si algo "no cambio", este numero dice de una si el
+   navegador esta mostrando la pagina publicada o una copia vieja que guardo. */
+const VER='7';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
@@ -391,7 +394,8 @@ function vPanel(){
       <button class="btn gh" onclick="salir()">Salir</button>
     </div>
     <div class="pie">Tus fotos solo se usan para tu seguimiento.<br>
-      Si autorizas que sean caso de éxito, te lo pediremos aparte.</div>`;
+      Si autorizas que sean caso de éxito, te lo pediremos aparte.
+      <br><span style="opacity:.45">v${VER}</span></div>`;
 }
 function verArchivo(t){
   const v=miFid(), val=t==='video'?(+v.valor_video||0):(+v.valor_foto||0);
