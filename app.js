@@ -473,8 +473,6 @@ const App = {
     // META = clientes con UNA compra > $300k (el perfil que buscamos)
     const perfilSet=new Set(); vReal.filter(v=>(+v.total_vendido||0)>300000).forEach(v=>perfilSet.add(norm(v.cliente)));
     const perfil=perfilSet.size, METcli=1000, avP=Math.min(100,perfil/METcli*100);
-    const porCli={};
-    vReal.forEach(x=>{ const k=norm(x.cliente)||'s/c'; const g=(porCli[k]=porCli[k]||{v:0,c:0,n:0,best:x.cliente,bv:-1,esteMes:false,doc:''}); const tv=+x.total_vendido||0; g.v+=tv; g.c+=+x.comision_bruta||0; g.n++; if(tv>g.bv){g.bv=tv;g.best=x.cliente;} if(x.documento && !g.doc) g.doc=x.documento; if(x.mes===mesActual) g.esteMes=true; });
     // ── Inteligencia de recompra por cliente ──
     this._cliByDoc={}; cli.forEach(c=>{ this._cliByDoc[c.documento]=c; });
     this._celByName={}; cli.forEach(c=>{ if(!c.celular) return; const kk=norm(c.nombre); if(kk) this._celByName[kk]=c.celular; const core=norm(String(c.nombre).replace(/\(.*?\)/g,'')); if(core && !this._celByName[core]) this._celByName[core]=c.celular; });
@@ -513,14 +511,36 @@ const App = {
        Y uno con dos documentos sale dos veces, con su compra real partida en dos:
        en cualquier lista se ve como dos medianos en vez de un grande. Las dos
        cosas se corrigen desde aca, que es donde se ven. */
+    /* 822003040 y 822003040-0 son el MISMO NIT. Si se agrupa por el texto crudo,
+       el cliente sale dos veces y su compra queda partida — que es justo lo que
+       pasaba con La Catira y con Amicaribe. Se normaliza antes de agrupar: se
+       quita el digito de verificacion, y si un documento de 10 digitos empieza
+       igual que otro de 9, se toman como uno solo. */
+    const soloDig=d=>String(d||'').replace(/\D/g,'');
+    const raiz=d=>{ const t=String(d||'').trim();
+      return t.indexOf('-')>=0 ? soloDig(t.split('-')[0]) : soloDig(t); };
+    const raices=new Set(); vReal.forEach(v=>{ const r=raiz(v.documento); if(r) raices.add(r); });
+    const docKey=d=>{ let r=raiz(d);
+      if(r.length===10 && raices.has(r.slice(0,9))) r=r.slice(0,9);
+      return r; };
+    this._docKey=docKey;
+    /* Con que UNA de las fichas tenga telefono basta: se busca por la raiz, no
+       por el texto exacto del documento. */
+    this._celByRaiz={};
+    cli.forEach(c=>{ if(!c.celular) return; const r=docKey(c.documento); if(r && !this._celByRaiz[r]) this._celByRaiz[r]=c.celular; });
+
     const porDoc={};
-    vReal.forEach(v=>{ const d=v.documento||''; if(!d) return;
-      const o=(porDoc[d]=porDoc[d]||{doc:d,best:v.cliente,v:0,n:0,k:norm(v.cliente),folios:[],ult:''});
-      o.v+=+v.total_vendido||0; o.n++;
+    vReal.forEach(v=>{ const d=docKey(v.documento); if(!d) return;
+      const o=(porDoc[d]=porDoc[d]||{doc:d,docs:new Set(),best:v.cliente,bv:-1,v:0,n:0,k:norm(v.cliente),folios:[],ult:'',com:0,esteMes:false});
+      o.docs.add(v.documento||'');
+      o.v+=+v.total_vendido||0; o.n++; o.com+=+v.comision_bruta||0;
+      const tv=+v.total_vendido||0; if(tv>o.bv){ o.bv=tv; o.best=v.cliente; }  // el nombre mejor escrito
       if(v.folio) o.folios.push(v.folio);
+      if(v.mes===mesActual) o.esteMes=true;
       const f=(v.creado_en||'').slice(0,10); if(f>o.ult) o.ult=f; });
-    const celDe=o=>(((this._cliByDoc||{})[o.doc]||{}).celular)||(this._celByName||{})[o.k]||'';
-    this._todosCli=Object.values(porDoc).map(o=>({...o,best:titt(o.best),cel:celDe(o)}))
+    const celDe=o=>(this._celByRaiz||{})[o.doc]||(((this._cliByDoc||{})[o.doc]||{}).celular)||(this._celByName||{})[o.k]||'';
+    this._todosCli=Object.values(porDoc).map(o=>({...o,best:titt(o.best),cel:celDe(o),
+        docs:[...o.docs].filter(Boolean)}))
       .sort((a,b)=>b.v-a.v);
     this._sinTel=this._todosCli.filter(o=>!o.cel);
     const grupoNom={};
@@ -541,15 +561,11 @@ const App = {
         <div style="height:14px;background:var(--gris);border-radius:8px;overflow:hidden;margin-top:8px"><div style="height:100%;width:${avP.toFixed(1)}%;background:var(--naranja)"></div></div>
         <div style="font-size:11.5px;color:#667;margin-top:6px">Buscamos <b>1.000 clientes</b> que en una sola compra superen <b>$300k</b> y compren <b>cada mes</b> → <b>$300.000.000/mes</b>. Vas en ${perfil}, faltan ${Math.max(0,METcli-perfil)}.</div>
       </div>
-      <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-size:15px;margin-bottom:4px">🏆 Clientes de más de $700.000 · barrido de llamadas</h2><button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="window.print()">🖨️ Imprimir</button></div>
-        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Todos los que acumulan más de <b>$700.000</b> en compras (${Object.values(porCli).filter(o=>o.v>700000).length}) · 🟢 ya pidió en ${mesActual} · ⚪ no este mes　|　🟢 bolita = <b>ya lo contacté</b> (clic) · ⚪ por contactar</div>
-        ${Object.entries(porCli).filter(([k,o])=>o.v>700000).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>{ const ref=o.doc||k; const cli2=(this._cliByDoc||{})[o.doc]||{}; const cel=((cli2.celular||(this._celByName||{})[k]||'')+''); const tel=cel.replace(/\D/g,''); return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-bottom:1px solid var(--linea);font-size:13px;border-radius:6px;${o.esteMes?'background:#e7f7ee':''}">
-          <span>${o.esteMes?'🟢':'⚪'} ${esc(titt(o.best))}${cel?` · <span style="color:#445;font-weight:600">📱 ${esc(cel)}</span>`:` · <button onclick="App.cliSmartTel('${esc(o.doc||'')}')" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa;border-radius:7px;padding:2px 8px;font-size:11px;cursor:pointer">➕ Tel</button>`}</span>
-          <span style="display:flex;align-items:center;gap:9px"><b>${cl(o.v)}</b> <small style="color:var(--gristxt);font-weight:700" title="compras registradas">(${o.n})</small> · <span style="color:var(--verde)">${cl(o.c)}</span>${this._bola(ref)}</span>
-        </div>`;}).join('')||'<div class="empty">Sin datos</div>'}
       </div>
-      <div class="card"><h2 style="font-size:15px;margin-bottom:4px">🧪 Kits sin segunda compra</h2>
-        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Compraron kit de muestras (${'$'+'39.000 o $60.000'}) y <b>nunca hicieron un pedido de verdad</b> (${this._kitsSin2.length}, ${cl(this._kitsSin2.reduce((a,o)=>a+(o.vale||0),0))} en kits). Del más reciente al más antiguo. 🟢 bolita = ya lo contacté (clic).</div>
+      <div class="card"><h2 style="font-size:15px;margin-bottom:4px">🧪 Solo compraron kit · nunca pidieron de verdad</h2>
+        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Compraron <b>kit de $39.000 o de $60.000</b> y
+          <b>nunca hicieron un pedido de verdad</b> (${this._kitsSin2.length} clientes, ${cl(this._kitsSin2.reduce((a,o)=>a+(o.vale||0),0))} en kits).
+          Del más reciente al más antiguo. 🟢 bolita = ya lo contacté (clic).</div>
         ${this._kitsRows(this._kitsSin2)}
       </div>
       ${(this._sinTel.length||this._dups.length)?`<div class="card" style="border-left:4px solid #dc2626">
@@ -579,19 +595,22 @@ const App = {
 
       <div class="card"><div style="display:flex;justify-content:space-between;align-items:center">
         <h2 style="font-size:15px;margin-bottom:4px">📋 Todos los que han comprado · ${this._todosCli.length}</h2>
-        <button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="App.cliCSV()">⬇️ Descargar</button></div>
-        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Con su celular, lo que llevan comprado y
-          sus números de factura. ${cl(this._todosCli.reduce((a,o)=>a+o.v,0))} en total. 🟢 bolita = ya lo contacté.</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="App.cliCSV()">⬇️ Descargar</button>
+          <button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="window.print()">🖨️ Imprimir</button></div></div>
+        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Todos los que han pedido, sin mínimo.
+          ${cl(this._todosCli.reduce((a,o)=>a+o.v,0))} en total · ${cl(this._todosCli.reduce((a,o)=>a+(o.com||0),0))} de comisión.
+          🟢 ya pidió en ${mesActual} · ⚪ no este mes　|　🟢 bolita = ya lo contacté (clic).</div>
         ${this._todosCli.map(o=>{ const tel=(o.cel||'').replace(/\D/g,'');
           const wa=tel.length===10?'57'+tel:(tel.length===12?tel:'');
-          return `<div style="padding:8px 9px;border-bottom:1px solid var(--linea);font-size:12.5px">
+          return `<div style="padding:8px 9px;border-bottom:1px solid var(--linea);font-size:12.5px;border-radius:6px;${o.esteMes?'background:#e7f7ee':''}">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-            <span style="min-width:0"><b>${esc(o.best)}</b>
+            <span style="min-width:0">${o.esteMes?'🟢':'⚪'} <b>${esc(o.best)}</b>
               ${o.cel?(wa?` · <a href="https://wa.me/${wa}" target="_blank" rel="noopener" style="color:#16a34a;font-weight:600;text-decoration:none">📱 ${esc(o.cel)}</a>`
                           :` · <span style="color:#445;font-weight:600">📱 ${esc(o.cel)}</span>`)
                     :` · <button class="btn-sm" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa;font-size:10.5px;padding:1px 7px" onclick="App.cliSmartTel('${esc(o.doc)}')">➕ Tel</button>`}
-              <small style="color:#889"> · ${o.n} compra${o.n===1?'':'s'} · última ${esc(o.ult||'—')}</small></span>
-            <span style="display:flex;align-items:center;gap:9px;flex:none"><b>${cl(o.v)}</b>${this._bola(o.doc)}</span>
+              <small style="color:#889"> · doc ${esc(o.docs[0]||o.doc)} · ${o.n} compra${o.n===1?'':'s'} · última ${esc(o.ult||'—')}</small></span>
+            <span style="display:flex;align-items:center;gap:9px;flex:none"><b>${cl(o.v)}</b>${o.com?`<span style="color:var(--verde)">${cl(o.com)}</span>`:''}${this._bola(o.doc)}</span>
           </div>
           ${o.folios.length?`<div style="font-size:10.5px;color:#98a;font-family:ui-monospace,monospace;margin-top:2px;word-break:break-all">${o.folios.map(f=>esc(f)).join(' · ')}</div>`:''}
         </div>`;}).join('')}
@@ -690,8 +709,8 @@ const App = {
   /* Para llevarse la lista al celular o pasarla a quien llame. */
   cliCSV(){
     const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
-    const filas=[['Cliente','Documento','Celular','Compras','Vendido','Ultima compra','Facturas']]
-      .concat((this._todosCli||[]).map(o=>[o.best,o.doc,o.cel,o.n,o.v,o.ult,(o.folios||[]).join(' ')]));
+    const filas=[['Cliente','Documento','Celular','Compras','Vendido','Comision','Ultima compra','Facturas']]
+      .concat((this._todosCli||[]).map(o=>[o.best,(o.docs||[])[0]||o.doc,o.cel,o.n,o.v,o.com||0,o.ult,(o.folios||[]).join(' ')]));
     const csv='\uFEFF'+filas.map(f=>f.map(q).join(';')).join('\r\n');
     const a=document.createElement('a');
     a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
