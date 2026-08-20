@@ -471,157 +471,177 @@ const CATMAT=['Cueros','Telas y forros','Herrajes','Cremalleras','Suelas y plant
 /* La maquila entra como proveedor: es la misma relación -le encargas, te cobra- y
    cuando suba el armado se repreciar igual que el cuero, en un solo sitio. */
 const CATMO='Mano de obra y maquila';
-let COSPROD=null, COSITEMS=[], COSBASE=[];
+let MODS=[], MODMAT=[], REFS=[], REFMAT=[], MODSEL=null, REFSEL=null;
 async function vCostos(){
-  CAT=await get('zarrat_catalogo?order=nombre.asc&limit=300');
-  COSBASE=await get('zarrat_costos_base?activo=is.true&order=orden.asc');
-  MATS=await get('zarrat_materiales?order=nombre.asc&limit=800');
-  PROV=await get('zarrat_proveedores?order=nombre.asc&limit=300');
-  if(COSPROD&&!CAT.some(x=>x.id===COSPROD)) COSPROD=null;
-  COSITEMS=COSPROD?await get('zarrat_costo_item?catalogo_id=eq.'+COSPROD+'&order=orden.asc'):[];
-  const p=CAT.find(x=>x.id===COSPROD);
+  [MODS,MATS,PROV]=await Promise.all([
+    get('zarrat_modelo?activo=is.true&order=id'),
+    get('zarrat_materiales?order=nombre.asc&limit=800'),
+    get('zarrat_proveedores?order=nombre.asc&limit=300')]);
+  if(MODSEL&&!MODS.some(m=>m.id===MODSEL)) MODSEL=null;
+  if(!MODSEL&&MODS.length) MODSEL=MODS[0].id;
+  MODMAT = MODSEL?await get('zarrat_modelo_mat?modelo_id=eq.'+MODSEL+'&order=orden'):[];
+  REFS   = MODSEL?await get('zarrat_referencia?modelo_id=eq.'+MODSEL+'&order=id'):[];
+  if(REFSEL&&!REFS.some(r=>r.id===REFSEL)) REFSEL=null;
+  REFMAT = REFSEL?await get('zarrat_ref_mat?referencia_id=eq.'+REFSEL+'&order=orden'):[];
+  const m=MODS.find(x=>x.id===MODSEL);
   $('main').innerHTML=`<h1>Costos</h1>
-    <div class="sub">Qué lleva cada producto y cuánto cuesta hacerlo. El valor de venta se pone en Catálogo.</div>
+    <div class="sub">El <b>modelo</b> es la receta: qué lleva y cuánto. La <b>referencia</b> es esa receta
+      en un color, un forro y unos apliques concretos — y es lo que se vende.</div>
     <div class="card">
-      <div class="g3">
-        <div><label>Producto</label><select id="c_sel" onchange="costoSel(this.value)">
-          <option value="">— elige un producto —</option>
-          ${CAT.map(x=>`<option value="${x.id}" ${x.id===COSPROD?'selected':''}>${esc(x.nombre)}${x.categoria?' · '+esc(x.categoria):''}</option>`).join('')}
+      <div class="g2">
+        <div><label>Modelo</label><select onchange="modSel(this.value)">
+          ${MODS.map(x=>`<option value="${x.id}" ${x.id===MODSEL?'selected':''}>${esc(x.nombre)}</option>`).join('')}
         </select></div>
-        <div><label>…o crea uno nuevo</label><input id="c_nom" placeholder="Ej: Maleta Andes"></div>
-        <div><label>Categoría</label><select id="c_cat">${Object.keys(MATCAT).map(k=>`<option>${k}</option>`).join('')}</select></div>
+        <div><label>…o crea uno nuevo</label>
+          <div style="display:flex;gap:6px"><input id="mo_n" placeholder="Ej: Bolso de mano">
+            <button class="btn gh" onclick="modNuevo()">+ modelo</button></div></div>
       </div>
-      <button class="btn acc full" onclick="costoNuevo()">+ Crear producto y armar su costo</button>
-      <div class="hint">Al crearlo queda también en el Catálogo, donde se le pone el valor de venta y la foto.</div>
+      ${m&&m.descripcion?`<div class="hint" style="margin-top:8px">${esc(m.descripcion)}</div>`:''}
     </div>
-    ${p?costoHoja(p):'<div class="card"><div class="hint">Elige un producto arriba para ver o armar su hoja de costos.</div></div>'}`;
+    ${m?recetaHTML(m):''}
+    ${m?refsHTML():''}
+    ${REFSEL?fichaHTML():''}`;
 }
-function costoHoja(p){
-  const mat=COSITEMS.filter(x=>x.grupo==='material'), mo=COSITEMS.filter(x=>x.grupo==='mano_obra');
-  const sum=a=>a.reduce((s,x)=>s+(+x.valor_unit||0)*(+x.cantidad||0),0);
-  const cm=sum(mat), co=sum(mo), tot=cm+co, venta=+p.valor||0;
+function modSel(v){ MODSEL=+v||null; REFSEL=null; vCostos(); }
+async function modNuevo(){
+  const n=($('mo_n').value||'').trim(); if(!n){ alert('Ponle nombre al modelo'); return; }
+  const r=await post('zarrat_modelo',{nombre:n,activo:true});
+  MODSEL=(Array.isArray(r)?r[0]:r).id; REFSEL=null; vCostos();
+}
+const PAPELES=['cuerpo','correas','forro','cremallera','herraje','aplique','insumo','mo'];
+function recetaHTML(m){
+  const G='grid-template-columns:96px 1.3fr 130px 80px auto';
+  const f=x=>`<div style="display:grid;${G};gap:6px;align-items:center;margin-bottom:5px">
+    <select onchange="modMatSet(${x.id},'papel',this.value)">${PAPELES.map(p=>`<option ${p===x.papel?'selected':''}>${p}</option>`).join('')}</select>
+    <input value="${esc(x.nombre)}" onchange="modMatSet(${x.id},'nombre',this.value)">
+    <select onchange="modMatSet(${x.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===x.unidad?'selected':''}>${u}</option>`).join('')}</select>
+    <input type="number" step="0.01" value="${+x.cantidad||1}" onchange="modMatSet(${x.id},'cantidad',this.value)">
+    <button class="btn gh" style="padding:4px 9px" onclick="modMatDel(${x.id})">✕</button></div>`;
+  return `<div class="card">
+    <h2 style="margin:0 0 3px">Receta de ${esc(m.nombre)}</h2>
+    <div class="hint" style="margin-bottom:10px">Qué lleva y en qué cantidad, sin decir de qué color.
+      Cambiar algo acá afecta a las ${REFS.length} referencias de este modelo.</div>
+    <div style="display:grid;${G};gap:6px;font-size:9.5px;color:var(--mut);font-weight:700;
+      text-transform:uppercase;padding:0 2px 4px">
+      <span>Papel</span><span>Qué es</span><span>Unidad</span><span>Cant.</span><span></span></div>
+    ${MODMAT.filter(x=>x.grupo==='material').map(f).join('')||'<div class="hint">Sin materiales.</div>'}
+    <div style="font-weight:800;color:var(--acc);font-size:11.5px;letter-spacing:.06em;margin:12px 0 6px">MANO DE OBRA</div>
+    ${MODMAT.filter(x=>x.grupo==='mano_obra').map(f).join('')||'<div class="hint">Sin pasos.</div>'}
+    <div style="display:flex;gap:6px;margin-top:9px">
+      <button class="btn gh" onclick="modMatAdd('material')">+ material</button>
+      <button class="btn gh" onclick="modMatAdd('mano_obra')">+ paso</button></div>
+  </div>`;
+}
+async function modMatAdd(g){ await post('zarrat_modelo_mat',{modelo_id:MODSEL,papel:g==='mano_obra'?'mo':'insumo',
+  nombre:'',unidad:'unidad',cantidad:1,grupo:g,orden:MODMAT.length},'return=minimal'); vCostos(); }
+async function modMatSet(id,c,v){ const b={}; b[c]=(c==='cantidad')?(+v||0):v;
+  await patch('zarrat_modelo_mat','id=eq.'+id,b); vCostos(); }
+async function modMatDel(id){ if(!confirm('¿Quitar de la receta? Se quita del modelo, no de las referencias ya hechas.'))return;
+  await del('zarrat_modelo_mat','id=eq.'+id); vCostos(); }
+
+function refsHTML(){
+  return `<div class="card">
+    <h2 style="margin:0 0 3px">Referencias</h2>
+    <div class="hint" style="margin-bottom:10px">Cada una es este modelo en un color, un forro y unos apliques.</div>
+    ${REFS.length?REFS.map(r=>`<div class="item" style="cursor:pointer${r.id===REFSEL?';border-color:var(--acc)':''}"
+      onclick="refSel(${r.id})">
+      <div><div class="nm">${esc(r.codigo||'')} · ${esc(r.nombre||'')}</div>
+        <div class="mt">${[r.color,r.forro,r.apliques].filter(x=>x&&x!=='—').map(esc).join(' · ')||'sin definir'}</div></div>
+      <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(r.precio)}</div>
+        <div class="mt">${r.id===REFSEL?'abierta':'ver ficha'}</div></div></div>`).join('')
+      :'<div class="hint">Todavía sin referencias.</div>'}
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;margin-top:10px">
+      <input id="rf_n" placeholder="Nombre (ej: Cuero verde)">
+      <input id="rf_c" placeholder="Color / material">
+      <input id="rf_f" placeholder="Forro">
+      <button class="btn acc" onclick="refNueva()">+ referencia</button></div>
+  </div>`;
+}
+function refSel(id){ REFSEL=(REFSEL===id?null:id); vCostos(); }
+async function refNueva(){
+  const n=($('rf_n').value||'').trim(); if(!n){ alert('Ponle nombre a la referencia'); return; }
+  const m=MODS.find(x=>x.id===MODSEL)||{};
+  const cod='ZR-'+(m.nombre||'M').split(' ').map(w=>w[0]).join('').toUpperCase()
+    +'-'+n.replace(/[^A-Za-zÁÉÍÓÚÑ]/g,'').slice(0,3).toUpperCase();
+  const r=await post('zarrat_referencia',{modelo_id:MODSEL,codigo:cod,nombre:n,
+    color:($('rf_c').value||'').trim()||null,forro:($('rf_f').value||'').trim()||null,
+    precio:0,activo:true});
+  const nid=(Array.isArray(r)?r[0]:r).id;
+  const ln=MODMAT.map((l,i)=>({referencia_id:nid,modelo_mat_id:l.id,nombre:l.nombre,unidad:l.unidad,
+    cantidad:l.cantidad,valor_unit:0,grupo:l.grupo,orden:i}));
+  if(ln.length) await post('zarrat_ref_mat',ln,'return=minimal');
+  REFSEL=nid; vCostos();
+}
+function fichaHTML(){
+  const r=REFS.find(x=>x.id===REFSEL); if(!r) return '';
+  const sum=g=>REFMAT.filter(x=>x.grupo===g).reduce((s,x)=>s+(+x.valor_unit||0)*(+x.cantidad||0),0);
+  const cm=sum('material'), co=sum('mano_obra'), tot=cm+co, venta=+r.precio||0;
   const marg=venta?((venta-tot)/venta*100):0;
-  const sug=(MATCAT[p.categoria]||[]).filter(x=>!mat.some(y=>y.nombre===x));
   const G='grid-template-columns:1.25fr .85fr 96px 92px 66px 92px auto';
-  /* El material se elige del maestro de Proveedores: asi el precio y la unidad entran
-     solos y queda escrito a quien se le compra. Escribirlo a mano volvia a perder eso. */
-  const selMat=(x,soloMO)=>{
-    const gr={}; (MATS||[]).filter(m=>soloMO?(m.categoria===CATMO):(m.categoria!==CATMO))
-      .forEach(m=>{ (gr[m.categoria||'Otros']=gr[m.categoria||'Otros']||[]).push(m); });
-    const act=(MATS||[]).find(m=>m.id===x.material_id)
-           || (MATS||[]).find(m=>(m.nombre||'').trim().toLowerCase()===(x.nombre||'').trim().toLowerCase());
-    let h=`<select onchange="costoMat(${x.id},this.value)">`;
-    h+=`<option value=""${act?'':' selected'}>${esc(x.nombre||(soloMO?'— elige el taller —':'— elige material —'))}</option>`;
-    Object.keys(gr).sort().forEach(g=>{
-      h+=`<optgroup label="${esc(g)}">`;
-      gr[g].forEach(m=>{ const et=[m.nombre,m.calibre,m.color].filter(Boolean).join(' · ');
-        h+=`<option value="${m.id}"${act&&act.id===m.id?' selected':''}>${esc(et)}</option>`; });
+  const selMat=(x,mo)=>{
+    const gr={}; (MATS||[]).filter(mm=>mo?(mm.categoria===CATMO):(mm.categoria!==CATMO))
+      .forEach(mm=>{ (gr[mm.categoria||'Otros']=gr[mm.categoria||'Otros']||[]).push(mm); });
+    const act=(MATS||[]).find(mm=>mm.id===x.material_id);
+    let h=`<select onchange="refMat(${x.id},this.value)">`;
+    h+=`<option value=""${act?'':' selected'}>${esc(x.nombre||(mo?'— elige el taller —':'— elige material —'))}</option>`;
+    Object.keys(gr).sort().forEach(g=>{ h+=`<optgroup label="${esc(g)}">`;
+      gr[g].forEach(mm=>{ const et=[mm.nombre,mm.calibre,mm.color].filter(Boolean).join(' · ');
+        h+=`<option value="${mm.id}"${act&&act.id===mm.id?' selected':''}>${esc(et)}</option>`; });
       h+='</optgroup>'; });
     return h+'</select>'; };
-  const provDe=x=>{
-    const m=(MATS||[]).find(y=>y.id===x.material_id); if(!m) return '<span class="dim">—</span>';
-    const v=(PROV||[]).find(y=>y.id===m.proveedor_id);
-    return v?esc(v.nombre):'<span class="dim">sin proveedor</span>'; };
-  const fila=x=>`<div style="display:grid;${G};gap:6px;align-items:center;margin-bottom:5px">
-    ${selMat(x, x.grupo==='mano_obra')}
+  const provDe=x=>{ const mm=(MATS||[]).find(y=>y.id===x.material_id); if(!mm) return '<span class="dim">—</span>';
+    const v=(PROV||[]).find(y=>y.id===mm.proveedor_id); return v?esc(v.nombre):'<span class="dim">sin proveedor</span>'; };
+  const f=x=>`<div style="display:grid;${G};gap:6px;align-items:center;margin-bottom:5px">
+    ${selMat(x,x.grupo==='mano_obra')}
     <span style="font-size:11.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${provDe(x)}</span>
-    <select onchange="costoSet(${x.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===x.unidad?'selected':''}>${u}</option>`).join('')}</select>
-    <input type="number" value="${+x.valor_unit||0}" title="Valor unitario" onchange="costoSet(${x.id},'valor_unit',this.value)">
-    <input type="number" step="0.01" value="${+x.cantidad||1}" title="Cantidad" onchange="costoSet(${x.id},'cantidad',this.value)">
+    <select onchange="refMatSet(${x.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===x.unidad?'selected':''}>${u}</option>`).join('')}</select>
+    <input type="number" value="${+x.valor_unit||0}" onchange="refMatSet(${x.id},'valor_unit',this.value)">
+    <input type="number" step="0.01" value="${+x.cantidad||1}" onchange="refMatSet(${x.id},'cantidad',this.value)">
     <b style="text-align:right">${$$((+x.valor_unit||0)*(+x.cantidad||0))}</b>
-    <button class="btn gh" style="padding:4px 9px" onclick="costoDel(${x.id})">✕</button></div>`;
-  const cab=`<div style="display:grid;${G};gap:6px;
-    font-size:9.5px;color:var(--mut);font-weight:700;text-transform:uppercase;padding:0 2px 4px">
-    <span>Material</span><span>Proveedor</span><span>Unidad</span><span>Vr. unit.</span><span>Cant.</span><span style="text-align:right">Total</span><span></span></div>`;
-  return `<div class="card">
-    <h2 style="margin:0 0 2px">${esc(p.nombre)}</h2>
-    <div class="hint" style="margin-bottom:10px">${esc(p.categoria||'sin categoría')}</div>
-    <div style="font-weight:800;color:var(--acc);font-size:12px;letter-spacing:.06em;margin:6px 0 7px">MATERIA PRIMA</div>
-    ${mat.length?cab+mat.map(fila).join(''):'<div class="hint">Todavía sin materiales.</div>'}
-    ${(()=>{ if(!MATS.length) return '';
-      /* Agrupado por tipo de material -cueros, herrajes, telas- que es como se busca:
-         'necesito un cuero', no 'necesito algo de la categoria maletas'. */
-      const grupos={}; MATS.forEach(m=>{ (grupos[m.categoria||'Otros']=grupos[m.categoria||'Otros']||[]).push(m); });
-      const et=m=>{ const v=PROV.find(x=>x.id===m.proveedor_id);
-        return [m.nombre,m.calibre,m.color].filter(Boolean).join(' · ')
-          +' — '+$$(m.valor_unit)+'/'+(m.unidad||'un')+(v?' · '+v.nombre:''); };
-      return `<div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px">
-        <select id="c_mat"><option value="">— traer un material de proveedores —</option>
-          ${Object.keys(grupos).sort().map(g=>`<optgroup label="${esc(g)}">${
-            grupos[g].map(m=>`<option value="${m.id}">${esc(et(m))}</option>`).join('')}</optgroup>`).join('')}
-        </select><button class="btn gh" onclick="costoDelMaestro()">+ agregar</button></div>`; })()}
-    ${sug.length?`<div style="margin:8px 0 4px;font-size:11.5px;color:var(--mut)">De ${esc(p.categoria)} suelen ir:
-      ${sug.map(nsug=>`<button class="btn gh" style="padding:3px 9px;margin:2px 3px 0 0;font-size:11.5px"
-        onclick="costoAdd('material',this.dataset.n)" data-n="${esc(nsug)}">+ ${esc(nsug)}</button>`).join('')}</div>`:''}
-    <button class="btn gh" style="margin-top:6px" onclick="costoAdd('material','')">+ otro material</button>
-    <div class="hint">Lo que escribas acá se graba solo en Proveedores, para no volver a escribirlo la próxima vez.</div>
-    <div style="font-weight:800;color:var(--acc);font-size:12px;letter-spacing:.06em;margin:16px 0 7px">MANO DE OBRA</div>
-    ${mo.length?cab.replace('Material','Paso')+mo.map(fila).join(''):'<div class="hint">Todavía sin mano de obra.</div>'}
-    ${COSBASE.filter(b=>!mo.some(y=>y.nombre===b.concepto)).map(b=>
-      `<button class="btn gh" style="padding:3px 9px;margin:4px 3px 0 0;font-size:11.5px"
-        onclick="costoAdd('mano_obra',this.dataset.n,this.dataset.v)" data-n="${esc(b.concepto)}" data-v="${+b.valor||0}">+ ${esc(b.concepto)}${+b.valor?' '+$$(b.valor):''}</button>`).join('')}
-    <button class="btn gh" style="margin-top:6px" onclick="costoAdd('mano_obra','')">+ otro paso</button>
-    <div style="border-top:2px solid var(--line);margin-top:16px;padding-top:11px;font-size:14px;line-height:2">
+    <button class="btn gh" style="padding:4px 9px" onclick="refMatDel(${x.id})">✕</button></div>`;
+  const campo=(k,t,ph)=>`<div><label>${t}</label><input value="${esc(r[k]||'')}" placeholder="${ph||''}"
+      onchange="refSet('${k}',this.value)"></div>`;
+  return `<div class="card" style="border-color:var(--acc)">
+    <h2 style="margin:0 0 3px">Ficha técnica · ${esc(r.codigo||'')}</h2>
+    <div class="hint" style="margin-bottom:10px">Lo que hace distinta a esta referencia dentro del modelo.</div>
+    <div class="g3">${campo('nombre','Nombre')}${campo('codigo','Referencia')}${campo('color','Color / material')}</div>
+    <div class="g3">${campo('forro','Forro')}${campo('apliques','Apliques')}${campo('personalizacion','Personalización','Iniciales, grabado…')}</div>
+    <div class="g3">${campo('medidas','Medidas','largo × alto × fondo')}${campo('taller','Taller que la hizo')}
+      <div><label>Precio de venta</label><input type="number" value="${+r.precio||0}" onchange="refSet('precio',this.value)"></div></div>
+    <div style="font-weight:800;color:var(--acc);font-size:11.5px;letter-spacing:.06em;margin:16px 0 6px">MATERIALES</div>
+    <div style="display:grid;${G};gap:6px;font-size:9.5px;color:var(--mut);font-weight:700;text-transform:uppercase;padding:0 2px 4px">
+      <span>Material</span><span>Proveedor</span><span>Unidad</span><span>Vr. unit.</span><span>Cant.</span><span style="text-align:right">Total</span><span></span></div>
+    ${REFMAT.filter(x=>x.grupo==='material').map(f).join('')}
+    <div style="font-weight:800;color:var(--acc);font-size:11.5px;letter-spacing:.06em;margin:14px 0 6px">MANO DE OBRA</div>
+    ${REFMAT.filter(x=>x.grupo==='mano_obra').map(f).join('')}
+    <div style="border-top:2px solid var(--line);margin-top:14px;padding-top:11px;font-size:14px;line-height:2">
       <div>Materia prima <b>${$$(cm)}</b></div>
       <div>Mano de obra <b>${$$(co)}</b></div>
-      <div style="font-size:17px;color:var(--acc)"><b>COSTO TOTAL ${$$(tot)}</b></div>
+      <div style="font-size:17px;color:var(--acc)"><b>COSTO ${$$(tot)}</b></div>
       ${venta?`<div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">
-        Valor de venta <b>${$$(venta)}</b> → deja <b style="color:${venta-tot>0?'var(--ok)':'var(--bad)'}">${$$(venta-tot)}</b>
+        Venta <b>${$$(venta)}</b> → deja <b style="color:${venta-tot>0?'var(--ok)':'var(--bad)'}">${$$(venta-tot)}</b>
         · margen <b style="color:${marg>=50?'var(--ok)':(marg>=30?'var(--acc)':'var(--bad)')}">${marg.toFixed(0)}%</b></div>`
-      :`<div class="hint" style="margin-top:8px">Sin valor de venta todavía. Se pone en la pestaña Catálogo.</div>`}
-    </div></div>`;
+       :`<div class="hint" style="margin-top:8px">Ponle precio de venta arriba para ver el margen.</div>`}
+    </div>
+    <button class="btn gh" style="margin-top:12px" onclick="refDel(${r.id})">Quitar esta referencia</button>
+  </div>`;
 }
-async function costoNuevo(){
-  const nom=($('c_nom').value||'').trim(); if(!nom){ alert('Ponle nombre al producto'); return; }
-  const cat=$('c_cat').value;
-  const r=await post('zarrat_catalogo',{nombre:nom,categoria:cat,valor:0,activo:true,
-    fecha_creacion:new Date().toISOString().slice(0,10)});
-  const nuevo=Array.isArray(r)?r[0]:r; COSPROD=nuevo&&nuevo.id; vCostos();
-}
-function costoSel(id){ COSPROD=id?+id:null; vCostos(); }
-async function costoAdd(grupo,nombre,valor){
-  if(!COSPROD){ alert('Elige primero un producto'); return; }
-  await post('zarrat_costo_item',{catalogo_id:COSPROD,grupo:grupo,nombre:nombre||'',
-    unidad:grupo==='material'?'unidad':'unidad',valor_unit:+valor||0,cantidad:1,
-    orden:COSITEMS.length},'return=minimal');
-  vCostos();
-}
-async function costoDelMaestro(){
-  const sel=$('c_mat'), id=sel&&sel.value; if(!id){ alert('Elige un material'); return; }
-  const m=MATS.find(x=>x.id===+id); if(!m) return;
-  const nom=[m.nombre,m.calibre,m.color].filter(Boolean).join(' · ');
-  await post('zarrat_costo_item',{catalogo_id:COSPROD,grupo:'material',nombre:nom,
-    unidad:m.unidad||'unidad',valor_unit:+m.valor_unit||0,cantidad:1,material_id:m.id,
-    orden:COSITEMS.length},'return=minimal');
-  vCostos();
-}
-async function costoMat(id,matId){
+async function refSet(c,v){ const b={}; b[c]=(c==='precio')?(+v||0):(v||null);
+  await patch('zarrat_referencia','id=eq.'+REFSEL,b); vCostos(); }
+async function refMat(id,matId){
   if(!matId){ vCostos(); return; }
   const m=(MATS||[]).find(x=>x.id===+matId); if(!m) return;
-  await patch('zarrat_costo_item','id=eq.'+id,{material_id:m.id,
+  await patch('zarrat_ref_mat','id=eq.'+id,{material_id:m.id,
     nombre:[m.nombre,m.calibre,m.color].filter(Boolean).join(' · '),
-    unidad:m.unidad||'unidad', valor_unit:+m.valor_unit||0});
+    unidad:m.unidad||'unidad',valor_unit:+m.valor_unit||0});
   vCostos();
 }
-async function costoSet(id,campo,v){
-  const b={}; b[campo]=(campo==='nombre'||campo==='unidad')?v:(+v||0);
-  await patch('zarrat_costo_item','id=eq.'+id,b);
-  /* Si se escribió un material que no está en el maestro, se graba: la próxima vez
-     sale en la lista con su precio en vez de haber que escribirlo otra vez. */
-  const it=COSITEMS.find(x=>x.id===id);
-  if(it&&it.grupo==='material'&&campo==='nombre'){
-    const nom=String(v||'').trim();
-    if(nom&&!MATS.some(m=>(m.nombre||'').toLowerCase()===nom.toLowerCase())){
-      const p=CAT.find(x=>x.id===COSPROD)||{};
-      const r=await post('zarrat_materiales',{nombre:nom,categoria:'Otros',
-        unidad:it.unidad||'unidad',valor_unit:+it.valor_unit||0,activo:true});
-      const nm=Array.isArray(r)?r[0]:r;
-      if(nm&&nm.id) await patch('zarrat_costo_item','id=eq.'+id,{material_id:nm.id});
-    }
-  }
-  vCostos();
-}
-async function costoDel(id){ await del('zarrat_costo_item','id=eq.'+id); vCostos(); }
+async function refMatSet(id,c,v){ const b={}; b[c]=(c==='unidad')?v:(+v||0);
+  await patch('zarrat_ref_mat','id=eq.'+id,b); vCostos(); }
+async function refMatDel(id){ await del('zarrat_ref_mat','id=eq.'+id); vCostos(); }
+async function refDel(id){ if(!confirm('¿Quitar esta referencia y su ficha?'))return;
+  await del('zarrat_ref_mat','referencia_id=eq.'+id);
+  await del('zarrat_referencia','id=eq.'+id); REFSEL=null; vCostos(); }
 
 /* ═══════ 1 · ESTRUCTURACIÓN ═══════ */
 const CATS=['Pendientes','Investigación','Directorio proveedores','Herramientas'];
