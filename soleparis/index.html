@@ -654,8 +654,16 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <div style="font-size:12.5px;color:var(--faint)">Cada referencia lleva <b>tres cápsulas</b>,
           siempre en el mismo orden: primero el porqué, después el cómo, y al final la prueba.
           No son tres versiones del mismo video — son tres lenguajes sobre el mismo producto.</div>
+        <div style="font-size:12.5px;color:var(--faint);margin-top:8px">Para el demo, sube el archivo
+          y ya. Cuando esté el canal de YouTube, pega el enlace en el mismo campo: el video sale de
+          Supabase y el que estaba subido se borra solo.</div>
       </div>
 
+      ${(()=>{ const pre=this.SB+'/storage/v1/object/public/documentos/';
+        const enSb=[...(this._caps||[]),...(this._rutas||[])].filter(x=>x.url&&x.url.indexOf(pre)===0).length;
+        return enSb?`<div style="font-size:12.5px;color:var(--warn);margin-top:10px">
+          ${enSb} video${enSb===1?'':'s'} guardado${enSb===1?'':'s'} en Supabase (el plan da 1 GB).
+          Al pegar el enlace de YouTube en su lugar, el archivo se borra.</div>`:''; })()}
       <h1 style="font-size:18px;margin-top:18px">Cápsulas por referencia</h1>
       <label style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)">Referencia</label>
       <select class="field" onchange="App.capProd(this.value)">
@@ -736,6 +744,12 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     return 'ERROR';
   },
 
+  async _borrarArchivo(url){
+    const pre=this.SB+'/storage/v1/object/public/documentos/';
+    if(!url||String(url).indexOf(pre)!==0) return;
+    try{ await fetch(this.SB+'/storage/v1/object/documentos/'+String(url).slice(pre.length),
+      {method:'DELETE',headers:{apikey:this.KEY,Authorization:'Bearer '+this.KEY}}); }catch(e){}
+  },
   async capGuardar(tipo){
     if(!this._capProd){ this.toast('Elige la referencia'); return; }
     const g=id=>(document.getElementById(id).value||'').trim();
@@ -745,12 +759,16 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const ex=(this._caps||[]).find(c=>c.producto_id===this._capProd&&c.tipo===tipo);
     const body={producto_id:this._capProd,tipo:tipo,titulo:g('c_'+tipo+'_t')||null,
       url:url||null,duracion:g('c_'+tipo+'_d')||null,activo:true};
-    if(ex) await this._patch('soleparis_capsula?id=eq.'+ex.id,body);
+    if(ex){ await this._patch('soleparis_capsula?id=eq.'+ex.id,body);
+      if(ex.url&&ex.url!==url) await this._borrarArchivo(ex.url); }
     else await this._post('soleparis_capsula',{id:'cx'+Date.now(),...body});
     this.toast('Cápsula '+tipo+' guardada'); this.vCapacitacion();
   },
   async capBorrar(id){ if(!confirm('¿Quitar esta cápsula?'))return;
-    await this._delq('soleparis_capsula?id=eq.'+id); this.vCapacitacion(); },
+    const c=(this._caps||[]).find(x=>x.id===id);
+    await this._delq('soleparis_capsula?id=eq.'+id);
+    if(c) await this._borrarArchivo(c.url);
+    this.vCapacitacion(); },
 
   async capRutaGuardar(b){
     const g=id=>(document.getElementById(id).value||'').trim();
@@ -760,7 +778,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const ex=(this._rutas||[]).find(r=>r.perfil===this._capPerfil&&+r.bloque===b);
     const body={perfil:this._capPerfil,bloque:b,titulo:g('r_'+b+'_t')||this.BLOQUES[b-1],
       url:url||null,duracion:g('r_'+b+'_d')||null,activo:true};
-    if(ex) await this._patch('soleparis_ruta?id=eq.'+ex.id,body);
+    if(ex){ await this._patch('soleparis_ruta?id=eq.'+ex.id,body);
+      if(ex.url&&ex.url!==url) await this._borrarArchivo(ex.url); }
     else await this._post('soleparis_ruta',{id:'rt'+Date.now(),...body});
     this.toast('Bloque '+b+' guardado'); this.vCapacitacion();
   },
