@@ -400,24 +400,11 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
           ${r.estado==='usado'&&!r.validado?`<button class="btn gh2" style="padding:4px 11px;font-size:12px" onclick="App.redValidar('${r.id}')">validar</button>`:''}
         </div></div>`).join('')}`:''}
 
-      ${pacs.length?`<h1 style="font-size:18px;margin-top:22px">Quiénes están participando</h1>
-      ${pacs.map(x=>{ const mios=ava.filter(a=>a.paciente_id===x.id);
-        const f=mios.filter(a=>a.tipo==='foto').length, v=mios.filter(a=>a.tipo==='video').length;
-        return `<div class="prod" style="cursor:pointer${x.id===this._pacSel?';border-color:var(--accent2)':''}"
-          onclick="App.pacAbrir('${x.id}')"><div class="top">
-          <div><div class="nm">${this.esc(x.nombre)}</div>
-            <div class="ct">c.c. ${this.esc(x.cedula||'')} · ${this.esc(x.kit_nombre||'—')} · ${this.esc(x.celular||'sin celular')}</div></div>
-          <div class="pv">${this.fmt(x.saldo)}</div></div>
-          <div class="meta" style="margin-top:6px">
-            <span class="pchip ${mios.length?'stock':'cost'}">${f} fotos · ${v} videos</span>
-            ${x.consentimiento?'<span class="pchip stock">autorización firmada</span>':'<span class="pchip cost">sin autorización</span>'}
-            ${x.invertido?`<span class="pchip">compró ${this.fmt(x.invertido)}</span>`:''}
-          </div>
-          ${x.id===this._pacSel?this.pacFicha(x,mios):''}
-          </div>`;}).join('')}`:''}`);
+`);
   },
   copiarLink(l){ navigator.clipboard.writeText(l).then(()=>this.toast('Enlace copiado')); },
   pacAbrir(id){ this._pacSel=(this._pacSel===id?null:id); this.vFidelizacion(); },
+  pacAbrir2(id){ this._pacSel=(this._pacSel===id?null:id); this.vCasos(); },
   /* Entrar a cada participante es lo que permite revisar antes de reconocer: una foto
      borrosa o repetida no debería valer lo mismo que un avance real. */
   pacFicha(x,mios){
@@ -611,8 +598,13 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
      Lo que cierra una venta de dermocosmética no es el folleto: es el resultado de
      otra persona. Sin el permiso escrito de esa persona, el caso no se publica. */
   async vCasos(){
-    const cs=await this._get('soleparis_casos?order=destacado.desc,orden');
-    this._casos=cs;
+    const [cs,pacs,ava,red,progs]=await Promise.all([
+      this._get('soleparis_casos?order=destacado.desc,orden'),
+      this._get('soleparis_paciente?order=creado_en.desc&limit=300'),
+      this._get('soleparis_avance?order=creado_en.desc&limit=800'),
+      this._get('soleparis_redencion?order=creado_en.desc&limit=200'),
+      this._get('soleparis_fideliza?order=kit_nombre')]);
+    this._casos=cs; this._pacs=pacs; this._ava=ava; this._red=red; this._progs=progs;
     const pub=cs.filter(c=>c.autoriza).length;
     const link=location.href.replace(/[^/]*$/,'')+'mi-tratamiento.html';
     this.set(`<h1>Casos de éxito</h1>
@@ -646,6 +638,24 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
           <input type="checkbox" id="cs_au" style="width:auto"> Autorizó publicar su caso</label>
         <button class="btn" onclick="App.casoAdd()">+ Agregar caso</button>
       </div>
+      ${(this._pacs||[]).length?`<h1 style="font-size:18px;margin-top:20px">Afiliadas al seguimiento</h1>
+      <div class="sub" style="margin-bottom:8px">Las que están llevando su tratamiento en el enlace.
+        Toca una para ver sus fotos y de ahí sale el caso.</div>
+      ${(this._pacs||[]).map(x=>{ const mios=(this._ava||[]).filter(a=>a.paciente_id===x.id);
+        const f=mios.filter(a=>a.tipo==='foto').length, v=mios.filter(a=>a.tipo==='video').length;
+        return `<div class="prod" style="cursor:pointer${x.id===this._pacSel?';border-color:var(--accent2)':''}"
+          onclick="App.pacAbrir2('${x.id}')"><div class="top">
+          <div><div class="nm">${this.esc(x.nombre)}</div>
+            <div class="ct">c.c. ${this.esc(x.cedula||'')} · ${this.esc(x.kit_nombre||'—')} · ${this.esc(x.celular||'')}</div></div>
+          <div class="pv">${this.fmt(x.saldo)}</div></div>
+          <div class="meta" style="margin-top:6px">
+            <span class="pchip ${mios.length?'stock':'cost'}">${f} fotos · ${v} videos</span>
+            ${x.consentimiento?'<span class="pchip stock">autorización firmada</span>':'<span class="pchip cost">sin autorización</span>'}
+          </div>
+          ${x.id===this._pacSel?this.pacFicha(x,mios):''}
+        </div>`;}).join('')}`:''}
+
+      <h1 style="font-size:18px;margin-top:22px">Casos publicables</h1>
       ${cs.length?cs.map(c=>`<div class="prod">
         <div class="top"><div><div class="nm">${this.esc(c.titulo)}${c.destacado?' ⭐':''}</div>
           <div class="ct">${[c.cliente,c.edad&&c.edad+' años',c.producto,c.tiempo].filter(Boolean).map(x=>this.esc(x)).join(' · ')}</div></div>

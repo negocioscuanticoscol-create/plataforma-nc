@@ -77,6 +77,9 @@
 <main id="app"><div class="cargando">Un momento…</div></main>
 
 <script>
+/* ═══ CONEXIÓN · lo único que cambia si Sole Paris migra a su propia base ═══
+   Todo lo de este cliente vive en tablas soleparis_* y no depende de ninguna otra:
+   se exportan esas tablas, se apunta acá y queda andando en su cuenta. */
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
@@ -103,37 +106,58 @@ const post=(t,b)=>api(t,{method:'POST',headers:{...H,Prefer:'return=representati
 const patch=(q,b)=>api(q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)});
 
 /* ── entrada: nombre y cédula ─────────────────────────────────────────── */
+/* La cédula es la llave. Si ya se registró, su nombre aparece solo: nadie tiene que
+   volver a escribirlo, y así no entra dos veces con el nombre escrito distinto. */
 function vEntrada(msg){
   $('app').innerHTML=`
     <h1 class="serif">Sigue tu tratamiento</h1>
     <p class="lead">Registra tu avance semana a semana. Por cada foto y cada video ganas
       descuento para tu próxima compra.</p>
     <div class="card">
-      <label>Tu nombre completo</label>
-      <input id="e_nom" placeholder="Como aparece en tu cédula" autocomplete="name">
-      <label>Número de cédula</label>
-      <input id="e_ced" inputmode="numeric" placeholder="Sin puntos ni comas" autocomplete="off">
+      <label>Tu número de cédula</label>
+      <input id="e_ced" inputmode="numeric" placeholder="Sin puntos ni comas" autocomplete="off"
+        oninput="buscarCed()" autofocus>
+      <div id="e_yo"></div>
       <button class="btn" onclick="entrar()">Continuar</button>
       <div class="err" id="e_err">${msg||''}</div>
-      <div class="hint">Si es tu primera vez, te pediremos unos datos más. Si ya te
-        registraste, entras directo a tu seguimiento.</div>
+      <div class="hint">Si es tu primera vez, te pedimos unos datos. Si ya te registraste,
+        entras directo a tu seguimiento.</div>
     </div>
     <div class="pie">Tus datos se usan solo para el seguimiento de tu tratamiento.</div>`;
   if(msg) $('e_err').style.display='block';
 }
 
+let _busca=null, _hallado=null;
+function buscarCed(){
+  const ced=soloNum($('e_ced').value), c=$('e_yo');
+  _hallado=null; c.innerHTML='';
+  if(ced.length<5) return;
+  clearTimeout(_busca);
+  _busca=setTimeout(async()=>{
+    const r=await api('soleparis_paciente?select=id,nombre,kit_nombre&cedula=eq.'+encodeURIComponent(ced));
+    if(soloNum($('e_ced').value)!==ced) return;            // ya siguió escribiendo
+    if(r&&r.length){
+      _hallado=r[0];
+      c.innerHTML=`<div style="background:var(--suave);border-radius:9px;padding:12px 13px;margin-top:10px">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:19px">${esc(r[0].nombre)}</div>
+        <div style="font-size:12.5px;color:var(--tinta2)">${esc(r[0].kit_nombre||'')}</div></div>`;
+    }else{
+      c.innerHTML='<div class="hint" style="margin-top:9px">No te encontramos. Al continuar te registramos.</div>';
+    }
+  },420);
+}
+
 async function entrar(){
-  const nom=($('e_nom').value||'').trim(), ced=soloNum($('e_ced').value);
-  if(nom.length<4){ return err('Escribe tu nombre completo.'); }
+  const ced=soloNum($('e_ced').value);
   if(ced.length<5){ return err('Revisa el número de cédula.'); }
-  $('app').innerHTML='<div class="cargando">Buscando tu registro…</div>';
+  $('app').innerHTML='<div class="cargando">Un momento…</div>';
   const r=await api('soleparis_paciente?cedula=eq.'+encodeURIComponent(ced));
   if(r&&r.length){
     YO=r[0];
     localStorage.setItem('sp_ced',ced);
     return cargar();
   }
-  vDatos(nom,ced);
+  vDatos('',ced);
 }
 function err(m){ const e=$('e_err'); if(e){ e.textContent=m; e.style.display='block'; } }
 
@@ -148,7 +172,7 @@ async function vDatos(nom,ced){
     <h1 class="serif">Bienvenida</h1>
     <p class="lead">Es tu primera vez. Cuéntanos cómo contactarte y qué kit estás usando.</p>
     <div class="card">
-      <label>Nombre completo</label><input id="d_nom" value="${esc(nom)}">
+      <label>Nombre completo</label><input id="d_nom" value="${esc(nom)}" placeholder="Como aparece en tu cédula" autofocus>
       <label>Cédula</label><input id="d_ced" value="${esc(ced)}" readonly style="background:var(--suave)">
       <label>Dirección</label><input id="d_dir" placeholder="Dónde recibes tus pedidos">
       <div class="g2">
@@ -172,6 +196,7 @@ async function vDatos(nom,ced){
 async function registrar(){
   const g=id=>($(id).value||'').trim();
   const e=$('d_err'); e.style.display='none';
+  if(g('d_nom').length<4){ e.textContent='Escribe tu nombre completo.'; e.style.display='block'; return; }
   if(!$('d_ok').checked){ e.textContent='Para continuar necesitamos tu autorización.'; e.style.display='block'; return; }
   if(!g('d_cel')){ e.textContent='Déjanos un celular para poder contactarte.'; e.style.display='block'; return; }
   if(!$('d_kit').value){ e.textContent='Elige el kit que estás usando.'; e.style.display='block'; return; }
