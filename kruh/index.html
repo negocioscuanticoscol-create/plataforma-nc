@@ -390,6 +390,8 @@ const App={
      usan las demás apps, así que el Centro de Mando suma todo sin registrar dos veces.
      Sin esto no se sabe cuál cliente sale caro ni cuánto cobrarle al siguiente. */
   NEGID:'kruh', _hmes:'',
+  /* Programar, ir a una reunion y atender el telefono no se cobran igual. */
+  TIPOHORA:['Programación','Presencial','Virtual'],
   _hhmm(m){ m=Math.round(+m||0); const h=Math.floor(m/60); return h?h+'h '+(m%60)+'m':(m%60)+'m'; },
   _hmins(i,f){ if(!i||!f) return 0;
     const [a,b]=i.split(':').map(Number), [c,d]=f.split(':').map(Number);
@@ -417,6 +419,8 @@ const App={
         <div class="g3"><div><label>Quién</label><select id="h_u">${us.map(u=>`<option value="${u.id}">${esc(u.nombre)}</option>`).join('')}</select></div>
           <div><label>Fecha</label><input type="date" id="h_f" value="${hoy}"></div>
           <div><label>Qué se hizo</label><input id="h_t" placeholder="Ej: cuadre de inventario"></div></div>
+        <div><label>Tipo de trabajo</label><select id="h_tp">${this.TIPOHORA.map(t=>`<option>${t}</option>`).join('')}</select>
+          <div class="hint">Programación es el trabajo en la app · Virtual es atención telefónica.</div></div>
         <div class="g3"><div><label>Empezó</label><input type="time" id="h_i" onchange="App.hCalc()"></div>
           <div><label>Terminó</label><input type="time" id="h_ff" onchange="App.hCalc()"></div>
           <div><label>Minutos</label><input type="number" id="h_m" placeholder="se calcula solo"></div></div>
@@ -439,7 +443,7 @@ const App={
         return `<div class="card" style="padding:9px 12px;margin-bottom:5px">
           <div class="row" style="justify-content:space-between;gap:10px">
           <div style="min-width:0"><b>${esc(x.tarea||'sin descripción')}</b>
-            <div class="hint">${esc(u.nombre||'—')} · ${esc(x.fecha||'')}${x.inicio?' · '+String(x.inicio).slice(0,5)+'→'+String(x.fin||'').slice(0,5):''}</div></div>
+            <div class="hint">${esc(x.tipo||'Programación')} · ${esc(u.nombre||'—')} · ${esc(x.fecha||'')}${x.inicio?' · '+String(x.inicio).slice(0,5)+'→'+String(x.fin||'').slice(0,5):''}</div></div>
           <div style="text-align:right;flex:none"><b>${hm(x.minutos)}</b>
             <div><a onclick="App.hDel(${x.id})" style="cursor:pointer;color:var(--bad);font-size:12px">quitar</a></div></div>
           </div></div>`;}).join(''):'<div class="card"><div class="hint">Sin tiempo registrado todavía.</div></div>'}
@@ -467,7 +471,8 @@ const App={
     const m=+($('h_m')||{}).value||this._hmins(i,f);
     if(!m){ toast('Pon las horas o los minutos'); return; }
     await POST('nc_hora',{usuario_id:+u,negocio_id:this.NEGID,fecha:$('h_f').value||new Date().toISOString().slice(0,10),
-      inicio:i,fin:f,minutos:m,tarea:($('h_t').value||'').trim()||null});
+      inicio:i,fin:f,minutos:m,tipo:($('h_tp')||{}).value||'Programación',
+      tarea:($('h_t').value||'').trim()||null});
     toast('Tiempo registrado'); this.vHoras();
   },
   async hDel(id){ if(!confirm('¿Borrar este registro de tiempo?'))return;

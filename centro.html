@@ -611,9 +611,10 @@ pintaHoras(){
   const tot=vis.reduce((s,x)=>s+(+x.minutos||0),0);
   const tarifa=id=>{ const u=usr.find(y=>y.id===id); return +(u&&u.tarifa_hora)||0; };
   const plata=vis.reduce((s,x)=>s+(+x.minutos||0)/60*tarifa(x.usuario_id),0);
-  const porN={}, porU={};
+  const porN={}, porU={}, porT={};
   vis.forEach(x=>{ porN[x.negocio_id]=(porN[x.negocio_id]||0)+(+x.minutos||0);
-                   porU[x.usuario_id]=(porU[x.usuario_id]||0)+(+x.minutos||0); });
+                   porU[x.usuario_id]=(porU[x.usuario_id]||0)+(+x.minutos||0);
+                   const t=x.tipo||'Programación'; porT[t]=(porT[t]||0)+(+x.minutos||0); });
   const orden=Object.entries(porN).sort((a,b)=>b[1]-a[1]);
   const max=orden.length?orden[0][1]:1;
   $('main').innerHTML='<h1>⏱️ Horas</h1>'
@@ -626,6 +627,8 @@ pintaHoras(){
    +`<div class="pkpi"><b>${hm(tot)}</b><i>en total</i></div>`
    +`<div class="pkpi"><b>${orden.length}</b><i>clientes atendidos</i></div>`
    +(plata?`<div class="pkpi"><b>$${nm(plata)}</b><i>a las tarifas cargadas</i></div>`:'')
+   +Object.entries(porT).sort((a,b)=>b[1]-a[1]).map(([t,m5])=>
+      `<div class="pkpi"><b>${hm(m5)}</b><i>${esc(t.toLowerCase())}</i></div>`).join('')
    +'</div>'
    +(orden.length?'<div class="card">'+orden.map(([id,m3])=>
      `<div style="margin-bottom:10px">
@@ -645,7 +648,7 @@ pintaHoras(){
      +vis.slice(0,25).map(x=>{ const u=usr.find(y=>y.id===x.usuario_id)||{};
        return `<div class="card" style="padding:9px 12px;margin-bottom:5px;display:flex;justify-content:space-between;gap:10px">
          <div style="min-width:0"><b>${esc(x.tarea||'sin descripción')}</b>
-           <div style="font-size:12px;color:var(--sub)">${esc(nom(x.negocio_id))} · ${esc(u.nombre||'—')} · ${esc(x.fecha||'')}</div></div>
+           <div style="font-size:12px;color:var(--sub)">${esc(nom(x.negocio_id))} · ${esc(x.tipo||'Programación')} · ${esc(u.nombre||'—')} · ${esc(x.fecha||'')}</div></div>
          <b style="flex:none">${hm(x.minutos)}</b></div>`;}).join(''):'');
 },
 hMes(m){ this._hmes=m; this.pintaHoras(); },

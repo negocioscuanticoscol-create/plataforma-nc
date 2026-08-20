@@ -151,6 +151,9 @@ function go(t){
    Mando se ve el consolidado de todos los clientes sin volver a registrar nada.
    Sin esto no se sabe cuál cliente sale caro ni cuánto cobrarle al siguiente. */
 const NEG_ID='zarrat';
+/* Programar no es lo mismo que ir a una reunion ni que atender el telefono: se
+   cobra distinto y hay que poder separarlo al facturar. */
+const TIPOHORA=['Programación','Presencial','Virtual'];
 let USRS=[], HRS=[], HMES='';
 const hhmm=m=>{ m=Math.round(+m||0); const h=Math.floor(m/60); return h?h+'h '+(m%60)+'m':(m%60)+'m'; };
 function minsDe(i,f){ if(!i||!f) return 0;
@@ -174,6 +177,8 @@ async function vHoras(){
       <div class="g3"><div><label>Quién</label><select id="h_u">${USRS.map(u=>`<option value="${u.id}">${esc(u.nombre)}</option>`).join('')}</select></div>
         <div><label>Fecha</label><input type="date" id="h_f" value="${hoy}"></div>
         <div><label>Qué se hizo</label><input id="h_t" placeholder="Ej: pestaña de costos"></div></div>
+      <div><label>Tipo de trabajo</label><select id="h_tp">${TIPOHORA.map(t=>`<option>${t}</option>`).join('')}</select>
+        <div class="hint">Programación es el trabajo en la app · Virtual es atención telefónica.</div></div>
       <div class="g3"><div><label>Empezó</label><input type="time" id="h_i" onchange="hCalc()"></div>
         <div><label>Terminó</label><input type="time" id="h_ff" onchange="hCalc()"></div>
         <div><label>Minutos</label><input type="number" id="h_m" placeholder="se calcula solo"></div></div>
@@ -196,7 +201,7 @@ async function vHoras(){
     </div>
     ${vis.length?vis.map(x=>{ const u=USRS.find(y=>y.id===x.usuario_id)||{};
       return `<div class="item"><div><div class="nm">${esc(x.tarea||'sin descripción')}</div>
-      <div class="mt">${esc(u.nombre||'—')} · 📅 ${esc(x.fecha||'')}${x.inicio?' · '+String(x.inicio).slice(0,5)+'→'+String(x.fin||'').slice(0,5):''}</div></div>
+      <div class="mt">${esc(x.tipo||'Programación')} · ${esc(u.nombre||'—')} · 📅 ${esc(x.fecha||'')}${x.inicio?' · '+String(x.inicio).slice(0,5)+'→'+String(x.fin||'').slice(0,5):''}</div></div>
       <div style="text-align:right"><div class="nm">${hhmm(x.minutos)}</div>
         <button class="btn sm gh" style="margin-top:5px" onclick="hDel(${x.id})">✕</button></div></div>`;}).join('')
       :'<div class="empty">Sin tiempo registrado todavía.</div>'}
@@ -224,7 +229,8 @@ async function hAdd(){
   const m=+($('h_m')||{}).value||minsDe(i,f);
   if(!m){ alert('Pon las horas o los minutos'); return; }
   await post('nc_hora',{usuario_id:+u,negocio_id:NEG_ID,fecha:$('h_f').value||new Date().toISOString().slice(0,10),
-    inicio:i,fin:f,minutos:m,tarea:($('h_t').value||'').trim()||null},'return=minimal');
+    inicio:i,fin:f,minutos:m,tipo:($('h_tp')||{}).value||'Programación',
+    tarea:($('h_t').value||'').trim()||null},'return=minimal');
   vHoras();
 }
 async function hDel(id){ if(!confirm('¿Borrar este registro de tiempo?'))return;
