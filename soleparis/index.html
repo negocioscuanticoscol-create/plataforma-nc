@@ -424,6 +424,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   copiarLink(l){ navigator.clipboard.writeText(l).then(()=>this.toast('Enlace copiado')); },
   pacAbrir(id){ this._pacSel=(this._pacSel===id?null:id); this.vFidelizacion(); },
   pacAbrir2(id){ this._pacSel=(this._pacSel===id?null:id); this.vCasos(); },
+  _kfil:'',
+  kitFil(k){ this._kfil=k; this._pacSel=null; this.vCasos(); },
   /* Entrar a cada participante es lo que permite revisar antes de reconocer: una foto
      borrosa o repetida no debería valer lo mismo que un avance real. */
   pacFicha(x,mios){
@@ -457,7 +459,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       ${mios.length?Object.keys(porSem).sort((a,b)=>b-a).map(s=>`
         <div style="border-left:2px solid var(--line,#eee);padding:0 0 12px 13px;margin:8px 0 0 5px">
           <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Semana ${this.esc(s)}</div>
-          ${porSem[s].map(a=>`<div style="margin-top:5px">
+          ${porSem[s].map(a=>`<div style="margin-top:7px">
+            <div style="font-size:11.5px;color:var(--faint)">${this.esc(String(a.creado_en||'').slice(0,10))}</div>
             <div style="font-size:13px">${this.esc(a.nota||(a.tipo==='video'?'Video de testimonio':'Foto de avance'))}
               <span style="color:${a.aprobado===false?'#a8452f':'var(--accent2)'};font-weight:500"> ${a.aprobado===false?'· rechazado':'· '+this.fmt(a.valor)}</span>
               ${a.redencion_id?'<span class="pchip" style="margin-left:6px">ya cobrado</span>':''}</div>
@@ -642,7 +645,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const pub=cs.filter(c=>c.autoriza).length;
     const link=location.href.replace(/[^/]*$/,'')+'mi-tratamiento.html';
     this.set(`<h1>Casos de éxito</h1>
-      <div class="sub">${cs.length} casos · ${pub} con autorización para publicar</div>
+      <div class="sub">${pacs.length} concursante${pacs.length===1?'':'s'} · ${pacs.filter(x=>x.consentimiento).length} con autorización para publicar</div>
       <div class="card" style="background:var(--accent-soft)">
         <div style="font-weight:600;margin-bottom:4px">De dónde salen los casos</div>
         <div style="font-size:12.5px;color:var(--faint);margin-bottom:9px">Este es el enlace donde tus
@@ -651,46 +654,47 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <input class="field" readonly value="${this.esc(link)}" onclick="this.select()">
         <button class="btn" onclick="App.copiarLink('${this.esc(link)}')">Copiar enlace</button>
       </div>
-      <div class="card">
-        <label>Título</label><input id="cs_t" class="field" placeholder="Ej: Manchas de melasma en 8 semanas">
-        <div class="row2">
-          <div><label>Cliente</label><input id="cs_c" class="field" placeholder="Nombre o iniciales"></div>
-          <div><label>Edad</label><input id="cs_e" class="field" placeholder="34"></div>
+      ${(this._pacs||[]).length?(()=>{
+        const av=id=>(this._ava||[]).filter(a=>a.paciente_id===id);
+        const kits=[...new Set((this._pacs||[]).map(x=>x.kit_nombre).filter(Boolean))].sort();
+        const vis=(this._pacs||[]).filter(x=>!this._kfil||x.kit_nombre===this._kfil);
+        /* «En juego» es lo que la marca ya se comprometió a reconocer y todavía no ha
+           pagado. Hay que verlo antes de que llegue a caja, no cuando ya llegó. */
+        const juego=vis.reduce((t,x)=>t+av(x.id).filter(a=>a.aprobado!==false&&!a.redencion_id)
+          .reduce((u,a)=>u+(+a.valor||0),0),0);
+        const tf=vis.reduce((t,x)=>t+av(x.id).filter(a=>a.tipo==='foto').length,0);
+        const tv=vis.reduce((t,x)=>t+av(x.id).filter(a=>a.tipo==='video').length,0);
+        const chip=(k,txt,cnt)=>`<button class="btn gh2" onclick="App.kitFil('${k}')"
+          style="padding:6px 13px;font-size:12.5px${this._kfil===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${txt} <b>${cnt}</b></button>`;
+        return `<h1 style="font-size:18px;margin-top:20px">Concursantes</h1>
+        <div class="sub" style="margin-bottom:9px">Toca una para ver sus fotos y de ahí sale el caso.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px">
+          ${chip('','Todos',(this._pacs||[]).length)}
+          ${kits.map(k=>chip(this.esc(k),this.esc(k),(this._pacs||[]).filter(x=>x.kit_nombre===k).length)).join('')}
         </div>
-        <div class="row2">
-          <div><label>Qué usó</label><input id="cs_p" class="field" placeholder="Kit Longevidad"></div>
-          <div><label>En cuánto tiempo</label><input id="cs_ti" class="field" placeholder="8 semanas"></div>
+        <div class="kpis">
+          <div class="kpi"><b>${this.fmt(juego)}</b><span>Descuentos en juego</span></div>
+          <div class="kpi"><b>${tf} · ${tv}</b><span>Fotos · videos</span></div>
         </div>
-        <label>De qué se quejaba</label><input id="cs_pr" class="field" placeholder="El problema, en sus palabras">
-        <label>Qué pasó</label><input id="cs_r" class="field" placeholder="El resultado, medible si se puede">
-        <label>Lo que dijo</label><input id="cs_te" class="field" placeholder="Testimonio textual">
-        <div class="row2">
-          <div><label>Foto antes (URL)</label><input id="cs_fa" class="field"></div>
-          <div><label>Foto después (URL)</label><input id="cs_fd" class="field"></div>
-        </div>
-        <label style="display:flex;align-items:center;gap:8px;text-transform:none;margin-top:8px">
-          <input type="checkbox" id="cs_au" style="width:auto"> Autorizó publicar su caso</label>
-        <button class="btn" onclick="App.casoAdd()">+ Agregar caso</button>
-      </div>
-      ${(this._pacs||[]).length?`<h1 style="font-size:18px;margin-top:20px">Afiliadas al seguimiento</h1>
-      <div class="sub" style="margin-bottom:8px">Las que están llevando su tratamiento en el enlace.
-        Toca una para ver sus fotos y de ahí sale el caso.</div>
-      ${(this._pacs||[]).map(x=>{ const mios=(this._ava||[]).filter(a=>a.paciente_id===x.id);
-        const f=mios.filter(a=>a.tipo==='foto').length, v=mios.filter(a=>a.tipo==='video').length;
-        return `<div class="prod" style="cursor:pointer${x.id===this._pacSel?';border-color:var(--accent2)':''}"
-          onclick="App.pacAbrir2('${x.id}')"><div class="top">
-          <div><div class="nm">${this.esc(x.nombre)}</div>
-            <div class="ct">c.c. ${this.esc(x.cedula||'')} · ${this.esc(x.kit_nombre||'—')} · ${this.esc(x.celular||'')}</div></div>
-          <div class="pv">${this.fmt(x.saldo)}</div></div>
-          <div class="meta" style="margin-top:6px">
-            <span class="pchip ${mios.length?'stock':'cost'}">${f} fotos · ${v} videos</span>
-            ${x.consentimiento?'<span class="pchip stock">autorización firmada</span>':'<span class="pchip cost">sin autorización</span>'}
-          </div>
-          ${x.id===this._pacSel?this.pacFicha(x,mios):''}
-        </div>`;}).join('')}`:''}
+        ${vis.map(x=>{ const mios=av(x.id);
+          const f=mios.filter(a=>a.tipo==='foto').length, v=mios.filter(a=>a.tipo==='video').length;
+          const debe=mios.filter(a=>a.aprobado!==false&&!a.redencion_id).reduce((t,a)=>t+(+a.valor||0),0);
+          const cobr=mios.filter(a=>a.redencion_id).reduce((t,a)=>t+(+a.valor||0),0);
+          return `<div class="prod" style="cursor:pointer${x.id===this._pacSel?';border-color:var(--accent2)':''}"
+            onclick="App.pacAbrir2('${x.id}')"><div class="top">
+            <div><div class="nm">${this.esc(x.nombre)}</div>
+              <div class="ct">c.c. ${this.esc(x.cedula||'')} · ${this.esc(x.kit_nombre||'—')}${x.celular?' · '+this.esc(x.celular):''}</div></div>
+            <div class="pv">${this.fmt(debe)}</div></div>
+            <div class="meta" style="margin-top:6px">
+              <span class="pchip ${f?'stock':'cost'}">${f} fotos · ${v} videos</span>
+              ${debe?'<span class="pchip cost">sin reclamar</span>'
+                   :(cobr?`<span class="pchip stock">reclamó ${this.fmt(cobr)}</span>`:'')}
+              ${x.consentimiento?'<span class="pchip stock">autorización firmada</span>':'<span class="pchip cost">sin autorización</span>'}
+            </div>
+            ${x.id===this._pacSel?this.pacFicha(x,mios):''}
+          </div>`;}).join('')}`;})():''}
 
-      <h1 style="font-size:18px;margin-top:22px">Casos publicables</h1>
-      ${cs.length?cs.map(c=>`<div class="prod">
+      ${cs.length?`<h1 style="font-size:18px;margin-top:22px">Casos publicables</h1>`+cs.map(c=>`<div class="prod">
         <div class="top"><div><div class="nm">${this.esc(c.titulo)}${c.destacado?' ⭐':''}</div>
           <div class="ct">${[c.cliente,c.edad&&c.edad+' años',c.producto,c.tiempo].filter(Boolean).map(x=>this.esc(x)).join(' · ')}</div></div>
           <div class="pv" style="font-size:13px"><span class="pchip ${c.autoriza?'stock':'cost'}">${c.autoriza?'autorizado':'sin permiso'}</span></div></div>
@@ -704,17 +708,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
           <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.casoDest('${c.id}',${!c.destacado})">${c.destacado?'quitar destacado':'destacar'}</button>
           <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.casoDel('${c.id}')">✕</button></div>
       </div>`).join('')
-      :'<div class="empty">Todavía sin casos. El primero es el que más cuesta conseguir y el que más vende.</div>'}`);
-  },
-  async casoAdd(){
-    const t=(document.getElementById('cs_t').value||'').trim();
-    if(!t){ this.toast('Ponle título'); return; }
-    const g=id=>(document.getElementById(id).value||'').trim()||null;
-    await this._post('soleparis_casos',{id:'cs'+Date.now(),titulo:t,cliente:g('cs_c'),edad:g('cs_e'),
-      producto:g('cs_p'),tiempo:g('cs_ti'),problema:g('cs_pr'),resultado:g('cs_r'),
-      testimonio:g('cs_te'),foto_antes:g('cs_fa'),foto_despues:g('cs_fd'),
-      autoriza:document.getElementById('cs_au').checked,orden:(this._casos||[]).length,activo:true});
-    this.toast('Caso agregado'); this.vCasos();
+      :''}`);
   },
   async casoDest(id,v){ await this._patch('soleparis_casos?id=eq.'+id,{destacado:v}); this.vCasos(); },
   async casoDel(id){ if(!confirm('¿Quitar este caso?'))return;

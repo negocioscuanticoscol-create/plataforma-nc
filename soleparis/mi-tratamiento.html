@@ -63,9 +63,22 @@
   .tabla tr:last-child td{border-bottom:none}
   .vacio{text-align:center;color:var(--tenue);padding:26px 10px;font-size:14px}
   .pie{text-align:center;font-size:11.5px;color:var(--tenue);margin-top:26px;line-height:1.6}
-  .estrellas{display:flex;gap:7px;margin-top:6px}
-  .estrellas span{font-size:31px;line-height:1;color:var(--linea);cursor:pointer;transition:color .12s}
-  .estrellas span.on{color:var(--acento)}
+  .estrellas{display:flex;gap:2px;margin-top:6px;background:var(--papel);border:1px solid var(--linea);
+    border-radius:10px;padding:5px 8px;width:max-content}
+  .estrellas span{font-size:30px;line-height:1;width:46px;height:46px;display:flex;align-items:center;
+    justify-content:center;color:#b9b0a6;cursor:pointer;user-select:none;
+    transition:color .12s,transform .1s}
+  .estrellas span:active{transform:scale(.85)}
+  .estrellas span.on{color:#dd9a2b}
+  /* Un boton por tipo: la clienta no tiene que adivinar si el archivo que eligio
+     cuenta como foto o como video - y el video, que es lo que mas paga, se ve. */
+  .sube{display:flex;flex-direction:column;align-items:center;gap:3px;padding:15px 8px;
+    border:1px solid var(--linea);border-radius:11px;background:var(--papel);cursor:pointer;
+    font-family:inherit;color:var(--tinta);transition:border-color .12s,background .12s}
+  .sube .ic{font-size:26px;line-height:1}
+  .sube b{font-size:14px;font-weight:500}
+  .sube i{font-style:normal;font-size:12.5px;color:var(--acento2)}
+  .sube.on{border-color:var(--acento);background:var(--suave)}
   .hide{display:none!important}
   .cargando{text-align:center;padding:40px;color:var(--tenue)}
 </style>
@@ -90,6 +103,11 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const soloNum=s=>String(s||'').replace(/\D/g,'');
+/* La fecha va junto a cada foto: es lo que convierte una galeria en un antes y
+   despues. Sin ella nadie sabe si esos dos resultados son de tres semanas o de un anno. */
+const fechaLarga=d=>{ if(!d) return '';
+  try{ return new Date(d).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'}); }
+  catch(e){ return String(d).slice(0,10); } };
 
 /* El texto que la clienta acepta queda GUARDADO con su registro. En datos personales
    e imágenes no basta con que haya marcado una casilla: tiene que constar qué aceptó. */
@@ -193,7 +211,7 @@ async function vDatos(nom,ced){
         ${CANALES.map(c=>`<option>${esc(c.nombre)}</option>`).join('')}</select>
       <label>¿Cómo fue tu experiencia de compra?</label>
       <div class="estrellas" id="d_est">
-        ${[1,2,3,4,5].map(i=>`<span onclick="calificar(${i})" data-i="${i}">★</span>`).join('')}
+        ${[1,2,3,4,5].map(i=>`<span onclick="calificar(${i})" data-i="${i}">☆</span>`).join('')}
       </div>
       <div class="hint" id="d_esttxt">Tócalas para calificar</div>
       <label>¿Algo que quieras contarnos?</label>
@@ -245,8 +263,11 @@ function miFid(){
 const TXTEST=['','Mala','Regular','Buena','Muy buena','Excelente'];
 function calificar(i){
   ESTRELLAS=i;
-  document.querySelectorAll('#d_est span').forEach(s=>
-    s.classList.toggle('on', (+s.dataset.i)<=i));
+  document.querySelectorAll('#d_est span').forEach(s=>{
+    const on=(+s.dataset.i)<=i;
+    s.classList.toggle('on',on);
+    s.textContent=on?'★':'☆';   /* llena y vacia: se ve cual marco sin depender del color */
+  });
   const t=$('d_esttxt'); if(t) t.textContent=TXTEST[i];
 }
 function verPrograma(){
@@ -287,10 +308,17 @@ function vPanel(){
       <input id="a_sem" type="number" min="1" max="52" value="${(sem||0)+1}">
       <label>¿Cómo te fue esta semana?</label>
       <textarea id="a_nota" placeholder="Qué notaste, cómo sientes tu cabello…"></textarea>
-      <label>Tu foto o video</label>
-      <input type="file" id="a_file" accept="image/*,video/*" onchange="verArchivo()">
-      <div class="hint" id="a_info"></div>
-      <button class="btn" id="a_btn" onclick="subir()">Subir y ganar mi descuento</button>
+      <label>¿Qué vas a subir?</label>
+      <div class="g2">
+        <button type="button" class="sube" id="sb_foto" onclick="pedir('foto')">
+          <span class="ic">📷</span><b>Subir foto</b><i>+ ${money(f.valor_foto)}</i></button>
+        <button type="button" class="sube" id="sb_video" onclick="pedir('video')">
+          <span class="ic">🎥</span><b>Subir video</b><i>+ ${money(f.valor_video)}</i></button>
+      </div>
+      <input type="file" id="a_foto" accept="image/*" style="display:none" onchange="verArchivo('foto')">
+      <input type="file" id="a_video" accept="video/*" style="display:none" onchange="verArchivo('video')">
+      <div class="hint" id="a_info">El video de 10 a 20 segundos es el que más paga.</div>
+      <button class="btn" id="a_btn" onclick="subir()" disabled>Elige foto o video</button>
       <div class="err" id="a_err"></div>
     </div>
     ${AVA.length?`<div class="card">
@@ -299,7 +327,7 @@ function vPanel(){
         <div class="n">Semana ${esc(s)}</div>
         ${porSem[s].map(a=>`
           <div class="t">${esc(a.nota||(a.tipo==='video'?'Video de avance':'Foto de avance'))}</div>
-          <div class="v">+ ${money(a.valor)} ${a.tipo==='video'?'· video':'· foto'}</div>
+          <div class="v">+ ${money(a.valor)} ${a.tipo==='video'?'· video':'· foto'}${a.creado_en?' · subida el '+fechaLarga(a.creado_en):''}</div>
           ${a.url?(a.tipo==='video'
             ?`<video src="${esc(a.url)}" controls preload="metadata"></video>`
             :`<img src="${esc(a.url)}" alt="Semana ${esc(s)}" loading="lazy">`):''}`).join('')}
@@ -318,19 +346,31 @@ function vPanel(){
     <div class="pie">Tus fotos solo se usan para tu seguimiento.<br>
       Si autorizas que sean caso de éxito, te lo pediremos aparte.</div>`;
 }
-function verArchivo(){
-  const f=$('a_file').files[0], i=$('a_info'); if(!f){ i.textContent=''; return; }
-  const mb=f.size/1048576, es=f.type.startsWith('video')?'video':'foto';
-  const v=miFid();
-  i.textContent=`${es==='video'?'Video':'Foto'} de ${mb.toFixed(1)} MB · te dará ${money(es==='video'?v.valor_video:v.valor_foto)}`;
+let TIPOSEL=null;
+function pedir(t){ document.getElementById('a_'+t).click(); }
+function verArchivo(t){
+  const otro=t==='foto'?'video':'foto';
+  $('a_'+otro).value='';   /* uno a la vez: si cambia de idea, no se sube el anterior */
+  document.querySelectorAll('.sube').forEach(x=>x.classList.remove('on'));
+  const f=$('a_'+t).files[0], i=$('a_info'), b=$('a_btn');
+  if(!f){ TIPOSEL=null; i.textContent='El video de 10 a 20 segundos es el que más paga.';
+    b.disabled=true; b.textContent='Elige foto o video'; return; }
+  TIPOSEL=t; $('sb_'+t).classList.add('on');
+  const v=miFid(), mb=f.size/1048576;
+  i.innerHTML=`<b>${esc(f.name)}</b> · ${mb.toFixed(1)} MB — te dará ${money(t==='video'?v.valor_video:v.valor_foto)}`;
+  b.disabled=false; b.textContent=(t==='video'?'Subir mi video':'Subir mi foto')+' y ganar mi descuento';
 }
 async function subir(){
-  const inp=$('a_file'), e=$('a_err'), b=$('a_btn');
+  const e=$('a_err'), b=$('a_btn');
   e.style.display='none';
+  if(!TIPOSEL){ e.textContent='Toca "Subir foto" o "Subir video" para elegir el archivo.'; e.style.display='block'; return; }
+  const tipo=TIPOSEL, inp=$('a_'+tipo);
   const f=inp.files[0];
-  if(!f){ e.textContent='Elige una foto o un video.'; e.style.display='block'; return; }
-  if(f.size>50*1048576){ e.textContent='El archivo pesa más de 50 MB. Intenta con uno más liviano.'; e.style.display='block'; return; }
-  const tipo=f.type.startsWith('video')?'video':'foto';
+  if(!f){ e.textContent='No quedó ningún archivo elegido. Vuelve a tocar el botón.'; e.style.display='block'; return; }
+  if(f.size>50*1048576){ e.textContent=tipo==='video'
+      ? 'El video pesa más de 50 MB. Grábalo más corto (10 a 20 segundos) e intenta otra vez.'
+      : 'La foto pesa más de 50 MB. Intenta con una más liviana.';
+    e.style.display='block'; return; }
   const fid=miFid();
   const valor=tipo==='video'?(+fid.valor_video||0):(+fid.valor_foto||0);
   b.disabled=true; b.textContent='Subiendo…';
@@ -342,7 +382,7 @@ async function subir(){
       {method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':f.type||'application/octet-stream'},body:f});
     if(r.ok) url=SB+'/storage/v1/object/public/documentos/'+ruta;
   }catch(ex){}
-  if(!url){ b.disabled=false; b.textContent='Subir y ganar mi descuento';
+  if(!url){ b.disabled=false; b.textContent='Intentar otra vez';
     e.textContent='No pudimos subir el archivo. Revisa tu conexión e intenta otra vez.'; e.style.display='block'; return; }
   await post('soleparis_avance',{id:'av'+Date.now(),paciente_id:YO.id,
     semana:+$('a_sem').value||1,tipo:tipo,url:url,nota:($('a_nota').value||'').trim()||null,
