@@ -573,69 +573,333 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     this.toast('Validado'); this.vFidelizacion();
   },
 
-  /* ---------- CAPACITACIÓN ----------
-     En dermocosmética quien vende tiene que saber qué hace cada activo y por qué.
-     Se registra quién vio cada pieza: mandar el enlace no es haber capacitado. */
-  MODULOS:['Producto','Protocolo','Ventas','Marca'],
-  TIPOSCAP:['video','documento','enlace','presencial'],
-  PARAQUIEN:['Todas','Asesoras','Distribuidores'],
+  /* ---------- ESCUELA SOLÉ (Capacitación) ----------
+     Sole no tiene problema de producto: tiene problema de transmisión. Quien formula
+     sabe por qué el producto es distinto, quien lo vende no sabe explicarlo — y termina
+     compitiendo por precio, que es el único argumento que domina. Esto graba una vez
+     por referencia y repite esa capacitación mil veces.
+
+     Tres cajones: se arma el programa, se ve como lo ve el estudiante, y se mira quién
+     se certificó. La certificación es la que abre el precio mayorista: sin eso, esto
+     es una videoteca; con eso, es el embudo de reclutamiento de distribuidores. */
+  CAPS:[['L','Laboratorio','Por qué está hecho así','La ingeniera formuladora · 2 a 3 min'],
+        ['U','Uso y rutina','Cómo se aplica','Asesora o esteticista · 60 a 90 seg · vertical'],
+        ['R','Resultados','Qué esperar y cómo medirlo','El que se reenvía por WhatsApp · 2 min']],
+  PERFILES:[['profesional','Profesional de belleza','Vende con las manos, en cabina'],
+            ['mostrador','Mostrador','El cliente entra con un problema y quiere solución ya'],
+            ['social','Venta social','WhatsApp, catálogo digital, Instagram'],
+            ['distribuidor','Distribuidor de zona','Revende y arma su propia red']],
+  BLOQUES:['Quién es tu cliente','Cómo diagnosticar','La objeción de precio','Cierre y recompra'],
+  _cajon:'estructura', _capProd:'', _capPerfil:'profesional', _estSel:null,
+
+  capCaj(c){ this._cajon=c; this._estSel=null; this.vCapacitacion(); },
+  capProd(id){ this._capProd=id; this.vCapacitacion(); },
+  capPerfil(p){ this._capPerfil=p; this.vCapacitacion(); },
+  estAbrir(id){ this._estSel=(this._estSel===id?null:id); this.vCapacitacion(); },
+
   async vCapacitacion(){
-    const [caps,vis]=await Promise.all([
-      this._get('soleparis_capacitacion?order=modulo,orden'),
-      this._get('soleparis_capa_visto?order=visto_en.desc&limit=500')]);
-    this._caps=caps; this._vis=vis;
-    const porMod={}; caps.forEach(c=>{ (porMod[c.modulo||'Producto']=porMod[c.modulo||'Producto']||[]).push(c); });
-    const vistos=id=>vis.filter(v=>v.capa_id===id);
-    this.set(`<h1>Capacitación</h1>
-      <div class="sub">${caps.length} piezas · ${new Set(vis.map(v=>v.persona)).size} personas capacitadas</div>
-      <div class="card">
-        <label>Título</label><input id="cp_t" class="field" placeholder="Ej: Qué hace el ácido hialurónico y cómo explicarlo">
-        <div class="row2">
-          <div><label>Módulo</label><select id="cp_m" class="field">${this.MODULOS.map(m=>`<option>${m}</option>`).join('')}</select></div>
-          <div><label>Tipo</label><select id="cp_ti" class="field">${this.TIPOSCAP.map(m=>`<option>${m}</option>`).join('')}</select></div>
-        </div>
-        <div class="row2">
-          <div><label>Duración</label><input id="cp_d" class="field" placeholder="12 min"></div>
-          <div><label>Para quién</label><select id="cp_pq" class="field">${this.PARAQUIEN.map(m=>`<option>${m}</option>`).join('')}</select></div>
-        </div>
-        <label>Enlace</label><input id="cp_u" class="field" placeholder="https://…">
-        <label>De qué se trata</label><input id="cp_r" class="field" placeholder="En una línea, qué se lleva quien lo vea">
-        <button class="btn" onclick="App.capAdd()">+ Agregar pieza</button>
+    const [caps,rutas,ests,vis]=await Promise.all([
+      this._get('soleparis_capsula?order=creado_en'),
+      this._get('soleparis_ruta?order=perfil,bloque'),
+      this._get('soleparis_estudiante?order=creado_en.desc&limit=300'),
+      this._get('soleparis_visto?order=visto_en.desc&limit=2000')]);
+    this._caps=caps; this._rutas=rutas; this._ests=ests; this._vistos=vis;
+    const CAJ=[['estructura','🏗️','Estructurar programa'],
+               ['academia','🎬','Academia'],
+               ['resultados','🎓','Estudiantes']];
+    const conVideo=caps.filter(c=>c.url).length;
+    const prods=(this._prods||[]).filter(p=>p.activo!==false);
+    this.set(`<h1>Escuela Solé</h1>
+      <div class="sub">${conVideo} de ${prods.length*3} cápsulas montadas ·
+        ${rutas.filter(r=>r.url).length} de 16 bloques de venta ·
+        ${ests.length} estudiante${ests.length===1?'':'s'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        ${CAJ.map(([k,ic,t])=>`<button class="btn gh2" onclick="App.capCaj('${k}')"
+          style="padding:8px 14px;font-size:13px${this._cajon===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${ic} ${t}</button>`).join('')}
       </div>
-      ${Object.keys(porMod).length?Object.keys(porMod).map(m=>`
-        <h1 style="font-size:17px;margin-top:20px">${this.esc(m)}</h1>
-        ${porMod[m].map(c=>{ const v=vistos(c.id);
-          return `<div class="prod">
-          <div class="top"><div><div class="nm">${this.esc(c.titulo)}</div>
-            <div class="ct">${this.esc(c.tipo||'')}${c.duracion?' · '+this.esc(c.duracion):''} · para ${this.esc(c.para_quien||'Todas')}</div></div>
-            <div class="pv" style="font-size:13px"><span class="pchip ${v.length?'stock':'cost'}">${v.length} vieron</span></div></div>
-          ${c.resumen?`<div style="font-size:13px;color:var(--faint);margin-top:7px">${this.esc(c.resumen)}</div>`:''}
-          ${v.length?`<div style="font-size:12px;color:var(--faint);margin-top:6px">${v.map(x=>this.esc(x.persona)).join(' · ')}</div>`:''}
-          <div class="meta" style="margin-top:9px;gap:6px">
-            ${c.url?`<a class="btn gh2" href="${this.esc(c.url)}" target="_blank" rel="noopener" style="padding:5px 12px;font-size:12px;text-decoration:none">abrir</a>`:''}
-            <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.capVisto('${c.id}')">marcar visto</button>
-            <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.capDel('${c.id}')">✕</button></div>
-        </div>`;}).join('')}`).join('')
-        :'<div class="empty">Todavía sin material. Agrega la primera pieza arriba.</div>'}`);
+      ${this._cajon==='estructura'?this.capEstructura(prods)
+        :this._cajon==='academia'?this.capAcademia(prods)
+        :this.capResultados()}`);
   },
-  async capAdd(){
-    const t=(document.getElementById('cp_t').value||'').trim();
-    if(!t){ this.toast('Ponle título'); return; }
+
+  /* El enlace de la escuela es el mismo para prospectos y para el equipo: quien entra
+     y se certifica queda registrado igual. Es la puerta del embudo. */
+  capLink(){ return location.href.replace(/[^/]*$/,'')+'escuela.html'; },
+
+  capEmbed(url,alto){
+    if(!url) return '';
+    const u=String(url);
+    const yt=u.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{6,})/);
+    if(yt) return `<iframe src="https://www.youtube.com/embed/${yt[1]}" allowfullscreen
+      style="width:100%;aspect-ratio:16/9;border:0;border-radius:10px;margin-top:8px"></iframe>`;
+    const vm=u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+    if(vm) return `<iframe src="https://player.vimeo.com/video/${vm[1]}" allowfullscreen
+      style="width:100%;aspect-ratio:16/9;border:0;border-radius:10px;margin-top:8px"></iframe>`;
+    const dr=u.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+    if(dr) return `<iframe src="https://drive.google.com/file/d/${dr[1]}/preview" allowfullscreen
+      style="width:100%;aspect-ratio:16/9;border:0;border-radius:10px;margin-top:8px"></iframe>`;
+    return `<video src="${this.esc(u)}" controls preload="metadata"
+      style="width:100%;max-height:${alto||300}px;border-radius:10px;margin-top:8px;background:#000"></video>`;
+  },
+
+  /* ---------- cajón 1 · estructurar ---------- */
+  capEstructura(prods){
+    const sel=this._capProd&&prods.find(p=>p.id===this._capProd);
+    const mias=t=>(this._caps||[]).find(c=>c.producto_id===this._capProd&&c.tipo===t);
+    const perf=this._capPerfil;
+    const rt=b=>(this._rutas||[]).find(r=>r.perfil===perf&&+r.bloque===b);
+    return `
+      <div class="card" style="background:var(--accent-soft)">
+        <div style="font-weight:600;margin-bottom:4px">Cómo se arma</div>
+        <div style="font-size:12.5px;color:var(--faint)">Cada referencia lleva <b>tres cápsulas</b>,
+          siempre en el mismo orden: primero el porqué, después el cómo, y al final la prueba.
+          No son tres versiones del mismo video — son tres lenguajes sobre el mismo producto.</div>
+      </div>
+
+      <h1 style="font-size:18px;margin-top:18px">Cápsulas por referencia</h1>
+      <label style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)">Referencia</label>
+      <select class="field" onchange="App.capProd(this.value)">
+        <option value="">— elige la referencia —</option>
+        ${prods.map(p=>{ const n=(this._caps||[]).filter(c=>c.producto_id===p.id&&c.url).length;
+          return `<option value="${p.id}"${p.id===this._capProd?' selected':''}>${this.esc(p.nombre)} · ${n}/3</option>`;}).join('')}
+      </select>
+
+      ${sel?this.CAPS.map(([t,nom,que,quien])=>{ const c=mias(t)||{};
+        return `<div class="prod" style="margin-top:10px">
+        <div class="top"><div><div class="nm">${t} · ${nom}</div>
+          <div class="ct">${this.esc(que)}</div></div>
+          <div class="pv" style="font-size:13px"><span class="pchip ${c.url?'stock':'cost'}">${c.url?'montada':'falta'}</span></div></div>
+        <div style="font-size:12px;color:var(--faint);margin-top:5px">${this.esc(quien)}</div>
+        <label style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin-top:10px;display:block">Título</label>
+        <input id="c_${t}_t" class="field" value="${this.esc(c.titulo||'')}" placeholder="${this.esc(que)}">
+        <label style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint);margin-top:8px;display:block">Enlace del video</label>
+        <input id="c_${t}_u" class="field" value="${this.esc(c.url||'')}" placeholder="YouTube no listado, Vimeo, Drive… o sube el archivo">
+        <div style="display:flex;gap:7px;align-items:center;margin-top:7px">
+          <input type="file" id="c_${t}_f" accept="video/*" style="flex:1;font-size:12px">
+          <input id="c_${t}_d" class="field" style="width:92px" value="${this.esc(c.duracion||'')}" placeholder="2:30">
+        </div>
+        <div class="sub" id="c_${t}_i" style="margin:6px 0 0;font-size:12px"></div>
+        <div style="display:flex;gap:7px;margin-top:9px">
+          <button class="btn" style="flex:1" id="c_${t}_b" onclick="App.capGuardar('${t}')">Guardar cápsula ${t}</button>
+          ${c.id?`<button class="btn gh2" onclick="App.capBorrar('${c.id}')">✕</button>`:''}
+        </div>
+        ${this.capEmbed(c.url)}
+      </div>`;}).join('')
+      :`<div class="empty" style="margin-top:10px">Elige una referencia para montar sus tres cápsulas.</div>`}
+
+      <h1 style="font-size:18px;margin-top:24px">Academia de ventas</h1>
+      <div class="sub">La misma crema no se vende igual en una cabina que en el mostrador de
+        una droguería. Cada perfil tiene su ruta, con los mismos cuatro bloques.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px">
+        ${this.PERFILES.map(([k,n])=>{ const hay=(this._rutas||[]).filter(r=>r.perfil===k&&r.url).length;
+          return `<button class="btn gh2" onclick="App.capPerfil('${k}')"
+          style="padding:6px 12px;font-size:12.5px${perf===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${this.esc(n)} <b>${hay}/4</b></button>`;}).join('')}
+      </div>
+      <div style="font-size:12.5px;color:var(--faint);margin-bottom:9px">
+        ${this.esc((this.PERFILES.find(p=>p[0]===perf)||[])[2]||'')}</div>
+      ${this.BLOQUES.map((nom,i)=>{ const b=i+1, r=rt(b)||{};
+        return `<div class="prod">
+        <div class="top"><div><div class="nm">${b}. ${this.esc(nom)}</div>
+          ${b===3?'<div class="ct">el bloque que más pesa</div>':''}</div>
+          <div class="pv" style="font-size:13px"><span class="pchip ${r.url?'stock':'cost'}">${r.url?'montado':'falta'}</span></div></div>
+        <input id="r_${b}_t" class="field" style="margin-top:9px" value="${this.esc(r.titulo||'')}" placeholder="Título del bloque">
+        <input id="r_${b}_u" class="field" style="margin-top:7px" value="${this.esc(r.url||'')}" placeholder="Enlace del video">
+        <div style="display:flex;gap:7px;align-items:center;margin-top:7px">
+          <input type="file" id="r_${b}_f" accept="video/*" style="flex:1;font-size:12px">
+          <input id="r_${b}_d" class="field" style="width:92px" value="${this.esc(r.duracion||'')}" placeholder="4:00">
+        </div>
+        <div class="sub" id="r_${b}_i" style="margin:6px 0 0;font-size:12px"></div>
+        <button class="btn" style="margin-top:9px" id="r_${b}_b" onclick="App.capRutaGuardar(${b})">Guardar bloque ${b}</button>
+        ${this.capEmbed(r.url)}
+      </div>`;}).join('')}`;
+  },
+
+  /* Subir a Supabase o pegar un enlace: las dos sirven. Con 40 referencias por 3 videos
+     son 120 archivos, y el plan Free da 1 GB — por eso el enlace externo es el camino
+     por defecto y la subida queda para lo corto. */
+  async _subirVideo(inputId,infoId,btnId){
+    const inp=document.getElementById(inputId), f=inp&&inp.files[0];
+    if(!f) return null;
+    const info=document.getElementById(infoId), b=document.getElementById(btnId);
+    if(f.size>50*1048576){ info.textContent='El archivo pesa más de 50 MB. Súbelo a YouTube no listado o a Drive y pega el enlace.'; return 'ERROR'; }
+    if(b){ b.disabled=true; b.textContent='Subiendo…'; }
+    const ext=(f.name.split('.').pop()||'mp4').toLowerCase();
+    const ruta='soleparis/escuela/'+Date.now()+'.'+ext;
+    try{
+      const r=await fetch(this.SB+'/storage/v1/object/documentos/'+ruta,
+        {method:'POST',headers:{apikey:this.KEY,Authorization:'Bearer '+this.KEY,
+         'Content-Type':f.type||'application/octet-stream'},body:f});
+      if(r.ok) return this.SB+'/storage/v1/object/public/documentos/'+ruta;
+    }catch(e){}
+    if(info) info.textContent='No se pudo subir. Intenta con un enlace externo.';
+    if(b){ b.disabled=false; b.textContent='Reintentar'; }
+    return 'ERROR';
+  },
+
+  async capGuardar(tipo){
+    if(!this._capProd){ this.toast('Elige la referencia'); return; }
     const g=id=>(document.getElementById(id).value||'').trim();
-    await this._post('soleparis_capacitacion',{id:'cp'+Date.now(),titulo:t,modulo:g('cp_m'),
-      tipo:g('cp_ti'),duracion:g('cp_d')||null,para_quien:g('cp_pq'),url:g('cp_u')||null,
-      resumen:g('cp_r')||null,orden:(this._caps||[]).length,activo:true});
-    this.toast('Pieza agregada'); this.vCapacitacion();
+    const sub=await this._subirVideo('c_'+tipo+'_f','c_'+tipo+'_i','c_'+tipo+'_b');
+    if(sub==='ERROR') return;
+    const url=sub||g('c_'+tipo+'_u');
+    const ex=(this._caps||[]).find(c=>c.producto_id===this._capProd&&c.tipo===tipo);
+    const body={producto_id:this._capProd,tipo:tipo,titulo:g('c_'+tipo+'_t')||null,
+      url:url||null,duracion:g('c_'+tipo+'_d')||null,activo:true};
+    if(ex) await this._patch('soleparis_capsula?id=eq.'+ex.id,body);
+    else await this._post('soleparis_capsula',{id:'cx'+Date.now(),...body});
+    this.toast('Cápsula '+tipo+' guardada'); this.vCapacitacion();
   },
-  async capVisto(id){
-    const p=prompt('¿Quién la vio?','');
-    if(p===null||!p.trim()) return;
-    await this._post('soleparis_capa_visto',{id:'cv'+Date.now(),capa_id:id,persona:p.trim()});
+  async capBorrar(id){ if(!confirm('¿Quitar esta cápsula?'))return;
+    await this._delq('soleparis_capsula?id=eq.'+id); this.vCapacitacion(); },
+
+  async capRutaGuardar(b){
+    const g=id=>(document.getElementById(id).value||'').trim();
+    const sub=await this._subirVideo('r_'+b+'_f','r_'+b+'_i','r_'+b+'_b');
+    if(sub==='ERROR') return;
+    const url=sub||g('r_'+b+'_u');
+    const ex=(this._rutas||[]).find(r=>r.perfil===this._capPerfil&&+r.bloque===b);
+    const body={perfil:this._capPerfil,bloque:b,titulo:g('r_'+b+'_t')||this.BLOQUES[b-1],
+      url:url||null,duracion:g('r_'+b+'_d')||null,activo:true};
+    if(ex) await this._patch('soleparis_ruta?id=eq.'+ex.id,body);
+    else await this._post('soleparis_ruta',{id:'rt'+Date.now(),...body});
+    this.toast('Bloque '+b+' guardado'); this.vCapacitacion();
+  },
+
+  /* ---------- cajón 2 · academia (lo que ve el estudiante) ---------- */
+  capAcademia(prods){
+    const link=this.capLink();
+    const conCaps=prods.filter(p=>(this._caps||[]).some(c=>c.producto_id===p.id&&c.url));
+    const sel=this._capProd&&conCaps.find(p=>p.id===this._capProd);
+    const perf=this._capPerfil;
+    return `
+      <div class="card" style="background:var(--accent-soft)">
+        <div style="font-weight:600;margin-bottom:4px">El enlace para prospectos</div>
+        <div style="font-size:12.5px;color:var(--faint);margin-bottom:9px">Mándaselo a quien
+          quiera vender Solé. Entra con su cédula, se forma, se certifica — y solo ahí ve
+          el precio mayorista.</div>
+        <input class="field" readonly value="${this.esc(link)}" onclick="this.select()">
+        <div style="display:flex;gap:7px;margin-top:8px">
+          <button class="btn" style="flex:1" onclick="App.copiarLink('${this.esc(link)}')">Copiar enlace</button>
+          <button class="btn gh2" onclick="App.abrirLink('${this.esc(link)}')">Abrir</button>
+        </div>
+      </div>
+
+      <h1 style="font-size:18px;margin-top:18px">Cápsulas de producto</h1>
+      ${conCaps.length?`<select class="field" onchange="App.capProd(this.value)">
+        <option value="">— elige la referencia —</option>
+        ${conCaps.map(p=>`<option value="${p.id}"${p.id===this._capProd?' selected':''}>${this.esc(p.nombre)}</option>`).join('')}
+      </select>
+      ${sel?this.CAPS.map(([t,nom])=>{ const c=(this._caps||[]).find(x=>x.producto_id===sel.id&&x.tipo===t);
+        if(!c||!c.url) return `<div class="prod" style="opacity:.5"><div class="nm">${t} · ${nom}</div>
+          <div class="ct">todavía sin grabar</div></div>`;
+        return `<div class="prod"><div class="top"><div>
+          <div class="nm">${t} · ${this.esc(c.titulo||nom)}</div>
+          <div class="ct">${this.esc(c.duracion||'')}</div></div></div>
+          ${this.capEmbed(c.url)}</div>`;}).join('')
+        :'<div class="sub" style="margin-top:9px">Elige una referencia para ver sus cápsulas.</div>'}`
+      :'<div class="empty">Todavía no hay cápsulas montadas. Móntalas en Estructurar programa.</div>'}
+
+      <h1 style="font-size:18px;margin-top:22px">Ruta de ventas</h1>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px">
+        ${this.PERFILES.map(([k,n])=>`<button class="btn gh2" onclick="App.capPerfil('${k}')"
+          style="padding:6px 12px;font-size:12.5px${perf===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${this.esc(n)}</button>`).join('')}
+      </div>
+      ${this.BLOQUES.map((nom,i)=>{ const r=(this._rutas||[]).find(x=>x.perfil===perf&&+x.bloque===i+1);
+        if(!r||!r.url) return `<div class="prod" style="opacity:.5"><div class="nm">${i+1}. ${this.esc(nom)}</div>
+          <div class="ct">todavía sin grabar</div></div>`;
+        return `<div class="prod"><div class="nm">${i+1}. ${this.esc(r.titulo||nom)}</div>
+          <div class="ct">${this.esc(r.duracion||'')}</div>${this.capEmbed(r.url)}</div>`;}).join('')}`;
+  },
+
+  /* ---------- cajón 3 · estudiantes ---------- */
+  capResultados(){
+    const ests=this._ests||[], vis=this._vistos||[];
+    const mios=id=>vis.filter(v=>v.estudiante_id===id);
+    const cert=ests.filter(e=>e.certificado).length;
+    const hoy=new Date().toISOString().slice(0,10);
+    const vencidos=ests.filter(e=>e.certificado&&e.vence_en&&e.vence_en<hoy).length;
+    const porPerfil={}; ests.forEach(e=>{ const k=e.perfil||'sin perfil'; porPerfil[k]=(porPerfil[k]||0)+1; });
+    return `
+      <div class="kpis">
+        <div class="kpi"><b>${cert}</b><span>Certificados</span></div>
+        <div class="kpi"><b>${ests.length-cert}</b><span>En formación</span></div>
+      </div>
+      ${vencidos?`<div class="prod" style="border-color:var(--warn)">
+        <div class="nm">${vencidos} certificación${vencidos===1?'':'es'} vencida${vencidos===1?'':'s'}</div>
+        <div class="ct">la certificación dura 12 meses — hay que recertificar</div></div>`:''}
+      ${ests.length?`<div style="font-size:12.5px;color:var(--faint);margin:10px 0">
+        ${Object.keys(porPerfil).map(k=>{ const n=(this.PERFILES.find(p=>p[0]===k)||[null,k])[1];
+          return this.esc(n)+': '+porPerfil[k]; }).join(' · ')}</div>`:''}
+      ${ests.length?ests.map(e=>{ const v=mios(e.id);
+        const nc=v.filter(x=>x.clase==='capsula').length, nr=v.filter(x=>x.clase==='ruta').length;
+        const venc=e.certificado&&e.vence_en&&e.vence_en<hoy;
+        return `<div class="prod" style="cursor:pointer${e.id===this._estSel?';border-color:var(--accent2)':''}"
+          onclick="App.estAbrir('${e.id}')">
+          <div class="top"><div><div class="nm">${this.esc(e.nombre)}</div>
+            <div class="ct">c.c. ${this.esc(e.cedula||'')}${e.ciudad?' · '+this.esc(e.ciudad):''}${e.tipo_negocio?' · '+this.esc(e.tipo_negocio):''}</div></div>
+            <div class="pv" style="font-size:13px">
+              <span class="pchip ${e.certificado&&!venc?'stock':'cost'}">${venc?'vencido':(e.certificado?'certificado':'en formación')}</span></div></div>
+          <div class="meta" style="margin-top:6px">
+            <span class="pchip">${nc} cápsulas · ${nr}/4 bloques</span>
+            ${e.perfil?`<span class="pchip">${this.esc((this.PERFILES.find(p=>p[0]===e.perfil)||[null,e.perfil])[1])}</span>`:''}
+            ${e.codigo?`<span class="pchip stock" style="font-family:monospace">${this.esc(e.codigo)}</span>`:''}
+          </div>
+          ${e.id===this._estSel?this.estFicha(e,v):''}
+        </div>`;}).join('')
+      :'<div class="empty">Todavía nadie se ha inscrito. Manda el enlace de la escuela desde Academia.</div>'}`;
+  },
+
+  estFicha(e,v){
+    const nom=id=>{ const c=(this._caps||[]).find(x=>x.id===id);
+      if(!c) return id;
+      const p=(this._prods||[]).find(y=>y.id===c.producto_id);
+      return (p?p.nombre:'—')+' · '+c.tipo; };
+    const rnom=id=>{ const r=(this._rutas||[]).find(x=>x.id===id);
+      return r?(r.bloque+'. '+(r.titulo||'')):id; };
+    const caps=v.filter(x=>x.clase==='capsula'), rut=v.filter(x=>x.clase==='ruta');
+    return `<div style="border-top:1px solid var(--line,#eee);margin-top:12px;padding-top:12px"
+      onclick="event.stopPropagation()">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tr><td style="padding:4px 0;color:var(--faint)">Celular</td><td style="text-align:right">${this.esc(e.celular||'—')}</td></tr>
+        <tr><td style="padding:4px 0;color:var(--faint)">Se inscribió</td><td style="text-align:right">${this.esc(String(e.creado_en||'').slice(0,10))}</td></tr>
+        ${e.certificado?`<tr><td style="padding:4px 0;color:var(--faint)">Certificado el</td>
+          <td style="text-align:right">${this.esc(String(e.certificado_en||'').slice(0,10))}</td></tr>
+          <tr><td style="padding:4px 0;color:var(--faint)">Vence</td>
+          <td style="text-align:right">${this.esc(e.vence_en||'—')}</td></tr>`:''}
+      </table>
+      <div style="font-weight:600;font-size:13px;margin-top:11px">Su ruta de ventas</div>
+      ${rut.length?rut.map(x=>`<div style="font-size:13px;margin-top:4px">✓ ${this.esc(rnom(x.item_id))}
+        <span style="color:var(--faint)">· ${this.esc(String(x.visto_en||'').slice(0,10))}</span></div>`).join('')
+        :'<div style="font-size:13px;color:var(--faint);margin-top:4px">Todavía no ha empezado su ruta.</div>'}
+      <div style="font-weight:600;font-size:13px;margin-top:11px">Cápsulas que vio (${caps.length})</div>
+      ${caps.length?`<div style="font-size:12.5px;color:var(--faint);margin-top:4px;line-height:1.7">
+        ${caps.map(x=>this.esc(nom(x.item_id))).join(' · ')}</div>`
+        :'<div style="font-size:13px;color:var(--faint);margin-top:4px">Ninguna.</div>'}
+      <div style="display:flex;gap:7px;margin-top:12px">
+        ${e.certificado
+          ? `<button class="btn gh2" style="flex:1" onclick="App.estQuitarCert('${e.id}')">Quitar certificación</button>`
+          : `<button class="btn" style="flex:1" onclick="App.estCertificar('${e.id}')">Certificar a mano</button>`}
+      </div>
+    </div>`;
+  },
+
+  /* El código es lo que se verifica cuando alguien dice "yo soy distribuidor de Solé".
+     Consecutivo y con vencimiento a 12 meses: una certificación vieja no vale. */
+  async estCertificar(id){
+    const e=(this._ests||[]).find(x=>x.id===id); if(!e) return;
+    if(!confirm('¿Certificar a '+e.nombre+'? Le queda habilitado el precio mayorista.')) return;
+    const n=(this._ests||[]).filter(x=>x.codigo).length+1;
+    const cod='ESC-'+String(new Date().getFullYear()).slice(2)+'-'+String(n).padStart(4,'0');
+    const vence=new Date(Date.now()+365*86400000).toISOString().slice(0,10);
+    await this._patch('soleparis_estudiante?id=eq.'+id,{certificado:true,
+      certificado_en:new Date().toISOString(),vence_en:vence,codigo:e.codigo||cod});
+    this.toast('Certificado '+(e.codigo||cod)); this.vCapacitacion();
+  },
+  async estQuitarCert(id){
+    if(!confirm('¿Quitarle la certificación? Deja de ver el precio mayorista.')) return;
+    await this._patch('soleparis_estudiante?id=eq.'+id,{certificado:false});
     this.vCapacitacion();
   },
-  async capDel(id){ if(!confirm('¿Quitar esta pieza?'))return;
-    await this._delq('soleparis_capa_visto?capa_id=eq.'+id);
-    await this._delq('soleparis_capacitacion?id=eq.'+id); this.vCapacitacion(); },
 
   /* ---------- CASOS DE ÉXITO ----------
      Lo que cierra una venta de dermocosmética no es el folleto: es el resultado de

@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- GitHub Pages guarda el HTML 10 minutos. Aqui eso significa que un estudiante
+     puede ver una version vieja justo despues de que Sole publique un video nuevo. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<title>Escuela Solé</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --papel:#FBF9F7; --carta:#fff; --tinta:#1D1B1A; --tinta2:#5C5754; --tenue:#918A85;
+    --linea:#EAE4DF; --acento:#8C6A4F; --acento2:#6E4F38; --suave:#F3EBE4;
+    --ok:#4A7355; --oksuave:#E6EFE7; --alerta:#A8452F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--papel);color:var(--tinta);
+    font-family:'Jost',system-ui,sans-serif;font-size:15px;line-height:1.6;
+    -webkit-font-smoothing:antialiased}
+  header{background:var(--carta);border-bottom:1px solid var(--linea);padding:16px 18px;text-align:center}
+  header .marca{font-family:'Cormorant Garamond',serif;font-size:21px;letter-spacing:.14em}
+  header .sub{font-size:12px;color:var(--tenue);margin-top:3px;letter-spacing:.05em}
+  main{max-width:620px;margin:0 auto;padding:22px 18px 70px}
+  h1{font-family:'Cormorant Garamond',serif;font-size:29px;font-weight:600;line-height:1.15;margin-bottom:5px}
+  .serif{font-family:'Cormorant Garamond',serif}
+  .lead{color:var(--tinta2);font-size:14.5px;margin-bottom:20px}
+  .card{background:var(--carta);border:1px solid var(--linea);border-radius:14px;padding:20px;margin-bottom:14px}
+  label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--tenue);
+        font-weight:500;margin:13px 0 5px}
+  label:first-child{margin-top:0}
+  input,select,textarea{width:100%;padding:12px 13px;border:1px solid var(--linea);border-radius:9px;
+    background:var(--papel);font-family:inherit;font-size:15px;color:var(--tinta)}
+  input:focus,select:focus{outline:2px solid var(--suave);border-color:var(--acento)}
+  .btn{width:100%;padding:14px;border:none;border-radius:9px;background:var(--acento2);color:#fff;
+    font-family:inherit;font-size:15px;font-weight:500;letter-spacing:.03em;cursor:pointer;margin-top:16px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.gh{background:transparent;color:var(--acento2);border:1px solid var(--linea);margin-top:9px}
+  .hint{font-size:12.5px;color:var(--tenue);margin-top:5px;line-height:1.5}
+  .err{color:var(--alerta);font-size:13px;margin-top:9px;display:none}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+
+  /* Los cajones son la navegacion entera: producto, ruta y certificado. */
+  .cajones{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+  .caj{flex:1;min-width:96px;padding:10px 8px;border:1px solid var(--linea);border-radius:10px;
+    background:var(--carta);font-family:inherit;font-size:13px;color:var(--tinta2);cursor:pointer;
+    text-align:center}
+  .caj.on{background:var(--acento2);color:#fff;border-color:var(--acento2)}
+
+  .item{background:var(--carta);border:1px solid var(--linea);border-radius:12px;
+    padding:15px 16px;margin-bottom:10px}
+  .item .t{font-weight:500;font-size:15px}
+  .item .d{font-size:12.5px;color:var(--tenue);margin-top:2px}
+  .item.listo{border-color:var(--ok)}
+  .tag{display:inline-block;font-size:11px;letter-spacing:.06em;padding:3px 9px;border-radius:20px;
+    background:var(--suave);color:var(--acento2)}
+  .tag.ok{background:var(--oksuave);color:var(--ok)}
+  video,iframe{width:100%;border:0;border-radius:10px;margin-top:10px;background:#000}
+  iframe{aspect-ratio:16/9}
+  .letra{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--suave);
+    color:var(--acento2);align-items:center;justify-content:center;font-weight:600;font-size:13px;
+    margin-right:8px;flex:none}
+
+  /* El certificado tiene que verse como un certificado: es lo que la persona
+     muestra cuando dice "yo soy distribuidor de Sole". */
+  .diploma{border:2px solid var(--acento);border-radius:14px;padding:28px 22px;text-align:center;
+    background:var(--carta)}
+  .diploma .k{font-family:'Cormorant Garamond',serif;font-size:31px;line-height:1.1;margin:8px 0}
+  .diploma .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:19px;letter-spacing:.11em;
+    color:var(--acento2);margin-top:10px}
+  .diploma .fe{font-size:12px;color:var(--tenue);letter-spacing:.06em;margin-top:8px}
+  .barra{height:7px;background:var(--suave);border-radius:6px;overflow:hidden;margin:10px 0 4px}
+  .barra i{display:block;height:100%;background:var(--acento);border-radius:6px}
+  .vacio{text-align:center;color:var(--tenue);padding:30px 10px;font-size:14px}
+  .pie{text-align:center;font-size:11.5px;color:var(--tenue);margin-top:26px;line-height:1.7}
+</style>
+</head>
+<body>
+<header>
+  <div class="marca">SOLÉ</div>
+  <div class="sub">ESCUELA · FORMACIÓN PARA QUIEN VENDE</div>
+</header>
+<main id="app"><div class="vacio">Cargando…</div></main>
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co';
+const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+/* Marca de version a la vista: si algo "no cambio", este numero dice de una si el
+   navegador esta mostrando la pagina publicada o una copia vieja que guardo. */
+const VER='1';
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const soloNum=s=>String(s||'').replace(/\D/g,'');
+const fechaLarga=d=>{ if(!d) return '';
+  try{ return new Date(d).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'}); }
+  catch(e){ return String(d).slice(0,10); } };
+
+const CAPS=[['L','Laboratorio','Por qué está hecho así'],
+            ['U','Uso y rutina','Cómo se aplica'],
+            ['R','Resultados','Qué esperar y cómo medirlo']];
+const PERFILES=[['profesional','Profesional de belleza','Vendes con las manos, en cabina, cobrando un servicio'],
+                ['mostrador','Mostrador','El cliente entra con un problema y quiere solución ya'],
+                ['social','Venta social','WhatsApp, catálogo digital, Instagram'],
+                ['distribuidor','Distribuidor de zona','Revendes y armas tu propia red']];
+const BLOQUES=['Quién es tu cliente','Cómo diagnosticar','La objeción de precio','Cierre y recompra'];
+
+let YO=null, PRODS=[], CAPSU=[], RUTAS=[], VIS=[], CAJ='productos', ABIERTO=null;
+
+async function api(q){ try{ const r=await fetch(SB+'/rest/v1/'+q,{headers:H}); return r.ok?await r.json():[]; }catch(e){ return []; } }
+async function post(t,b){ try{ await fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); }catch(e){} }
+async function patch(q,b){ try{ await fetch(SB+'/rest/v1/'+q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)}); }catch(e){} }
+
+function embed(url){
+  if(!url) return '';
+  const u=String(url);
+  const yt=u.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([\w-]{6,})/);
+  if(yt) return `<iframe src="https://www.youtube.com/embed/${yt[1]}" allowfullscreen></iframe>`;
+  const vm=u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if(vm) return `<iframe src="https://player.vimeo.com/video/${vm[1]}" allowfullscreen></iframe>`;
+  const dr=u.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+  if(dr) return `<iframe src="https://drive.google.com/file/d/${dr[1]}/preview" allowfullscreen></iframe>`;
+  return `<video src="${esc(u)}" controls preload="metadata" style="max-height:320px"></video>`;
+}
+
+/* ---------- ENTRADA ----------
+   La cedula primero: con eso solo, quien ya se inscribio entra directo. */
+let _busca=null, _hallado=null;
+function vEntrada(){
+  $('app').innerHTML=`
+    <h1 class="serif">Aprende a vender Solé</h1>
+    <p class="lead">Formación por producto y ruta de ventas según cómo vendes tú.
+      Al terminar te certificas y quedas registrado como distribuidor.</p>
+    <div class="card">
+      <label>Tu cédula</label>
+      <input id="e_ced" inputmode="numeric" placeholder="Sin puntos ni comas" oninput="buscarCed()">
+      <div id="e_yo"></div>
+      <div class="err" id="e_err"></div>
+    </div>
+    <div class="pie">Solé · Escuela de formación<br><span style="opacity:.45">v${VER}</span></div>`;
+}
+function buscarCed(){
+  const ced=soloNum($('e_ced').value), c=$('e_yo');
+  _hallado=null; c.innerHTML='';
+  if(ced.length<5) return;
+  clearTimeout(_busca);
+  _busca=setTimeout(async()=>{
+    const r=await api('soleparis_estudiante?select=id,nombre,perfil&cedula=eq.'+encodeURIComponent(ced));
+    if(soloNum($('e_ced').value)!==ced) return;
+    if(r&&r.length){
+      _hallado=r[0];
+      c.innerHTML=`<div style="background:var(--suave);border-radius:10px;padding:14px;margin-top:12px">
+        <div class="serif" style="font-size:19px">Hola, ${esc((r[0].nombre||'').split(' ')[0])}</div>
+        <div class="hint">Sigue donde quedaste.</div></div>
+        <button class="btn" onclick="entrar()">Entrar a mi formación</button>`;
+    }else{
+      c.innerHTML=`<div class="hint" style="margin-top:12px">No te encontramos. Cuéntanos quién eres:</div>
+        <label>Tu nombre completo</label><input id="e_nom" placeholder="Como aparece en tu cédula">
+        <label>Celular</label><input id="e_cel" inputmode="tel" placeholder="300 000 0000">
+        <label>Ciudad</label><input id="e_ciu" placeholder="Bogotá">
+        <label>¿Qué tienes hoy?</label>
+        <select id="e_neg">
+          <option value="">— elige —</option>
+          <option>Salón de belleza o spa</option>
+          <option>Droguería o tienda</option>
+          <option>Vendo por redes o WhatsApp</option>
+          <option>Distribuyo a otros</option>
+          <option>Todavía nada, quiero empezar</option>
+        </select>
+        <button class="btn" onclick="inscribir()">Empezar mi formación</button>`;
+    }
+  },420);
+}
+async function entrar(){
+  const r=await api('soleparis_estudiante?cedula=eq.'+encodeURIComponent(soloNum($('e_ced').value)));
+  if(!r||!r.length) return;
+  YO=r[0]; localStorage.setItem('sp_esc',YO.cedula); cargar();
+}
+async function inscribir(){
+  const e=$('e_err'); e.style.display='none';
+  const ced=soloNum($('e_ced').value), nom=($('e_nom').value||'').trim();
+  if(ced.length<5){ e.textContent='Escribe tu cédula.'; e.style.display='block'; return; }
+  if(nom.length<4){ e.textContent='Escribe tu nombre completo.'; e.style.display='block'; return; }
+  const nuevo={id:'es'+Date.now(),nombre:nom,cedula:ced,
+    celular:($('e_cel').value||'').trim()||null,ciudad:($('e_ciu').value||'').trim()||null,
+    tipo_negocio:$('e_neg').value||null,certificado:false};
+  await post('soleparis_estudiante',nuevo);
+  YO=nuevo; localStorage.setItem('sp_esc',ced); cargar();
+}
+
+/* ---------- PANEL ---------- */
+async function cargar(){
+  [PRODS,CAPSU,RUTAS,VIS]=await Promise.all([
+    api('soleparis_productos?select=id,nombre,categoria,presentacion&order=nombre'),
+    api('soleparis_capsula?order=creado_en'),
+    api('soleparis_ruta?order=perfil,bloque'),
+    api('soleparis_visto?estudiante_id=eq.'+YO.id)]);
+  vPanel();
+}
+const yaVi=id=>VIS.some(v=>v.item_id===id);
+function misBloques(){ return RUTAS.filter(r=>r.perfil===YO.perfil&&r.url).sort((a,b)=>a.bloque-b.bloque); }
+function listo(){ const b=misBloques(); return b.length===4 && b.every(r=>yaVi(r.id)); }
+
+function caj(c){ CAJ=c; ABIERTO=null; vPanel(); }
+function abrir(id){ ABIERTO=(ABIERTO===id?null:id); vPanel(); }
+
+function vPanel(){
+  const nc=VIS.filter(v=>v.clase==='capsula').length;
+  const b=misBloques(), nb=b.filter(r=>yaVi(r.id)).length;
+  $('app').innerHTML=`
+    <h1 class="serif">Hola, ${esc((YO.nombre||'').split(' ')[0])}</h1>
+    <p class="lead">${YO.certificado?'Distribuidor certificado':'En formación'} ·
+      ${nc} cápsula${nc===1?'':'s'} vista${nc===1?'':'s'} · ${nb} de 4 bloques de tu ruta</p>
+    <div class="cajones">
+      <button class="caj${CAJ==='productos'?' on':''}" onclick="caj('productos')">🧴 Productos</button>
+      <button class="caj${CAJ==='ruta'?' on':''}" onclick="caj('ruta')">🎯 Mi ruta</button>
+      <button class="caj${CAJ==='cert'?' on':''}" onclick="caj('cert')">🎓 Certificado</button>
+    </div>
+    ${CAJ==='productos'?vProductos():CAJ==='ruta'?vRuta():vCert()}
+    <div class="pie">Solé · Escuela de formación
+      <br><a onclick="salir()" style="cursor:pointer;color:var(--acento2)">Salir</a>
+      <br><span style="opacity:.45">v${VER}</span></div>`;
+}
+
+function vProductos(){
+  const con=PRODS.filter(p=>CAPSU.some(c=>c.producto_id===p.id&&c.url));
+  if(!con.length) return '<div class="vacio">Todavía no hay cápsulas publicadas.<br>Vuelve en unos días.</div>';
+  return `<p class="hint" style="margin-bottom:12px">Cada referencia tiene tres videos: por qué está
+    hecha así, cómo se aplica y qué resultados esperar. Son los tres argumentos con los que la vendes.</p>
+    ${con.map(p=>{ const mis=CAPSU.filter(c=>c.producto_id===p.id&&c.url);
+      const v=mis.filter(c=>yaVi(c.id)).length;
+      return `<div class="item${v===mis.length?' listo':''}">
+      <div onclick="abrir('${p.id}')" style="cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div><div class="t">${esc(p.nombre)}</div>
+          <div class="d">${esc(p.categoria||'')}${p.presentacion?' · '+esc(p.presentacion):''}</div></div>
+        <span class="tag${v===mis.length?' ok':''}">${v}/${mis.length}</span>
+      </div>
+      ${ABIERTO===p.id?mis.map(c=>{ const meta=CAPS.find(x=>x[0]===c.tipo)||[c.tipo,'',''];
+        return `<div style="border-top:1px solid var(--linea);margin-top:12px;padding-top:12px">
+        <div style="display:flex;align-items:center">
+          <span class="letra">${esc(c.tipo)}</span>
+          <div><div class="t" style="font-size:14px">${esc(c.titulo||meta[2])}</div>
+            <div class="d">${esc(meta[1])}${c.duracion?' · '+esc(c.duracion):''}</div></div></div>
+        ${embed(c.url)}
+        ${yaVi(c.id)?'<div class="hint" style="color:var(--ok);margin-top:8px">✓ Ya la viste</div>'
+          :`<button class="btn gh" onclick="marcar('capsula','${c.id}')">Ya la vi</button>`}
+      </div>`;}).join(''):''}
+    </div>`;}).join('')}`;
+}
+
+function vRuta(){
+  if(!YO.perfil) return `<h1 class="serif" style="font-size:22px">¿Cómo vendes tú?</h1>
+    <p class="lead">La misma crema no se vende igual en una cabina que en el mostrador de una
+      droguería. Escoge tu forma y te armamos la ruta.</p>
+    ${PERFILES.map(([k,n,d])=>`<div class="item" style="cursor:pointer" onclick="elegirPerfil('${k}')">
+      <div class="t">${esc(n)}</div><div class="d">${esc(d)}</div></div>`).join('')}`;
+  const b=misBloques();
+  const nom=(PERFILES.find(p=>p[0]===YO.perfil)||[null,YO.perfil])[1];
+  const n=b.filter(r=>yaVi(r.id)).length;
+  return `<div class="card">
+      <div class="t" style="font-weight:500">${esc(nom)}</div>
+      <div class="barra"><i style="width:${b.length?Math.round(n/4*100):0}%"></i></div>
+      <div class="hint">${n} de 4 bloques</div>
+      <button class="btn gh" onclick="cambiarPerfil()">Cambiar mi forma de vender</button>
+    </div>
+    ${BLOQUES.map((t,i)=>{ const r=b.find(x=>+x.bloque===i+1);
+      if(!r) return `<div class="item" style="opacity:.5"><div class="t">${i+1}. ${esc(t)}</div>
+        <div class="d">Todavía lo estamos grabando</div></div>`;
+      return `<div class="item${yaVi(r.id)?' listo':''}">
+        <div onclick="abrir('${r.id}')" style="cursor:pointer;display:flex;justify-content:space-between;gap:10px">
+          <div><div class="t">${i+1}. ${esc(r.titulo||t)}</div>
+            <div class="d">${esc(r.duracion||'')}${i===2?' · el bloque que más pesa':''}</div></div>
+          <span class="tag${yaVi(r.id)?' ok':''}">${yaVi(r.id)?'visto':'ver'}</span></div>
+        ${ABIERTO===r.id?embed(r.url)+(yaVi(r.id)
+          ?'<div class="hint" style="color:var(--ok);margin-top:8px">✓ Ya lo viste</div>'
+          :`<button class="btn gh" onclick="marcar('ruta','${r.id}')">Ya lo vi</button>`):''}
+      </div>`;}).join('')}`;
+}
+
+function vCert(){
+  if(YO.certificado){
+    const venc=YO.vence_en&&YO.vence_en<new Date().toISOString().slice(0,10);
+    return `<div class="diploma">
+      <div style="font-size:11px;letter-spacing:.15em;color:var(--tenue)">CERTIFICADO DE FORMACIÓN</div>
+      <div class="k">${esc(YO.nombre)}</div>
+      <div style="font-size:13px;color:var(--tinta2)">está formado para vender los productos Solé
+        como ${esc((PERFILES.find(p=>p[0]===YO.perfil)||[null,YO.perfil||''])[1])}</div>
+      <div class="cod">${esc(YO.codigo||'')}</div>
+      <div class="fe">Certificado el ${fechaLarga(YO.certificado_en)}<br>
+        ${venc?'VENCIÓ el '+fechaLarga(YO.vence_en):'Vigente hasta el '+fechaLarga(YO.vence_en)}</div>
+    </div>
+    ${venc?`<div class="card" style="margin-top:14px">
+      <div class="t" style="font-weight:500">Tu certificación venció</div>
+      <div class="hint">Dura 12 meses. Vuelve a ver tu ruta y recertifícate para seguir
+        apareciendo como distribuidor.</div>
+      <button class="btn" onclick="certificar()">Recertificarme</button></div>`
+    :`<div class="card" style="margin-top:14px">
+      <div class="t" style="font-weight:500">Ese código es tu identificación</div>
+      <div class="hint">Cuando pidas mercancía o te presenten como distribuidor Solé, ese es el
+        número con el que te verifican.</div></div>`}`;
+  }
+  const b=misBloques(), n=b.filter(r=>yaVi(r.id)).length;
+  if(!YO.perfil) return `<div class="vacio">Primero escoge cómo vendes,<br>en <b>Mi ruta</b>.</div>`;
+  if(b.length<4) return `<div class="vacio">Tu ruta todavía se está grabando.<br>
+    Van ${b.length} de 4 bloques publicados.</div>`;
+  return `<div class="card">
+    <h1 class="serif" style="font-size:22px;margin-bottom:4px">Tu certificación</h1>
+    <p class="hint">Se abre cuando termines los cuatro bloques de tu ruta.</p>
+    <div class="barra"><i style="width:${Math.round(n/4*100)}%"></i></div>
+    <div class="hint">${n} de 4</div>
+    ${BLOQUES.map((t,i)=>{ const r=b.find(x=>+x.bloque===i+1);
+      return `<div style="font-size:13.5px;margin-top:7px;color:${r&&yaVi(r.id)?'var(--ok)':'var(--tenue)'}">
+        ${r&&yaVi(r.id)?'✓':'○'} ${esc(r&&r.titulo||t)}</div>`;}).join('')}
+    <button class="btn" onclick="certificar()" ${listo()?'':'disabled'}>
+      ${listo()?'Quiero mi certificado':'Te faltan '+(4-n)+' bloque'+(4-n===1?'':'s')}</button>
+  </div>`;
+}
+
+async function elegirPerfil(k){
+  YO.perfil=k; await patch('soleparis_estudiante?id=eq.'+YO.id,{perfil:k}); vPanel();
+}
+async function cambiarPerfil(){
+  if(!confirm('¿Cambiar tu forma de vender? Tu ruta empieza de nuevo.')) return;
+  YO.perfil=null; await patch('soleparis_estudiante?id=eq.'+YO.id,{perfil:null}); vPanel();
+}
+async function marcar(clase,id){
+  if(yaVi(id)) return;
+  const v={id:'vs'+Date.now(),estudiante_id:YO.id,clase:clase,item_id:id};
+  VIS.push(v); await post('soleparis_visto',v); vPanel();
+}
+/* El codigo es consecutivo y unico: es con lo que se verifica a alguien que dice ser
+   distribuidor de Sole. Vence a los 12 meses — una certificacion vieja no vale. */
+async function certificar(){
+  if(!listo()) return;
+  let cod=YO.codigo;
+  if(!cod){
+    const todos=await api('soleparis_estudiante?select=codigo&codigo=not.is.null');
+    cod='ESC-'+String(new Date().getFullYear()).slice(2)+'-'+String((todos||[]).length+1).padStart(4,'0');
+  }
+  const hoy=new Date(), vence=new Date(Date.now()+365*86400000).toISOString().slice(0,10);
+  await patch('soleparis_estudiante?id=eq.'+YO.id,
+    {certificado:true,certificado_en:hoy.toISOString(),vence_en:vence,codigo:cod});
+  Object.assign(YO,{certificado:true,certificado_en:hoy.toISOString(),vence_en:vence,codigo:cod});
+  CAJ='cert'; vPanel();
+}
+function salir(){ localStorage.removeItem('sp_esc'); YO=null; vEntrada(); }
+
+/* Si ya entro antes en este telefono, no se le vuelve a pedir la cedula. */
+(async()=>{
+  const ced=localStorage.getItem('sp_esc');
+  if(ced){
+    const r=await api('soleparis_estudiante?cedula=eq.'+encodeURIComponent(ced));
+    if(r&&r.length){ YO=r[0]; return cargar(); }
+  }
+  vEntrada();
+})();
+</script>
+</body>
+</html>
