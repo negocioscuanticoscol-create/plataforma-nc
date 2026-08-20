@@ -29,6 +29,7 @@
   #login .sub{color:var(--muted);font-size:13px;margin:16px 0 18px}
   #login input{width:100%;padding:14px;border:1.5px solid var(--line);border-radius:11px;text-align:center;letter-spacing:1px}
   #login input:focus{outline:none;border-color:var(--accent)}
+  .btn.gh2{background:transparent;border:1px solid var(--line,#ddd);color:var(--faint,#666)}
   .btn{width:100%;padding:15px;border:none;border-radius:11px;font-weight:600;cursor:pointer;margin-top:14px;letter-spacing:.5px}
   .btn-main{background:var(--ink);color:#fff}
   .btn-main:active{background:#000}
@@ -213,6 +214,11 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     this._saveLocal(tabla,cacheArr);   // respaldo local SIEMPRE
     if(this._onl[tabla]){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)}); }catch(e){} }
   },
+  /* Consultas sueltas: esta app solo tenia lectura por tabla completa. */
+  async _get(q){ try{ const r=await fetch(this.SB+'/rest/v1/'+q,{headers:this._H()}); return r.ok?await r.json():[]; }catch(e){ return []; } },
+  async _post(t,b){ try{ await fetch(this.SB+'/rest/v1/'+t,{method:'POST',headers:{...this._H(),Prefer:'return=minimal'},body:JSON.stringify(b)}); }catch(e){} },
+  async _patch(q,b){ try{ await fetch(this.SB+'/rest/v1/'+q,{method:'PATCH',headers:{...this._H(),Prefer:'return=minimal'},body:JSON.stringify(b)}); }catch(e){} },
+  async _delq(q){ try{ await fetch(this.SB+'/rest/v1/'+q,{method:'DELETE',headers:this._H()}); }catch(e){} },
   async _del(tabla,id,cacheArr){
     this._saveLocal(tabla,cacheArr);
     if(this._onl[tabla]){ try{ await fetch(this.SB+'/rest/v1/'+tabla+'?id=eq.'+encodeURIComponent(id),{method:'DELETE',headers:this._H()}); }catch(e){} }
@@ -240,7 +246,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   pintarNav(){
     // Cliente: SOLO Starting Point. Admin: toda la botonería.
     const TABS = this.esAdmin()
-      ? [['resultados','📊','Resultados'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['stock','🏬','Stock'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM']]
+      ? [['resultados','📊','Resultados'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['stock','🏬','Stock'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM'],['capacitacion','🎓','Capacitación'],['casos','⭐','Casos de éxito']]
       : [['inicio','✦','Starting Point']];
     document.getElementById('nav').innerHTML = TABS.map(([v,ic,t])=>
       `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
@@ -253,7 +259,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     window.scrollTo(0,0);
     ({inicio:this.vInicio, resultados:this.vResultados, panel:this.vPanel, productos:this.vProductos, catalogo:this.vCatalogo,
       stock:this.vStock, clientes:this.vClientes, cotizar:this.vCotizar, pedidos:this.vPedidos, despachos:this.vDespachos,
-      cartera:this.vCartera, crm:this.vCrm}[view]||this.vInicio).call(this);
+      cartera:this.vCartera, crm:this.vCrm, capacitacion:this.vCapacitacion, casos:this.vCasos}[view]||this.vInicio).call(this);
   },
   set(html){ document.getElementById('main').innerHTML = html; },
   fmt(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
@@ -271,6 +277,130 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <div style="margin-top:12px;display:inline-block;background:var(--accent-soft);color:var(--accent2);font-weight:600;font-size:12px;padding:6px 14px;border-radius:20px">Próximamente</div>
       </div>`);
   },
+  /* ---------- CAPACITACIÓN ----------
+     En dermocosmética quien vende tiene que saber qué hace cada activo y por qué.
+     Se registra quién vio cada pieza: mandar el enlace no es haber capacitado. */
+  MODULOS:['Producto','Protocolo','Ventas','Marca'],
+  TIPOSCAP:['video','documento','enlace','presencial'],
+  PARAQUIEN:['Todas','Asesoras','Distribuidores'],
+  async vCapacitacion(){
+    const [caps,vis]=await Promise.all([
+      this._get('soleparis_capacitacion?order=modulo,orden'),
+      this._get('soleparis_capa_visto?order=visto_en.desc&limit=500')]);
+    this._caps=caps; this._vis=vis;
+    const porMod={}; caps.forEach(c=>{ (porMod[c.modulo||'Producto']=porMod[c.modulo||'Producto']||[]).push(c); });
+    const vistos=id=>vis.filter(v=>v.capa_id===id);
+    this.set(`<h1>Capacitación</h1>
+      <div class="sub">${caps.length} piezas · ${new Set(vis.map(v=>v.persona)).size} personas capacitadas</div>
+      <div class="card">
+        <label>Título</label><input id="cp_t" class="field" placeholder="Ej: Qué hace el ácido hialurónico y cómo explicarlo">
+        <div class="row2">
+          <div><label>Módulo</label><select id="cp_m" class="field">${this.MODULOS.map(m=>`<option>${m}</option>`).join('')}</select></div>
+          <div><label>Tipo</label><select id="cp_ti" class="field">${this.TIPOSCAP.map(m=>`<option>${m}</option>`).join('')}</select></div>
+        </div>
+        <div class="row2">
+          <div><label>Duración</label><input id="cp_d" class="field" placeholder="12 min"></div>
+          <div><label>Para quién</label><select id="cp_pq" class="field">${this.PARAQUIEN.map(m=>`<option>${m}</option>`).join('')}</select></div>
+        </div>
+        <label>Enlace</label><input id="cp_u" class="field" placeholder="https://…">
+        <label>De qué se trata</label><input id="cp_r" class="field" placeholder="En una línea, qué se lleva quien lo vea">
+        <button class="btn" onclick="App.capAdd()">+ Agregar pieza</button>
+      </div>
+      ${Object.keys(porMod).length?Object.keys(porMod).map(m=>`
+        <h1 style="font-size:17px;margin-top:20px">${this.esc(m)}</h1>
+        ${porMod[m].map(c=>{ const v=vistos(c.id);
+          return `<div class="prod">
+          <div class="top"><div><div class="nm">${this.esc(c.titulo)}</div>
+            <div class="ct">${this.esc(c.tipo||'')}${c.duracion?' · '+this.esc(c.duracion):''} · para ${this.esc(c.para_quien||'Todas')}</div></div>
+            <div class="pv" style="font-size:13px"><span class="pchip ${v.length?'stock':'cost'}">${v.length} vieron</span></div></div>
+          ${c.resumen?`<div style="font-size:13px;color:var(--faint);margin-top:7px">${this.esc(c.resumen)}</div>`:''}
+          ${v.length?`<div style="font-size:12px;color:var(--faint);margin-top:6px">${v.map(x=>this.esc(x.persona)).join(' · ')}</div>`:''}
+          <div class="meta" style="margin-top:9px;gap:6px">
+            ${c.url?`<a class="btn gh2" href="${this.esc(c.url)}" target="_blank" rel="noopener" style="padding:5px 12px;font-size:12px;text-decoration:none">abrir</a>`:''}
+            <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.capVisto('${c.id}')">marcar visto</button>
+            <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.capDel('${c.id}')">✕</button></div>
+        </div>`;}).join('')}`).join('')
+        :'<div class="empty">Todavía sin material. Agrega la primera pieza arriba.</div>'}`);
+  },
+  async capAdd(){
+    const t=(document.getElementById('cp_t').value||'').trim();
+    if(!t){ this.toast('Ponle título'); return; }
+    const g=id=>(document.getElementById(id).value||'').trim();
+    await this._post('soleparis_capacitacion',{id:'cp'+Date.now(),titulo:t,modulo:g('cp_m'),
+      tipo:g('cp_ti'),duracion:g('cp_d')||null,para_quien:g('cp_pq'),url:g('cp_u')||null,
+      resumen:g('cp_r')||null,orden:(this._caps||[]).length,activo:true});
+    this.toast('Pieza agregada'); this.vCapacitacion();
+  },
+  async capVisto(id){
+    const p=prompt('¿Quién la vio?','');
+    if(p===null||!p.trim()) return;
+    await this._post('soleparis_capa_visto',{id:'cv'+Date.now(),capa_id:id,persona:p.trim()});
+    this.vCapacitacion();
+  },
+  async capDel(id){ if(!confirm('¿Quitar esta pieza?'))return;
+    await this._delq('soleparis_capa_visto?capa_id=eq.'+id);
+    await this._delq('soleparis_capacitacion?id=eq.'+id); this.vCapacitacion(); },
+
+  /* ---------- CASOS DE ÉXITO ----------
+     Lo que cierra una venta de dermocosmética no es el folleto: es el resultado de
+     otra persona. Sin el permiso escrito de esa persona, el caso no se publica. */
+  async vCasos(){
+    const cs=await this._get('soleparis_casos?order=destacado.desc,orden');
+    this._casos=cs;
+    const pub=cs.filter(c=>c.autoriza).length;
+    this.set(`<h1>Casos de éxito</h1>
+      <div class="sub">${cs.length} casos · ${pub} con autorización para publicar</div>
+      <div class="card">
+        <label>Título</label><input id="cs_t" class="field" placeholder="Ej: Manchas de melasma en 8 semanas">
+        <div class="row2">
+          <div><label>Cliente</label><input id="cs_c" class="field" placeholder="Nombre o iniciales"></div>
+          <div><label>Edad</label><input id="cs_e" class="field" placeholder="34"></div>
+        </div>
+        <div class="row2">
+          <div><label>Qué usó</label><input id="cs_p" class="field" placeholder="Kit Longevidad"></div>
+          <div><label>En cuánto tiempo</label><input id="cs_ti" class="field" placeholder="8 semanas"></div>
+        </div>
+        <label>De qué se quejaba</label><input id="cs_pr" class="field" placeholder="El problema, en sus palabras">
+        <label>Qué pasó</label><input id="cs_r" class="field" placeholder="El resultado, medible si se puede">
+        <label>Lo que dijo</label><input id="cs_te" class="field" placeholder="Testimonio textual">
+        <div class="row2">
+          <div><label>Foto antes (URL)</label><input id="cs_fa" class="field"></div>
+          <div><label>Foto después (URL)</label><input id="cs_fd" class="field"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;margin-top:8px">
+          <input type="checkbox" id="cs_au" style="width:auto"> Autorizó publicar su caso</label>
+        <button class="btn" onclick="App.casoAdd()">+ Agregar caso</button>
+      </div>
+      ${cs.length?cs.map(c=>`<div class="prod">
+        <div class="top"><div><div class="nm">${this.esc(c.titulo)}${c.destacado?' ⭐':''}</div>
+          <div class="ct">${[c.cliente,c.edad&&c.edad+' años',c.producto,c.tiempo].filter(Boolean).map(x=>this.esc(x)).join(' · ')}</div></div>
+          <div class="pv" style="font-size:13px"><span class="pchip ${c.autoriza?'stock':'cost'}">${c.autoriza?'autorizado':'sin permiso'}</span></div></div>
+        ${c.problema?`<div style="font-size:13px;margin-top:8px"><b>Antes:</b> ${this.esc(c.problema)}</div>`:''}
+        ${c.resultado?`<div style="font-size:13px;margin-top:3px"><b>Después:</b> ${this.esc(c.resultado)}</div>`:''}
+        ${c.testimonio?`<div style="font-size:13px;color:var(--ink);margin-top:9px;background:var(--accent-soft);border-radius:8px;padding:11px 13px;font-style:italic">“${this.esc(c.testimonio)}”</div>`:''}
+        ${(c.foto_antes||c.foto_despues)?`<div style="display:flex;gap:8px;margin-top:9px">
+          ${c.foto_antes?`<img src="${this.esc(c.foto_antes)}" style="width:50%;border-radius:8px" alt="antes">`:''}
+          ${c.foto_despues?`<img src="${this.esc(c.foto_despues)}" style="width:50%;border-radius:8px" alt="después">`:''}</div>`:''}
+        <div class="meta" style="margin-top:9px;gap:6px">
+          <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.casoDest('${c.id}',${!c.destacado})">${c.destacado?'quitar destacado':'destacar'}</button>
+          <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.casoDel('${c.id}')">✕</button></div>
+      </div>`).join('')
+      :'<div class="empty">Todavía sin casos. El primero es el que más cuesta conseguir y el que más vende.</div>'}`);
+  },
+  async casoAdd(){
+    const t=(document.getElementById('cs_t').value||'').trim();
+    if(!t){ this.toast('Ponle título'); return; }
+    const g=id=>(document.getElementById(id).value||'').trim()||null;
+    await this._post('soleparis_casos',{id:'cs'+Date.now(),titulo:t,cliente:g('cs_c'),edad:g('cs_e'),
+      producto:g('cs_p'),tiempo:g('cs_ti'),problema:g('cs_pr'),resultado:g('cs_r'),
+      testimonio:g('cs_te'),foto_antes:g('cs_fa'),foto_despues:g('cs_fd'),
+      autoriza:document.getElementById('cs_au').checked,orden:(this._casos||[]).length,activo:true});
+    this.toast('Caso agregado'); this.vCasos();
+  },
+  async casoDest(id,v){ await this._patch('soleparis_casos?id=eq.'+id,{destacado:v}); this.vCasos(); },
+  async casoDel(id){ if(!confirm('¿Quitar este caso?'))return;
+    await this._delq('soleparis_casos?id=eq.'+id); this.vCasos(); },
+
   vPedidos(){ this._soon('📦','Pedidos','Aquí verás los pedidos confirmados de cada cliente.'); },
   vDespachos(){ this._soon('🚚','Despachos','Seguimiento de envíos y entregas.'); },
   vCartera(){ this._soon('💳','Cartera','Estado de pagos y cartera por cliente.'); },
