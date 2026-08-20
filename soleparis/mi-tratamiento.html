@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Mi tratamiento · Sole Paris</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --papel:#FBF9F7; --carta:#fff; --tinta:#1D1B1A; --tinta2:#5C5754; --tenue:#918A85;
+    --linea:#EAE4DF; --acento:#8C6A4F; --acento2:#6E4F38; --suave:#F3EBE4;
+    --ok:#4A7355; --oksuave:#E6EFE7; --alerta:#A8452F;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{background:var(--papel);color:var(--tinta);font-family:'Jost',system-ui,sans-serif;
+       font-size:15px;line-height:1.6}
+  .serif{font-family:'Cormorant Garamond',Georgia,serif}
+  header{background:var(--carta);border-bottom:1px solid var(--linea);padding:18px 20px;text-align:center}
+  header .marca{font-family:'Jost';font-size:13px;letter-spacing:.42em;text-transform:uppercase;color:var(--acento2);font-weight:500}
+  header .sub{font-size:12px;color:var(--tenue);margin-top:3px;letter-spacing:.05em}
+  main{max-width:560px;margin:0 auto;padding:22px 18px 70px}
+  h1{font-family:'Cormorant Garamond',serif;font-size:29px;font-weight:600;line-height:1.15;margin-bottom:5px}
+  .lead{color:var(--tinta2);font-size:14.5px;margin-bottom:20px}
+  .card{background:var(--carta);border:1px solid var(--linea);border-radius:14px;padding:20px;margin-bottom:14px}
+  label{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--tenue);
+        font-weight:500;margin:13px 0 5px}
+  label:first-child{margin-top:0}
+  input,select,textarea{width:100%;padding:12px 13px;border:1px solid var(--linea);border-radius:9px;
+    background:var(--papel);font-family:inherit;font-size:15px;color:var(--tinta)}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--suave);border-color:var(--acento)}
+  textarea{min-height:76px;resize:vertical}
+  .btn{width:100%;padding:14px;border:none;border-radius:9px;background:var(--acento2);color:#fff;
+    font-family:inherit;font-size:15px;font-weight:500;letter-spacing:.03em;cursor:pointer;margin-top:16px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.gh{background:transparent;color:var(--acento2);border:1px solid var(--linea);margin-top:9px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .hint{font-size:12.5px;color:var(--tenue);margin-top:5px;line-height:1.5}
+  .err{color:var(--alerta);font-size:13px;margin-top:9px;display:none}
+  .consent{display:flex;gap:11px;align-items:flex-start;background:var(--suave);border-radius:10px;
+    padding:14px;margin-top:16px}
+  .consent input{width:19px;height:19px;flex:none;margin-top:2px;accent-color:var(--acento2)}
+  .consent span{font-size:12.5px;color:var(--tinta2);line-height:1.55}
+  .saldo{background:var(--acento2);color:#fff;border-radius:14px;padding:22px;text-align:center;margin-bottom:14px}
+  .saldo b{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:600;display:block;line-height:1}
+  .saldo span{font-size:12px;letter-spacing:.13em;text-transform:uppercase;opacity:.8}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:14px}
+  .kpi{background:var(--carta);border:1px solid var(--linea);border-radius:12px;padding:15px;text-align:center}
+  .kpi b{font-family:'Cormorant Garamond',serif;font-size:25px;font-weight:600;display:block}
+  .kpi span{font-size:11px;color:var(--tenue);letter-spacing:.07em;text-transform:uppercase}
+  .sem{border-left:2px solid var(--linea);padding:0 0 16px 16px;margin-left:7px;position:relative}
+  .sem:last-child{padding-bottom:0}
+  .sem::before{content:'';position:absolute;left:-6px;top:3px;width:10px;height:10px;border-radius:50%;
+    background:var(--acento);border:2px solid var(--papel)}
+  .sem .n{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--tenue)}
+  .sem .t{font-size:14.5px;margin-top:2px}
+  .sem .v{font-size:12.5px;color:var(--ok);font-weight:500;margin-top:2px}
+  .sem img,.sem video{width:100%;border-radius:10px;margin-top:8px;display:block}
+  .chip{display:inline-block;font-size:11px;font-weight:500;letter-spacing:.05em;padding:4px 11px;
+    border-radius:20px;background:var(--oksuave);color:var(--ok)}
+  .tabla{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:10px}
+  .tabla td{padding:9px 0;border-bottom:1px solid var(--linea)}
+  .tabla td:last-child{text-align:right;font-weight:500}
+  .tabla tr:last-child td{border-bottom:none}
+  .vacio{text-align:center;color:var(--tenue);padding:26px 10px;font-size:14px}
+  .pie{text-align:center;font-size:11.5px;color:var(--tenue);margin-top:26px;line-height:1.6}
+  .hide{display:none!important}
+  .cargando{text-align:center;padding:40px;color:var(--tenue)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="marca">Sole Paris</div>
+  <div class="sub">Mi tratamiento</div>
+</header>
+
+<main id="app"><div class="cargando">Un momento…</div></main>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co';
+const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+const soloNum=s=>String(s||'').replace(/\D/g,'');
+
+/* El texto que la clienta acepta queda GUARDADO con su registro. En datos personales
+   e imágenes no basta con que haya marcado una casilla: tiene que constar qué aceptó. */
+const CONSENT='Autorizo a Sole Paris a tratar mis datos personales y las imágenes y videos '
+ +'que yo cargue, con la finalidad de hacer seguimiento a mi tratamiento y, si lo apruebo '
+ +'previamente y por escrito, usarlos como caso de éxito. Conozco que puedo consultar, '
+ +'actualizar, rectificar o solicitar la supresión de mis datos escribiendo a Sole Paris.';
+
+let YO=null, PROGS=[], PRODS=[], FID=[], AVA=[];
+
+async function api(q,o={}){
+  try{ const r=await fetch(SB+'/rest/v1/'+q,{headers:H,...o});
+    if(!r.ok) return o.method?null:[]; const t=await r.text();
+    return t?JSON.parse(t):[]; }catch(e){ return o.method?null:[]; }
+}
+const post=(t,b)=>api(t,{method:'POST',headers:{...H,Prefer:'return=representation'},body:JSON.stringify(b)});
+const patch=(q,b)=>api(q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)});
+
+/* ── entrada: nombre y cédula ─────────────────────────────────────────── */
+function vEntrada(msg){
+  $('app').innerHTML=`
+    <h1 class="serif">Sigue tu tratamiento</h1>
+    <p class="lead">Registra tu avance semana a semana. Por cada foto y cada video ganas
+      descuento para tu próxima compra.</p>
+    <div class="card">
+      <label>Tu nombre completo</label>
+      <input id="e_nom" placeholder="Como aparece en tu cédula" autocomplete="name">
+      <label>Número de cédula</label>
+      <input id="e_ced" inputmode="numeric" placeholder="Sin puntos ni comas" autocomplete="off">
+      <button class="btn" onclick="entrar()">Continuar</button>
+      <div class="err" id="e_err">${msg||''}</div>
+      <div class="hint">Si es tu primera vez, te pediremos unos datos más. Si ya te
+        registraste, entras directo a tu seguimiento.</div>
+    </div>
+    <div class="pie">Tus datos se usan solo para el seguimiento de tu tratamiento.</div>`;
+  if(msg) $('e_err').style.display='block';
+}
+
+async function entrar(){
+  const nom=($('e_nom').value||'').trim(), ced=soloNum($('e_ced').value);
+  if(nom.length<4){ return err('Escribe tu nombre completo.'); }
+  if(ced.length<5){ return err('Revisa el número de cédula.'); }
+  $('app').innerHTML='<div class="cargando">Buscando tu registro…</div>';
+  const r=await api('soleparis_paciente?cedula=eq.'+encodeURIComponent(ced));
+  if(r&&r.length){
+    YO=r[0];
+    localStorage.setItem('sp_ced',ced);
+    return cargar();
+  }
+  vDatos(nom,ced);
+}
+function err(m){ const e=$('e_err'); if(e){ e.textContent=m; e.style.display='block'; } }
+
+/* ── primera vez: datos y consentimiento ──────────────────────────────── */
+async function vDatos(nom,ced){
+  if(!PROGS.length){
+    [PROGS,PRODS]=await Promise.all([
+      api('soleparis_fideliza?activo=is.true&order=kit_nombre'),
+      api('soleparis_productos?select=id,nombre,precio_venta&limit=100')]);
+  }
+  $('app').innerHTML=`
+    <h1 class="serif">Bienvenida</h1>
+    <p class="lead">Es tu primera vez. Cuéntanos cómo contactarte y qué kit estás usando.</p>
+    <div class="card">
+      <label>Nombre completo</label><input id="d_nom" value="${esc(nom)}">
+      <label>Cédula</label><input id="d_ced" value="${esc(ced)}" readonly style="background:var(--suave)">
+      <label>Dirección</label><input id="d_dir" placeholder="Dónde recibes tus pedidos">
+      <div class="g2">
+        <div><label>Teléfono</label><input id="d_tel" inputmode="tel"></div>
+        <div><label>Celular</label><input id="d_cel" inputmode="tel" placeholder="300 000 0000"></div>
+      </div>
+      <label>Correo</label><input id="d_ema" inputmode="email" placeholder="tucorreo@ejemplo.com">
+      <label>¿Qué tratamiento estás haciendo?</label>
+      <select id="d_kit" onchange="verPrograma()"><option value="">— elige tu tratamiento —</option>
+        ${PROGS.map(k=>`<option value="${k.id}">${esc(k.kit_nombre)}</option>`).join('')}</select>
+      <div id="d_prog"></div>
+      <div class="consent">
+        <input type="checkbox" id="d_ok">
+        <span><b>Autorización de datos e imágenes.</b> ${CONSENT}</span>
+      </div>
+      <button class="btn" onclick="registrar()">Crear mi seguimiento</button>
+      <div class="err" id="d_err"></div>
+    </div>`;
+}
+
+async function registrar(){
+  const g=id=>($(id).value||'').trim();
+  const e=$('d_err'); e.style.display='none';
+  if(!$('d_ok').checked){ e.textContent='Para continuar necesitamos tu autorización.'; e.style.display='block'; return; }
+  if(!g('d_cel')){ e.textContent='Déjanos un celular para poder contactarte.'; e.style.display='block'; return; }
+  if(!$('d_kit').value){ e.textContent='Elige el kit que estás usando.'; e.style.display='block'; return; }
+  const k=PROGS.find(x=>x.id===$('d_kit').value)||{};
+  const row={id:'pa'+Date.now(),nombre:g('d_nom'),cedula:g('d_ced'),direccion:g('d_dir')||null,
+    telefono:g('d_tel')||null,celular:g('d_cel'),email:g('d_ema')||null,
+    programa_id:k.id||null,kit_nombre:k.kit_nombre||null,productos:k.productos||[],
+    consentimiento:true,consentimiento_en:new Date().toISOString(),consentimiento_txt:CONSENT,
+    saldo:0,activo:true};
+  const r=await post('soleparis_paciente',row);
+  YO=(Array.isArray(r)?r[0]:r)||row;
+  localStorage.setItem('sp_ced',row.cedula);
+  cargar();
+}
+
+/* ── su seguimiento ───────────────────────────────────────────────────── */
+async function cargar(){
+  [AVA,FID]=await Promise.all([
+    api('soleparis_avance?paciente_id=eq.'+YO.id+'&order=semana.desc,creado_en.desc'),
+    api('soleparis_fideliza?activo=is.true')]);
+  vPanel();
+}
+function miFid(){
+  return FID.find(f=>f.id===YO.programa_id)
+      || FID.find(f=>(f.kit_nombre||'').toUpperCase()===(YO.kit_nombre||'').toUpperCase())
+      || {valor_foto:0,valor_video:0,semanas:12,tope:0};
+}
+/* Al elegir el tratamiento se le muestra QUE lleva y CUANTO gana. Sin eso, la
+   casilla de consentimiento es un tramite; con eso, es una propuesta. */
+function verPrograma(){
+  const k=PROGS.find(x=>x.id===$('d_kit').value), c=$('d_prog');
+  if(!k){ c.innerHTML=''; return; }
+  const ids=Array.isArray(k.productos)?k.productos:[];
+  const li=ids.map(id=>{ const p=PRODS.find(y=>y.id===id); return p?p.nombre:null; }).filter(Boolean);
+  c.innerHTML=`<div style="background:var(--suave);border-radius:10px;padding:14px;margin-top:10px">
+    ${k.promesa?`<div style="font-family:'Cormorant Garamond',serif;font-size:18px;margin-bottom:7px">${esc(k.promesa)}</div>`:''}
+    ${li.length?`<div style="font-size:12.5px;color:var(--tinta2);line-height:1.8">${li.map(x=>'· '+esc(x)).join('<br>')}</div>`:''}
+    <div style="margin-top:10px;font-size:13px;color:var(--acento2);font-weight:500">
+      Ganas ${money(k.valor_foto)} por cada foto y ${money(k.valor_video)} por cada video<br>
+      ${k.tope?`hasta ${money(k.tope)} de descuento en tu próxima compra`:'sin tope de descuento'}</div>
+  </div>`;
+}
+function vPanel(){
+  const f=miFid();
+  const ganado=AVA.filter(a=>a.aprobado!==false).reduce((s,a)=>s+(+a.valor||0),0);
+  const tope=+f.tope||0;
+  const saldo=tope?Math.min(ganado,tope):ganado;
+  const fotos=AVA.filter(a=>a.tipo==='foto').length, vids=AVA.filter(a=>a.tipo==='video').length;
+  const sem=AVA.length?Math.max(...AVA.map(a=>+a.semana||0)):0;
+  const porSem={}; AVA.forEach(a=>{ (porSem[a.semana||0]=porSem[a.semana||0]||[]).push(a); });
+  $('app').innerHTML=`
+    <h1 class="serif">Hola, ${esc((YO.nombre||'').split(' ')[0])}</h1>
+    <p class="lead">${esc(YO.kit_nombre||'Tu tratamiento')} · semana ${sem||1} de ${f.semanas||12}</p>
+    <div class="saldo"><span>Tu descuento acumulado</span><b>${money(saldo)}</b>
+      <span style="opacity:.75;text-transform:none;letter-spacing:0;font-size:12.5px">
+        para tu próxima compra${tope?` · tope ${money(tope)}`:''}</span></div>
+    <div class="kpis">
+      <div class="kpi"><b>${fotos}</b><span>Fotos · ${money(f.valor_foto)} c/u</span></div>
+      <div class="kpi"><b>${vids}</b><span>Videos · ${money(f.valor_video)} c/u</span></div>
+    </div>
+    <div class="card">
+      <h1 class="serif" style="font-size:21px;margin-bottom:3px">Registrar mi avance</h1>
+      <p class="hint" style="margin-bottom:4px">Sube una foto o un video de esta semana.</p>
+      <label>Semana</label>
+      <input id="a_sem" type="number" min="1" max="52" value="${(sem||0)+1}">
+      <label>¿Cómo te fue esta semana?</label>
+      <textarea id="a_nota" placeholder="Qué notaste, cómo sientes tu cabello…"></textarea>
+      <label>Tu foto o video</label>
+      <input type="file" id="a_file" accept="image/*,video/*" onchange="verArchivo()">
+      <div class="hint" id="a_info"></div>
+      <button class="btn" id="a_btn" onclick="subir()">Subir y ganar mi descuento</button>
+      <div class="err" id="a_err"></div>
+    </div>
+    ${AVA.length?`<div class="card">
+      <h1 class="serif" style="font-size:21px;margin-bottom:10px">Mi progreso</h1>
+      ${Object.keys(porSem).sort((a,b)=>b-a).map(s=>`<div class="sem">
+        <div class="n">Semana ${esc(s)}</div>
+        ${porSem[s].map(a=>`
+          <div class="t">${esc(a.nota||(a.tipo==='video'?'Video de avance':'Foto de avance'))}</div>
+          <div class="v">+ ${money(a.valor)} ${a.tipo==='video'?'· video':'· foto'}</div>
+          ${a.url?(a.tipo==='video'
+            ?`<video src="${esc(a.url)}" controls preload="metadata"></video>`
+            :`<img src="${esc(a.url)}" alt="Semana ${esc(s)}" loading="lazy">`):''}`).join('')}
+      </div>`).join('')}
+    </div>`:'<div class="card"><div class="vacio">Todavía no has registrado nada.<br>Tu primera foto ya te da descuento.</div></div>'}
+    <div class="card">
+      <h1 class="serif" style="font-size:19px;margin-bottom:3px">Mis datos</h1>
+      <table class="tabla">
+        <tr><td>Celular</td><td>${esc(YO.celular||'—')}</td></tr>
+        <tr><td>Correo</td><td>${esc(YO.email||'—')}</td></tr>
+        <tr><td>Dirección</td><td>${esc(YO.direccion||'—')}</td></tr>
+        <tr><td>Autorización</td><td><span class="chip">firmada</span></td></tr>
+      </table>
+      <button class="btn gh" onclick="salir()">Salir</button>
+    </div>
+    <div class="pie">Tus fotos solo se usan para tu seguimiento.<br>
+      Si autorizas que sean caso de éxito, te lo pediremos aparte.</div>`;
+}
+function verArchivo(){
+  const f=$('a_file').files[0], i=$('a_info'); if(!f){ i.textContent=''; return; }
+  const mb=f.size/1048576, es=f.type.startsWith('video')?'video':'foto';
+  const v=miFid();
+  i.textContent=`${es==='video'?'Video':'Foto'} de ${mb.toFixed(1)} MB · te dará ${money(es==='video'?v.valor_video:v.valor_foto)}`;
+}
+async function subir(){
+  const inp=$('a_file'), e=$('a_err'), b=$('a_btn');
+  e.style.display='none';
+  const f=inp.files[0];
+  if(!f){ e.textContent='Elige una foto o un video.'; e.style.display='block'; return; }
+  if(f.size>50*1048576){ e.textContent='El archivo pesa más de 50 MB. Intenta con uno más liviano.'; e.style.display='block'; return; }
+  const tipo=f.type.startsWith('video')?'video':'foto';
+  const fid=miFid();
+  const valor=tipo==='video'?(+fid.valor_video||0):(+fid.valor_foto||0);
+  b.disabled=true; b.textContent='Subiendo…';
+  const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+  const ruta='soleparis/avance/'+YO.id+'_'+Date.now()+'.'+ext;
+  let url=null;
+  try{
+    const r=await fetch(SB+'/storage/v1/object/documentos/'+ruta,
+      {method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':f.type||'application/octet-stream'},body:f});
+    if(r.ok) url=SB+'/storage/v1/object/public/documentos/'+ruta;
+  }catch(ex){}
+  if(!url){ b.disabled=false; b.textContent='Subir y ganar mi descuento';
+    e.textContent='No pudimos subir el archivo. Revisa tu conexión e intenta otra vez.'; e.style.display='block'; return; }
+  await post('soleparis_avance',{id:'av'+Date.now(),paciente_id:YO.id,
+    semana:+$('a_sem').value||1,tipo:tipo,url:url,nota:($('a_nota').value||'').trim()||null,
+    valor:valor,aprobado:true});
+  /* El saldo se guarda en el registro para que Sole Paris lo vea sin recalcular. */
+  const nuevo=AVA.reduce((s,a)=>s+(+a.valor||0),0)+valor;
+  await patch('soleparis_paciente?id=eq.'+YO.id,{saldo:nuevo});
+  YO.saldo=nuevo;
+  await cargar();
+}
+function salir(){ localStorage.removeItem('sp_ced'); YO=null; vEntrada(); }
+
+/* Si ya entró antes en este teléfono, no se le vuelve a pedir la cédula. */
+(async()=>{
+  const ced=localStorage.getItem('sp_ced');
+  if(ced){
+    const r=await api('soleparis_paciente?cedula=eq.'+encodeURIComponent(ced));
+    if(r&&r.length){ YO=r[0]; return cargar(); }
+  }
+  vEntrada();
+})();
+</script>
+</body>
+</html>
