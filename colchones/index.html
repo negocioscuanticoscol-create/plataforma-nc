@@ -926,4 +926,5 @@ App.arranca();
      van aparte, pero el tiempo se le carga a Nido. -->
 <script src="../assets/notas.js"></script>
 <script src="../assets/horas.js"></script>
-<script>try{Notas.montar('colchones',App.rol==='admin');Horas.montar('nido','Colchones Nido',App.rol==='admin')}catch(e){}</script>
+<script>try{var ok=function(){return App.rol==='admin'};
+Notas.montar('colchones',ok);Horas.montar('nido','Colchones Nido',ok)}catch(e){}</script>

@@ -3234,9 +3234,9 @@ window.addEventListener('DOMContentLoaded',()=>App.init());
 
 <!-- Bloc de notas: los pendientes de José en esta app. Solo aparece para él. -->
 <script src="../assets/notas.js"></script>
-<script>try{Notas.montar('kruh',App.rol==='admin')}catch(e){}</script>
+<script>try{Notas.montar('kruh',function(){return App.rol==='admin'})}catch(e){}</script>
 
 <!-- Horas: el tiempo que NC le trabaja a este negocio. Va a nc_hora, la misma tabla
      de todas las apps, y el Centro de Mando lo suma sin registrar dos veces. -->
 <script src="../assets/horas.js"></script>
-<script>try{Horas.montar('kruh','Kruh',App.rol==='admin')}catch(e){}</script>
+<script>try{Horas.montar('kruh','Kruh',function(){return App.rol==='admin'})}catch(e){}</script>

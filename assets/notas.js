@@ -191,6 +191,19 @@
       } catch (e) { return false; }
     },
     montar: function (nombreApp, permitido) {
+      /* El permiso puede llegar despues: varias apps piden clave y solo ahi se sabe
+         quien entro. Si viene una funcion, se le vuelve a preguntar hasta 30 segundos
+         en vez de decidir una sola vez al cargar y dejar la pestana sin aparecer. */
+      if (typeof permitido === 'function') {
+        var veces = 0, self = this, args = arguments;
+        (function reintenta() {
+          var ok = false;
+          try { ok = !!permitido(); } catch (e) { ok = false; }
+          if (ok) return self.montar(args[0], true);
+          if (++veces < 45) setTimeout(reintenta, 700);
+        })();
+        return;
+      }
       if (!permitido) return;
       app = nombreApp;
       var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
