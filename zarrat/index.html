@@ -467,7 +467,10 @@ const UNIDS=['unidad','metro','decímetro','pie cuadrado','par','juego','gramo',
 /* La categoria del MATERIAL es el tipo de material, no el producto que se va a hacer:
    un proveedor vende cueros y otro herrajes, y en la hoja de costos se busca asi. */
 const CATMAT=['Cueros','Telas y forros','Herrajes','Cremalleras','Suelas y plantillas',
-              'Hilos','Pegantes y químicos','Empaque','Otros'];
+              'Hilos','Pegantes y químicos','Empaque','Mano de obra y maquila','Otros'];
+/* La maquila entra como proveedor: es la misma relación -le encargas, te cobra- y
+   cuando suba el armado se repreciar igual que el cuero, en un solo sitio. */
+const CATMO='Mano de obra y maquila';
 let COSPROD=null, COSITEMS=[], COSBASE=[];
 async function vCostos(){
   CAT=await get('zarrat_catalogo?order=nombre.asc&limit=300');
@@ -502,12 +505,13 @@ function costoHoja(p){
   const G='grid-template-columns:1.25fr .85fr 96px 92px 66px 92px auto';
   /* El material se elige del maestro de Proveedores: asi el precio y la unidad entran
      solos y queda escrito a quien se le compra. Escribirlo a mano volvia a perder eso. */
-  const selMat=x=>{
-    const gr={}; (MATS||[]).forEach(m=>{ (gr[m.categoria||'Otros']=gr[m.categoria||'Otros']||[]).push(m); });
+  const selMat=(x,soloMO)=>{
+    const gr={}; (MATS||[]).filter(m=>soloMO?(m.categoria===CATMO):(m.categoria!==CATMO))
+      .forEach(m=>{ (gr[m.categoria||'Otros']=gr[m.categoria||'Otros']||[]).push(m); });
     const act=(MATS||[]).find(m=>m.id===x.material_id)
            || (MATS||[]).find(m=>(m.nombre||'').trim().toLowerCase()===(x.nombre||'').trim().toLowerCase());
     let h=`<select onchange="costoMat(${x.id},this.value)">`;
-    h+=`<option value=""${act?'':' selected'}>${esc(x.nombre||'— elige material —')}</option>`;
+    h+=`<option value=""${act?'':' selected'}>${esc(x.nombre||(soloMO?'— elige el taller —':'— elige material —'))}</option>`;
     Object.keys(gr).sort().forEach(g=>{
       h+=`<optgroup label="${esc(g)}">`;
       gr[g].forEach(m=>{ const et=[m.nombre,m.calibre,m.color].filter(Boolean).join(' · ');
@@ -519,8 +523,8 @@ function costoHoja(p){
     const v=(PROV||[]).find(y=>y.id===m.proveedor_id);
     return v?esc(v.nombre):'<span class="dim">sin proveedor</span>'; };
   const fila=x=>`<div style="display:grid;${G};gap:6px;align-items:center;margin-bottom:5px">
-    ${x.grupo==='material'?selMat(x):`<input value="${esc(x.nombre||'')}" onchange="costoSet(${x.id},'nombre',this.value)">`}
-    <span style="font-size:11.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${x.grupo==='material'?provDe(x):'<span class="dim">taller</span>'}</span>
+    ${selMat(x, x.grupo==='mano_obra')}
+    <span style="font-size:11.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${provDe(x)}</span>
     <select onchange="costoSet(${x.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===x.unidad?'selected':''}>${u}</option>`).join('')}</select>
     <input type="number" value="${+x.valor_unit||0}" title="Valor unitario" onchange="costoSet(${x.id},'valor_unit',this.value)">
     <input type="number" step="0.01" value="${+x.cantidad||1}" title="Cantidad" onchange="costoSet(${x.id},'cantidad',this.value)">
