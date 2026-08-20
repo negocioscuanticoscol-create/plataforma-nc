@@ -19,7 +19,10 @@
   .hd .quien{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a49a86}
   /* ---- nav ---- */
   nav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;overflow-x:auto}
-  .nv{max-width:900px;margin:0 auto;display:flex;gap:2px;padding:0 10px}
+  .nv{max-width:900px;margin:0 auto;padding:0 10px}
+  .nvfila{display:flex;gap:2px;overflow-x:auto}
+  .nvfila+.nvfila{border-top:1px solid var(--line2)}
+  .nvfila+.nvfila button{padding:10px 12px;font-size:12px}
   nav button{flex:0 0 auto;background:none;border:none;padding:13px 12px;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap;font-family:inherit}
   nav button.on{color:var(--ink);border-bottom-color:var(--acc)}
   /* ---- generales ---- */
@@ -126,10 +129,16 @@ const post=(t,b,pref)=>fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefe
 const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)});
 const del=(t,q)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'DELETE',headers:H});
 
-const TABS=[['pend','🏗️ Estructuración'],['gastos','💰 Gastos'],['clientes','👥 Clientes'],['medidas','📐 Medidas'],
-            ['catalogo','🖼️ Catálogo'],['prov','🚚 Proveedores'],['costos','🧵 Costos'],['cotiz','📋 Cotizaciones'],['pedidos','🧾 Pedidos'],['horas','⏱️ Horas'],['ventas','🛒 Ventas'],['crm','📇 CRM']];
+/* Dos filas: arriba lo que se ARMA (el taller), abajo lo que se VENDE (la calle).
+   Buscar «costos» y «cotizaciones» en la misma tira era lo que hacía perder el hilo. */
+const TABS_ARMA=[['pend','🏗️ Estructura'],['gastos','💰 Gastos'],['prov','🚚 Proveedores'],
+                 ['costos','🧵 Costos'],['catalogo','🖼️ Catálogo'],['medidas','📐 Medidas']];
+const TABS_VENDE=[['horas','⏱️ Horas'],['clientes','👥 Clientes'],['crm','📇 CRM'],
+                  ['cotiz','📋 Cotizaciones'],['pedidos','🧾 Pedidos'],['ventas','🛒 Ventas']];
+const TABS=[...TABS_ARMA,...TABS_VENDE];
 let TAB='pend', CLI=[], PRENDAS=[], CAT=[];
-$('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('');
+const _tira=T=>'<div class="nvfila">'+T.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('')+'</div>';
+$('nav').innerHTML=_tira(TABS_ARMA)+_tira(TABS_VENDE);
 function go(t){
   TAB=t; TABS.forEach(([v])=>{const b=$('t_'+v); if(b)b.className=(v===t?'on':'');});
   const V={pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,prov:vProv,costos:vCostos,cotiz:vCotiz,pedidos:vPedidos,horas:vHoras,ventas:vVentas,crm:vCrm}[t];
