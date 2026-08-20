@@ -309,7 +309,10 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <div style="font-size:12.5px;color:var(--faint);margin-bottom:9px">Entran con nombre y cédula y firman
           la autorización una sola vez. Después entran solo con la cédula.</div>
         <input class="field" readonly value="${this.esc(link)}" onclick="this.select()">
-        <button class="btn" onclick="App.copiarLink('${this.esc(link)}')">Copiar enlace</button>
+        <div style="display:flex;gap:7px">
+          <button class="btn" style="flex:1" onclick="App.copiarLink('${this.esc(link)}')">Copiar enlace</button>
+          <button class="btn gh2" onclick="App.abrirLink('${this.esc(link)}')">Abrir</button>
+        </div>
       </div>
 
       <div class="kpis">
@@ -422,6 +425,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
 `);
   },
   copiarLink(l){ navigator.clipboard.writeText(l).then(()=>this.toast('Enlace copiado')); },
+  /* Abre siempre la version recien publicada: sin el ?v el navegador reusa la copia
+     que guardo y uno cree que el cambio no se hizo. */
+  abrirLink(l){ window.open(l+(l.includes('?')?'&':'?')+'v='+Date.now(),'_blank','noopener'); },
   pacAbrir(id){ this._pacSel=(this._pacSel===id?null:id); this.vFidelizacion(); },
   pacAbrir2(id){ this._pacSel=(this._pacSel===id?null:id); this.vCasos(); },
   _kfil:'',
@@ -652,7 +658,10 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
           clientas llevan su tratamiento y suben sus fotos. De ahí salen los antes y después que
           después se publican acá — con su autorización.</div>
         <input class="field" readonly value="${this.esc(link)}" onclick="this.select()">
-        <button class="btn" onclick="App.copiarLink('${this.esc(link)}')">Copiar enlace</button>
+        <div style="display:flex;gap:7px">
+          <button class="btn" style="flex:1" onclick="App.copiarLink('${this.esc(link)}')">Copiar enlace</button>
+          <button class="btn gh2" onclick="App.abrirLink('${this.esc(link)}')">Abrir</button>
+        </div>
       </div>
       ${(this._pacs||[]).length?(()=>{
         const av=id=>(this._ava||[]).filter(a=>a.paciente_id===id);
