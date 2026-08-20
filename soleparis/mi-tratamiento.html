@@ -79,15 +79,12 @@
     transition:color .12s,transform .1s}
   .estrellas span:active{transform:scale(.85)}
   .estrellas span.on{color:#dd9a2b}
-  /* Un boton por tipo: la clienta no tiene que adivinar si el archivo que eligio
-     cuenta como foto o como video - y el video, que es lo que mas paga, se ve. */
-  .sube{display:flex;flex-direction:column;align-items:center;gap:3px;padding:15px 8px;
-    border:1px solid var(--linea);border-radius:11px;background:var(--papel);cursor:pointer;
-    font-family:inherit;color:var(--tinta);transition:border-color .12s,background .12s}
-  .sube .ic{font-size:26px;line-height:1}
-  .sube b{font-size:14px;font-weight:500}
-  .sube i{font-style:normal;font-size:12.5px;color:var(--acento2)}
-  .sube.on{border-color:var(--acento);background:var(--suave)}
+  /* El video de testimonio va en su propia tarjeta con el valor a la vista: es lo
+     que mas paga y lo que mas cuesta que la clienta se anime a grabar. */
+  .premio{background:var(--suave);border-radius:10px;padding:14px;text-align:center;margin:12px 0}
+  .premio b{display:block;font-family:'Cormorant Garamond',serif;font-size:31px;font-weight:600;
+    line-height:1;color:var(--acento2)}
+  .premio span{font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--tenue)}
   .hide{display:none!important}
   .cargando{text-align:center;padding:40px;color:var(--tenue)}
 </style>
@@ -126,7 +123,7 @@ const CONSENT='Autorizo a Sole Paris a tratar mis datos personales y las imágen
  +'previamente y por escrito, usarlos como caso de éxito. Conozco que puedo consultar, '
  +'actualizar, rectificar o solicitar la supresión de mis datos escribiendo a Sole Paris.';
 
-let YO=null, PROGS=[], PRODS=[], FID=[], AVA=[], REDS=[], CANALES=[], ESTRELLAS=0;
+let YO=null, PROGS=[], PRODS=[], FID=[], AVA=[], REDS=[], CANALES=[], ESTRELLAS=0, PASO=0, SEMVID=0;
 
 async function api(q,o={}){
   try{ const r=await fetch(SB+'/rest/v1/'+q,{headers:H,...o});
@@ -317,12 +314,14 @@ function vPanel(){
     </div>`; };
   const fotos=AVA.filter(a=>a.tipo==='foto').length, vids=AVA.filter(a=>a.tipo==='video').length;
   const sem=AVA.length?Math.max(...AVA.map(a=>+a.semana||0)):0;
-  const hayAntes=AVA.some(a=>+a.semana===0);
-  const prox=Math.min(sem+1,+f.semanas||12);
+  /* Mientras no exista la foto de antes, todo lo que se pida es esa. Despues la
+     semana la calcula el sistema: la clienta entra y sube, no busca en cual va. */
+  const hayAntes=AVA.some(a=>+a.semana===0&&a.tipo==='foto');
+  PASO=hayAntes?sem+1:0; SEMVID=sem;
   const porSem={}; AVA.forEach(a=>{ (porSem[a.semana||0]=porSem[a.semana||0]||[]).push(a); });
   $('app').innerHTML=`
     <h1 class="serif">Hola, ${esc((YO.nombre||'').split(' ')[0])}</h1>
-    <p class="lead">${esc(YO.kit_nombre||'Tu tratamiento')} · ${hayAntes&&!sem?'recién empezando':'semana '+(sem||1)+' de '+(f.semanas||12)}</p>
+    <p class="lead">${esc(YO.kit_nombre||'Tu tratamiento')} · ${hayAntes?'semana '+(sem||1)+' de '+(f.semanas||12):'aún no has empezado'}</p>
     <div class="saldo"><span>Tu descuento acumulado</span><b>${money(saldo)}</b>
       <span style="opacity:.75;text-transform:none;letter-spacing:0;font-size:12.5px">
         ${saldo?`para tu próxima compra${tope?` · tope ${money(tope)}`:''}`
@@ -339,30 +338,29 @@ function vPanel(){
       <div class="kpi"><b>${vids}</b><span>Videos · ${money(f.valor_video)} c/u</span></div>
     </div>
     <div class="card">
-      <h1 class="serif" style="font-size:21px;margin-bottom:3px">Registrar mi avance</h1>
-      <p class="hint" style="margin-bottom:4px">Sube una foto o un video de esta semana.</p>
-      <label>¿De cuándo es?</label>
-      <select id="a_sem">
-        <option value="0"${hayAntes?'':' selected'}>Antes de empezar · mi foto inicial</option>
-        ${Array.from({length:(+f.semanas||12)},(_,k)=>k+1).map(w=>
-          `<option value="${w}"${hayAntes&&w===prox?' selected':''}>Semana ${w}</option>`).join('')}
-      </select>
-      ${hayAntes?'':`<div class="hint" style="color:var(--acento2)">Empieza por tu foto de antes:
-        es la que hace que se note el cambio.</div>`}
-      <label>¿Cómo te fue esta semana?</label>
-      <textarea id="a_nota" placeholder="Qué notaste, cómo sientes tu cabello…"></textarea>
-      <label>¿Qué vas a subir?</label>
-      <div class="g2">
-        <button type="button" class="sube" id="sb_foto" onclick="pedir('foto')">
-          <span class="ic">📷</span><b>Subir foto</b><i>+ ${money(f.valor_foto)}</i></button>
-        <button type="button" class="sube" id="sb_video" onclick="pedir('video')">
-          <span class="ic">🎥</span><b>Subir video</b><i>+ ${money(f.valor_video)}</i></button>
-      </div>
-      <input type="file" id="a_foto" accept="image/*" style="display:none" onchange="verArchivo('foto')">
-      <input type="file" id="a_video" accept="video/*" style="display:none" onchange="verArchivo('video')">
-      <div class="hint" id="a_info">El video de 10 a 20 segundos es el que más paga.</div>
-      <button class="btn" id="a_btn" onclick="subir()" disabled>Elige foto o video</button>
-      <div class="err" id="a_err"></div>
+      <h1 class="serif" style="font-size:21px;margin-bottom:3px">${PASO===0
+        ? 'Sube tu foto antes de iniciar el tratamiento'
+        : 'Mi foto de la semana '+PASO}</h1>
+      <p class="hint" style="margin-bottom:4px">${PASO===0
+        ? 'Es la foto con la que vamos a comparar todo lo que venga después.'
+        : 'Ya subiste hasta la semana '+sem+'. Esta es la que sigue.'}</p>
+      ${PASO===0?'':`<label>¿Cómo te fue esta semana?</label>
+      <textarea id="a_nota" placeholder="Qué notaste, cómo sientes tu cabello…"></textarea>`}
+      <label>${PASO===0?'Mi foto de antes':'Mi foto de esta semana'}</label>
+      <input type="file" id="a_foto" accept="image/*" onchange="verArchivo('foto')">
+      <div class="hint" id="i_foto">Te da ${money(f.valor_foto)}.</div>
+      <button class="btn" id="b_foto" onclick="subir('foto')">Subir y ganar mi descuento</button>
+      <div class="err" id="e_foto"></div>
+    </div>
+
+    <div class="card">
+      <h1 class="serif" style="font-size:21px;margin-bottom:3px">Mi video de testimonio</h1>
+      <p class="hint">De 10 a 20 segundos contando cómo te ha ido. Puedes subir uno cuando quieras.</p>
+      <div class="premio"><b>+ ${money(f.valor_video)}</b><span>por cada video</span></div>
+      <input type="file" id="a_video" accept="video/*" onchange="verArchivo('video')">
+      <div class="hint" id="i_video"></div>
+      <button class="btn gh" id="b_video" onclick="subir('video')">Subir mi video</button>
+      <div class="err" id="e_video"></div>
     </div>
     ${AVA.length?`<div class="card">
       <h1 class="serif" style="font-size:21px;margin-bottom:10px">Mi progreso</h1>
@@ -391,27 +389,18 @@ function vPanel(){
     <div class="pie">Tus fotos solo se usan para tu seguimiento.<br>
       Si autorizas que sean caso de éxito, te lo pediremos aparte.</div>`;
 }
-let TIPOSEL=null;
-function pedir(t){ document.getElementById('a_'+t).click(); }
 function verArchivo(t){
-  const otro=t==='foto'?'video':'foto';
-  $('a_'+otro).value='';   /* uno a la vez: si cambia de idea, no se sube el anterior */
-  document.querySelectorAll('.sube').forEach(x=>x.classList.remove('on'));
-  const f=$('a_'+t).files[0], i=$('a_info'), b=$('a_btn');
-  if(!f){ TIPOSEL=null; i.textContent='El video de 10 a 20 segundos es el que más paga.';
-    b.disabled=true; b.textContent='Elige foto o video'; return; }
-  TIPOSEL=t; $('sb_'+t).classList.add('on');
-  const v=miFid(), mb=f.size/1048576;
-  i.innerHTML=`<b>${esc(f.name)}</b> · ${mb.toFixed(1)} MB — te dará ${money(t==='video'?v.valor_video:v.valor_foto)}`;
-  b.disabled=false; b.textContent=(t==='video'?'Subir mi video':'Subir mi foto')+' y ganar mi descuento';
+  const v=miFid(), val=t==='video'?(+v.valor_video||0):(+v.valor_foto||0);
+  const f=$('a_'+t).files[0], i=$('i_'+t);
+  if(!f){ i.textContent=t==='video'?'':'Te da '+money(val)+'.'; return; }
+  i.innerHTML=`<b>${esc(f.name)}</b> · ${(f.size/1048576).toFixed(1)} MB — te dará ${money(val)}`;
 }
-async function subir(){
-  const e=$('a_err'), b=$('a_btn');
+async function subir(tipo){
+  const e=$('e_'+tipo), b=$('b_'+tipo), inp=$('a_'+tipo);
   e.style.display='none';
-  if(!TIPOSEL){ e.textContent='Toca "Subir foto" o "Subir video" para elegir el archivo.'; e.style.display='block'; return; }
-  const tipo=TIPOSEL, inp=$('a_'+tipo);
   const f=inp.files[0];
-  if(!f){ e.textContent='No quedó ningún archivo elegido. Vuelve a tocar el botón.'; e.style.display='block'; return; }
+  if(!f){ e.textContent=tipo==='video'?'Elige tu video primero.':'Elige tu foto primero.';
+    e.style.display='block'; return; }
   if(f.size>50*1048576){ e.textContent=tipo==='video'
       ? 'El video pesa más de 50 MB. Grábalo más corto (10 a 20 segundos) e intenta otra vez.'
       : 'La foto pesa más de 50 MB. Intenta con una más liviana.';
@@ -428,9 +417,12 @@ async function subir(){
     if(r.ok) url=SB+'/storage/v1/object/public/documentos/'+ruta;
   }catch(ex){}
   if(!url){ b.disabled=false; b.textContent='Intentar otra vez';
+    inp.value='';
     e.textContent='No pudimos subir el archivo. Revisa tu conexión e intenta otra vez.'; e.style.display='block'; return; }
+  const na=$('a_nota');
   await post('soleparis_avance',{id:'av'+Date.now(),paciente_id:YO.id,
-    semana:+$('a_sem').value||0,tipo:tipo,url:url,nota:($('a_nota').value||'').trim()||null,
+    semana:tipo==='video'?SEMVID:PASO,tipo:tipo,url:url,
+    nota:(tipo==='foto'&&na?(na.value||'').trim():'')||null,
     valor:valor,aprobado:true});
   /* El saldo se guarda en el registro para que Sole Paris lo vea sin recalcular. */
   const nuevo=AVA.filter(a=>a.aprobado!==false&&!a.redencion_id)
