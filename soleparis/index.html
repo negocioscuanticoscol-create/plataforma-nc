@@ -284,12 +284,13 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
      que en dermocosmética es lo que de verdad vende. */
   _fcat:'', _fsel:[], _pacSel:null,
   async vFidelizacion(){
-    const [progs,pacs,ava,red]=await Promise.all([
+    const [progs,pacs,ava,red,cans]=await Promise.all([
       this._get('soleparis_fideliza?order=kit_nombre'),
       this._get('soleparis_paciente?order=creado_en.desc&limit=300'),
       this._get('soleparis_avance?order=creado_en.desc&limit=800'),
-      this._get('soleparis_redencion?order=creado_en.desc&limit=200')]);
-    this._progs=progs; this._pacs=pacs; this._ava=ava; this._red=red;
+      this._get('soleparis_redencion?order=creado_en.desc&limit=200'),
+      this._get('soleparis_canal?order=orden')]);
+    this._progs=progs; this._pacs=pacs; this._ava=ava; this._red=red; this._cans=cans;
     const prods=this._prods||[];
     const cats=[...new Set(prods.map(p=>p.categoria).filter(Boolean))].sort();
     const nom=id=>{ const p=prods.find(x=>x.id===id); return p?p.nombre:id; };
@@ -314,6 +315,24 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       <div class="kpis">
         <div class="kpi"><b>${pacs.length}</b><span>Inscritas</span></div>
         <div class="kpi"><b>${this.fmt(porCobrar)}</b><span>Descuentos por cobrar</span></div>
+      </div>
+
+      <h1 style="font-size:18px;margin-top:20px">Canales de compra</h1>
+      <div class="card">
+        <div class="hint" style="margin-top:0;margin-bottom:9px">Es lo que la clienta escoge cuando
+          se registra. Agrega los que falten: mañana abren un canal nuevo y no hay que tocar código.</div>
+        ${cans.map(c=>{ const mios=pacs.filter(x=>x.canal===c.nombre);
+          const cal=mios.filter(x=>x.calificacion);
+          const prom=cal.length?(cal.reduce((s2,x)=>s2+(+x.calificacion||0),0)/cal.length):0;
+          return `<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--line,#eee)">
+            <span style="flex:1;font-size:13.5px${c.activo?'':';opacity:.4;text-decoration:line-through'}">${this.esc(c.nombre)}</span>
+            ${mios.length?`<span class="pchip">${mios.length} clientas</span>`:''}
+            ${prom?`<span class="pchip ${prom>=4?'stock':'cost'}">${'★'.repeat(Math.round(prom))} ${prom.toFixed(1)}</span>`:''}
+            <a onclick="App.canTogg('${c.id}',${!c.activo})" style="cursor:pointer;color:var(--faint);font-size:12px">${c.activo?'ocultar':'activar'}</a>
+          </div>`;}).join('')}
+        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:10px">
+          <input id="cn_n" class="field" placeholder="Ej: Spa · Marketplace · Feria">
+          <button class="btn gh2" onclick="App.canAdd()">+ canal</button></div>
       </div>
 
       <h1 style="font-size:18px;margin-top:20px">Armar un plan de seguimiento</h1>
@@ -422,7 +441,12 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <tr><td style="padding:4px 0;color:var(--faint)">Dirección</td><td style="text-align:right">${this.esc(x.direccion||'—')}</td></tr>
         <tr><td style="padding:4px 0;color:var(--faint)">Inició</td><td style="text-align:right">${this.esc(String(x.inicio||x.creado_en||'').slice(0,10))}</td></tr>
         <tr><td style="padding:4px 0;color:var(--faint)">Autorizó el</td><td style="text-align:right">${this.esc(String(x.consentimiento_en||'').slice(0,10)||'—')}</td></tr>
+        <tr><td style="padding:4px 0;color:var(--faint)">Compró en</td><td style="text-align:right">${this.esc(x.canal||'—')}</td></tr>
+        ${x.calificacion?`<tr><td style="padding:4px 0;color:var(--faint)">Su experiencia</td>
+          <td style="text-align:right;color:var(--accent2)">${'★'.repeat(+x.calificacion)}${'☆'.repeat(5-+x.calificacion)}</td></tr>`:''}
       </table>
+      ${x.comentario?`<div style="background:var(--accent-soft);border-radius:8px;padding:10px 12px;
+        margin-top:8px;font-size:13px;font-style:italic">“${this.esc(x.comentario)}”</div>`:''}
       ${comp.length?`<div style="font-weight:600;font-size:13px;margin-top:11px">Lo que compró</div>
         <table style="width:100%;border-collapse:collapse;font-size:13px">
         ${comp.map(c=>`<tr><td style="padding:4px 0">${this.esc(c.nombre||nom(c.id))}</td>
@@ -482,6 +506,16 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     alert('Código '+cod+' por '+this.fmt(valor)+'. Se anexa a la factura para autorizar el descuento. Vence el '+vence+'.');
     this.vFidelizacion();
   },
+  async canAdd(){
+    const n=(document.getElementById('cn_n').value||'').trim();
+    if(!n){ this.toast('Escribe el nombre del canal'); return; }
+    await this._post('soleparis_canal',{id:'cn'+Date.now(),nombre:n,
+      orden:((this._cans||[]).length+1),activo:true});
+    this.toast('Canal agregado'); this.vFidelizacion();
+  },
+  /* Se ocultan, no se borran: si alguien ya entro por ese canal, borrarlo dejaria
+     su registro apuntando a algo que ya no existe. */
+  async canTogg(id,v){ await this._patch('soleparis_canal?id=eq.'+id,{activo:v}); this.vFidelizacion(); },
   fidCat(c){ this._fcat=c; this._fsel=[]; this.vFidelizacion(); },
   fidTick(id){ const i=this._fsel.indexOf(id);
     if(i<0) this._fsel.push(id); else this._fsel.splice(i,1);

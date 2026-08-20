@@ -63,6 +63,9 @@
   .tabla tr:last-child td{border-bottom:none}
   .vacio{text-align:center;color:var(--tenue);padding:26px 10px;font-size:14px}
   .pie{text-align:center;font-size:11.5px;color:var(--tenue);margin-top:26px;line-height:1.6}
+  .estrellas{display:flex;gap:7px;margin-top:6px}
+  .estrellas span{font-size:31px;line-height:1;color:var(--linea);cursor:pointer;transition:color .12s}
+  .estrellas span.on{color:var(--acento)}
   .hide{display:none!important}
   .cargando{text-align:center;padding:40px;color:var(--tenue)}
 </style>
@@ -95,7 +98,7 @@ const CONSENT='Autorizo a Sole Paris a tratar mis datos personales y las imágen
  +'previamente y por escrito, usarlos como caso de éxito. Conozco que puedo consultar, '
  +'actualizar, rectificar o solicitar la supresión de mis datos escribiendo a Sole Paris.';
 
-let YO=null, PROGS=[], PRODS=[], FID=[], AVA=[];
+let YO=null, PROGS=[], PRODS=[], FID=[], AVA=[], CANALES=[], ESTRELLAS=0;
 
 async function api(q,o={}){
   try{ const r=await fetch(SB+'/rest/v1/'+q,{headers:H,...o});
@@ -164,9 +167,10 @@ function err(m){ const e=$('e_err'); if(e){ e.textContent=m; e.style.display='bl
 /* ── primera vez: datos y consentimiento ──────────────────────────────── */
 async function vDatos(nom,ced){
   if(!PROGS.length){
-    [PROGS,PRODS]=await Promise.all([
+    [PROGS,PRODS,CANALES]=await Promise.all([
       api('soleparis_fideliza?activo=is.true&order=kit_nombre'),
-      api('soleparis_productos?select=id,nombre,precio_venta&limit=100')]);
+      api('soleparis_productos?select=id,nombre,precio_venta&limit=100'),
+      api('soleparis_canal?activo=is.true&order=orden')]);
   }
   $('app').innerHTML=`
     <h1 class="serif">Bienvenida</h1>
@@ -184,6 +188,16 @@ async function vDatos(nom,ced){
       <select id="d_kit" onchange="verPrograma()"><option value="">— elige tu tratamiento —</option>
         ${PROGS.map(k=>`<option value="${k.id}">${esc(k.kit_nombre)}</option>`).join('')}</select>
       <div id="d_prog"></div>
+      <label>¿Dónde compraste?</label>
+      <select id="d_can"><option value="">— elige —</option>
+        ${CANALES.map(c=>`<option>${esc(c.nombre)}</option>`).join('')}</select>
+      <label>¿Cómo fue tu experiencia de compra?</label>
+      <div class="estrellas" id="d_est">
+        ${[1,2,3,4,5].map(i=>`<span onclick="calificar(${i})" data-i="${i}">★</span>`).join('')}
+      </div>
+      <div class="hint" id="d_esttxt">Tócalas para calificar</div>
+      <label>¿Algo que quieras contarnos?</label>
+      <textarea id="d_com" placeholder="Opcional"></textarea>
       <div class="consent">
         <input type="checkbox" id="d_ok">
         <span><b>Autorización de datos e imágenes.</b> ${CONSENT}</span>
@@ -204,6 +218,8 @@ async function registrar(){
   const row={id:'pa'+Date.now(),nombre:g('d_nom'),cedula:g('d_ced'),direccion:g('d_dir')||null,
     telefono:g('d_tel')||null,celular:g('d_cel'),email:g('d_ema')||null,
     programa_id:k.id||null,kit_nombre:k.kit_nombre||null,productos:k.productos||[],
+    canal:($('d_can').value||null),calificacion:ESTRELLAS||null,
+    comentario:($('d_com').value||'').trim()||null,
     consentimiento:true,consentimiento_en:new Date().toISOString(),consentimiento_txt:CONSENT,
     saldo:0,activo:true};
   const r=await post('soleparis_paciente',row);
@@ -226,6 +242,13 @@ function miFid(){
 }
 /* Al elegir el tratamiento se le muestra QUE lleva y CUANTO gana. Sin eso, la
    casilla de consentimiento es un tramite; con eso, es una propuesta. */
+const TXTEST=['','Mala','Regular','Buena','Muy buena','Excelente'];
+function calificar(i){
+  ESTRELLAS=i;
+  document.querySelectorAll('#d_est span').forEach(s=>
+    s.classList.toggle('on', (+s.dataset.i)<=i));
+  const t=$('d_esttxt'); if(t) t.textContent=TXTEST[i];
+}
 function verPrograma(){
   const k=PROGS.find(x=>x.id===$('d_kit').value), c=$('d_prog');
   if(!k){ c.innerHTML=''; return; }
