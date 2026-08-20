@@ -344,11 +344,12 @@ async function vProv(){
     <div class="sub">${PROV.length} proveedores · ${MATS.length} materiales. De acá salen los materiales de la hoja de costos.</div>
     <div class="card">
       <div class="g3"><div><label>Proveedor</label><input id="pv_n" placeholder="Ej: Marroquinero Restrepo"></div>
-        <div><label>Contacto</label><input id="pv_c" placeholder="Con quién se habla"></div>
-        <div><label>Teléfono</label><input id="pv_t" placeholder="310 000 0000"></div></div>
-      <div class="g3"><div><label>Dirección</label><input id="pv_d"></div>
-        <div><label>Ciudad</label><input id="pv_ci" placeholder="Bogotá"></div>
-        <div><label>Correo</label><input id="pv_e"></div></div>
+        <div><label>Tipo</label><select id="pv_tp">${TIPOPROV.map(t=>`<option>${t}</option>`).join('')}</select></div>
+        <div><label>Contacto</label><input id="pv_c" placeholder="Con quién se habla"></div></div>
+      <div class="g3"><div><label>Teléfono</label><input id="pv_t" placeholder="310 000 0000"></div>
+        <div><label>Dirección</label><input id="pv_d"></div>
+        <div><label>Ciudad</label><input id="pv_ci" placeholder="Bogotá"></div></div>
+      <div><label>Correo</label><input id="pv_e"></div>
       <label>Notas</label><input id="pv_no" placeholder="Días de entrega, mínimos, formas de pago…">
       <button class="btn acc full" onclick="provAdd()">+ Agregar proveedor</button>
     </div>
@@ -359,11 +360,12 @@ async function vProv(){
       <div style="border:1px dashed var(--acc);border-radius:9px;padding:11px;background:#faf7f1">
         <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--acc);margin-bottom:8px">EDITANDO PROVEEDOR</div>
         <div class="g3"><div><label>Proveedor</label><input id="pe_n_${v.id}" value="${esc(v.nombre||'')}"></div>
-          <div><label>Contacto</label><input id="pe_c_${v.id}" value="${esc(v.contacto||'')}"></div>
-          <div><label>Teléfono</label><input id="pe_t_${v.id}" value="${esc(v.telefono||'')}"></div></div>
-        <div class="g3"><div><label>Dirección</label><input id="pe_d_${v.id}" value="${esc(v.direccion||'')}"></div>
-          <div><label>Ciudad</label><input id="pe_ci_${v.id}" value="${esc(v.ciudad||'')}"></div>
-          <div><label>Correo</label><input id="pe_e_${v.id}" value="${esc(v.email||'')}"></div></div>
+          <div><label>Tipo</label><select id="pe_tp_${v.id}">${TIPOPROV.map(t=>`<option ${t===(v.tipo||'Proveedor')?'selected':''}>${t}</option>`).join('')}</select></div>
+          <div><label>Contacto</label><input id="pe_c_${v.id}" value="${esc(v.contacto||'')}"></div></div>
+        <div class="g3"><div><label>Teléfono</label><input id="pe_t_${v.id}" value="${esc(v.telefono||'')}"></div>
+          <div><label>Dirección</label><input id="pe_d_${v.id}" value="${esc(v.direccion||'')}"></div>
+          <div><label>Ciudad</label><input id="pe_ci_${v.id}" value="${esc(v.ciudad||'')}"></div></div>
+        <div><label>Correo</label><input id="pe_e_${v.id}" value="${esc(v.email||'')}"></div>
         <label>Notas</label><input id="pe_no_${v.id}" value="${esc(v.notas||'')}" placeholder="Días de entrega, mínimos, formas de pago…">
         <div style="display:flex;gap:8px;margin-top:11px">
           <button class="btn acc" onclick="provSave(${v.id})">Guardar cambios</button>
@@ -371,7 +373,10 @@ async function vProv(){
           <button class="btn gh" style="margin-left:auto;color:var(--bad)" onclick="provDel(${v.id})">Quitar proveedor</button></div>
       </div>`:`
       <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
-        <div><h2 style="margin:0">${esc(v.nombre)}</h2>
+        <div><h2 style="margin:0">${esc(v.nombre)}
+          <span class="chip" style="font-size:10.5px;vertical-align:middle;margin-left:6px;background:${
+            v.tipo==='Maquilador'?'var(--acc)':'var(--line)'};color:${v.tipo==='Maquilador'?'#fff':'var(--ink2)'};
+            padding:2px 9px;border-radius:20px;font-weight:700">${esc(v.tipo||'Proveedor')}</span></h2>
           <div class="hint">${[v.contacto,v.telefono,v.ciudad,v.direccion,v.email].filter(Boolean).map(esc).join(' · ')||'sin datos de contacto'}</div>
           ${v.notas?`<div class="hint">${esc(v.notas)}</div>`:''}</div>
         <div style="display:flex;gap:6px;flex:none">
@@ -413,7 +418,8 @@ async function vProv(){
 }
 async function provAdd(){
   const nom=($('pv_n').value||'').trim(); if(!nom){ alert('Falta el nombre del proveedor'); return; }
-  await post('zarrat_proveedores',{nombre:nom,contacto:$('pv_c').value.trim(),telefono:$('pv_t').value.trim(),
+  await post('zarrat_proveedores',{nombre:nom,tipo:($('pv_tp')||{}).value||'Proveedor',
+    contacto:$('pv_c').value.trim(),telefono:$('pv_t').value.trim(),
     direccion:$('pv_d').value.trim(),ciudad:$('pv_ci').value.trim(),email:$('pv_e').value.trim(),
     notas:$('pv_no').value.trim()||null,activo:true},'return=minimal');
   vProv();
@@ -422,7 +428,8 @@ function provEdit(id){ PROVEDIT=id; vProv(); }
 async function provSave(id){
   const g=k=>(($('pe_'+k+'_'+id)||{}).value||'').trim();
   const nom=g('n'); if(!nom){ alert('El proveedor necesita nombre'); return; }
-  await patch('zarrat_proveedores','id=eq.'+id,{nombre:nom,contacto:g('c'),telefono:g('t'),
+  await patch('zarrat_proveedores','id=eq.'+id,{nombre:nom,
+    tipo:(($('pe_tp_'+id)||{}).value)||'Proveedor',contacto:g('c'),telefono:g('t'),
     direccion:g('d'),ciudad:g('ci'),email:g('e'),notas:g('no')||null});
   PROVEDIT=null; vProv();
 }
@@ -471,6 +478,9 @@ const CATMAT=['Cueros','Telas y forros','Herrajes','Cremalleras','Suelas y plant
 /* La maquila entra como proveedor: es la misma relación -le encargas, te cobra- y
    cuando suba el armado se repreciar igual que el cuero, en un solo sitio. */
 const CATMO='Mano de obra y maquila';
+/* Quien vende material y quien maquila no se manejan igual: al maquilador se le
+   programa y se le paga por prenda, al proveedor se le pide y se le recibe. */
+const TIPOPROV=['Proveedor','Maquilador','Ambos'];
 let MODS=[], MODMAT=[], REFS=[], REFMAT=[], MODSEL=null, REFSEL=null;
 async function vCostos(){
   [MODS,MATS,PROV]=await Promise.all([
