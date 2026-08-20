@@ -2142,4 +2142,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
 
 <!-- Bloc de notas: los pendientes de José en esta app. Solo aparece para él. -->
 <script src="../assets/notas.js"></script>
-<script>try{Notas.montar('nido',App.rol==='admin')}catch(e){}</script>
+<!-- Horas: el tiempo que NC le trabaja a este negocio. Va a nc_hora, la misma
+     tabla de todas las apps, y el Centro de Mando lo suma sin registrar dos veces. -->
+<script src="../assets/horas.js"></script>
+<script>try{Notas.montar('nido',App.rol==='admin');Horas.montar('nido','Colchones Nido',App.rol==='admin')}catch(e){}</script>

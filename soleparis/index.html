@@ -1327,5 +1327,11 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
 };
 (function(){ const r=sessionStorage.getItem('sole_rol'); if(r&&Object.values(App.PASS).includes(r)){ App.rol=r; App._start(); } else { setTimeout(()=>{const e=document.getElementById('lg');if(e)e.focus();},80); } })();
 </script>
+
+<!-- Bloc de notas y Horas de Sole Paris. Al migrar la clienta a su propia cuenta,
+     estas dos lineas se quitan: son de NC, no del negocio. -->
+<script src="../assets/notas.js"></script>
+<script src="../assets/horas.js"></script>
+<script>try{Notas.montar('sole',App.esAdmin());Horas.montar('sole','Sole Paris',App.esAdmin())}catch(e){}</script>
 </body>
 </html>

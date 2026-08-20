@@ -1112,7 +1112,11 @@ const App = {
     this._toast('✅ Referencia creada: '+sku+' ('+cols.join(', ')+')');
     this.vPlantaSmart();
   },
-  async invIngresar(){
+  /* Este es el ingreso de la planta de Smart, no el de CED. Se llamaba igual que
+     el de abajo y quedaba tapado: dos metodos con el mismo nombre en el mismo
+     objeto y gana el ultimo, sin avisar. Hoy no lo llama nadie -CED entra siempre
+     como 'feroz'- pero con el nombre repetido, el dia que se use, no funciona. */
+  async invIngresarPlantaSmart(){
     const sku=$('inv_sku').value, color=$('inv_color').value, cant=+($('inv_cant').value||0);
     if(!sku||!color){ alert('Elige SKU y color.'); return; }
     const r=(this._plRefs||[]).find(c=>c.sku===sku)||{};

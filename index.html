@@ -180,6 +180,7 @@
 <!-- Bloc de notas. Esta app sirve a dos marcas, asi que cada una lleva su
      propia libreta: las notas de Feroz no se mezclan con las de Smart. -->
 <script src="assets/notas.js"></script>
+<script src="assets/horas.js"></script>
 <script>
 /* App entra por document.write y el login es asincrono, asi que se espera a que
    haya sesion antes de decidir si el bloc aparece. */
@@ -189,7 +190,9 @@
       var yo=(App.user.email)||'';
       var jefe=['jrcalderon@me.com','negocioscuanticoscol@gmail.com'].indexOf(yo)>=0
         || (App.perfil&&['admin','director'].indexOf(App.perfil.rol)>=0);
-      Notas.montar(window.NC_EMPRESA||'feroz', !!jefe);
+      var emp=window.NC_EMPRESA||'feroz';
+      Notas.montar(emp, !!jefe);
+      Horas.montar(emp, emp==='smart'?'Smart Envases':'Industrias Feroz', !!jefe);
       return;
     }
   }catch(e){}

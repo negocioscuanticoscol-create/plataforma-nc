@@ -218,8 +218,25 @@
   });
 </script>
 
-<!-- Bloc de notas: los pendientes de José en esta app. Solo aparece para él. -->
+<!-- Bloc de notas y Horas. En CED las notas van POR SEDE: cada agencia apunta lo
+     suyo y no ve lo de las otras. El tiempo, en cambio, es de CED como cliente.
+     La sesion llega asincrona, por eso se espera antes de decidir. -->
 <script src="../assets/notas.js"></script>
-<script>try{Notas.montar('ced',!!(App.user&&App.user.email==='jrcalderon@me.com'))}catch(e){}</script>
+<script src="../assets/horas.js"></script>
+<script>
+(function espera(n){
+  try{
+    if(typeof App!=='undefined' && App.user){
+      var sede=(App.miSede&&App.miSede())||'principal';
+      var yo=String(App.user.email||'');
+      var jefe=['jrcalderon@me.com','negocioscuanticoscol@gmail.com'].indexOf(yo)>=0;
+      Notas.montar('ced:'+sede, true);
+      Horas.montar('ced','CED', jefe);
+      return;
+    }
+  }catch(e){}
+  if((n||0)<40) setTimeout(function(){espera((n||0)+1)},700);
+})();
+</script>
 </body>
 </html>

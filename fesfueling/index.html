@@ -1734,6 +1734,9 @@ App.nav(); App.go('inicio');
 
 <!-- Bloc de notas: los pendientes de José en esta app. Solo aparece para él. -->
 <script src="../assets/notas.js"></script>
-<script>try{Notas.montar('fes',Notas.soyJose())}catch(e){}</script>
+<!-- Horas: el tiempo que NC le trabaja a este negocio. Va a nc_hora, la misma
+     tabla de todas las apps, y el Centro de Mando lo suma sin registrar dos veces. -->
+<script src="../assets/horas.js"></script>
+<script>try{Notas.montar('fes',Notas.soyJose());Horas.montar('fes','FES Fueling',Horas.soyJose())}catch(e){}</script>
 </body>
 </html>

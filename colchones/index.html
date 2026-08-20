@@ -921,3 +921,9 @@ const App={
 };
 App.arranca();
 </script>
+
+<!-- Bloc de notas y Horas. El informe es otra app del mismo negocio: sus pendientes
+     van aparte, pero el tiempo se le carga a Nido. -->
+<script src="../assets/notas.js"></script>
+<script src="../assets/horas.js"></script>
+<script>try{Notas.montar('colchones',App.rol==='admin');Horas.montar('nido','Colchones Nido',App.rol==='admin')}catch(e){}</script>
