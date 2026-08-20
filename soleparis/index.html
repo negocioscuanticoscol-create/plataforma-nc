@@ -614,8 +614,17 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const cs=await this._get('soleparis_casos?order=destacado.desc,orden');
     this._casos=cs;
     const pub=cs.filter(c=>c.autoriza).length;
+    const link=location.href.replace(/[^/]*$/,'')+'mi-tratamiento.html';
     this.set(`<h1>Casos de éxito</h1>
       <div class="sub">${cs.length} casos · ${pub} con autorización para publicar</div>
+      <div class="card" style="background:var(--accent-soft)">
+        <div style="font-weight:600;margin-bottom:4px">De dónde salen los casos</div>
+        <div style="font-size:12.5px;color:var(--faint);margin-bottom:9px">Este es el enlace donde tus
+          clientas llevan su tratamiento y suben sus fotos. De ahí salen los antes y después que
+          después se publican acá — con su autorización.</div>
+        <input class="field" readonly value="${this.esc(link)}" onclick="this.select()">
+        <button class="btn" onclick="App.copiarLink('${this.esc(link)}')">Copiar enlace</button>
+      </div>
       <div class="card">
         <label>Título</label><input id="cs_t" class="field" placeholder="Ej: Manchas de melasma en 8 semanas">
         <div class="row2">
