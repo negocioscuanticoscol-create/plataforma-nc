@@ -455,7 +455,7 @@ const App = {
     let cli=[], ventas=[];
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_clientes?empresa=eq.smart&order=nombre.asc&limit=2000',{headers:H}); const j=await r.json(); cli=Array.isArray(j)?j:[]; }catch(e){}
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&select=documento,cliente,total_vendido,comision_bruta,mes,pedidos_mes,estado_pago,es_kit,creado_en&limit=3000',{headers:H}); const j=await r.json(); ventas=Array.isArray(j)?j:[]; }catch(e){}
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&select=documento,cliente,total_vendido,comision_bruta,mes,pedidos_mes,estado_pago,es_kit,creado_en,folio,lista&limit=3000',{headers:H}); const j=await r.json(); ventas=Array.isArray(j)?j:[]; }catch(e){}
     const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     const norm=s=>(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\b(SAS|LTDA|SA|EU)\b/g,' ').replace(/\s+/g,' ').trim();
     const titt=s=>(s||'').toLowerCase().replace(/(^|\s)\S/g,c=>c.toUpperCase());
@@ -499,10 +499,35 @@ const App = {
     // ── Kits sin segunda compra: clientes cuya ÚNICA compra registrada es un kit ──
     //    (compraron el muestrario y nunca volvieron → prospecto tibio para convertir)
     const byKit={}; vReal.forEach(v=>{ const k=norm(v.cliente); if(!k)return; (byKit[k]=byKit[k]||[]).push(v); });
-    this._kitsSin2=Object.entries(byKit).filter(([k,rows])=>rows.length===1 && rows[0].es_kit===true).map(([k,rows])=>{
-      const r=rows[0], doc=r.documento||'';
-      return {best:titt(r.cliente), doc, ref:doc||k, fecha:(r.creado_en||'').slice(0,10), mes:r.mes||'', cel:(((this._cliByDoc||{})[doc]||{}).celular)||(this._celByName||{})[k]||''};
-    }).sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));   // más reciente primero → más antiguo
+    this._kitsSin2=Object.entries(byKit).filter(([k,rows])=>rows.every(r=>r.es_kit===true)).map(([k,rows])=>{
+      const r=rows.slice().sort((a,b)=>String(b.creado_en||'').localeCompare(String(a.creado_en||'')))[0];
+      const doc=r.documento||'';
+      return {best:titt(r.cliente), doc, ref:doc||k, fecha:(r.creado_en||'').slice(0,10), mes:r.mes||'',
+        kits:rows.length, vale:rows.reduce((a,x)=>a+(+x.total_vendido||0),0),
+        folios:rows.map(x=>x.folio).filter(Boolean),
+        cel:(((this._cliByDoc||{})[doc]||{}).celular)||(this._celByName||{})[k]||''};
+    }).sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));
+
+    /* ── Lo que hay que arreglar para poder llamar ──
+       Un cliente sin telefono no se puede llamar por mas plata que haya dejado.
+       Y uno con dos documentos sale dos veces, con su compra real partida en dos:
+       en cualquier lista se ve como dos medianos en vez de un grande. Las dos
+       cosas se corrigen desde aca, que es donde se ven. */
+    const porDoc={};
+    vReal.forEach(v=>{ const d=v.documento||''; if(!d) return;
+      const o=(porDoc[d]=porDoc[d]||{doc:d,best:v.cliente,v:0,n:0,k:norm(v.cliente),folios:[],ult:''});
+      o.v+=+v.total_vendido||0; o.n++;
+      if(v.folio) o.folios.push(v.folio);
+      const f=(v.creado_en||'').slice(0,10); if(f>o.ult) o.ult=f; });
+    const celDe=o=>(((this._cliByDoc||{})[o.doc]||{}).celular)||(this._celByName||{})[o.k]||'';
+    this._todosCli=Object.values(porDoc).map(o=>({...o,best:titt(o.best),cel:celDe(o)}))
+      .sort((a,b)=>b.v-a.v);
+    this._sinTel=this._todosCli.filter(o=>!o.cel);
+    const grupoNom={};
+    this._todosCli.forEach(o=>{ (grupoNom[o.k]=grupoNom[o.k]||[]).push(o); });
+    this._dups=Object.values(grupoNom).filter(a=>a.length>1)
+      .map(a=>a.slice().sort((x,y)=>y.v-x.v))
+      .sort((a,b)=>b.reduce((s,x)=>s+x.v,0)-a.reduce((s,x)=>s+x.v,0));   // más reciente primero → más antiguo
     this.set(`<h1>Clientes · Smart</h1><div class="sub">Dashboard de clientes · perfil meta y recurrencia</div>
       <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><button class="btn-sm" style="background:#fde8e8;color:#b3261e;border:1px solid #f5c2c2" onclick="App.recompraReset()">↺ Reiniciar seguimiento</button></div>
       <div class="kpis">
@@ -524,9 +549,54 @@ const App = {
         </div>`;}).join('')||'<div class="empty">Sin datos</div>'}
       </div>
       <div class="card"><h2 style="font-size:15px;margin-bottom:4px">🧪 Kits sin segunda compra</h2>
-        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Clientes cuya única compra fue un kit de muestras y aún no recompran (${this._kitsSin2.length}). Del más reciente al más antiguo. 🟢 bolita = ya lo contacté (clic).</div>
+        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Compraron kit de muestras (${'$'+'39.000 o $60.000'}) y <b>nunca hicieron un pedido de verdad</b> (${this._kitsSin2.length}, ${cl(this._kitsSin2.reduce((a,o)=>a+(o.vale||0),0))} en kits). Del más reciente al más antiguo. 🟢 bolita = ya lo contacté (clic).</div>
         ${this._kitsRows(this._kitsSin2)}
       </div>
+      ${(this._sinTel.length||this._dups.length)?`<div class="card" style="border-left:4px solid #dc2626">
+        <h2 style="font-size:15px;margin-bottom:4px">🔧 Datos por arreglar</h2>
+        <div style="font-size:11.5px;color:#667;margin-bottom:10px">Esto es lo que hace que el informe
+          no jale bien. Se corrige acá y queda corregido en la base para todas las pantallas.</div>
+        ${this._dups.length?`<div style="font-size:12.5px;font-weight:700;margin:10px 0 6px">Repetidos · ${this._dups.length} clientes con dos documentos</div>
+          <div style="font-size:11.5px;color:#667;margin-bottom:8px">Su compra real está partida. Unificar deja
+            todas las ventas bajo un solo documento — el que tú escojas.</div>
+          ${this._dups.map(g=>`<div style="padding:9px;border:1px solid var(--linea);border-radius:8px;margin-bottom:7px">
+            <div style="font-weight:700;font-size:13px;margin-bottom:5px">${esc(g[0].best)} · juntos ${cl(g.reduce((a,x)=>a+x.v,0))}</div>
+            ${g.map((o,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:12.5px;padding:4px 0">
+              <span>doc <b>${esc(o.doc)}</b> · ${o.n} compra${o.n===1?'':'s'}${o.cel?' · 📱 '+esc(o.cel):' · <span style="color:#b3261e">sin tel</span>'}</span>
+              <span style="display:flex;align-items:center;gap:8px"><b>${cl(o.v)}</b>
+                ${i===0?'<span style="font-size:11px;color:#16a34a;font-weight:700">el bueno</span>'
+                       :`<button class="btn-sm" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa;font-size:11px" onclick="App.cliUnificar('${esc(o.doc)}','${esc(g[0].doc)}')">Pasar a ${esc(g[0].doc)}</button>`}</span>
+            </div>`).join('')}
+          </div>`).join('')}`:''}
+        ${this._sinTel.length?`<div style="font-size:12.5px;font-weight:700;margin:14px 0 6px">Sin teléfono · ${this._sinTel.length} clientes</div>
+          <div style="font-size:11.5px;color:#667;margin-bottom:8px">Han comprado ${cl(this._sinTel.reduce((a,o)=>a+o.v,0))} entre todos y no hay cómo llamarlos.</div>
+          ${this._sinTel.map(o=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 9px;border-bottom:1px solid var(--linea);font-size:12.5px">
+            <span>${esc(o.best)} <small style="color:#889">· doc ${esc(o.doc)} · ${o.n} compra${o.n===1?'':'s'}</small></span>
+            <span style="display:flex;align-items:center;gap:8px"><b>${cl(o.v)}</b>
+              <button class="btn-sm" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa;font-size:11px" onclick="App.cliSmartTel('${esc(o.doc)}')">➕ Tel</button></span>
+          </div>`).join('')}`:''}
+      </div>`:''}
+
+      <div class="card"><div style="display:flex;justify-content:space-between;align-items:center">
+        <h2 style="font-size:15px;margin-bottom:4px">📋 Todos los que han comprado · ${this._todosCli.length}</h2>
+        <button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="App.cliCSV()">⬇️ Descargar</button></div>
+        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Con su celular, lo que llevan comprado y
+          sus números de factura. ${cl(this._todosCli.reduce((a,o)=>a+o.v,0))} en total. 🟢 bolita = ya lo contacté.</div>
+        ${this._todosCli.map(o=>{ const tel=(o.cel||'').replace(/\D/g,'');
+          const wa=tel.length===10?'57'+tel:(tel.length===12?tel:'');
+          return `<div style="padding:8px 9px;border-bottom:1px solid var(--linea);font-size:12.5px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <span style="min-width:0"><b>${esc(o.best)}</b>
+              ${o.cel?(wa?` · <a href="https://wa.me/${wa}" target="_blank" rel="noopener" style="color:#16a34a;font-weight:600;text-decoration:none">📱 ${esc(o.cel)}</a>`
+                          :` · <span style="color:#445;font-weight:600">📱 ${esc(o.cel)}</span>`)
+                    :` · <button class="btn-sm" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa;font-size:10.5px;padding:1px 7px" onclick="App.cliSmartTel('${esc(o.doc)}')">➕ Tel</button>`}
+              <small style="color:#889"> · ${o.n} compra${o.n===1?'':'s'} · última ${esc(o.ult||'—')}</small></span>
+            <span style="display:flex;align-items:center;gap:9px;flex:none"><b>${cl(o.v)}</b>${this._bola(o.doc)}</span>
+          </div>
+          ${o.folios.length?`<div style="font-size:10.5px;color:#98a;font-family:ui-monospace,monospace;margin-top:2px;word-break:break-all">${o.folios.map(f=>esc(f)).join(' · ')}</div>`:''}
+        </div>`;}).join('')}
+      </div>
+
       <div style="margin:16px 0 6px"><h2 style="font-size:15px">📊 Clientes por hace cuánto compraron</h2>
         <div style="font-size:11.5px;color:#667;margin:4px 0 10px">Los ${this._cliAnalitico.length} clientes con compras, cada uno en un solo cajón según su última compra. La base guarda el <b>mes</b> de la venta, no el día, así que van por meses cumplidos. Ábrelos para ver quiénes son y llamarlos.</div></div>
       ${this._cliCajon('✅ Compraron este mes', 'al día', 0, '#16a34a')}
@@ -591,6 +661,42 @@ const App = {
     this._contactadoMes=new Set();
     document.querySelectorAll('.bolita').forEach(el=>el.style.background='#fff');
     this._toast('↺ Seguimiento reiniciado');
+  },
+  /* Pasa las ventas de un documento al otro. Es un UPDATE sobre datos vivos y no
+     hay respaldo automatico, asi que se dice exactamente cuantas filas se mueven
+     antes de tocar nada. */
+  async cliUnificar(malo,bueno){
+    if(!malo||!bueno||malo===bueno) return;
+    const o=(this._todosCli||[]).find(x=>x.doc===malo)||{n:'?'};
+    if(!confirm('Pasar '+o.n+' venta(s) del documento '+malo+' al '+bueno+'.\n\n'+
+      'Las dos fichas quedan como un solo cliente y su compra deja de estar partida.\n'+
+      'Esto cambia datos y no se puede deshacer solo. ¿Seguir?')) return;
+    const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'};
+    try{
+      const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&documento=eq.'+encodeURIComponent(malo),
+        {method:'PATCH',headers:H,body:JSON.stringify({documento:bueno})});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      /* Si el bueno no tenia telefono y el malo si, se lo lleva: seria absurdo
+         perder el unico numero por unificar. */
+      const cMalo=(this._cliByDoc||{})[malo]||{}, cBueno=(this._cliByDoc||{})[bueno]||{};
+      if(cMalo.celular && !cBueno.celular){
+        await fetch(this._SBU()+'/rest/v1/nc_clientes?on_conflict=empresa,documento',
+          {method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},
+           body:JSON.stringify({empresa:'smart',documento:bueno,nombre:cBueno.nombre||o.best||('Cliente '+bueno),celular:cMalo.celular})});
+      }
+      this._toast('Unificado'); this.vClientesSmart();
+    }catch(e){ alert('No se pudo unificar: '+e); }
+  },
+  /* Para llevarse la lista al celular o pasarla a quien llame. */
+  cliCSV(){
+    const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+    const filas=[['Cliente','Documento','Celular','Compras','Vendido','Ultima compra','Facturas']]
+      .concat((this._todosCli||[]).map(o=>[o.best,o.doc,o.cel,o.n,o.v,o.ult,(o.folios||[]).join(' ')]));
+    const csv='\uFEFF'+filas.map(f=>f.map(q).join(';')).join('\r\n');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    a.download='clientes-smart-'+new Date().toISOString().slice(0,10)+'.csv';
+    a.click(); URL.revokeObjectURL(a.href);
   },
   async cliSmartTel(doc){
     if(!doc){ alert('Este cliente no tiene documento en la base para guardar el teléfono.'); return; }
