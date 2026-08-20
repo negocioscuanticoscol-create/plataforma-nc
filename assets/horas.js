@@ -20,7 +20,7 @@
   var KEY = 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
   var H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
 
-  var neg = null, negNom = '', us = [], hs = [], mes = '', abierto = false;
+  var neg = null, negNom = '', us = [], hs = [], mes = '', abierto = false, propTocado = false;
 
   function api(path, opt) {
     opt = opt || {};
@@ -66,6 +66,23 @@
     'Presencial': 'visita o reunión con el cliente',
     'Virtual': 'atención telefónica o por chat'
   };
+  /* El tipo dice CÓMO se trabajó; el propósito dice PARA QUÉ. Son dos preguntas
+     distintas y sin la segunda no se ve lo único que importa de verdad: cuánto del
+     día se fue en conseguir clientes y cuánto en construir. */
+  var PROPS = ['Conseguir clientes', 'Estructurar', 'Atender', 'Administrar'];
+  var PAYUDA = {
+    'Conseguir clientes': 'prospectar, llamar, visitar, pautar — lo que trae plata nueva',
+    'Estructurar': 'construir la app, la base, los agentes — lo que deja capacidad',
+    'Atender': 'servirle a un cliente que ya compró',
+    'Administrar': 'cuentas, trámites, plata'
+  };
+  /* Por defecto se propone según la hora, que es el ritmo que se quiere sostener:
+     mañana para conseguir, tarde y noche para construir. Se puede cambiar siempre. */
+  function propPorHora(hhmm) {
+    var h = parseInt(String(hhmm || '').slice(0, 2), 10);
+    if (isNaN(h)) h = new Date().getHours();
+    return h < 13 ? 'Conseguir clientes' : 'Estructurar';
+  }
 
   var CSS = '' +
     '#hr-btn{position:fixed;right:18px;bottom:80px;z-index:9998;width:52px;height:52px;border-radius:50%;' +
@@ -128,12 +145,15 @@
       return +(u && u.tarifa_hora) || 0;
     };
     var vale = vis.reduce(function (s, x) { return s + (+x.minutos || 0) / 60 * tarifa(x.usuario_id); }, 0);
-    var porU = {}, porT = {};
+    var porU = {}, porT = {}, porP = {};
     vis.forEach(function (x) {
       porU[x.usuario_id] = (porU[x.usuario_id] || 0) + (+x.minutos || 0);
       var t = x.tipo || 'Programación';
       porT[t] = (porT[t] || 0) + (+x.minutos || 0);
+      var p = x.proposito || 'Estructurar';
+      porP[p] = (porP[p] || 0) + (+x.minutos || 0);
     });
+    var conseguir = porP['Conseguir clientes'] || 0;
     var hoy = new Date().toISOString().slice(0, 10);
 
     body.innerHTML =
@@ -148,6 +168,11 @@
           '<div class="fila"><label>Tipo</label><select id="hr_tp" onchange="Horas.tipo()">' +
             TIPOS.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select></div>' +
         '</div>' +
+        '<div class="fila"><label>¿Para qué fue este rato?</label>' +
+          '<select id="hr_pr" onchange="Horas._tocaProp();Horas.tipo()">' +
+          PROPS.map(function (t) {
+            return '<option' + (t === propPorHora() ? ' selected' : '') + '>' + t + '</option>'; }).join('') +
+          '</select></div>' +
         '<div class="hr-hint" id="hr_ayuda">' + AYUDA[TIPOS[0]] + '</div>' +
         '<div class="hr-g" style="margin-top:8px">' +
           '<div class="fila"><label>Empezó</label><input type="time" id="hr_i" onchange="Horas.calc()"></div>' +
@@ -169,9 +194,23 @@
         '</div><div style="text-align:right"><b>' + hhmm(tot) + '</b>' +
           (vale ? '<div class="hr-hint">' + plata(vale) + ' a las tarifas cargadas</div>' : '') +
         '</div></div>' +
-        (tot ? Object.keys(porT).sort(function (a, b) { return porT[b] - porT[a]; }).map(function (t) {
-          return '<div class="hr-fila"><span>' + esc(t) + '</span><b>' + hhmm(porT[t]) + '</b></div>';
-        }).join('') : '') +
+        (tot
+          ? '<div class="hr-tit" style="margin-top:12px">Para qué se fue</div>' +
+            Object.keys(porP).sort(function (a, b) { return porP[b] - porP[a]; }).map(function (p) {
+              var pct = Math.round(porP[p] / tot * 100);
+              return '<div class="hr-fila"><span>' + esc(p) + '</span>' +
+                '<b>' + hhmm(porP[p]) + ' <span style="color:#8b95a1;font-weight:400">' + pct + '%</span></b></div>';
+            }).join('') +
+            /* Sin esta linea el tablero solo cuenta horas. Con ella dice si el dia
+               se fue construyendo capacidad o consiguiendo con quien usarla. */
+            '<div class="hr-hint" style="margin-top:6px">' +
+              (conseguir ? Math.round(conseguir / tot * 100) + '% del tiempo fue a conseguir clientes.'
+                         : 'Nada de este tiempo fue a conseguir clientes.') + '</div>' +
+            '<div class="hr-tit" style="margin-top:14px">Cómo se trabajó</div>' +
+            Object.keys(porT).sort(function (a, b) { return porT[b] - porT[a]; }).map(function (t) {
+              return '<div class="hr-fila"><span>' + esc(t) + '</span><b>' + hhmm(porT[t]) + '</b></div>';
+            }).join('')
+          : '') +
         (Object.keys(porU).length > 1
           ? '<div class="hr-tit">Por persona</div>' + Object.keys(porU).sort(function (a, b) { return porU[b] - porU[a]; })
               .map(function (uid) {
@@ -186,7 +225,8 @@
         var u = us.filter(function (y) { return y.id === x.usuario_id; })[0] || {};
         return '<div class="hr-it"><div style="min-width:0">' +
           '<b>' + esc(x.tarea || 'sin descripción') + '</b>' +
-          '<div class="d">' + esc(x.tipo || 'Programación') + ' · ' + esc(u.nombre || '—') + ' · ' + esc(x.fecha || '') +
+          '<div class="d">' + esc(x.proposito || 'Estructurar') + ' · ' + esc(x.tipo || 'Programación') +
+            ' · ' + esc(u.nombre || '—') + ' · ' + esc(x.fecha || '') +
             (x.inicio ? ' · ' + String(x.inicio).slice(0, 5) + '→' + String(x.fin || '').slice(0, 5) : '') + '</div>' +
           '</div><div style="text-align:right;flex:none"><b>' + hhmm(x.minutos) + '</b>' +
           '<div><button class="hr-del" onclick="Horas.borrar(' + x.id + ')">quitar</button></div></div></div>';
@@ -278,20 +318,26 @@
         '<button id="hr-x" onclick="Horas.cerrar()">✕</button></h3>' +
         '<div id="hr-body"><div class="hr-vacio">Cargando…</div></div></div>';
       document.body.appendChild(c);
+      propTocado = false;
       cargar();
     },
     cerrar: function () {
       var c = $('hr-cap'); if (c) c.remove();
       abierto = false;
     },
+    /* En cuanto lo escoge a mano, calc() deja de proponer segun la hora. */
+    _tocaProp: function () { propTocado = true; },
     mes: function (m) { mes = m; pinta(); },
     tipo: function () {
-      var a = $('hr_ayuda'); if (a) a.textContent = AYUDA[val('hr_tp')] || '';
+      var a = $('hr_ayuda');
+      if (a) a.textContent = (AYUDA[val('hr_tp')] || '') + ' · ' + (PAYUDA[val('hr_pr')] || '');
     },
     /* Con las dos horas se calculan los minutos; si los escribe a mano, mandan. */
     calc: function (aMano) {
       var m = aMano ? (+val('hr_m') || 0) : mins(val('hr_i'), val('hr_ff'));
       if (!aMano && m && $('hr_m')) $('hr_m').value = m;
+      var pr = $('hr_pr');
+      if (!aMano && pr && !propTocado) { pr.value = propPorHora(val('hr_i')); Horas.tipo(); }
       var p = $('hr_prev'); if (p) p.textContent = m ? 'Son ' + hhmm(m) : '';
     },
     agregar: function () {
@@ -306,7 +352,8 @@
         method: 'POST', body: JSON.stringify({
           usuario_id: +u, negocio_id: neg,
           fecha: val('hr_f') || new Date().toISOString().slice(0, 10),
-          inicio: i, fin: f, minutos: m, tipo: val('hr_tp') || 'Programación', tarea: t
+          inicio: i, fin: f, minutos: m, tipo: val('hr_tp') || 'Programación',
+          proposito: val('hr_pr') || propPorHora(i), tarea: t
         })
       }).then(cargar);
     },

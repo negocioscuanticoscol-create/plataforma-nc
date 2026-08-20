@@ -216,6 +216,18 @@ table.mx .it i{font-style:normal;color:var(--sub);font-size:11px;display:block;m
 .stleg i{width:8px;height:8px;border-radius:2px;display:inline-block}
 .barra{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:7px}
 .barra div{height:100%;background:#2f9e6e;border-radius:3px}
+  /* tabla de la regla de los 4 meses */
+  .fintab{width:100%;border-collapse:collapse;font-size:13.5px;min-width:560px}
+  .fintab th{text-align:left;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--faint);font-weight:600;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .fintab td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+  .fintab td.nmr{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .fintab .fn{font-size:11px;color:var(--faint);margin-top:2px}
+  .finest{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+  .fin-ok .finest{background:#12351f;color:#5fd39a}
+  .fin-tibio .finest{background:#37301a;color:#e0b551}
+  .fin-mal .finest{background:#3a1f1c;color:#f08a72}
+  .fin-gris .finest{background:#232a30;color:#8b95a1}
 </style>
 </head>
 <body>
@@ -253,47 +265,159 @@ nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vist
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
   ({resumen:this.vResumen,pauta:this.vPauta,horas:this.vHoras,cuentas:this.vCuentas,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero}[v]||this.vResumen).call(this); },
 
+/* ---------- FINANCIERO ----------
+   Esto no es contabilidad: es el tablero con el que se decide qué negocio sigue.
+   La caja es una sola, así que acá entra TODO — incluidos el arriendo y la luz,
+   que no son de ningún cliente pero se pagan igual.
+
+   Cada negocio se mide contra la regla de José: si en 4 meses no cubre lo que
+   costó, se suelta. Por eso lo que manda no es el mes, es el acumulado desde que
+   arrancó. Un negocio puede tener un buen mes y seguir en rojo desde el día uno. */
+_finMes:'',
+_mesNom(m){ const N=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const p=String(m||'').split('-'); return p[1]?(N[+p[1]]+' '+p[0]):(m||'—'); },
+_mesesDesde(d){ if(!d) return null; const a=new Date(d), h=new Date();
+  return (h.getFullYear()-a.getFullYear())*12+(h.getMonth()-a.getMonth()); },
+/* Una línea cuenta en un mes si es de ese mes, o si es fija y se repite. */
+_enMes(l,m){ return l.activo!==false && (l.mes===m || (!l.mes && l.fijo!==false)); },
+
 async vFinanciero(){
-  const lineas=await api('nc_finanzas?order=orden&limit=500');
-  const sc=(await api('nc_smart_comision_mes'))[0]||{comision:0,ventas:0};
-  const fc=(await api('nc_feroz_comision_mes'))[0]||{comision:0,pedidos:0};
-  this._fin=lineas;
-  const money=n=>'$'+nm(n);
-  const ing=lineas.filter(l=>l.tipo==='ingreso'&&l.activo!==false);
-  const gas=lineas.filter(l=>l.tipo==='gasto'&&l.activo!==false).sort((a,b)=>(a.dia_pago||99)-(b.dia_pago||99));
-  const comSmart=+sc.comision||0, comFeroz=+fc.comision||0;
-  const totIng=ing.reduce((a,l)=>a+(+l.monto||0),0)+comSmart+comFeroz;
-  const cobrado=ing.filter(l=>l.pagado).reduce((a,l)=>a+(+l.monto||0),0)+comSmart+comFeroz;
-  const porCobrar=ing.filter(l=>!l.pagado).reduce((a,l)=>a+(+l.monto||0),0);
-  const totGas=gas.reduce((a,l)=>a+(+l.monto||0),0);
+  const [lineas,negs,pauta,horas]=await Promise.all([
+    api('nc_finanzas?select=*&order=tipo,orden&limit=1000'),
+    api('nc_negocio?select=*&order=orden'),
+    api('nc_pauta_hoy?select=negocio_id,gasto&limit=2000'),
+    api('nc_hora?select=negocio_id,minutos&limit=3000')]);
+  this._fin=lineas; this._fnegs=negs;
+  const hoy=new Date().toISOString().slice(0,7);
+  if(!this._finMes) this._finMes=hoy;
+  const mes=this._finMes;
+  const M=n=>'$'+nm(Math.round(+n||0));
+
+  /* Lo que la pauta se llevó de verdad, que no está en nc_finanzas: sale de las
+     tarjetas de José y no aparecía en ninguna cuenta. */
+  const pautaDe={}; pauta.forEach(p=>{ pautaDe[p.negocio_id]=(pautaDe[p.negocio_id]||0)+(+p.gasto||0); });
+  const minDe={}; horas.forEach(h=>{ minDe[h.negocio_id]=(minDe[h.negocio_id]||0)+(+h.minutos||0); });
+
+  const meses=[...new Set([hoy,...lineas.map(l=>l.mes).filter(Boolean)])].sort().reverse();
+  const vis=lineas.filter(l=>this._enMes(l,mes));
+  const casa=vis.filter(l=>l.tipo==='gasto'&&(l.negocio_id==='nc'||!l.negocio_id));
+  const totCasa=casa.reduce((a,l)=>a+(+l.monto||0),0);
+  const totIng=vis.filter(l=>l.tipo==='ingreso').reduce((a,l)=>a+(+l.monto||0),0);
+  const totGas=vis.filter(l=>l.tipo==='gasto').reduce((a,l)=>a+(+l.monto||0),0);
   const neto=totIng-totGas;
-  // fila de INGRESO: monto + ¿entró?
-  const rowIng=l=>`<div class="finrow"><div class="fc"><b>${esc(l.concepto)}</b>${l.empresa?`<span class="finbadge">${esc(l.empresa)}</span>`:''}${l.nota?`<div class="fn">${esc(l.nota)}</div>`:''}</div>
-    <div class="finm"><span class="pfx">$</span><input type="number" value="${+l.monto||0}" onchange="App.finUpd(${l.id},'monto',this.value)">
-      <button class="chip ${l.pagado?'on':'off'}" style="cursor:pointer;border:none" onclick="App.finPagado(${l.id},${!l.pagado})">${l.pagado?'✅ entró':'⏳ pendiente'}</button>
-      <button class="finx" onclick="App.finDel(${l.id})">✕</button></div></div>`;
-  // fila de GASTO: día de pago + monto
-  const rowGas=l=>`<div class="finrow"><div class="fc"><b>${esc(l.concepto)}</b>${l.nota?`<div class="fn">${esc(l.nota)}</div>`:''}</div>
-    <div class="finm">📅 <input type="number" min="1" max="31" placeholder="día" style="width:56px" value="${l.dia_pago||''}" onchange="App.finUpd(${l.id},'dia_pago',this.value)">
-      <span class="pfx">$</span><input type="number" value="${+l.monto||0}" onchange="App.finUpd(${l.id},'monto',this.value)"><button class="finx" onclick="App.finDel(${l.id})">✕</button></div></div>`;
-  const auto=(nom,det,val)=>`<div class="finrow"><div class="fc"><b>${nom}</b><span class="finbadge auto">AUTO</span>${det?`<div class="fn">${det}</div>`:''}</div><div class="finm"><b>${'$'+nm(val)}</b></div></div>`;
-  $('main').innerHTML=`<h1>💰 Financiero · cómo vamos</h1>
-    <div class="sub">Comisiones que traen las apps + gastos con su día de pago. Para cuadrar el flujo de caja.</div>
-    <div class="neto"><div class="nl">Cómo vamos este mes (ingresos − gastos)</div>
-      <div class="nv" style="color:${neto>=0?'var(--ok)':'var(--rosa)'}">${'$'+nm(neto)}</div>
-      <div style="font-size:12.5px;color:var(--sub);margin-top:6px">Ingresos ${'$'+nm(totIng)} · Gastos ${'$'+nm(totGas)} · Por cobrar ${'$'+nm(porCobrar)}</div></div>
-    <div class="finsec"><h3>📈 Ingresos / Comisiones — ¿entró la plata?</h3>
-      ${auto('Comisión Smart',(sc.ventas||0)+' ventas este mes',comSmart)}
-      ${auto('Comisión Feroz',(fc.pedidos||0)+' pedido(s) con comisión',comFeroz)}
-      ${ing.map(rowIng).join('')}</div>
-    <div class="finsec"><h3>📅 Gastos de NC — ordenados por día de pago</h3>
-      ${gas.map(rowGas).join('')||'<div class="finrow"><span style="color:var(--faint);padding:6px 10px">Sin gastos cargados</span></div>'}</div>
-    <div style="display:flex;gap:8px"><button class="btn" onclick="App.finAdd('ingreso')">＋ Ingreso</button><button class="btn ghost" onclick="App.finAdd('gasto')">＋ Gasto</button></div>`;
+  const porCobrar=vis.filter(l=>l.tipo==='ingreso'&&!l.pagado).reduce((a,l)=>a+(+l.monto||0),0);
+
+  /* El acumulado de vida: las fijas se multiplican por los meses que lleva. */
+  const acum=(id,tipo)=>{
+    const m=Math.max(1,(this._mesesDesde((negs.find(n=>n.id===id)||{}).arranco_en)||0)+1);
+    return lineas.filter(l=>l.negocio_id===id&&l.tipo===tipo&&l.activo!==false)
+      .reduce((a,l)=>a+(+l.monto||0)*(l.mes?1:m),0);
+  };
+
+  const fila=l=>{
+    const ing=l.tipo==='ingreso';
+    const n=(negs.find(x=>x.id===l.negocio_id)||{}).nombre||l.negocio_id||'NC';
+    return `<div class="finrow"><div class="fc"><b>${esc(l.concepto)}</b>
+      <span class="finbadge">${esc(n)}</span>${l.categoria?`<span class="finbadge">${esc(l.categoria)}</span>`:''}
+      <div class="fn">${l.mes?'solo '+esc(this._mesNom(l.mes)):'todos los meses'}${l.dia_pago?' · día '+l.dia_pago:''}${l.nota?' · '+esc(l.nota):''}</div></div>
+      <div class="finm">${l.dia_pago||!ing?`📅 <input type="number" min="1" max="31" placeholder="día" style="width:52px" value="${l.dia_pago||''}" onchange="App.finUpd(${l.id},'dia_pago',this.value)">`:''}
+        <span class="pfx">$</span><input type="number" value="${+l.monto||0}" onchange="App.finUpd(${l.id},'monto',this.value)">
+        ${ing?`<button class="chip ${l.pagado?'on':'off'}" style="cursor:pointer;border:none" onclick="App.finPagado(${l.id},${!l.pagado})">${l.pagado?'✅ entró':'⏳ pendiente'}</button>`:''}
+        <button class="finx" onclick="App.finDel(${l.id})">✕</button></div></div>`;
+  };
+
+  /* La tabla que de verdad decide. Se ordena por el que más falta le hace cubrir. */
+  const filas=negs.filter(n=>n.id!=='nc').map(n=>{
+    const e=acum(n.id,'ingreso');
+    const s=acum(n.id,'gasto')+(pautaDe[n.id]||0);
+    const m=this._mesesDesde(n.arranco_en);
+    const mesE=vis.filter(l=>l.negocio_id===n.id&&l.tipo==='ingreso').reduce((a,l)=>a+(+l.monto||0),0);
+    let est,cls;
+    if(m===null){ est='falta la fecha de arranque'; cls='fin-gris'; }
+    else if(e>=s&&e>0){ est='se paga solo'; cls='fin-ok'; }
+    else if(m>=4){ est=`${m} meses y no se cubre`; cls='fin-mal'; }
+    else { est=`mes ${m+1} de 4`; cls='fin-tibio'; }
+    return {n,e,s,m,mesE,est,cls,falta:s-e,hrs:Math.round((minDe[n.id]||0)/60*10)/10};
+  }).sort((a,b)=>b.falta-a.falta);
+
+  const sinFecha=filas.filter(f=>f.m===null).length;
+  const enRojo=filas.filter(f=>f.cls==='fin-mal');
+
+  $('main').innerHTML=`<h1>💰 Financiero · mi situación</h1>
+    <div class="sub">Toda la plata en un solo sitio — la de los clientes y la de la casa.
+      Cada negocio se mide contra la regla: <b>4 meses para cubrirse.</b></div>
+
+    <div style="margin-bottom:14px"><select onchange="App.finMes(this.value)" style="max-width:220px">
+      ${meses.map(m=>`<option value="${m}"${mes===m?' selected':''}>${this._mesNom(m)}</option>`).join('')}
+    </select></div>
+
+    <div class="neto"><div class="nl">Cómo voy en ${this._mesNom(mes)}</div>
+      <div class="nv" style="color:${neto>=0?'var(--ok)':'var(--rosa)'}">${M(neto)}</div>
+      <div style="font-size:12.5px;color:var(--sub);margin-top:6px">
+        Entra ${M(totIng)} · Sale ${M(totGas)} · Por cobrar ${M(porCobrar)}</div></div>
+
+    ${enRojo.length?`<div class="finsec" style="border-left:3px solid var(--rosa)">
+      <h3 style="color:var(--rosa)">⚠️ ${enRojo.length} pasaron los 4 meses sin cubrirse</h3>
+      <div style="font-size:13px;color:var(--sub);padding:0 10px 10px">
+        ${enRojo.map(f=>esc(f.n.nombre)+' ('+f.m+' meses, falta '+M(f.falta)+')').join(' · ')}.
+        Según tu regla, estos son los que hay que soltar — o cambiarles el trato.</div></div>`:''}
+
+    <div class="finsec"><h3>🏠 La casa · lo que se paga así no entre nada</h3>
+      ${casa.length?casa.map(fila).join(''):'<div class="finrow"><span style="color:var(--faint);padding:6px 10px">Sin gastos de casa cargados</span></div>'}
+      <div style="padding:10px;font-size:13px;color:var(--sub);border-top:1px solid var(--line)">
+        <b>${M(totCasa)}</b> al mes. Eso es lo mínimo que tienen que dejar los negocios juntos
+        para que el mes no dé pérdida.</div></div>
+
+    <div class="finsec"><h3>📊 Negocio por negocio · desde que arrancó</h3>
+      <div style="overflow-x:auto"><table class="fintab">
+        <tr><th>Negocio</th><th>Entró</th><th>Costó</th><th>Horas</th><th>Estado</th><th></th></tr>
+        ${filas.map(f=>`<tr class="${f.cls}">
+          <td><b>${esc(f.n.nombre)}</b><div class="fn">${f.n.arranco_en?'desde '+esc(f.n.arranco_en):'sin fecha'}</div></td>
+          <td class="nmr">${M(f.e)}</td>
+          <td class="nmr">${M(f.s)}${pautaDe[f.n.id]?`<div class="fn">${M(pautaDe[f.n.id])} de pauta</div>`:''}</td>
+          <td class="nmr">${f.hrs?f.hrs+'h':'—'}</td>
+          <td><span class="finest">${esc(f.est)}</span></td>
+          <td><input type="date" value="${esc(f.n.arranco_en||'')}" onchange="App.finArranco('${f.n.id}',this.value)" style="width:132px"></td>
+        </tr>`).join('')}
+      </table></div>
+      ${sinFecha?`<div style="padding:10px;font-size:13px;color:var(--sub)">
+        ${sinFecha} negocio${sinFecha===1?'':'s'} sin fecha de arranque. Sin esa fecha el reloj de
+        los 4 meses no corre y el estado no significa nada.</div>`:''}
+    </div>
+
+    <div class="finsec"><h3>📈 Lo que entra en ${this._mesNom(mes)}</h3>
+      ${vis.filter(l=>l.tipo==='ingreso').map(fila).join('')||'<div class="finrow"><span style="color:var(--faint);padding:6px 10px">Ningún ingreso este mes</span></div>'}</div>
+
+    <div class="finsec"><h3>📅 Lo que sale de los negocios</h3>
+      ${vis.filter(l=>l.tipo==='gasto'&&l.negocio_id&&l.negocio_id!=='nc').sort((a,b)=>(a.dia_pago||99)-(b.dia_pago||99)).map(fila).join('')||'<div class="finrow"><span style="color:var(--faint);padding:6px 10px">Sin gastos cargados a un negocio</span></div>'}</div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="App.finAdd('ingreso')">＋ Entra plata</button>
+      <button class="btn ghost" onclick="App.finAdd('gasto')">＋ Sale plata</button></div>`;
 },
+finMes(m){ this._finMes=m; this.vFinanciero(); },
+async finArranco(id,v){ await patch('nc_negocio?id=eq.'+id,{arranco_en:v||null}); this.vFinanciero(); },
 async finUpd(id,campo,val){ const b={}; b[campo]=(campo==='dia_pago')?(+val||null):(+val||0); await patch('nc_finanzas?id=eq.'+id,b); const l=(this._fin||[]).find(x=>x.id===id); if(l)l[campo]=b[campo]; toast('Guardado'); if(campo==='dia_pago') this.vFinanciero(); },
 async finPagado(id,val){ await patch('nc_finanzas?id=eq.'+id,{pagado:val}); const l=(this._fin||[]).find(x=>x.id===id); if(l)l.pagado=val; this.vFinanciero(); },
 async finDel(id){ if(!confirm('¿Eliminar esta línea?'))return; await api('nc_finanzas?id=eq.'+id,{method:'DELETE',headers:{...H,Prefer:'return=minimal'}}); toast('Eliminada'); this.vFinanciero(); },
-async finAdd(tipo){ const con=prompt((tipo==='ingreso'?'Ingreso':'Gasto')+' — concepto:'); if(!con)return; const mo=prompt('Monto ($):','0'); const b={tipo,concepto:con.trim(),monto:+mo||0,orden:50}; if(tipo==='gasto'){ const d=prompt('Día de pago del mes (1-31, opcional):',''); if(d)b.dia_pago=+d||null; } await post('nc_finanzas',b); toast('Agregado'); this.vFinanciero(); },
+/* Se pregunta el negocio de una: sin eso la línea cae en un limbo y no cuenta
+   para la regla de los 4 meses de nadie. */
+async finAdd(tipo){
+  const negs=this._fnegs||[];
+  const lista=negs.map((n,i)=>(i+1)+'. '+n.nombre).join('\n');
+  const q=prompt((tipo==='ingreso'?'¿De qué negocio ENTRA?':'¿A qué negocio se le carga?')+
+    '\n(escribe el número · 0 = la casa / gasto general)\n\n'+lista,'0');
+  if(q===null) return;
+  const negId = (+q>0 && negs[+q-1]) ? negs[+q-1].id : 'nc';
+  const con=prompt('¿Qué es?'); if(!con) return;
+  const mo=prompt('¿Cuánto? ($)','0');
+  const rep=confirm('¿Se repite todos los meses?\n\nAceptar = fijo · Cancelar = solo este mes');
+  const b={tipo,negocio_id:negId,empresa:negId,concepto:con.trim(),monto:+mo||0,
+    categoria:tipo==='ingreso'?'Cobro':(negId==='nc'?'Casa':'Operación'),
+    fijo:rep, mes:rep?null:this._finMes, activo:true, pagado:false, orden:50};
+  if(tipo==='gasto'){ const d=prompt('¿Qué día del mes se paga? (1-31, opcional)',''); if(d) b.dia_pago=+d||null; }
+  await post('nc_finanzas',b); toast('Registrado'); this.vFinanciero();
+},
 
 /* total historico: todos los leads que han entrado, no solo los del mes */
 async _leadsMes(){
@@ -611,10 +735,18 @@ pintaHoras(){
   const tot=vis.reduce((s,x)=>s+(+x.minutos||0),0);
   const tarifa=id=>{ const u=usr.find(y=>y.id===id); return +(u&&u.tarifa_hora)||0; };
   const plata=vis.reduce((s,x)=>s+(+x.minutos||0)/60*tarifa(x.usuario_id),0);
-  const porN={}, porU={}, porT={};
+  const porN={}, porU={}, porT={}, porP={}, porF={};
   vis.forEach(x=>{ porN[x.negocio_id]=(porN[x.negocio_id]||0)+(+x.minutos||0);
                    porU[x.usuario_id]=(porU[x.usuario_id]||0)+(+x.minutos||0);
-                   const t=x.tipo||'Programación'; porT[t]=(porT[t]||0)+(+x.minutos||0); });
+                   const t=x.tipo||'Programación'; porT[t]=(porT[t]||0)+(+x.minutos||0);
+                   const pr=x.proposito||'Estructurar'; porP[pr]=(porP[pr]||0)+(+x.minutos||0);
+                   /* La franja dice si el ritmo se está sosteniendo: la mañana era
+                      para conseguir clientes y la tarde para construir. */
+                   const h=parseInt(String(x.inicio||'').slice(0,2),10);
+                   const f=isNaN(h)?'sin hora':(h<13?'Mañana':(h<19?'Tarde':'Noche'));
+                   porF[f]=(porF[f]||0)+(+x.minutos||0); });
+  const conseguir=porP['Conseguir clientes']||0;
+  const pctCons=tot?Math.round(conseguir/tot*100):0;
   const orden=Object.entries(porN).sort((a,b)=>b[1]-a[1]);
   const max=orden.length?orden[0][1]:1;
   $('main').innerHTML='<h1>⏱️ Horas</h1>'
@@ -627,9 +759,24 @@ pintaHoras(){
    +`<div class="pkpi"><b>${hm(tot)}</b><i>en total</i></div>`
    +`<div class="pkpi"><b>${orden.length}</b><i>clientes atendidos</i></div>`
    +(plata?`<div class="pkpi"><b>$${nm(plata)}</b><i>a las tarifas cargadas</i></div>`:'')
-   +Object.entries(porT).sort((a,b)=>b[1]-a[1]).map(([t,m5])=>
-      `<div class="pkpi"><b>${hm(m5)}</b><i>${esc(t.toLowerCase())}</i></div>`).join('')
+   +`<div class="pkpi"><b style="color:${pctCons>=30?'var(--ok)':'var(--rosa)'}">${pctCons}%</b><i>a conseguir clientes</i></div>`
    +'</div>'
+   +(tot?'<div class="card"><div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--sub);margin-bottom:9px">PARA QUÉ SE FUE EL TIEMPO</div>'
+     +Object.entries(porP).sort((a,b)=>b[1]-a[1]).map(([pr,m6])=>
+       `<div style="margin-bottom:9px">
+         <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:3px">
+           <span>${esc(pr)}</span><b>${hm(m6)} <span style="color:var(--sub);font-weight:400">${Math.round(m6/tot*100)}%</span></b></div>
+         <div style="height:7px;background:var(--panel);border-radius:99px;overflow:hidden">
+           <div style="height:100%;width:${Math.max(2,m6/tot*100)}%;background:${pr==='Conseguir clientes'?'var(--ok)':'var(--acc)'};border-radius:99px"></div></div>
+       </div>`).join('')
+     +'<div style="font-size:12.5px;color:var(--sub);margin-top:4px;line-height:1.5">'
+     +(pctCons>=30
+        ? 'El ritmo se está sosteniendo: la mañana está trayendo clientes.'
+        : 'Casi todo el tiempo se está yendo en construir. Las herramientas ya están; lo que falta es con quién usarlas.')
+     +'</div>'
+     +'<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--sub);margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">'
+     +Object.entries(porF).sort((a,b)=>b[1]-a[1]).map(([f,m7])=>`<span>${esc(f)}: <b style="color:var(--tx)">${hm(m7)}</b></span>`).join('')
+     +'</div></div>':'')
    +(orden.length?'<div class="card">'+orden.map(([id,m3])=>
      `<div style="margin-bottom:10px">
        <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:3px">
@@ -648,7 +795,7 @@ pintaHoras(){
      +vis.slice(0,25).map(x=>{ const u=usr.find(y=>y.id===x.usuario_id)||{};
        return `<div class="card" style="padding:9px 12px;margin-bottom:5px;display:flex;justify-content:space-between;gap:10px">
          <div style="min-width:0"><b>${esc(x.tarea||'sin descripción')}</b>
-           <div style="font-size:12px;color:var(--sub)">${esc(nom(x.negocio_id))} · ${esc(x.tipo||'Programación')} · ${esc(u.nombre||'—')} · ${esc(x.fecha||'')}</div></div>
+           <div style="font-size:12px;color:var(--sub)">${esc(nom(x.negocio_id))} · ${esc(x.proposito||'Estructurar')} · ${esc(x.tipo||'Programación')} · ${esc(u.nombre||'—')} · ${esc(x.fecha||'')}${x.inicio?' · '+String(x.inicio).slice(0,5):''}</div></div>
          <b style="flex:none">${hm(x.minutos)}</b></div>`;}).join(''):'');
 },
 hMes(m){ this._hmes=m; this.pintaHoras(); },

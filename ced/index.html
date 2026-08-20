@@ -223,6 +223,7 @@
      La sesion llega asincrona, por eso se espera antes de decidir. -->
 <script src="../assets/notas.js"></script>
 <script src="../assets/horas.js"></script>
+<script src="../assets/plata.js"></script>
 <script>
 (function espera(n){
   try{
@@ -232,6 +233,7 @@
       var jefe=['jrcalderon@me.com','negocioscuanticoscol@gmail.com'].indexOf(yo)>=0;
       Notas.montar('ced:'+sede, true);
       Horas.montar('ced','CED', jefe);
+      Plata.montar('ced','CED', jefe);
       return;
     }
   }catch(e){}

@@ -2145,5 +2145,6 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
 <!-- Horas: el tiempo que NC le trabaja a este negocio. Va a nc_hora, la misma
      tabla de todas las apps, y el Centro de Mando lo suma sin registrar dos veces. -->
 <script src="../assets/horas.js"></script>
+<script src="../assets/plata.js"></script>
 <script>try{var ok=function(){return App.rol==='admin'};
-Notas.montar('nido',ok);Horas.montar('nido','Colchones Nido',ok)}catch(e){}</script>
+Notas.montar('nido',ok);Horas.montar('nido','Colchones Nido',ok);Plata.montar('nido','Colchones Nido',ok)}catch(e){}</script>
