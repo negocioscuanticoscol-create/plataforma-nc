@@ -458,7 +458,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       <div style="font-weight:600;font-size:13px;margin-top:12px">Su seguimiento</div>
       ${mios.length?Object.keys(porSem).sort((a,b)=>b-a).map(s=>`
         <div style="border-left:2px solid var(--line,#eee);padding:0 0 12px 13px;margin:8px 0 0 5px">
-          <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Semana ${this.esc(s)}</div>
+          <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">${+s===0?'Antes de empezar':'Semana '+this.esc(s)}</div>
           ${porSem[s].map(a=>`<div style="margin-top:7px">
             <div style="font-size:11.5px;color:var(--faint)">${this.esc(String(a.creado_en||'').slice(0,10))}</div>
             <div style="font-size:13px">${this.esc(a.nota||(a.tipo==='video'?'Video de testimonio':'Foto de avance'))}

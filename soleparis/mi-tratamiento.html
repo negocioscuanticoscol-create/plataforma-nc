@@ -40,6 +40,15 @@
     padding:14px;margin-top:16px}
   .consent input{width:19px;height:19px;flex:none;margin-top:2px;accent-color:var(--acento2)}
   .consent span{font-size:12.5px;color:var(--tinta2);line-height:1.55}
+  /* El codigo es lo que ella muestra en caja: tiene que leerse de un vistazo y
+     poder dictarse por telefono sin equivocarse. */
+  .cupon{border:1px dashed var(--acento);border-radius:12px;padding:15px;margin-bottom:10px;
+    background:var(--suave);text-align:center}
+  .cupon .cod{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:23px;letter-spacing:.11em;
+    font-weight:600;color:var(--acento2)}
+  .cupon .val{font-family:'Cormorant Garamond',serif;font-size:27px;line-height:1.15;margin-top:3px}
+  .cupon .est{font-size:12.5px;color:var(--tenue);margin-top:6px;line-height:1.55}
+  .cupon.usado{border-style:solid;border-color:var(--linea);background:transparent;opacity:.7}
   .saldo{background:var(--acento2);color:#fff;border-radius:14px;padding:22px;text-align:center;margin-bottom:14px}
   .saldo b{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:600;display:block;line-height:1}
   .saldo span{font-size:12px;letter-spacing:.13em;text-transform:uppercase;opacity:.8}
@@ -105,6 +114,7 @@ const money=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const soloNum=s=>String(s||'').replace(/\D/g,'');
 /* La fecha va junto a cada foto: es lo que convierte una galeria en un antes y
    despues. Sin ella nadie sabe si esos dos resultados son de tres semanas o de un anno. */
+const nomSem=s=>(+s===0?'Antes de empezar':'Semana '+s);
 const fechaLarga=d=>{ if(!d) return '';
   try{ return new Date(d).toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'}); }
   catch(e){ return String(d).slice(0,10); } };
@@ -116,7 +126,7 @@ const CONSENT='Autorizo a Sole Paris a tratar mis datos personales y las imágen
  +'previamente y por escrito, usarlos como caso de éxito. Conozco que puedo consultar, '
  +'actualizar, rectificar o solicitar la supresión de mis datos escribiendo a Sole Paris.';
 
-let YO=null, PROGS=[], PRODS=[], FID=[], AVA=[], CANALES=[], ESTRELLAS=0;
+let YO=null, PROGS=[], PRODS=[], FID=[], AVA=[], REDS=[], CANALES=[], ESTRELLAS=0;
 
 async function api(q,o={}){
   try{ const r=await fetch(SB+'/rest/v1/'+q,{headers:H,...o});
@@ -248,9 +258,10 @@ async function registrar(){
 
 /* ── su seguimiento ───────────────────────────────────────────────────── */
 async function cargar(){
-  [AVA,FID]=await Promise.all([
+  [AVA,FID,REDS]=await Promise.all([
     api('soleparis_avance?paciente_id=eq.'+YO.id+'&order=semana.desc,creado_en.desc'),
-    api('soleparis_fideliza?activo=is.true')]);
+    api('soleparis_fideliza?activo=is.true'),
+    api('soleparis_redencion?paciente_id=eq.'+YO.id+'&order=creado_en.desc')]);
   vPanel();
 }
 function miFid(){
@@ -285,18 +296,44 @@ function verPrograma(){
 }
 function vPanel(){
   const f=miFid();
-  const ganado=AVA.filter(a=>a.aprobado!==false).reduce((s,a)=>s+(+a.valor||0),0);
+  /* Un avance ya cobrado sale de la cuenta: es el mismo redencion_id que marca
+     el admin al emitir el codigo, y es lo que evita que le paguen dos veces. */
+  const vivos=AVA.filter(a=>a.aprobado!==false&&!a.redencion_id);
+  const ganado=vivos.reduce((s,a)=>s+(+a.valor||0),0);
+  const cobrado=REDS.reduce((s,r)=>s+(+r.valor||0),0);
   const tope=+f.tope||0;
   const saldo=tope?Math.min(ganado,tope):ganado;
+  const codigo=r=>{
+    const usado=r.estado==='usado';
+    const venc=r.vence&&!usado&&new Date(r.vence)<new Date();
+    return `<div class="cupon${usado||venc?' usado':''}">
+      <div class="cod">${esc(r.codigo)}</div>
+      <div class="val">${money(r.valor)}</div>
+      <div class="est">${usado
+        ? 'Ya aplicado'+(r.factura?' en la factura '+esc(r.factura):'')
+        : venc
+          ? 'Venci\u00f3 el '+fechaLarga(r.vence)
+          : 'Mu\u00e9stralo al pagar tu pr\u00f3xima compra'+(r.vence?'<br>Vence el '+fechaLarga(r.vence):'')}</div>
+    </div>`; };
   const fotos=AVA.filter(a=>a.tipo==='foto').length, vids=AVA.filter(a=>a.tipo==='video').length;
   const sem=AVA.length?Math.max(...AVA.map(a=>+a.semana||0)):0;
+  const hayAntes=AVA.some(a=>+a.semana===0);
+  const prox=Math.min(sem+1,+f.semanas||12);
   const porSem={}; AVA.forEach(a=>{ (porSem[a.semana||0]=porSem[a.semana||0]||[]).push(a); });
   $('app').innerHTML=`
     <h1 class="serif">Hola, ${esc((YO.nombre||'').split(' ')[0])}</h1>
-    <p class="lead">${esc(YO.kit_nombre||'Tu tratamiento')} · semana ${sem||1} de ${f.semanas||12}</p>
+    <p class="lead">${esc(YO.kit_nombre||'Tu tratamiento')} · ${hayAntes&&!sem?'recién empezando':'semana '+(sem||1)+' de '+(f.semanas||12)}</p>
     <div class="saldo"><span>Tu descuento acumulado</span><b>${money(saldo)}</b>
       <span style="opacity:.75;text-transform:none;letter-spacing:0;font-size:12.5px">
-        para tu próxima compra${tope?` · tope ${money(tope)}`:''}</span></div>
+        ${saldo?`para tu próxima compra${tope?` · tope ${money(tope)}`:''}`
+               :(cobrado?`ya cobraste ${money(cobrado)} · sigue subiendo y vuelve a acumular`
+                        :'sube tu primera foto y empieza a acumular')}</span></div>
+    ${REDS.length?`<div class="card">
+      <h1 class="serif" style="font-size:21px;margin-bottom:3px">Mis descuentos cobrados</h1>
+      <p class="hint" style="margin-bottom:11px">Este es tu número de autorización. Se anexa a la
+        factura para que te apliquen el descuento.</p>
+      ${REDS.map(codigo).join('')}
+    </div>`:''}
     <div class="kpis">
       <div class="kpi"><b>${fotos}</b><span>Fotos · ${money(f.valor_foto)} c/u</span></div>
       <div class="kpi"><b>${vids}</b><span>Videos · ${money(f.valor_video)} c/u</span></div>
@@ -304,8 +341,14 @@ function vPanel(){
     <div class="card">
       <h1 class="serif" style="font-size:21px;margin-bottom:3px">Registrar mi avance</h1>
       <p class="hint" style="margin-bottom:4px">Sube una foto o un video de esta semana.</p>
-      <label>Semana</label>
-      <input id="a_sem" type="number" min="1" max="52" value="${(sem||0)+1}">
+      <label>¿De cuándo es?</label>
+      <select id="a_sem">
+        <option value="0"${hayAntes?'':' selected'}>Antes de empezar · mi foto inicial</option>
+        ${Array.from({length:(+f.semanas||12)},(_,k)=>k+1).map(w=>
+          `<option value="${w}"${hayAntes&&w===prox?' selected':''}>Semana ${w}</option>`).join('')}
+      </select>
+      ${hayAntes?'':`<div class="hint" style="color:var(--acento2)">Empieza por tu foto de antes:
+        es la que hace que se note el cambio.</div>`}
       <label>¿Cómo te fue esta semana?</label>
       <textarea id="a_nota" placeholder="Qué notaste, cómo sientes tu cabello…"></textarea>
       <label>¿Qué vas a subir?</label>
@@ -324,13 +367,15 @@ function vPanel(){
     ${AVA.length?`<div class="card">
       <h1 class="serif" style="font-size:21px;margin-bottom:10px">Mi progreso</h1>
       ${Object.keys(porSem).sort((a,b)=>b-a).map(s=>`<div class="sem">
-        <div class="n">Semana ${esc(s)}</div>
+        <div class="n">${esc(nomSem(s))}</div>
         ${porSem[s].map(a=>`
           <div class="t">${esc(a.nota||(a.tipo==='video'?'Video de avance':'Foto de avance'))}</div>
-          <div class="v">+ ${money(a.valor)} ${a.tipo==='video'?'· video':'· foto'}${a.creado_en?' · subida el '+fechaLarga(a.creado_en):''}</div>
+          <div class="v">+ ${money(a.valor)} ${a.tipo==='video'?'· video':'· foto'}${a.creado_en?' · subida el '+fechaLarga(a.creado_en):''}${(()=>{
+            const r=REDS.find(x=>x.id===a.redencion_id);
+            return r?` · cobrada con ${esc(r.codigo)}`:''; })()}</div>
           ${a.url?(a.tipo==='video'
             ?`<video src="${esc(a.url)}" controls preload="metadata"></video>`
-            :`<img src="${esc(a.url)}" alt="Semana ${esc(s)}" loading="lazy">`):''}`).join('')}
+            :`<img src="${esc(a.url)}" alt="${esc(nomSem(s))}" loading="lazy">`):''}`).join('')}
       </div>`).join('')}
     </div>`:'<div class="card"><div class="vacio">Todavía no has registrado nada.<br>Tu primera foto ya te da descuento.</div></div>'}
     <div class="card">
@@ -385,10 +430,11 @@ async function subir(){
   if(!url){ b.disabled=false; b.textContent='Intentar otra vez';
     e.textContent='No pudimos subir el archivo. Revisa tu conexión e intenta otra vez.'; e.style.display='block'; return; }
   await post('soleparis_avance',{id:'av'+Date.now(),paciente_id:YO.id,
-    semana:+$('a_sem').value||1,tipo:tipo,url:url,nota:($('a_nota').value||'').trim()||null,
+    semana:+$('a_sem').value||0,tipo:tipo,url:url,nota:($('a_nota').value||'').trim()||null,
     valor:valor,aprobado:true});
   /* El saldo se guarda en el registro para que Sole Paris lo vea sin recalcular. */
-  const nuevo=AVA.reduce((s,a)=>s+(+a.valor||0),0)+valor;
+  const nuevo=AVA.filter(a=>a.aprobado!==false&&!a.redencion_id)
+                 .reduce((s,a)=>s+(+a.valor||0),0)+valor;
   await patch('soleparis_paciente?id=eq.'+YO.id,{saldo:nuevo});
   YO.saldo=nuevo;
   await cargar();
