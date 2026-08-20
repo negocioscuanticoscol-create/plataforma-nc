@@ -278,149 +278,269 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       </div>`);
   },
   /* ---------- FIDELIZACIÓN ----------
-     Un programa no es un producto del catálogo: es un tratamiento armado con varias
-     referencias, con su duración y con lo que se le reconoce a quien documenta su
-     avance. Ese reconocimiento es lo que consigue los antes y después — que es lo
-     que de verdad vende dermocosmética. */
+     El programa arranca por la CATEGORÍA del tratamiento; de ahí salen las
+     referencias de esa línea y el admin escoge cuáles debería usar la clienta.
+     Lo que se reconoce por foto y por video es lo que consigue los antes y después,
+     que en dermocosmética es lo que de verdad vende. */
+  _fcat:'', _fsel:[], _pacSel:null,
   async vFidelizacion(){
-    const [progs,pacs,ava]=await Promise.all([
+    const [progs,pacs,ava,red]=await Promise.all([
       this._get('soleparis_fideliza?order=kit_nombre'),
       this._get('soleparis_paciente?order=creado_en.desc&limit=300'),
-      this._get('soleparis_avance?order=creado_en.desc&limit=800')]);
-    this._progs=progs; this._pacs=pacs; this._ava=ava;
+      this._get('soleparis_avance?order=creado_en.desc&limit=800'),
+      this._get('soleparis_redencion?order=creado_en.desc&limit=200')]);
+    this._progs=progs; this._pacs=pacs; this._ava=ava; this._red=red;
     const prods=this._prods||[];
+    const cats=[...new Set(prods.map(p=>p.categoria).filter(Boolean))].sort();
     const nom=id=>{ const p=prods.find(x=>x.id===id); return p?p.nombre:id; };
     const val=id=>{ const p=prods.find(x=>x.id===id); return +(p&&p.precio_venta)||0; };
     const link=location.href.replace(/[^/]*$/,'')+'mi-tratamiento.html';
-    const pagado=ava.filter(a=>a.aprobado!==false).reduce((s,a)=>s+(+a.valor||0),0);
+    const dela=prods.filter(p=>!this._fcat||p.categoria===this._fcat);
+    const selVal=this._fsel.reduce((s,id)=>s+val(id),0);
+    const porCobrar=red.filter(r=>r.estado==='emitido').reduce((s,r)=>s+(+r.valor||0),0);
+
     this.set(`<h1>Fidelización</h1>
-      <div class="sub">${progs.length} programa${progs.length===1?'':'s'} · ${pacs.length} personas inscritas
-        · ${ava.length} registros de avance</div>
+      <div class="sub">${progs.length} programa${progs.length===1?'':'s'} · ${pacs.length} inscritas
+        · ${ava.length} avances · ${red.length} códigos emitidos</div>
 
       <div class="card" style="background:var(--accent-soft)">
         <div style="font-weight:600;margin-bottom:5px">El enlace para tus clientas</div>
-        <div style="font-size:12.5px;color:var(--faint);margin-bottom:9px">Entran con nombre y cédula.
-          La primera vez llenan sus datos y firman la autorización; después ya entran directo a su seguimiento.</div>
+        <div style="font-size:12.5px;color:var(--faint);margin-bottom:9px">Entran con nombre y cédula y firman
+          la autorización una sola vez. Después entran solo con la cédula.</div>
         <input class="field" readonly value="${this.esc(link)}" onclick="this.select()">
         <button class="btn" onclick="App.copiarLink('${this.esc(link)}')">Copiar enlace</button>
       </div>
 
       <div class="kpis">
         <div class="kpi"><b>${pacs.length}</b><span>Inscritas</span></div>
-        <div class="kpi"><b>${this.fmt(pagado)}</b><span>Descuento reconocido</span></div>
+        <div class="kpi"><b>${this.fmt(porCobrar)}</b><span>Descuentos por cobrar</span></div>
       </div>
 
-      <h1 style="font-size:18px;margin-top:20px">Armar un programa</h1>
+      <h1 style="font-size:18px;margin-top:20px">Armar un plan de seguimiento</h1>
       <div class="card">
-        <label>Nombre del programa</label><input id="fp_n" class="field" placeholder="Ej: Kit Capilar">
-        <label>La promesa · qué se lleva quien lo haga</label>
-        <input id="fp_pr" class="field" placeholder="Menos caída y cuero cabelludo sano en 12 semanas">
-        <label>Descripción</label><input id="fp_d" class="field" placeholder="Qué incluye y para qué sirve">
-        <div class="row2">
-          <div><label>Por cada foto</label><input id="fp_vf" class="field" type="number" placeholder="8000"></div>
-          <div><label>Por cada video</label><input id="fp_vv" class="field" type="number" placeholder="25000"></div>
-        </div>
-        <div class="row2">
-          <div><label>Semanas de seguimiento</label><input id="fp_s" class="field" type="number" value="12"></div>
-          <div><label>Tope de descuento</label><input id="fp_t" class="field" type="number" placeholder="120000"></div>
-        </div>
-        <div class="hint">El tope evita que el descuento se coma el margen. En cero, sin tope.</div>
-        <button class="btn" onclick="App.fidAdd()">+ Crear programa</button>
+        <label>Kit / línea de tratamiento</label>
+        <select id="fp_cat" class="field" onchange="App.fidCat(this.value)">
+          <option value="">— elige la línea —</option>
+          ${cats.map(c=>`<option value="${this.esc(c)}" ${c===this._fcat?'selected':''}>${this.esc(c)}</option>`).join('')}
+        </select>
+
+        ${this._fcat?`
+          <label>Qué referencias debería usar</label>
+          <div style="border:1px solid var(--line,#eee);border-radius:9px;padding:10px;max-height:260px;overflow-y:auto">
+            ${dela.length?dela.map(p=>`<label style="display:flex;align-items:center;gap:9px;padding:6px 2px;
+              text-transform:none;letter-spacing:0;font-size:13.5px;color:var(--ink);margin:0;cursor:pointer">
+              <input type="checkbox" style="width:auto" ${this._fsel.includes(p.id)?'checked':''}
+                onchange="App.fidTick('${p.id}')">
+              <span style="flex:1">${this.esc(p.nombre)}</span>
+              <span style="color:var(--faint)">${this.fmt(p.precio_venta)}</span></label>`).join('')
+              :'<div style="color:var(--faint);font-size:13px">No hay referencias en esa línea.</div>'}
+          </div>
+          ${this._fsel.length?`<div style="text-align:right;font-weight:600;margin-top:7px">
+            ${this._fsel.length} referencias · ${this.fmt(selVal)}</div>`:''}
+
+          <label>Nombre del plan</label>
+          <input id="fp_n" class="field" placeholder="Ej: Kit Capilar" value="${this.esc('KIT '+this._fcat.toUpperCase())}">
+          <label>La promesa · qué se lleva quien lo haga</label>
+          <input id="fp_pr" class="field" placeholder="Menos caída y cuero cabelludo sano">
+          <div class="row2">
+            <div><label>Por cada foto</label><input id="fp_vf" class="field" type="number" placeholder="8000"></div>
+            <div><label>Por el video de testimonio</label><input id="fp_vv" class="field" type="number" placeholder="25000"></div>
+          </div>
+          <div class="row2">
+            <div><label>Meses de tratamiento</label><input id="fp_m" class="field" type="number" value="3" oninput="App.fidSem()"></div>
+            <div><label>Tope de descuento</label><input id="fp_t" class="field" type="number" placeholder="120000"></div>
+          </div>
+          <div class="hint" id="fp_hint">3 meses son 12 semanas: 12 fotos posibles.</div>
+          <button class="btn" onclick="App.fidAdd()">Crear plan</button>
+        `:'<div class="hint">Elige primero la línea y te muestro sus referencias.</div>'}
       </div>
 
       ${progs.length?progs.map(p=>{
         const ids=Array.isArray(p.productos)?p.productos:[];
         const vk=ids.reduce((s,id)=>s+val(id),0);
-        const insc=pacs.filter(x=>x.programa_id===p.id||x.kit_nombre===p.kit_nombre);
+        const insc=pacs.filter(x=>x.programa_id===p.id);
+        const sem=(+p.meses||3)*4;
         const pct=vk?Math.round((+p.tope||0)/vk*100):0;
         return `<div class="prod">
         <div class="top"><div><div class="nm">${this.esc(p.kit_nombre)}</div>
-          <div class="ct">${this.esc(p.promesa||p.descripcion||'')}</div></div>
+          <div class="ct">${this.esc(p.categoria||'')}${p.promesa?' · '+this.esc(p.promesa):''}</div></div>
           <div class="pv" style="font-size:13px"><span class="pchip stock">${insc.length} inscritas</span></div></div>
-
-        <table class="tabla" style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px">
           ${ids.length?ids.map(id=>`<tr><td style="padding:6px 0;border-bottom:1px solid var(--line,#eee)">${this.esc(nom(id))}</td>
-            <td style="text-align:right;padding:6px 0;border-bottom:1px solid var(--line,#eee)">${this.fmt(val(id))}</td>
-            <td style="text-align:right;width:34px;padding:6px 0;border-bottom:1px solid var(--line,#eee)">
-              <a onclick="App.fidQuitar('${p.id}','${id}')" style="cursor:pointer;color:var(--faint)">✕</a></td></tr>`).join('')
-            :'<tr><td colspan="3" style="padding:8px 0;color:var(--faint)">Sin referencias todavía.</td></tr>'}
+            <td style="text-align:right;padding:6px 0;border-bottom:1px solid var(--line,#eee)">${this.fmt(val(id))}</td></tr>`).join('')
+            :'<tr><td style="padding:8px 0;color:var(--faint)">Sin referencias.</td></tr>'}
           ${ids.length?`<tr><td style="padding:8px 0;font-weight:600">Vale el tratamiento</td>
-            <td style="text-align:right;padding:8px 0;font-weight:600">${this.fmt(vk)}</td><td></td></tr>`:''}
+            <td style="text-align:right;padding:8px 0;font-weight:600">${this.fmt(vk)}</td></tr>`:''}
         </table>
-
-        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-top:8px">
-          <select id="fa_${p.id}" class="field">
-            <option value="">— agregar referencia —</option>
-            ${prods.filter(x=>!ids.includes(x.id)).map(x=>`<option value="${x.id}">${this.esc(x.nombre)} · ${this.fmt(x.precio_venta)}</option>`).join('')}
-          </select>
-          <button class="btn gh2" onclick="App.fidPone('${p.id}')">+</button>
-        </div>
-
         <div style="background:var(--accent-soft);border-radius:8px;padding:11px 13px;margin-top:11px;font-size:13px;line-height:1.7">
-          <b>Lo que gana quien participa</b><br>
-          Cada foto ${this.fmt(p.valor_foto)} · cada video ${this.fmt(p.valor_video)} · durante ${p.semanas||12} semanas<br>
-          Hasta <b>${this.fmt(p.tope)}</b> de descuento${vk?` — el ${pct}% de lo que vale el tratamiento`:''}
+          <b>${p.meses||3} meses · ${sem} semanas de seguimiento</b><br>
+          Cada foto ${this.fmt(p.valor_foto)} · el video de testimonio ${this.fmt(p.valor_video)}<br>
+          Puede llegar a ${this.fmt(sem*(+p.valor_foto||0)+(+p.valor_video||0))}, con tope de <b>${this.fmt(p.tope)}</b>${vk?` — el ${pct}% del tratamiento`:''}
         </div>
-        ${pct>=35?`<div style="font-size:12.5px;color:var(--alerta,#a8452f);margin-top:7px">
-          ⚠ El tope es el ${pct}% del tratamiento. Revisa que el margen lo aguante.</div>`:''}
-
+        ${pct>=35?`<div style="font-size:12.5px;color:#a8452f;margin-top:7px">
+          ⚠ El tope es el ${pct}% de lo que vale el tratamiento. Revisa que el margen lo aguante.</div>`:''}
         <div class="meta" style="margin-top:10px;gap:6px">
           <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.fidEdit('${p.id}')">editar valores</button>
           <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.fidDel('${p.id}')">✕</button></div>
       </div>`;}).join('')
-      :'<div class="empty">Todavía sin programas. Arma el primero arriba.</div>'}
+      :'<div class="empty">Todavía sin planes.</div>'}
+
+      ${red.length?`<h1 style="font-size:18px;margin-top:22px">Códigos de descuento</h1>
+      <div class="sub" style="margin-bottom:8px">Se anexan a la factura para autorizar el descuento en caja
+        y validarlo después en contabilidad.</div>
+      ${red.map(r=>`<div class="prod"><div class="top">
+        <div><div class="nm" style="font-family:monospace">${this.esc(r.codigo)}</div>
+          <div class="ct">${this.esc(r.paciente||'')} · c.c. ${this.esc(r.cedula||'')} · ${String(r.creado_en||'').slice(0,10)}</div></div>
+        <div class="pv">${this.fmt(r.valor)}</div></div>
+        <div class="meta" style="margin-top:7px;gap:6px">
+          <span class="pchip ${r.estado==='usado'?'stock':'cost'}">${this.esc(r.estado)}</span>
+          ${r.factura?`<span class="pchip">factura ${this.esc(r.factura)}</span>`:''}
+          ${r.validado?'<span class="pchip stock">validado</span>':''}
+          ${r.estado==='emitido'?`<button class="btn gh2" style="padding:4px 11px;font-size:12px" onclick="App.redUsar('${r.id}')">marcar usado</button>`:''}
+          ${r.estado==='usado'&&!r.validado?`<button class="btn gh2" style="padding:4px 11px;font-size:12px" onclick="App.redValidar('${r.id}')">validar</button>`:''}
+        </div></div>`).join('')}`:''}
 
       ${pacs.length?`<h1 style="font-size:18px;margin-top:22px">Quiénes están participando</h1>
       ${pacs.map(x=>{ const mios=ava.filter(a=>a.paciente_id===x.id);
         const f=mios.filter(a=>a.tipo==='foto').length, v=mios.filter(a=>a.tipo==='video').length;
-        return `<div class="prod"><div class="top">
+        return `<div class="prod" style="cursor:pointer${x.id===this._pacSel?';border-color:var(--accent2)':''}"
+          onclick="App.pacAbrir('${x.id}')"><div class="top">
           <div><div class="nm">${this.esc(x.nombre)}</div>
-            <div class="ct">${this.esc(x.kit_nombre||'—')} · ${this.esc(x.celular||'sin celular')}${x.email?' · '+this.esc(x.email):''}</div></div>
+            <div class="ct">c.c. ${this.esc(x.cedula||'')} · ${this.esc(x.kit_nombre||'—')} · ${this.esc(x.celular||'sin celular')}</div></div>
           <div class="pv">${this.fmt(x.saldo)}</div></div>
           <div class="meta" style="margin-top:6px">
             <span class="pchip ${mios.length?'stock':'cost'}">${f} fotos · ${v} videos</span>
             ${x.consentimiento?'<span class="pchip stock">autorización firmada</span>':'<span class="pchip cost">sin autorización</span>'}
-          </div></div>`;}).join('')}`:''}`);
+            ${x.invertido?`<span class="pchip">compró ${this.fmt(x.invertido)}</span>`:''}
+          </div>
+          ${x.id===this._pacSel?this.pacFicha(x,mios):''}
+          </div>`;}).join('')}`:''}`);
   },
   copiarLink(l){ navigator.clipboard.writeText(l).then(()=>this.toast('Enlace copiado')); },
+  pacAbrir(id){ this._pacSel=(this._pacSel===id?null:id); this.vFidelizacion(); },
+  /* Entrar a cada participante es lo que permite revisar antes de reconocer: una foto
+     borrosa o repetida no debería valer lo mismo que un avance real. */
+  pacFicha(x,mios){
+    const prods=this._prods||[];
+    const nom=id=>{ const p=prods.find(y=>y.id===id); return p?p.nombre:id; };
+    const porSem={}; mios.forEach(a=>{ (porSem[a.semana||0]=porSem[a.semana||0]||[]).push(a); });
+    const pend=mios.filter(a=>a.aprobado!==false&&!a.redencion_id);
+    const pendVal=pend.reduce((s,a)=>s+(+a.valor||0),0);
+    const comp=Array.isArray(x.comprados)?x.comprados:[];
+    const mis=(this._red||[]).filter(r=>r.paciente_id===x.id);
+    return `<div style="border-top:1px solid var(--line,#eee);margin-top:12px;padding-top:12px"
+      onclick="event.stopPropagation()">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tr><td style="padding:4px 0;color:var(--faint)">Correo</td><td style="text-align:right">${this.esc(x.email||'—')}</td></tr>
+        <tr><td style="padding:4px 0;color:var(--faint)">Dirección</td><td style="text-align:right">${this.esc(x.direccion||'—')}</td></tr>
+        <tr><td style="padding:4px 0;color:var(--faint)">Inició</td><td style="text-align:right">${this.esc(String(x.inicio||x.creado_en||'').slice(0,10))}</td></tr>
+        <tr><td style="padding:4px 0;color:var(--faint)">Autorizó el</td><td style="text-align:right">${this.esc(String(x.consentimiento_en||'').slice(0,10)||'—')}</td></tr>
+      </table>
+      ${comp.length?`<div style="font-weight:600;font-size:13px;margin-top:11px">Lo que compró</div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+        ${comp.map(c=>`<tr><td style="padding:4px 0">${this.esc(c.nombre||nom(c.id))}</td>
+          <td style="text-align:right">${this.fmt(c.valor)}</td></tr>`).join('')}
+        <tr><td style="padding:6px 0;font-weight:600">Invertido</td>
+          <td style="text-align:right;font-weight:600">${this.fmt(x.invertido)}</td></tr></table>`:''}
+      <div style="font-weight:600;font-size:13px;margin-top:12px">Su seguimiento</div>
+      ${mios.length?Object.keys(porSem).sort((a,b)=>b-a).map(s=>`
+        <div style="border-left:2px solid var(--line,#eee);padding:0 0 12px 13px;margin:8px 0 0 5px">
+          <div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)">Semana ${this.esc(s)}</div>
+          ${porSem[s].map(a=>`<div style="margin-top:5px">
+            <div style="font-size:13px">${this.esc(a.nota||(a.tipo==='video'?'Video de testimonio':'Foto de avance'))}
+              <span style="color:${a.aprobado===false?'#a8452f':'var(--accent2)'};font-weight:500"> ${a.aprobado===false?'· rechazado':'· '+this.fmt(a.valor)}</span>
+              ${a.redencion_id?'<span class="pchip" style="margin-left:6px">ya cobrado</span>':''}</div>
+            ${a.url?(a.tipo==='video'
+              ?`<video src="${this.esc(a.url)}" controls preload="metadata" style="width:100%;max-width:280px;border-radius:8px;margin-top:5px"></video>`
+              :`<img src="${this.esc(a.url)}" style="width:100%;max-width:220px;border-radius:8px;margin-top:5px" loading="lazy">`):''}
+            ${!a.redencion_id?`<div style="margin-top:4px">
+              <button class="btn gh2" style="padding:3px 10px;font-size:11.5px" onclick="App.avaTogg('${a.id}',${a.aprobado===false})">${a.aprobado===false?'aprobar':'rechazar'}</button>
+              </div>`:''}
+          </div>`).join('')}
+        </div>`).join('')
+        :'<div style="color:var(--faint);font-size:13px;margin-top:5px">Todavía no ha subido nada.</div>'}
+      ${pendVal?`<div style="background:var(--accent-soft);border-radius:8px;padding:11px 13px;margin-top:11px;font-size:13px">
+        <b>Tiene ${this.fmt(pendVal)} sin cobrar</b> en ${pend.length} registro${pend.length===1?'':'s'}.
+        <button class="btn" style="margin-top:9px" onclick="App.emitirCodigo('${x.id}')">Emitir código de descuento</button>
+      </div>`:''}
+      ${mis.length?`<div style="font-size:12.5px;color:var(--faint);margin-top:9px">
+        Códigos: ${mis.map(r=>this.esc(r.codigo)+' ('+this.esc(r.estado)+')').join(' · ')}</div>`:''}
+    </div>`;
+  },
+  async avaTogg(id,aprobar){
+    await this._patch('soleparis_avance?id=eq.'+id,{aprobado:!!aprobar});
+    this.vFidelizacion();
+  },
+  /* El código es consecutivo y único: es lo que se anexa a la factura para autorizar
+     el descuento en caja, y lo que contabilidad revisa después. */
+  async emitirCodigo(pid){
+    const x=(this._pacs||[]).find(p=>p.id===pid); if(!x) return;
+    const pend=(this._ava||[]).filter(a=>a.paciente_id===pid&&a.aprobado!==false&&!a.redencion_id);
+    if(!pend.length){ this.toast('No tiene avances pendientes'); return; }
+    const prog=(this._progs||[]).find(p=>p.id===x.programa_id)||{};
+    const bruto=pend.reduce((s,a)=>s+(+a.valor||0),0);
+    const tope=+prog.tope||0;
+    const valor=tope?Math.min(bruto,tope):bruto;
+    const aviso=(tope&&bruto>tope)?' (acumuló '+this.fmt(bruto)+' pero el tope del plan es '+this.fmt(tope)+')':'';
+    if(!confirm('¿Emitir código por '+this.fmt(valor)+' para '+x.nombre+'?'+aviso)) return;
+    const num=((this._red||[]).length+1);
+    const cod='SP-'+String(new Date().getFullYear()).slice(2)+'-'+String(num).padStart(4,'0');
+    const vence=new Date(Date.now()+60*86400000).toISOString().slice(0,10);
+    const rid='rd'+Date.now();
+    await this._post('soleparis_redencion',{id:rid,codigo:cod,paciente_id:pid,paciente:x.nombre,
+      cedula:x.cedula,valor:valor,estado:'emitido',vence:vence,
+      detalle:pend.map(a=>({id:a.id,semana:a.semana,tipo:a.tipo,valor:a.valor}))});
+    for(const a of pend) await this._patch('soleparis_avance?id=eq.'+a.id,{redencion_id:rid});
+    await this._patch('soleparis_paciente?id=eq.'+pid,{saldo:0});
+    alert('Código '+cod+' por '+this.fmt(valor)+'. Se anexa a la factura para autorizar el descuento. Vence el '+vence+'.');
+    this.vFidelizacion();
+  },
+  fidCat(c){ this._fcat=c; this._fsel=[]; this.vFidelizacion(); },
+  fidTick(id){ const i=this._fsel.indexOf(id);
+    if(i<0) this._fsel.push(id); else this._fsel.splice(i,1);
+    this.vFidelizacion(); },
+  fidSem(){ const m=+document.getElementById('fp_m').value||3;
+    const h=document.getElementById('fp_hint');
+    if(h) h.textContent=`${m} ${m===1?'mes son 4 semanas':'meses son '+(m*4)+' semanas'}: ${m*4} fotos posibles.`; },
   async fidAdd(){
     const g=id=>(document.getElementById(id).value||'').trim();
-    if(!g('fp_n')){ this.toast('Ponle nombre al programa'); return; }
+    if(!g('fp_n')){ this.toast('Ponle nombre al plan'); return; }
+    if(!this._fsel.length){ this.toast('Marca al menos una referencia'); return; }
     await this._post('soleparis_fideliza',{id:'fd'+Date.now(),kit_nombre:g('fp_n').toUpperCase(),
-      promesa:g('fp_pr')||null,descripcion:g('fp_d')||null,
+      categoria:this._fcat,promesa:g('fp_pr')||null,
       valor_foto:+g('fp_vf')||0,valor_video:+g('fp_vv')||0,
-      semanas:+g('fp_s')||12,tope:+g('fp_t')||0,productos:[],activo:true});
-    this.toast('Programa creado'); this.vFidelizacion();
-  },
-  async fidPone(pid){
-    const s=document.getElementById('fa_'+pid); const id=s&&s.value;
-    if(!id) return;
-    const p=(this._progs||[]).find(x=>x.id===pid); if(!p) return;
-    const ids=Array.isArray(p.productos)?p.productos.slice():[];
-    if(!ids.includes(id)) ids.push(id);
-    await this._patch('soleparis_fideliza?id=eq.'+pid,{productos:ids});
-    this.vFidelizacion();
-  },
-  async fidQuitar(pid,id){
-    const p=(this._progs||[]).find(x=>x.id===pid); if(!p) return;
-    const ids=(Array.isArray(p.productos)?p.productos:[]).filter(x=>x!==id);
-    await this._patch('soleparis_fideliza?id=eq.'+pid,{productos:ids});
-    this.vFidelizacion();
+      meses:+g('fp_m')||3,semanas:(+g('fp_m')||3)*4,tope:+g('fp_t')||0,
+      productos:this._fsel.slice(),activo:true});
+    this._fsel=[]; this.toast('Plan creado · ya le aparece a tus clientas'); this.vFidelizacion();
   },
   async fidEdit(pid){
     const p=(this._progs||[]).find(x=>x.id===pid); if(!p) return;
-    const f=prompt('¿Cuánto se le reconoce por cada FOTO?',p.valor_foto); if(f===null) return;
-    const v=prompt('¿Y por cada VIDEO?',p.valor_video); if(v===null) return;
+    const f=prompt('¿Cuánto por cada FOTO?',p.valor_foto); if(f===null) return;
+    const v=prompt('¿Y por el VIDEO de testimonio?',p.valor_video); if(v===null) return;
+    const m=prompt('¿De cuántos meses es el tratamiento?',p.meses||3); if(m===null) return;
     const t=prompt('Tope de descuento (0 = sin tope)',p.tope); if(t===null) return;
     await this._patch('soleparis_fideliza?id=eq.'+pid,
-      {valor_foto:+f||0,valor_video:+v||0,tope:+t||0});
+      {valor_foto:+f||0,valor_video:+v||0,meses:+m||3,semanas:(+m||3)*4,tope:+t||0});
     this.vFidelizacion();
   },
   async fidDel(pid){
     const insc=(this._pacs||[]).filter(x=>x.programa_id===pid).length;
-    if(insc){ alert('No se puede quitar: hay '+insc+' persona(s) inscrita(s) en este programa.'); return; }
-    if(!confirm('¿Quitar este programa?'))return;
+    if(insc){ alert('No se puede quitar: hay '+insc+' persona(s) inscrita(s).'); return; }
+    if(!confirm('¿Quitar este plan?'))return;
     await this._delq('soleparis_fideliza?id=eq.'+pid); this.vFidelizacion();
+  },
+  async redUsar(id){
+    const f=prompt('¿En qué factura se aplicó el descuento?','');
+    if(f===null) return;
+    await this._patch('soleparis_redencion?id=eq.'+id,
+      {estado:'usado',factura:f.trim()||null,usado_en:new Date().toISOString()});
+    this.vFidelizacion();
+  },
+  async redValidar(id){
+    const q=prompt('¿Quién lo validó en contabilidad?','');
+    if(q===null||!q.trim()) return;
+    await this._patch('soleparis_redencion?id=eq.'+id,{validado:true,validado_por:q.trim()});
+    this.toast('Validado'); this.vFidelizacion();
   },
 
   /* ---------- CAPACITACIÓN ----------
