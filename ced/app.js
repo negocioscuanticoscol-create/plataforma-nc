@@ -5591,6 +5591,17 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   /* Para meter un texto dentro de un onclick="...('aquí')": si la referencia
      trae una comilla, sin esto el botón queda roto. */
   _plnJs(s){ return esc(String(s==null?'':s)).replace(/'/g,'&#39;'); },
+  /* La referencia se escribe a mano y agrupa el saldo. "701", "701 " y "  701"
+     son la misma bota, pero como texto son tres cosas distintas: sin esto
+     aparecen referencias fantasma con el saldo repartido entre ellas. */
+  _plnRef(s){ return String(s==null?'':s).trim().replace(/\s+/g,' ').toUpperCase(); },
+  /* Las referencias que ya se han usado, para autocompletar y no reescribirlas. */
+  _plnRefs(){
+    const s=new Set();
+    (this._plnFoto||[]).forEach(r=>s.add(r.referencia));
+    (this._plnMovs||[]).forEach(r=>s.add(r.referencia));
+    return [...s].filter(Boolean).sort();
+  },
   _plnFecha(t){
     if(!t) return '—';
     const d=new Date(t); if(isNaN(d)) return '—';
@@ -5786,7 +5797,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       <div id="pl_tipos" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       <div class="hint" id="pl_hint"></div>
       <div class="row2">
-        <div><label>Referencia</label><input id="pl_ref" class="field" value="${esc(ref||'')}" placeholder="ej: 701" onchange="App._plnTraer()"></div>
+        <div><label>Referencia</label><input id="pl_ref" class="field" list="pl_refs" value="${esc(ref||'')}" placeholder="ej: 701" onchange="App._plnTraer()">
+          <datalist id="pl_refs">${this._plnRefs().map(r=>`<option value="${esc(r)}">`).join('')}</datalist></div>
         <div><label>Color</label><input id="pl_col" class="field" value="${esc(color||'')}" placeholder="opcional" onchange="App._plnTraer()"></div>
       </div>
       <label>Tallaje</label>
@@ -5819,8 +5831,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   _plnTraer(){
     if(this._plnTipo!=='foto') return;
     const p=(document.getElementById('pl_planta')||{}).value;
-    const r=((document.getElementById('pl_ref')||{}).value||'').trim();
-    const c=((document.getElementById('pl_col')||{}).value||'').trim();
+    const r=this._plnRef((document.getElementById('pl_ref')||{}).value);
+    const c=this._plnRef((document.getElementById('pl_col')||{}).value);
     if(!r) return;
     const filas=(this._plnFoto||[]).filter(x=>x.planta===p && x.referencia===r && (x.color||'')===c);
     if(!filas.length) return;
@@ -5832,8 +5844,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
 
   async plnGuardar(){
     const planta=(document.getElementById('pl_planta')||{}).value;
-    const ref=((document.getElementById('pl_ref')||{}).value||'').trim();
-    const color=((document.getElementById('pl_col')||{}).value||'').trim();
+    const ref=this._plnRef((document.getElementById('pl_ref')||{}).value);
+    const color=this._plnRef((document.getElementById('pl_col')||{}).value);
     const nota=((document.getElementById('pl_nota')||{}).value||'').trim();
     const tipo=this._plnTipo;
     if(!ref){ alert('Falta la referencia.'); return; }
@@ -5926,7 +5938,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           if(v==='') return;
           const n=parseInt(v,10); if(isNaN(n)||n<0){ malas++; return; }
           if(!t) return;
-          filas.push({referencia:ref, color, talla:String(t), cantidad:n});
+          filas.push({referencia:this._plnRef(ref), color:this._plnRef(color), talla:String(t).trim(), cantidad:n});
         });
       }
       return {filas, modo:'cuadro', malas};
@@ -5940,7 +5952,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       const ref=(c[0]||'').trim(); if(!ref){ malas++; return; }
       const talla=String(c[c.length-2]||'').trim();
       const color=c.length>=4 ? String(c[1]||'').trim() : '';
-      filas.push({referencia:ref, color, talla, cantidad:n});
+      filas.push({referencia:this._plnRef(ref), color:this._plnRef(color), talla:talla.trim(), cantidad:n});
     });
     return {filas, modo:'lista', malas};
   },
@@ -5984,34 +5996,87 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     } finally { if(btn){ btn.disabled=false; btn.textContent='Guardar lo que se entendió'; } }
   },
 
-  /* --- 🏭 la lista de plantas, editable desde acá --- */
+  /* --- 🏭 la lista de plantas, con su ficha --- */
+  /* Una planta no es solo un nombre: hay que poder llamarla y facturarle. Por eso
+     la ficha lleva NIT, dirección y teléfono. Lo único obligatorio es el nombre:
+     así se puede dejar creada la planta y completar los datos después, en vez de
+     inventarlos con tal de poder guardar. */
   plnPlantas(){
     if(!this.plnPuedeGrabar()){ alert('Tu cargo puede consultar, pero no grabar.'); return; }
     const ps=this._plantas||[];
+    const falta=p=>!p.nit||!p.direccion||!p.telefono;
     this.modal(`<h3>🏭 Plantas de producción</h3>
       <div class="sub">Las que producen y alimentan esta consulta</div>
       ${ps.length?ps.map(p=>`<div class="item" style="padding:11px">
-        <div class="top"><div>
-          <div class="nom">${esc(p.nombre)} ${p.activo===false?'<span style="color:#dc2626;font-size:11px;font-weight:800">inactiva</span>':''}</div>
-          <div class="meta">${esc(p.ciudad||'sin ciudad')}</div>
+        <div class="top"><div style="min-width:0;flex:1">
+          <div class="nom">${esc(p.nombre)}
+            ${p.activo===false?'<span style="color:#dc2626;font-size:11px;font-weight:800;margin-left:4px">inactiva</span>':''}
+            ${falta(p)?'<span style="font-size:10px;font-weight:700;background:#fdf6e6;color:#8a5a12;padding:2px 7px;border-radius:9px;margin-left:4px">faltan datos</span>':''}</div>
+          <div class="meta">${p.nit?'NIT '+esc(p.nit):'sin NIT'}${p.ciudad?' · '+esc(p.ciudad):''}</div>
+          <div class="meta">${p.telefono?'📞 '+esc(p.telefono):'sin teléfono'}${p.direccion?' · '+esc(p.direccion):''}</div>
         </div>
-        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnBorrarPlanta('${p.id}')">🗑️</button></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnPlantaModal('${p.id}')">✎</button>
+          <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnBorrarPlanta('${p.id}')">🗑️</button>
+        </div></div>
       </div>`).join(''):'<div class="empty">Todavía no hay ninguna.</div>'}
-      <div class="row2" style="margin-top:10px">
-        <div><label>Nombre de la planta</label><input id="pp_nom" class="field" placeholder="ej: Planta Bogotá"></div>
-        <div><label>Ciudad</label><input id="pp_ciu" class="field" placeholder="opcional"></div>
-      </div>
-      <button class="btn btn-main" onclick="App.plnAgregarPlanta()">＋ Agregar planta</button>
+      <button class="btn btn-main" onclick="App.plnPlantaModal()">＋ Agregar planta</button>
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cerrar</button>`);
   },
-  async plnAgregarPlanta(){
-    const nombre=((document.getElementById('pp_nom')||{}).value||'').trim();
-    const ciudad=((document.getElementById('pp_ciu')||{}).value||'').trim();
+  plnPlantaModal(id){
+    const p=(this._plantas||[]).find(x=>x.id===id)||{};
+    this.modal(`<h3>${id?'Ficha de la planta':'Nueva planta'}</h3>
+      <div class="sub">Lo único obligatorio es el nombre · el resto se puede completar después</div>
+      <label>Nombre</label>
+      <input id="pp_nom" class="field" value="${esc(p.nombre||'')}" placeholder="ej: Industrias MGO">
+      <div class="row2">
+        <div><label>NIT</label><input id="pp_nit" class="field" value="${esc(p.nit||'')}" placeholder="900000000-0"></div>
+        <div><label>Ciudad</label><input id="pp_ciu" class="field" value="${esc(p.ciudad||'')}" placeholder="Ibagué"></div>
+      </div>
+      <label>Dirección</label>
+      <input id="pp_dir" class="field" value="${esc(p.direccion||'')}" placeholder="Calle 00 # 00-00">
+      <div class="row2">
+        <div><label>Teléfono</label><input id="pp_tel" class="field" inputmode="tel" value="${esc(p.telefono||'')}" placeholder="3000000000"></div>
+        <div><label>Contacto</label><input id="pp_con" class="field" value="${esc(p.contacto||'')}" placeholder="con quién se habla"></div>
+      </div>
+      <label>Correo</label>
+      <input id="pp_ema" class="field" inputmode="email" value="${esc(p.email||'')}" placeholder="opcional">
+      <label>Notas</label>
+      <textarea id="pp_not" class="field" rows="3" placeholder="lo que haya que recordar de esta planta">${esc(p.notas||'')}</textarea>
+      ${id?`<label style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        <input type="checkbox" id="pp_act" style="width:auto" ${p.activo===false?'':'checked'}> Sigue produciendo
+      </label>`:''}
+      <button class="btn btn-main" onclick="App.plnPlantaGuardar('${id||''}')">Guardar</button>
+      <button class="btn btn-ghost" onclick="App.plnPlantas()">Volver</button>`);
+  },
+  async plnPlantaGuardar(id){
+    const v=k=>((document.getElementById(k)||{}).value||'').trim();
+    const nombre=v('pp_nom');
     if(!nombre){ alert('Falta el nombre de la planta.'); return; }
-    const { error } = await this.sb.from('ced_plantas').insert({nombre, ciudad:ciudad||null, orden:(this._plantas||[]).length});
-    if(error){ alert(/duplicate|unique/i.test(error.message)?'Ya existe una planta con ese nombre.':'Error: '+error.message); return; }
-    const { data } = await this.sb.from('ced_plantas').select('*').order('orden').order('nombre');
-    this._plantas=data||[]; this.toast('Planta agregada'); this.plnPlantas();
+    const b={ nombre, nit:v('pp_nit')||null, ciudad:v('pp_ciu')||null, direccion:v('pp_dir')||null,
+              telefono:v('pp_tel')||null, contacto:v('pp_con')||null, email:v('pp_ema')||null,
+              notas:v('pp_not')||null };
+    const act=document.getElementById('pp_act');
+    if(act) b.activo=act.checked;
+    const antes=(this._plantas||[]).find(x=>x.id===id);
+    const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+    try{
+      const { error } = id ? await this.sb.from('ced_plantas').update(b).eq('id',id)
+                           : await this.sb.from('ced_plantas').insert(Object.assign(b,{orden:(this._plantas||[]).length+1}));
+      if(error){ alert(/duplicate|unique/i.test(error.message)?'Ya existe una planta con ese nombre.':'Error: '+error.message); return; }
+      /* Si le cambiaron el nombre, hay que arrastrar lo ya grabado: el inventario
+         y los movimientos guardan el nombre, no el id. Sin esto la planta se
+         renombra y su inventario se queda colgado del nombre viejo. */
+      if(antes && antes.nombre!==nombre){
+        await this.sb.from('ced_planta_inv').update({planta:nombre}).eq('planta',antes.nombre);
+        await this.sb.from('ced_planta_movs').update({planta:nombre}).eq('planta',antes.nombre);
+        if(this._plnSel===antes.nombre) this._plnSel=nombre;
+      }
+      const { data } = await this.sb.from('ced_plantas').select('*').order('orden').order('nombre');
+      this._plantas=data||[];
+      this.toast(id?'Ficha guardada':'Planta agregada');
+      this.plnPlantas();
+    } finally { if(btn){ btn.disabled=false; btn.textContent='Guardar'; } }
   },
   async plnBorrarPlanta(id){
     const p=(this._plantas||[]).find(x=>x.id===id)||{};
@@ -6028,7 +6093,6 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const { data } = await this.sb.from('ced_plantas').select('*').order('orden').order('nombre');
     this._plantas=data||[]; this.toast('Listo'); this.plnPlantas();
   },
-
   async vInventario(){
     this.loading();
     const [ri,rm,rc,rp,rl,rf,rk] = await Promise.all([
