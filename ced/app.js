@@ -5980,7 +5980,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
             const i=this._plnInvDe(pSel,r,c.color);
             const cab=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:9px;padding-top:8px;border-top:1px solid var(--linea)">
                 <div style="font-size:12.5px;font-weight:700">${esc(c.color||'sin color')}
-                  ${puede?`<span style="color:var(--azul);font-weight:400;cursor:pointer" onclick="App.plnRefModal('${c.id}')"> ✎</span>`:''}</div>
+                  ${puede?`<span style="color:var(--azul);font-weight:400;cursor:pointer" onclick="App.plnRefModal('${this._plnJs(r)}')"> ✎</span>`:''}</div>
                 <div style="font-size:12px;color:var(--suave)">📸 ${i.fotoTot} · 🔄 <b style="color:${i.saldo<0?'var(--rojo)':'var(--texto)'}">${i.saldo}</b></div>
               </div>`;
             if(!solaUna) return cab;
@@ -6004,27 +6004,51 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         </div>`;}).join(''):`<div class="empty">${todas.length?'Ninguna referencia con ese filtro.':'Esta planta todavía no tiene referencias.'+(puede?'<br>Toca “Crear referencia”.':'')}</div>`}
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cerrar</button>`);
   },
-  plnRefModal(id){
-    const r=(this._plnRefsCat||[]).find(x=>x.id===id)||{};
+  /* La ficha trabaja con la REFERENCIA COMPLETA, no con un color suelto: se marcan
+     los colores que maneja, igual que se marcan las tallas. Antes tocaba crear una
+     ficha por color reescribiendo el nombre exacto, y con un nombre mal escrito
+     salía una referencia gemela con el saldo repartido. */
+  PLN_COLORES:['NEGRO','BLANCO','CAFÉ'],
+  plnRefModal(referencia){
     const plantas=(this._plantas||[]).filter(p=>p.activo!==false);
-    const pSel=r.planta||this._plnRefPlanta||plantas[0].nombre;
+    const pSel=this._plnRefPlanta||plantas[0].nombre;
+    const cat=this._plnCat(pSel);
+    const existentes=[...new Set(cat.map(r=>r.referencia))].sort();
+    const ref=referencia||'';
+    const filas=cat.filter(r=>r.referencia===ref);
+    const base=filas[0]||{};
     const cats=Object.keys(this.TALLAS_CAT);
-    this.modal(`<h3>${id?'Editar referencia':'Nueva referencia'}</h3>
+    /* Los tres de siempre, más cualquier otro que ya exista en esa planta: si
+       alguien creó un color raro, no se le desaparece de la vista. */
+    const colores=[...new Set(this.PLN_COLORES.concat(cat.map(r=>r.color).filter(Boolean)))];
+    const puestos=new Set(filas.map(r=>r.color));
+    this.modal(`<h3>${ref?'Editar referencia':'Nueva referencia'}</h3>
       <label>Planta</label>
-      <select id="pr_planta" class="field">${plantas.map(p=>`<option ${p.nombre===pSel?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>
+      <select id="pr_planta" class="field" onchange="App._plnRefPlanta=this.value;App.plnRefModal()">
+        ${plantas.map(p=>`<option ${p.nombre===pSel?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>
       <label>Referencia</label>
-      <input id="pr_ref" class="field" value="${esc(r.referencia||'')}" placeholder="como se le dice en bodega: PETER PAN MUJER">
-      <div class="hint">Es el nombre que va a aparecer en el inventario. El número de la ficha va abajo.</div>
+      <select id="pr_sel" class="field" onchange="App.plnRefModal(this.value)">
+        <option value="">＋ Crear una nueva</option>
+        ${existentes.map(r=>`<option value="${esc(r)}" ${r===ref?'selected':''}>${esc(r)}</option>`).join('')}
+      </select>
+      ${ref?'':`<input id="pr_ref" class="field" style="margin-top:8px" placeholder="como se le dice en bodega: 0722 PETER PAN MUJER">
+        <div class="hint">Es el nombre que va a aparecer en el inventario. El número de la ficha va abajo.</div>`}
       <label>Código</label>
-      <input id="pr_cod" class="field" value="${esc(r.codigo||'')}" placeholder="0722 · opcional">
-      <label>Color${id?'':'es'}</label>
-      <input id="pr_col" class="field" value="${esc(r.color||'')}" placeholder="${id?'NEGRO':'NEGRO, CAFÉ, AZUL'}">
-      <div class="hint">Es el color de la <b>bota</b> — negro, blanco o café. El azul o el naranja
-        de la suela y el color de las costuras NO van acá: son la misma bota.</div>
-      ${id?'<div class="hint">Un color por ficha. Para agregar otro, crea una referencia nueva con el mismo nombre.</div>'
-          :'<div class="hint">Varios de una: sepáralos con coma y se crea una ficha por cada color.</div>'}
+      <input id="pr_cod" class="field" value="${esc(base.codigo||'')}" placeholder="0722 · opcional">
+
+      <label>Colores · marca los que sí maneja</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="pr_cols">
+        ${colores.map(c=>`<label style="flex:1 0 auto;display:flex;align-items:center;gap:7px;padding:10px 13px;border:1.5px solid ${puestos.has(c)?'var(--naranja)':'var(--linea)'};border-radius:10px;cursor:pointer;font-weight:700;font-size:13px">
+          <input type="checkbox" data-color="${esc(c)}" ${puestos.has(c)?'checked':''}
+            style="width:18px;height:18px;accent-color:var(--naranja)"
+            onchange="this.parentNode.style.borderColor=this.checked?'var(--naranja)':'var(--linea)'">${esc(c)}</label>`).join('')}
+      </div>
+      <input id="pr_otro" class="field" style="margin-top:8px" placeholder="¿otro color? escríbelo acá (separa con coma)">
+      <div class="hint">Es el color de la <b>bota</b>. El azul o el naranja de la suela y el
+        color de las costuras NO van acá: es la misma bota.</div>
+
       <label>Tallaje</label>
-      <select id="pr_cat" class="field" onchange="App._plnCurva()">${cats.map(c=>`<option ${r.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      <select id="pr_cat" class="field" onchange="App._plnCurva()">${cats.map(c=>`<option ${base.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
       <label>Curva · marca las tallas que sí maneja</label>
       <div style="display:flex;gap:7px;margin-bottom:2px">
         <button type="button" class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App._plnCurvaTodas(true)">Marcar todas</button>
@@ -6033,11 +6057,11 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       </div>
       <div class="grid-tallas" id="pr_curva"></div>
       <label>Descripción</label>
-      <input id="pr_des" class="field" value="${esc(r.descripcion||'')}" placeholder="opcional">
-      <button class="btn btn-main" onclick="App.plnRefGuardar('${id||''}')">Guardar</button>
-      ${id?`<button class="btn" style="background:#fde8e8;color:#b3261e" onclick="App.plnRefBorrar('${id}')">Eliminar</button>`:''}
+      <input id="pr_des" class="field" value="${esc(base.descripcion||'')}" placeholder="opcional">
+      <button class="btn btn-main" onclick="App.plnRefGuardar('${this._plnJs(ref)}')">Guardar</button>
+      ${ref?`<button class="btn" style="background:#fde8e8;color:#b3261e" onclick="App.plnRefBorrar('${this._plnJs(ref)}')">Eliminar referencia</button>`:''}
       <button class="btn btn-ghost" onclick="App.plnRefs()">Volver</button>`);
-    this._plnCurva(r.tallas);
+    this._plnCurva(base.tallas);
   },
   /* La curva: una casilla por talla. Antes esto era una casilla de texto donde
      tocaba escribir "34-46", y una referencia rara vez maneja el rango completo
@@ -6070,46 +6094,57 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   _plnCurvaValor(){
     return [...document.querySelectorAll('#pr_curva input:checked')].map(i=>i.dataset.talla).join(',');
   },
-  async plnRefGuardar(id){
+  async plnRefGuardar(refAnterior){
     const v=k=>((document.getElementById(k)||{}).value||'').trim();
-    const planta=v('pr_planta'), ref=this._plnRef(v('pr_ref'));
-    if(!ref){ alert('Falta la referencia.'); return; }
+    const planta=v('pr_planta');
+    const ref=this._plnRef(refAnterior || v('pr_ref'));
+    if(!ref){ alert('Falta el nombre de la referencia.'); return; }
     const curva=this._plnCurvaValor();
     if(!curva){ alert('Marca al menos una talla en la curva.'); return; }
+    const marcados=[...document.querySelectorAll('#pr_cols input:checked')].map(i=>i.dataset.color);
+    const otros=v('pr_otro').split(',').map(c=>this._plnRef(c)).filter(Boolean);
+    const colores=[...new Set(marcados.concat(otros))];
+    if(!colores.length){ alert('Marca al menos un color.'); return; }
+
     const base={ planta, referencia:ref, codigo:v('pr_cod')||null, tallas:curva,
                  categoria:v('pr_cat')||'Calzado', descripcion:v('pr_des')||null, usuario:this._plnYo() };
-    const colores=[...new Set(v('pr_col').split(',').map(c=>this._plnRef(c)))];
     const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
     try{
-      let error;
-      if(id){
-        ({ error } = await this.sb.from('ced_planta_refs').update(Object.assign({},base,{color:colores[0]||''})).eq('id',id));
-      }else{
-        const filas=colores.map(c=>Object.assign({},base,{color:c}));
-        ({ error } = await this.sb.from('ced_planta_refs').upsert(filas,{onConflict:'planta,referencia,color'}));
+      const { error } = await this.sb.from('ced_planta_refs')
+        .upsert(colores.map(c=>Object.assign({},base,{color:c,activo:true})),{onConflict:'planta,referencia,color'});
+      if(error){ alert('Error: '+error.message); return; }
+      /* Los colores que quedaron sin marcar se quitan. Si ya tienen inventario NO
+         se borran — se dejan inactivos, porque borrarlos dejaría el saldo huérfano. */
+      const sobran=this._plnCat(planta).filter(r=>r.referencia===ref && colores.indexOf(r.color)<0);
+      for(const r of sobran){
+        const usada=(this._plnFoto||[]).some(f=>f.planta===planta&&f.referencia===ref&&(f.color||'')===r.color)
+                 || (this._plnMovs||[]).some(m=>m.planta===planta&&m.referencia===ref&&(m.color||'')===r.color);
+        if(usada) await this.sb.from('ced_planta_refs').update({activo:false}).eq('id',r.id);
+        else      await this.sb.from('ced_planta_refs').delete().eq('id',r.id);
       }
-      if(error){ alert(/duplicate|unique/i.test(error.message)?'Ya existe esa referencia con ese color en esa planta.':'Error: '+error.message); return; }
       await this._plnCargarRefs();
       this._plnRefPlanta=planta;
-      this.toast(id?'Referencia guardada':'Referencia creada');
+      this.toast(refAnterior?'Referencia guardada':'Referencia creada · '+colores.length+' color(es)');
       this.plnRefs(planta);
     } finally { if(btn){ btn.disabled=false; btn.textContent='Guardar'; } }
   },
-  async plnRefBorrar(id){
-    const r=(this._plnRefsCat||[]).find(x=>x.id===id)||{};
-    const usada=(this._plnFoto||[]).some(f=>f.planta===r.planta&&f.referencia===r.referencia&&(f.color||'')===(r.color||''))
-             || (this._plnMovs||[]).some(m=>m.planta===r.planta&&m.referencia===r.referencia&&(m.color||'')===(r.color||''));
+  async plnRefBorrar(ref){
+    const planta=this._plnRefPlanta;
+    const filas=this._plnCat(planta).filter(r=>r.referencia===ref);
+    if(!filas.length) return;
+    const usada=(this._plnFoto||[]).some(f=>f.planta===planta&&f.referencia===ref)
+             || (this._plnMovs||[]).some(m=>m.planta===planta&&m.referencia===ref);
     if(usada){
       if(!confirm('Esta referencia ya tiene inventario o movimientos.\n\nSe deja INACTIVA (deja de aparecer al grabar) pero no se borra lo que ya tiene. ¿Seguir?')) return;
-      const { error } = await this.sb.from('ced_planta_refs').update({activo:false}).eq('id',id);
+      const { error } = await this.sb.from('ced_planta_refs').update({activo:false}).eq('planta',planta).eq('referencia',ref);
       if(error){ alert('Error: '+error.message); return; }
     }else{
-      if(!confirm('¿Eliminar esta referencia? Todavía no tiene nada grabado.')) return;
-      const { error } = await this.sb.from('ced_planta_refs').delete().eq('id',id);
+      if(!confirm('¿Eliminar '+ref+' con todos sus colores? Todavía no tiene nada grabado.')) return;
+      const { error } = await this.sb.from('ced_planta_refs').delete().eq('planta',planta).eq('referencia',ref);
       if(error){ alert('Error: '+error.message); return; }
     }
     await this._plnCargarRefs();
-    this.toast('Listo'); this.plnRefs(r.planta);
+    this.toast('Listo'); this.plnRefs(planta);
   },
   async _plnCargarRefs(){
     const { data } = await this.sb.from('ced_planta_refs').select('*').order('referencia').order('color');
