@@ -163,7 +163,7 @@
      Entonces los tres comparten UNA sola hilera, la última. En las apps cuyo nav
      va en fila, se cuelga directo como siempre. */
   function ncHilera(nav) {
-    var est = window.getComputedStyle ? getComputedStyle(nav) : null;
+    var est = window.getComputedStyle ? window.getComputedStyle(nav) : null;
     if (!est || est.flexDirection !== 'column') return nav;
     var f = document.getElementById('nc-extra');
     if (!f || f.parentNode !== nav) {
@@ -177,24 +177,47 @@
     return f;
   }
 
+  /* Donde va el boton. La barra de abajo (#nav) muchas veces NO existe todavia
+     cuando corre este script: varias apps la pintan despues del login. Antes se
+     miraba UNA sola vez y, si no estaba, quedaba un circulo flotante encima del
+     contenido para siempre. Ahora se sigue mirando: apenas aparece la barra el
+     boton se pasa alla y el circulo se quita solo. */
   function pestana() {
-    var nav = document.getElementById('nav');
-    if (!nav) return;
-    function poner() {
-      if (document.getElementById('nt-tab')) return;
-      var hermano = nav.querySelector('button, a');
-      var t = document.createElement('button');
-      t.id = 'nt-tab';
-      t.type = 'button';
-      if (hermano) t.className = hermano.className.replace(/on/g, '').trim();
-      t.innerHTML = '📝 Notas';
-      t.onclick = function (e) { e.preventDefault(); Notas.abrir(); };
-      ncHilera(nav).appendChild(t);
+    var vigilado = false;
+    function vigila(nav) {
+      if (vigilado) return;
+      vigilado = true;
+      try { new MutationObserver(function () { poner(); }).observe(nav, { childList: true }); }
+      catch (e) {}
     }
-    poner();
-    try {
-      new MutationObserver(function () { poner(); }).observe(nav, { childList: true });
-    } catch (e) { setInterval(poner, 1500); }
+    function flotante() {
+      if (document.getElementById('nt-btn')) return;
+      var b = document.createElement('button');
+      b.id = 'nt-btn'; b.title = 'Mis pendientes de esta app'; b.innerHTML = '📝';
+      b.onclick = Notas.abrir; document.body.appendChild(b);
+    }
+    function poner() {
+      var nav = document.getElementById('nav');
+      if (!nav) return false;
+      if (!document.getElementById('nt-tab')) {
+        var hermano = nav.querySelector('button, a');
+        var t = document.createElement('button');
+        t.id = 'nt-tab';
+        t.type = 'button';
+        if (hermano) t.className = hermano.className.replace(/on/g, '').trim();
+        t.innerHTML = '📝 Notas';
+        t.onclick = function (e) { e.preventDefault(); Notas.abrir(); };
+        ncHilera(nav).appendChild(t);
+      }
+      var f = document.getElementById('nt-btn');
+      if (f && f.parentNode) f.parentNode.removeChild(f);   // ya esta en la barra: sobra el circulo
+      vigila(nav);
+      return true;
+    }
+    if (!poner()) flotante();   // sin barra todavia: que igual se pueda abrir
+    /* El reloj no se apaga a proposito: hay apts que borran y vuelven a pintar el
+       #nav entero, y ahi el observador se queda mirando un elemento muerto. */
+    setInterval(poner, 2000);
   }
 
   var Notas = {
@@ -227,10 +250,7 @@
       if (!permitido) return;
       app = nombreApp;
       var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
-      var b = document.createElement('button');
-      b.id = 'nt-btn'; b.title = 'Mis pendientes de esta app'; b.innerHTML = '📝';
-      b.onclick = Notas.abrir; document.body.appendChild(b);
-      pestana();
+      pestana();   // el circulo flotante ya NO se crea aca: lo decide pestana(), y solo si no hay barra
       cargar();
     },
     abrir: function () {
