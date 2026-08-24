@@ -257,6 +257,8 @@ const App = {
     // perfiles.rol='vendedor', asi que mostrar el rol hacia que un gerente o un
     // administrador saliera rotulado como VENDEDOR.
     $('me_rol').textContent = this.miCargo() || ROL_NOMBRE[this.perfil.rol] || this.perfil.rol;
+    // que se vea que version esta corriendo, sin tener que abrir nada
+    if($('me_ver')) $('me_ver').textContent = window.NCVER || '';
     try{ const { data:cfg } = await this.sb.from('config').select('value').eq('key','nav_permisos').maybeSingle(); this._permisos = cfg?cfg.value:null; }catch(e){ this._permisos=null; }
     // Permisos de la red, por CARGO. Es lo que se edita en la pantalla Permisos.
     try{ const { data:pm } = await this.sb.from('ced_permisos').select('cargo,tabs');

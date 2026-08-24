@@ -197,7 +197,12 @@
   <div class="topbar">
     <img src="../assets/logo.png" alt="Feroz">
     <div style="display:flex;align-items:center">
-      <div class="who"><b id="me_nombre">—</b><span class="rol" id="me_rol">—</span></div>
+      <!-- La version a la vista. GitHub Pages manda Cache-Control: max-age=600, o sea
+           que el navegador se queda 10 minutos con el index.html viejo — y NCVER vive
+           DENTRO de ese archivo. Sin este numero no hay como saber si lo que estas
+           viendo es lo nuevo o la copia vieja. -->
+      <div class="who"><b id="me_nombre">—</b><span class="rol" id="me_rol">—</span>
+        <span id="me_ver" style="display:block;font-size:9px;color:#b9c0c9;letter-spacing:.03em"></span></div>
       <button class="ayuda" onclick="App.manual()" title="Cómo se usa esta pantalla">?</button>
       <button class="logout" onclick="App.logout()">Salir</button>
     </div>
@@ -212,7 +217,7 @@
 <script>
   // Versión fija → el navegador CACHEA los archivos (carga 1 vez y luego instantáneo).
   // Cuando se cambie el código, subir este número (NCVER) y el usuario hace Ctrl+Shift+R una vez.
-  var NCVER='20260824-ced48';
+  var NCVER='20260824-ced49';
   ['config.js','geo-co.js','app.js'].forEach(function(s){
     document.write('<scr'+'ipt src="'+s+'?v='+NCVER+'"><\/scr'+'ipt>');
   });
