@@ -5595,13 +5595,6 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
      son la misma bota, pero como texto son tres cosas distintas: sin esto
      aparecen referencias fantasma con el saldo repartido entre ellas. */
   _plnRef(s){ return String(s==null?'':s).trim().replace(/\s+/g,' ').toUpperCase(); },
-  /* Las referencias que ya se han usado, para autocompletar y no reescribirlas. */
-  _plnRefs(){
-    const s=new Set();
-    (this._plnFoto||[]).forEach(r=>s.add(r.referencia));
-    (this._plnMovs||[]).forEach(r=>s.add(r.referencia));
-    return [...s].filter(Boolean).sort();
-  },
   _plnFecha(t){
     if(!t) return '—';
     const d=new Date(t); if(isNaN(d)) return '—';
@@ -5619,10 +5612,11 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
 
   async vConsulta(){
     this.loading();
-    const [rp,rf,rm] = await Promise.all([
+    const [rp,rf,rm,rc] = await Promise.all([
       this.sb.from('ced_plantas').select('*').order('orden').order('nombre'),
       this.sb.from('ced_planta_inv').select('*').order('referencia'),
       this.sb.from('ced_planta_movs').select('*').order('creado_en',{ascending:false}).limit(5000),
+      this.sb.from('ced_planta_refs').select('*').order('referencia').order('color'),
     ]);
     const err = rp.error||rf.error||rm.error;
     if(err){
@@ -5634,6 +5628,9 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       return;
     }
     this._plantas=rp.data||[]; this._plnFoto=rf.data||[]; this._plnMovs=rm.data||[];
+    /* El catalogo puede faltar si no se corrio su SQL: no es motivo para tumbar
+       la pantalla, solo se graba escribiendo a mano. */
+    this._plnRefsCat = rc.error ? [] : (rc.data||[]);
     this._plnRender();
   },
 
@@ -5669,6 +5666,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       ${puede?`<div class="acciones-item" style="margin-bottom:12px">
         <button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.plnGrabar()">✍️ Grabar</button>
         <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnPegar()">📋 Pegar de Excel</button>
+        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnRefs()">📕 Referencias</button>
         <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnPlantas()">🏭 Plantas</button>
       </div>`:''}`;
 
@@ -5781,33 +5779,33 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       </div>`).join('')}`;
   },
 
-  /* --- el formulario único: referencia + color + tallas, y decides qué es --- */
+  /* --- el formulario único: escoges la referencia del catálogo y decides qué es --- */
+  /* Antes la referencia se escribía a mano, y la referencia es lo que agrupa el
+     saldo: una letra distinta creaba una referencia fantasma. Ahora sale del
+     catálogo de la planta (📕 Referencias) y las tallas también, así que la
+     Peter Pan mujer ofrece 34-43 y no 34-46. Queda la salida de emergencia
+     "escribir a mano" para no bloquear a nadie con una referencia sin crear. */
   plnGrabar(tipo,planta,ref,color){
     if(!this.plnPuedeGrabar()){ alert('Tu cargo puede consultar, pero no grabar.'); return; }
     const plantas=(this._plantas||[]).filter(p=>p.activo!==false);
     if(!plantas.length){ alert('Primero hay que cargar las plantas (botón 🏭 Plantas).'); return; }
     this._plnTipo=tipo||'entrada';
+    this._plnLibre=false;
     const pSel=planta||this._plnSel||plantas[0].nombre;
-    const cats=Object.keys(this.TALLAS_CAT);
     this.modal(`<h3>✍️ Grabar en planta</h3>
       <div class="sub">Escoges la referencia y el color, escribes las tallas, y decides qué es</div>
       <label>Planta</label>
-      <select id="pl_planta" class="field">${plantas.map(p=>`<option ${p.nombre===pSel?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>
+      <select id="pl_planta" class="field" onchange="App._plnRefsUI()">${plantas.map(p=>`<option ${p.nombre===pSel?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>
       <label>¿Qué vas a grabar?</label>
       <div id="pl_tipos" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       <div class="hint" id="pl_hint"></div>
-      <div class="row2">
-        <div><label>Referencia</label><input id="pl_ref" class="field" list="pl_refs" value="${esc(ref||'')}" placeholder="ej: 701" onchange="App._plnTraer()">
-          <datalist id="pl_refs">${this._plnRefs().map(r=>`<option value="${esc(r)}">`).join('')}</datalist></div>
-        <div><label>Color</label><input id="pl_col" class="field" value="${esc(color||'')}" placeholder="opcional" onchange="App._plnTraer()"></div>
-      </div>
-      <label>Tallaje</label>
-      <select id="pl_cat" class="field" onchange="App._plnGrid()">${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+      <div id="pl_refbox"></div>
       <div class="grid-tallas" id="pl_grid"></div>
       <div id="pl_nota_box"><label>Nota</label><input id="pl_nota" class="field" placeholder="de dónde vino o para dónde va (opcional)"></div>
       <button class="btn btn-main" onclick="App.plnGuardar()">Guardar</button>
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
-    this._plnTipos(); this._plnGrid(); if(ref) this._plnTraer();
+    this._plnTipos();
+    this._plnRefsUI(ref,color);
   },
   _plnTipos(){
     const T=[['entrada','＋ Entrada','var(--verde)'],['salida','− Salida','var(--rojo)'],['foto','📸 Inventario actualizado','var(--azul)']];
@@ -5821,13 +5819,71 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const nb=document.getElementById('pl_nota_box'); if(nb) nb.style.display = t==='foto' ? 'none' : '';
     if(t==='foto') this._plnTraer();
   },
+  /* Las referencias del catálogo de esa planta */
+  _plnCat(planta){ return (this._plnRefsCat||[]).filter(r=>r.planta===planta && r.activo!==false); },
+  _plnRefsUI(ref,color){
+    const box=document.getElementById('pl_refbox'); if(!box) return;
+    const planta=(document.getElementById('pl_planta')||{}).value;
+    const cat=this._plnCat(planta);
+    const refs=[...new Set(cat.map(r=>r.referencia))].sort();
+    if(this._plnLibre || !refs.length){
+      const cats=Object.keys(this.TALLAS_CAT);
+      box.innerHTML=`<div class="row2">
+          <div><label>Referencia</label><input id="pl_ref" class="field" value="${esc(ref||'')}" placeholder="ej: PETER PAN" onchange="App._plnTraer()"></div>
+          <div><label>Color</label><input id="pl_col" class="field" value="${esc(color||'')}" placeholder="opcional" onchange="App._plnTraer()"></div>
+        </div>
+        <label>Tallaje</label>
+        <select id="pl_cat" class="field" onchange="App._plnGrid()">${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+        ${refs.length?`<div class="hint" style="cursor:pointer;color:var(--azul)" onclick="App._plnLibre=false;App._plnRefsUI()">‹ Volver a escoger del catálogo</div>`
+          :`<div class="hint">Esta planta todavía no tiene referencias creadas. Créalas en <b>📕 Referencias</b> y así no hay que escribirlas cada vez.</div>`}`;
+    }else{
+      const rSel = (ref && refs.includes(ref)) ? ref : refs[0];
+      box.innerHTML=`<label>Referencia</label>
+        <select id="pl_ref" class="field" onchange="App._plnColUI()">${refs.map(r=>`<option ${r===rSel?'selected':''}>${esc(r)}</option>`).join('')}</select>
+        <label>Color</label>
+        <select id="pl_col" class="field" onchange="App._plnGrid();App._plnTraer()"></select>
+        <div class="hint" style="cursor:pointer;color:var(--azul)" onclick="App._plnLibre=true;App._plnRefsUI()">✏️ No está en la lista · escribirla a mano</div>`;
+      this._plnColUI(color);
+    }
+    this._plnGrid(); if(ref) this._plnTraer();
+  },
+  _plnColUI(color){
+    const sel=document.getElementById('pl_col'); if(!sel || sel.tagName!=='SELECT') return;
+    const planta=(document.getElementById('pl_planta')||{}).value;
+    const ref=(document.getElementById('pl_ref')||{}).value;
+    const cols=this._plnCat(planta).filter(r=>r.referencia===ref).map(r=>r.color||'');
+    sel.innerHTML=cols.map(c=>`<option value="${esc(c)}" ${c===color?'selected':''}>${esc(c||'sin color')}</option>`).join('')
+      || '<option value="">sin color</option>';
+    this._plnGrid(); this._plnTraer();
+  },
+  /* La ficha del catálogo que corresponde a lo escogido */
+  _plnFicha(){
+    const planta=(document.getElementById('pl_planta')||{}).value;
+    const ref=this._plnRef((document.getElementById('pl_ref')||{}).value);
+    const col=this._plnRef((document.getElementById('pl_col')||{}).value);
+    return this._plnCat(planta).find(r=>this._plnRef(r.referencia)===ref && this._plnRef(r.color)===col);
+  },
+  /* "34-46" -> 34,35,…,46 · "S,M,L" -> S,M,L · vacío -> las de la categoría */
+  _plnTallas(txt,cat){
+    const s=String(txt||'').trim();
+    const r=s.match(/^(\d{1,2})\s*(?:-|–|a|al)\s*(\d{1,2})$/i);
+    if(r){
+      const a=+r[1], b=+r[2], out=[];
+      for(let i=Math.min(a,b);i<=Math.max(a,b);i++) out.push(String(i));
+      return out;
+    }
+    const l=s.split(/[,;/]/).map(x=>x.trim()).filter(Boolean);
+    return l.length?l:this._tallasDe(cat);
+  },
   _plnGrid(){
-    const cat=(document.getElementById('pl_cat')||{}).value;
     const box=document.getElementById('pl_grid'); if(!box) return;
-    box.innerHTML=this._tallasDe(cat).map(t=>`<div class="t"><span>${esc(t)}</span><input type="number" min="0" inputmode="numeric" data-talla="${esc(t)}" placeholder="0"></div>`).join('');
+    const f=this._plnFicha();
+    const cat=(document.getElementById('pl_cat')||{}).value || (f&&f.categoria) || 'Calzado';
+    const tallas=f ? this._plnTallas(f.tallas,f.categoria) : this._tallasDe(cat);
+    box.innerHTML=tallas.map(t=>`<div class="t"><span>${esc(t)}</span><input type="number" min="0" inputmode="numeric" data-talla="${esc(t)}" placeholder="0"></div>`).join('');
   },
   /* Si esa referencia ya tiene foto, la trae para que se corrija en vez de
-     escribirla de nuevo. Solo aplica a la foto: entradas y salidas siempre en blanco. */
+     escribirla de nuevo. Solo aplica a la foto: entradas y salidas van en blanco. */
   _plnTraer(){
     if(this._plnTipo!=='foto') return;
     const p=(document.getElementById('pl_planta')||{}).value;
@@ -5840,6 +5896,107 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       const f=filas.find(x=>String(x.talla)===i.dataset.talla);
       i.value = f ? (+f.cantidad||0) : '';
     });
+  },
+
+  /* --- 📕 el cajón de referencias, por planta --- */
+  plnRefs(planta){
+    if(!this.plnPuedeGrabar()){ alert('Tu cargo puede consultar, pero no grabar.'); return; }
+    const plantas=(this._plantas||[]).filter(p=>p.activo!==false);
+    if(!plantas.length){ alert('Primero hay que cargar las plantas (botón 🏭 Plantas).'); return; }
+    const pSel=planta||this._plnRefPlanta||this._plnSel||plantas[0].nombre;
+    this._plnRefPlanta=pSel;
+    const cat=this._plnCat(pSel);
+    /* Se agrupa por referencia: una fila por color se lee fatal cuando una bota
+       viene en cuatro colores. */
+    const gr={};
+    cat.forEach(r=>{ (gr[r.referencia]=gr[r.referencia]||{cod:r.codigo, tallas:r.tallas, cats:r.categoria, cols:[]}).cols.push(r); });
+    const refs=Object.keys(gr).sort();
+    this.modal(`<h3>📕 Referencias</h3>
+      <div class="sub">Lo que fabrica cada planta · de acá salen las listas al grabar</div>
+      <label>Planta</label>
+      <select class="field" onchange="App.plnRefs(this.value)">${plantas.map(p=>`<option ${p.nombre===pSel?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>
+      <button class="btn btn-main" onclick="App.plnRefModal()">＋ Crear referencia</button>
+      <div class="sub" style="margin:14px 0 8px">${refs.length} referencia${refs.length===1?'':'s'} · ${cat.length} con color</div>
+      ${refs.length?refs.map(r=>{const g=gr[r];
+        return `<div class="item" style="padding:11px">
+          <div class="top"><div style="min-width:0;flex:1">
+            <div class="nom">${esc(r)}${g.cod?`<span style="font-size:11px;color:var(--suave);font-weight:600"> · cód ${esc(g.cod)}</span>`:''}</div>
+            <div class="meta">tallas ${esc(g.tallas||'—')} · ${esc(g.cats||'')}</div>
+            <div class="meta" style="margin-top:4px">${g.cols.map(c=>`<span style="display:inline-block;font-size:10px;font-weight:700;background:#eef1f5;color:#54636b;padding:2px 8px;border-radius:9px;margin:2px 3px 0 0;cursor:pointer" onclick="App.plnRefModal('${c.id}')">${esc(c.color||'sin color')} ✎</span>`).join('')}</div>
+          </div></div>
+        </div>`;}).join(''):'<div class="empty">Esta planta todavía no tiene referencias.<br>Toca “Crear referencia”.</div>'}
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cerrar</button>`);
+  },
+  plnRefModal(id){
+    const r=(this._plnRefsCat||[]).find(x=>x.id===id)||{};
+    const plantas=(this._plantas||[]).filter(p=>p.activo!==false);
+    const pSel=r.planta||this._plnRefPlanta||plantas[0].nombre;
+    const cats=Object.keys(this.TALLAS_CAT);
+    this.modal(`<h3>${id?'Editar referencia':'Nueva referencia'}</h3>
+      <label>Planta</label>
+      <select id="pr_planta" class="field">${plantas.map(p=>`<option ${p.nombre===pSel?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>
+      <label>Referencia</label>
+      <input id="pr_ref" class="field" value="${esc(r.referencia||'')}" placeholder="como se le dice en bodega: PETER PAN MUJER">
+      <div class="hint">Es el nombre que va a aparecer en el inventario. El número de la ficha va abajo.</div>
+      <div class="row2">
+        <div><label>Código</label><input id="pr_cod" class="field" value="${esc(r.codigo||'')}" placeholder="0722 · opcional"></div>
+        <div><label>Tallas</label><input id="pr_tal" class="field" value="${esc(r.tallas||'')}" placeholder="34-46"></div>
+      </div>
+      <div class="hint">Se puede poner un rango (<b>34-46</b>) o una lista (<b>S,M,L,XL</b>).</div>
+      <label>Color${id?'':'es'}</label>
+      <input id="pr_col" class="field" value="${esc(r.color||'')}" placeholder="${id?'NEGRO':'NEGRO, CAFÉ, AZUL'}">
+      ${id?'<div class="hint">Un color por ficha. Para agregar otro, crea una referencia nueva con el mismo nombre.</div>'
+          :'<div class="hint">Varios de una: sepáralos con coma y se crea una ficha por cada color.</div>'}
+      <label>Tallaje</label>
+      <select id="pr_cat" class="field">${cats.map(c=>`<option ${r.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      <label>Descripción</label>
+      <input id="pr_des" class="field" value="${esc(r.descripcion||'')}" placeholder="opcional">
+      <button class="btn btn-main" onclick="App.plnRefGuardar('${id||''}')">Guardar</button>
+      ${id?`<button class="btn" style="background:#fde8e8;color:#b3261e" onclick="App.plnRefBorrar('${id}')">Eliminar</button>`:''}
+      <button class="btn btn-ghost" onclick="App.plnRefs()">Volver</button>`);
+  },
+  async plnRefGuardar(id){
+    const v=k=>((document.getElementById(k)||{}).value||'').trim();
+    const planta=v('pr_planta'), ref=this._plnRef(v('pr_ref'));
+    if(!ref){ alert('Falta la referencia.'); return; }
+    const base={ planta, referencia:ref, codigo:v('pr_cod')||null, tallas:v('pr_tal')||null,
+                 categoria:v('pr_cat')||'Calzado', descripcion:v('pr_des')||null, usuario:this._plnYo() };
+    const colores=[...new Set(v('pr_col').split(',').map(c=>this._plnRef(c)))];
+    const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+    try{
+      let error;
+      if(id){
+        ({ error } = await this.sb.from('ced_planta_refs').update(Object.assign({},base,{color:colores[0]||''})).eq('id',id));
+      }else{
+        const filas=colores.map(c=>Object.assign({},base,{color:c}));
+        ({ error } = await this.sb.from('ced_planta_refs').upsert(filas,{onConflict:'planta,referencia,color'}));
+      }
+      if(error){ alert(/duplicate|unique/i.test(error.message)?'Ya existe esa referencia con ese color en esa planta.':'Error: '+error.message); return; }
+      await this._plnCargarRefs();
+      this._plnRefPlanta=planta;
+      this.toast(id?'Referencia guardada':'Referencia creada');
+      this.plnRefs(planta);
+    } finally { if(btn){ btn.disabled=false; btn.textContent='Guardar'; } }
+  },
+  async plnRefBorrar(id){
+    const r=(this._plnRefsCat||[]).find(x=>x.id===id)||{};
+    const usada=(this._plnFoto||[]).some(f=>f.planta===r.planta&&f.referencia===r.referencia&&(f.color||'')===(r.color||''))
+             || (this._plnMovs||[]).some(m=>m.planta===r.planta&&m.referencia===r.referencia&&(m.color||'')===(r.color||''));
+    if(usada){
+      if(!confirm('Esta referencia ya tiene inventario o movimientos.\n\nSe deja INACTIVA (deja de aparecer al grabar) pero no se borra lo que ya tiene. ¿Seguir?')) return;
+      const { error } = await this.sb.from('ced_planta_refs').update({activo:false}).eq('id',id);
+      if(error){ alert('Error: '+error.message); return; }
+    }else{
+      if(!confirm('¿Eliminar esta referencia? Todavía no tiene nada grabado.')) return;
+      const { error } = await this.sb.from('ced_planta_refs').delete().eq('id',id);
+      if(error){ alert('Error: '+error.message); return; }
+    }
+    await this._plnCargarRefs();
+    this.toast('Listo'); this.plnRefs(r.planta);
+  },
+  async _plnCargarRefs(){
+    const { data } = await this.sb.from('ced_planta_refs').select('*').order('referencia').order('color');
+    this._plnRefsCat=data||[];
   },
 
   async plnGuardar(){
