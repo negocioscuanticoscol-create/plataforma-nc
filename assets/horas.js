@@ -251,6 +251,26 @@
 
   /* La pestaña en la barra de arriba. Casi todas las apps repintan su <nav> al
      cambiar de vista, por eso se vigila y se vuelve a poner sola. */
+  /* Donde se cuelga la pestaña. Si el <nav> está en COLUMNA (el CED reparte sus
+     botones en hileras completas), colgarse directo de él hace que cada uno se
+     vuelva su propia hilera y los tres quedan en vertical, uno debajo del otro.
+     Entonces los tres comparten UNA sola hilera, la última. En las apps cuyo nav
+     va en fila, se cuelga directo como siempre. */
+  function ncHilera(nav) {
+    var est = window.getComputedStyle ? getComputedStyle(nav) : null;
+    if (!est || est.flexDirection !== 'column') return nav;
+    var f = document.getElementById('nc-extra');
+    if (!f || f.parentNode !== nav) {
+      f = document.createElement('div');
+      f.id = 'nc-extra';
+      f.className = 'nav-row nav-row2';
+      f.style.display = 'flex';
+      f.style.width = '100%';
+      nav.appendChild(f);
+    }
+    return f;
+  }
+
   function pestana() {
     var nav = $('nav');
     if (!nav) {
@@ -268,7 +288,7 @@
       if (hermano) t.className = hermano.className.replace(/on/g, '').trim();
       t.innerHTML = '⏱️ Horas';
       t.onclick = function (e) { e.preventDefault(); Horas.abrir(); };
-      nav.appendChild(t);
+      ncHilera(nav).appendChild(t);
     }
     poner();
     try {

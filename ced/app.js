@@ -262,7 +262,10 @@ const App = {
     try{ const { data:pm } = await this.sb.from('ced_permisos').select('cargo,tabs');
          this._cedPerm={}; (pm||[]).forEach(p=>this._cedPerm[p.cargo]=p.tabs||[]); }catch(e){ this._cedPerm=null; }
     this.pintarNav();
-    const inicio = {facturacion:'cotizaciones', bodega:'despachos', planta:'planta'}[this.perfil.rol] || (window.NC_EMPRESA==='smart'?'panel':'dashboard');
+    let inicio = {facturacion:'cotizaciones', bodega:'despachos', planta:'planta'}[this.perfil.rol] || (window.NC_EMPRESA==='smart'?'panel':'dashboard');
+    /* Si esa pestaña no está entre las suyas, cae en la primera que SÍ tenga.
+       Antes el consultador aterrizaba en un dashboard que no le corresponde. */
+    if(!(this._permitidos||[]).includes(inicio)) inicio=(this._permitidos||[])[0]||'consulta';
     this.go(inicio);
   },
 
@@ -310,6 +313,7 @@ const App = {
     /* Tres hileras, en el orden que pidió José:
        1 · lo comercial del día  2 · plata y operación  3 · plataforma */
     const ROW1=[
+      {v:'consulta', ic:'🔎', t:'Consulta'},
       {v:'crm', ic:'📇', t:'CRM'},
       {v:'cotizaciones', ic:'📝', t:'Cotizar'},
       {v:'pedidos', ic:'📦', t:'Pedidos'},
@@ -331,11 +335,14 @@ const App = {
       {v:'admin', ic:'👤', t:'Usuarios'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','pendientes','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','pendientes'],
-      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores'],
-      vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario'],
-      facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos','inventario'], planta:['dashboard','pedidos','planta','inventario']};
+    /* 'consulta' va en TODOS los roles a proposito: la consulta de plantas es de
+       toda la organizacion, no de un area. Quien solo debe ver eso y nada mas
+       lleva el cargo 'consultador', que en ced_permisos tiene unicamente consulta. */
+    const TODOS=['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','pendientes','datos','admin','permisos'];
+    const DEF={admin:TODOS, gerente:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','pendientes'],
+      director:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores'],
+      vendedor:['dashboard','consulta','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario'],
+      facturacion:['panel','consulta','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','consulta','despachos','inventario'], planta:['dashboard','consulta','pedidos','planta','inventario']};
     /* De donde salen las pestañas, en orden:
        1. Si la persona entra por la red (tiene CARGO), manda ced_permisos —
           que es justo lo que se edita en la pantalla de Permisos. Antes esa
@@ -355,6 +362,20 @@ const App = {
     $('nav').innerHTML = `${f1?`<div class="nav-row">${f1}</div>`:''}`
       + `${f2?`<div class="nav-row nav-row2">${f2}</div>`:''}`
       + `${f3?`<div class="nav-row nav-row2">${f3}</div>`:''}`;
+    this._navAlto();
+  },
+  /* El alto de la barra no es fijo: cambia según cuántas hileras le toquen al
+     cargo, y la de Notas/Horas/Plata llega segundos después. Con el padding
+     quemado en el CSS, al consultador le sobraba media pantalla y al que ve
+     todo se le escondía lo último de la lista detrás de la barra. */
+  _navAlto(){
+    const nav=$('nav'), m=$('main'); if(!nav||!m) return;
+    const ajusta=()=>{ const h=nav.offsetHeight; if(h) m.style.paddingBottom=(h+22)+'px'; };
+    ajusta(); setTimeout(ajusta,300); setTimeout(ajusta,1500);
+    if(!this._navObs){
+      try{ this._navObs=new MutationObserver(ajusta); this._navObs.observe(nav,{childList:true,subtree:true}); }catch(e){}
+      window.addEventListener('resize', ajusta);
+    }
   },
   // sub-barra (pastillas) de la pestaña actual → integra los secundarios DENTRO de su pestaña
   _subnav(){
@@ -381,6 +402,7 @@ const App = {
     window.scrollTo(0,0);
     // Multi-empresa: módulos de Feroz que aún no tienen versión propia para otra empresa
     if(view==='cotizaciones' && window.NC_EMPRESA==='smart') return this.vCotLanding();   // Smart: landing nc_cotizaciones · Feroz cae a vCotizaciones (tabla 'cotizaciones')
+    if(view==='consulta') return this.vConsulta();  // plantas de produccion · NO es el inventario de las sedes
     if(view==='datos') return this.vDatos();   // visor de la superdata (leer Supabase como el Sheet)
     if(window.NC_EMPRESA==='smart' && view==='crm') return this.vCrmSmart();
     if(window.NC_EMPRESA==='smart' && view==='planta') return this.vPlantaSmart();
@@ -4542,7 +4564,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
      lista le falta uno, ese modulo no se puede marcar — y como el menu ahora se
      rige por ced_permisos, lo que no este aca queda invisible para todo cargo.
      Faltaban Inventario, Datos, Usuarios y Permisos. */
-  CED_MODS:[['crm','📇 CRM'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],
+  CED_MODS:[['consulta','🔎 Consulta'],['crm','📇 CRM'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],
     ['despachos','🚚 Despachos'],['gastos','💸 Gastos'],['inventario','🗃️ Inventario'],
     ['cartera','💳 Cartera'],['comisiones','🧾 Comisiones'],['proveedores','🚚 Proveedores'],
     ['panel','📈 Panel'],['planta','🏭 Planta'],['clientes','👥 Clientes'],
@@ -5062,7 +5084,13 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   },
 
   /* ---------- ADMIN (equipo) ---------- */
-  CED_CARGOS:['gerente','administrador','vendedor','contabilidad','finanzas','produccion','bodega','cajera'],
+  /* Los dos últimos son los que solo viven en 🔎 Consulta, y no es lo mismo
+     mirar que cargar:
+       consultador → entra a Consulta y SOLO MIRA.
+       planta      → entra a Consulta y SÍ carga inventario y movimientos.
+     A esa gente se le pone el CED "Consulta", que no tiene operación. Dejarlos
+     sin CED sería peor: mi_ced() le da 'ALL' a quien no tiene sede. */
+  CED_CARGOS:['gerente','administrador','vendedor','contabilidad','finanzas','produccion','bodega','cajera','consultador','planta'],
 
   async vAdmin(){
     this.loading();
@@ -5463,6 +5491,9 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       <input id="u_nom" class="field" value="${esc(u.nombre||'')}" placeholder="Nombre y apellido">
       <label>Cargo</label>
       <select id="u_car" class="field" style="text-transform:capitalize">${this.CED_CARGOS.map(c=>`<option ${u.cargo===c?'selected':''}>${c}</option>`).join('')}</select>
+      <div class="hint">Para quien solo entra a 🔎 <b>Consulta</b> y a nada más:
+        <b>consultador</b> mira y ya · <b>planta</b> además carga el inventario.
+        A esa gente ponla en el CED <b>Consulta</b>.</div>
       <label>Usuario con el que entra</label>
       <input id="u_usr" class="field" value="${esc(u.usuario||'')}" placeholder="se arma solo con el nombre"
              oninput="this.dataset.tocado=1">
@@ -5537,6 +5568,467 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   /* ===================== INVENTARIO · por CED =====================
      Cada sucursal ve solo su bodega (eso lo garantiza la base, no esta pantalla).
      El grano es referencia + color + talla. */
+  /* ================= 🔎 CONSULTA · PLANTAS DE PRODUCCIÓN =================
+     OJO con la confusión que ya costó una vuelta: esto NO es el inventario de
+     las SEDES (ese vive en la tabla `inventario`, está aislado por sucursal y se
+     ve en 🗃️ Inventario). Acá viven las PLANTAS DE PRODUCCIÓN, que son de toda
+     la organización: cualquiera con usuario las consulta, y solo quien produce o
+     está en bodega puede grabar. El aislamiento por sede NO aplica aquí.
+
+     Dos maneras de ver el inventario, y son distintas a propósito:
+     1. 📸 INVENTARIO ACTUAL → la foto. Informativa. NO está en tiempo real: no
+        se mueve sola, solo cambia cuando alguien la actualiza. (ced_planta_inv)
+     2. 🔄 CON MOVIMIENTOS   → entrada, salida y saldo. Esta SÍ opera en tiempo
+        real y se calcula sumando el libro. (ced_planta_movs)
+
+     El cargo `consultador` solo trae esta pestaña: entra, mira y ya. */
+
+  plnPuedeGrabar(){
+    if(this.perfil && ['admin','director','gerente'].includes(this.perfil.rol)) return true;
+    return ['bodega','produccion','planta','gerente','administrador'].includes(this.miCargo());
+  },
+  _plnYo(){ return (this.perfil&&this.perfil.nombre) || (this.user&&this.user.email) || ''; },
+  /* Para meter un texto dentro de un onclick="...('aquí')": si la referencia
+     trae una comilla, sin esto el botón queda roto. */
+  _plnJs(s){ return esc(String(s==null?'':s)).replace(/'/g,'&#39;'); },
+  _plnFecha(t){
+    if(!t) return '—';
+    const d=new Date(t); if(isNaN(d)) return '—';
+    const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return d.getDate()+' '+M[d.getMonth()]+' · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  },
+  _plnHace(t){
+    if(!t) return '';
+    const d=(Date.now()-new Date(t))/86400000;
+    if(isNaN(d)) return '';
+    if(d<1) return 'hoy';
+    if(d<2) return 'ayer';
+    return 'hace '+Math.floor(d)+' días';
+  },
+
+  async vConsulta(){
+    this.loading();
+    const [rp,rf,rm] = await Promise.all([
+      this.sb.from('ced_plantas').select('*').order('orden').order('nombre'),
+      this.sb.from('ced_planta_inv').select('*').order('referencia'),
+      this.sb.from('ced_planta_movs').select('*').order('creado_en',{ascending:false}).limit(5000),
+    ]);
+    const err = rp.error||rf.error||rm.error;
+    if(err){
+      this.set(`<h1>🔎 Consulta</h1>
+        <div class="card" style="border-color:#f0c4c4;background:#fdecec">
+          <b>Faltan las tablas de plantas.</b>
+          <div style="font-size:13.5px;margin-top:5px">Se corre <b>_PLAYBOOK/ced_plantas-crear.sql</b> una sola vez y este módulo arranca.</div>
+          <div class="hint" style="margin-top:6px">${esc(err.message||'')}</div></div>`);
+      return;
+    }
+    this._plantas=rp.data||[]; this._plnFoto=rf.data||[]; this._plnMovs=rm.data||[];
+    this._plnRender();
+  },
+
+  _plnRender(){
+    const plantas=(this._plantas||[]).filter(p=>p.activo!==false);
+    const modo=this._plnModo||'foto';
+    const sel=this._plnSel||'';
+    const q=(this._plnQ||'').trim().toLowerCase();
+    const puede=this.plnPuedeGrabar();
+    const pasa = r => (!sel || r.planta===sel)
+      && (!q || (String(r.referencia||'')+' '+String(r.color||'')).toLowerCase().includes(q));
+
+    const cabeza = `
+      <h1>🔎 Consulta</h1>
+      <div class="sub">Inventario de las plantas de producción · lo pueden ver todos</div>
+      <div class="card" style="padding:11px 13px;background:#eef2ff;border-color:#c9d3f5">
+        <span style="font-size:12.5px;color:#3a48b3">Esto <b>no</b> es el inventario de las sedes. El de tu bodega está en 🗃️ Inventario.</span>
+      </div>
+      <div class="card" style="padding:12px">
+        <label style="margin-top:0">Planta</label>
+        <select class="field" id="pln_planta" onchange="App._plnSel=this.value;App._plnRender()">
+          <option value="">Todas las plantas</option>
+          ${plantas.map(p=>`<option value="${esc(p.nombre)}" ${sel===p.nombre?'selected':''}>${esc(p.nombre)}${p.ciudad?' · '+esc(p.ciudad):''}</option>`).join('')}
+        </select>
+        <label>Buscar referencia o color</label>
+        <input class="field" id="pln_q" value="${esc(this._plnQ||'')}" placeholder="ej: 701, negro…"
+               oninput="App._plnQ=this.value;clearTimeout(App._plnT);App._plnT=setTimeout(()=>{App._plnRender();const e=document.getElementById('pln_q');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length)}},350)">
+        <div style="display:flex;gap:7px;margin-top:12px">
+          <button onclick="App._plnModo='foto';App._plnRender()" style="flex:1;padding:11px 8px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;background:${modo==='foto'?'var(--naranja);color:#fff':'#eef1f5;color:#555'}">📸 Inventario actual</button>
+          <button onclick="App._plnModo='movs';App._plnRender()" style="flex:1;padding:11px 8px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;background:${modo==='movs'?'var(--naranja);color:#fff':'#eef1f5;color:#555'}">🔄 Con movimientos</button>
+        </div>
+      </div>
+      ${puede?`<div class="acciones-item" style="margin-bottom:12px">
+        <button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.plnGrabar()">✍️ Grabar</button>
+        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnPegar()">📋 Pegar de Excel</button>
+        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnPlantas()">🏭 Plantas</button>
+      </div>`:''}`;
+
+    if(!plantas.length){
+      this.set(cabeza+`<div class="card" style="text-align:center;padding:30px 16px">
+        <div style="font-size:38px">🏭</div>
+        <div style="font-weight:700;margin-top:8px">Todavía no hay plantas cargadas</div>
+        <div class="sub" style="margin-top:6px">${puede?'Toca <b>🏭 Plantas</b> y agrega las que producen.':'Pídele a un gerente que cargue las plantas.'}</div></div>`);
+      return;
+    }
+
+    this.set(cabeza + (modo==='foto' ? this._plnVistaFoto(pasa,puede) : this._plnVistaMovs(pasa)));
+  },
+
+  /* --- 📸 la foto: informativa, NO en tiempo real --- */
+  _plnVistaFoto(pasa,puede){
+    const gr={};
+    (this._plnFoto||[]).filter(pasa).forEach(r=>{
+      const k=r.planta+'||'+r.referencia+'||'+(r.color||'');
+      if(!gr[k]) gr[k]={planta:r.planta, ref:r.referencia, color:r.color||'', tallas:[], total:0, fecha:r.actualizado_en, quien:r.usuario||''};
+      gr[k].tallas.push(r); gr[k].total+=(+r.cantidad||0);
+      if(r.actualizado_en>gr[k].fecha){ gr[k].fecha=r.actualizado_en; gr[k].quien=r.usuario||''; }
+    });
+    const g=Object.values(gr).sort((a,b)=> a.planta.localeCompare(b.planta) || String(a.ref).localeCompare(String(b.ref)));
+    const total=g.reduce((a,x)=>a+x.total,0);
+    const aviso=`<div class="card" style="padding:11px 13px;background:#fdf6e6;border-color:#f3ddb0">
+      <b style="color:#8a5a12">📸 Esto es una foto, no el saldo vivo.</b>
+      <span style="font-size:12.5px;color:#7a5f2a"> No se mueve sola: solo cambia cuando alguien la actualiza. Para ver la operación al día usa <b>🔄 Con movimientos</b>.</span></div>`;
+    if(!g.length) return aviso+'<div class="empty">Nadie ha subido inventario todavía con ese filtro.</div>';
+    return aviso+`
+      <div class="kpis">
+        <div class="kpi naranja"><b>${total}</b><span>unidades en la foto</span></div>
+        <div class="kpi"><b>${g.length}</b><span>referencias</span></div>
+      </div>
+      ${g.map(x=>{
+        const viejo=(Date.now()-new Date(x.fecha))/86400000>15;
+        return `<div class="item">
+          <div class="top">
+            <div style="min-width:0;flex:1">
+              <div class="nom">${esc(x.ref)}${x.color?' · '+esc(x.color):''}
+                <span style="font-size:10px;font-weight:700;background:#fdeee2;color:#9a5312;padding:2px 7px;border-radius:9px;margin-left:4px">${esc(x.planta)}</span></div>
+              <div class="meta" style="${viejo?'color:#b45309;font-weight:700':''}">Actualizado ${esc(this._plnFecha(x.fecha))} · ${esc(this._plnHace(x.fecha))}${x.quien?' · por '+esc(x.quien):''}${viejo?' ⚠️ ya está viejo':''}</div>
+            </div>
+            <div class="tot">${x.total}</div>
+          </div>
+          <div class="grid-tallas">${x.tallas.sort((a,b)=>String(a.talla).localeCompare(String(b.talla),undefined,{numeric:true}))
+            .map(t=>`<div class="t"><span>${esc(t.talla||'—')}</span><div style="font-weight:800;padding:4px 0;color:${+t.cantidad>0?'var(--texto)':'#bcc3cc'}">${+t.cantidad||0}</div></div>`).join('')}</div>
+          ${puede?`<div class="acciones-item"><button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnGrabar('foto','${this._plnJs(x.planta)}','${this._plnJs(x.ref)}','${this._plnJs(x.color)}')">✎ Actualizar esta</button></div>`:''}
+        </div>`;}).join('')}`;
+  },
+
+  /* --- 🔄 entradas, salidas y saldo: esto SÍ es tiempo real --- */
+  _plnVistaMovs(pasa){
+    const movs=(this._plnMovs||[]).filter(pasa);
+    const gm={};
+    movs.forEach(m=>{
+      const k=m.planta+'||'+m.referencia+'||'+(m.color||'');
+      if(!gm[k]) gm[k]={planta:m.planta, ref:m.referencia, color:m.color||'', t:{}, ent:0, sal:0, ultimo:m.creado_en};
+      const g=gm[k], ta=m.talla||'—', c=+m.cantidad||0;
+      if(!g.t[ta]) g.t[ta]={ent:0,sal:0};
+      if(m.tipo==='entrada'){ g.t[ta].ent+=c; g.ent+=c; } else { g.t[ta].sal+=c; g.sal+=c; }
+      if(m.creado_en>g.ultimo) g.ultimo=m.creado_en;
+    });
+    const g=Object.values(gm).sort((a,b)=> a.planta.localeCompare(b.planta) || String(a.ref).localeCompare(String(b.ref)));
+    if(!g.length) return `<div class="card" style="padding:11px 13px;background:#e7f6ec;border-color:#bfe0cd">
+        <b style="color:#1c7a3e">🔄 Acá el saldo se calcula solo</b>
+        <span style="font-size:12.5px;color:#3f6b52"> · entradas menos salidas, al segundo.</span></div>
+      <div class="empty">Todavía no hay movimientos con ese filtro.</div>`;
+    const tE=g.reduce((a,x)=>a+x.ent,0), tS=g.reduce((a,x)=>a+x.sal,0);
+    const ultimos=movs.slice(0,25);
+    return `
+      <div class="card" style="padding:11px 13px;background:#e7f6ec;border-color:#bfe0cd">
+        <b style="color:#1c7a3e">🔄 Acá el saldo se calcula solo</b>
+        <span style="font-size:12.5px;color:#3f6b52"> · entradas menos salidas, al segundo.</span></div>
+      <div class="kpis">
+        <div class="kpi verde"><b>${tE}</b><span>entradas</span></div>
+        <div class="kpi rojo"><b>${tS}</b><span>salidas</span></div>
+        <div class="kpi naranja"><b>${tE-tS}</b><span>saldo</span></div>
+        <div class="kpi"><b>${g.length}</b><span>referencias</span></div>
+      </div>
+      ${g.map(x=>{
+        const saldo=x.ent-x.sal;
+        const tallas=Object.keys(x.t).sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
+        return `<div class="item" style="border-left:4px solid ${saldo>0?'var(--verde)':(saldo<0?'var(--rojo)':'#c8ced6')}">
+          <div class="top">
+            <div style="min-width:0;flex:1">
+              <div class="nom">${esc(x.ref)}${x.color?' · '+esc(x.color):''}
+                <span style="font-size:10px;font-weight:700;background:#fdeee2;color:#9a5312;padding:2px 7px;border-radius:9px;margin-left:4px">${esc(x.planta)}</span></div>
+              <div class="meta">↑ ${x.ent} entradas · ↓ ${x.sal} salidas · último ${esc(this._plnFecha(x.ultimo))}</div>
+            </div>
+            <div style="text-align:right"><div class="tot" style="color:${saldo<0?'var(--rojo)':'var(--naranja)'}">${saldo}</div><div class="meta">saldo</div></div>
+          </div>
+          <div style="overflow-x:auto;margin-top:9px">
+            <table style="border-collapse:collapse;font-size:12px;min-width:100%">
+              <tr><td style="color:var(--suave);font-weight:700;padding:3px 8px 3px 0">Talla</td>${tallas.map(t=>`<td style="text-align:center;font-weight:700;padding:3px 7px">${esc(t)}</td>`).join('')}</tr>
+              <tr><td style="color:var(--verde);font-weight:700;padding:3px 8px 3px 0">Entra</td>${tallas.map(t=>`<td style="text-align:center;padding:3px 7px">${x.t[t].ent||''}</td>`).join('')}</tr>
+              <tr><td style="color:var(--rojo);font-weight:700;padding:3px 8px 3px 0">Sale</td>${tallas.map(t=>`<td style="text-align:center;padding:3px 7px">${x.t[t].sal||''}</td>`).join('')}</tr>
+              <tr style="border-top:1px solid var(--linea)"><td style="font-weight:800;padding:4px 8px 4px 0">Saldo</td>${tallas.map(t=>{const s=x.t[t].ent-x.t[t].sal;
+                return `<td style="text-align:center;font-weight:800;padding:4px 7px;color:${s<0?'var(--rojo)':(s>0?'var(--texto)':'#bcc3cc')}">${s}</td>`;}).join('')}</tr>
+            </table>
+          </div>
+        </div>`;}).join('')}
+      <h1 style="font-size:16px;margin-top:16px">Últimos movimientos</h1>
+      <div class="sub">Este libro no se edita ni se borra: solo se le agrega</div>
+      ${ultimos.map(m=>`<div class="item" style="padding:10px 12px">
+        <div class="top"><div>
+          <div class="nom" style="font-size:14px">${m.tipo==='entrada'?'<span style="color:var(--verde)">↑</span>':'<span style="color:var(--rojo)">↓</span>'} ${esc(m.referencia)}${m.color?' · '+esc(m.color):''} · T${esc(m.talla||'—')}</div>
+          <div class="meta">${esc(m.planta)} · ${esc(this._plnFecha(m.creado_en))}${m.usuario?' · '+esc(m.usuario):''}${m.nota?' · '+esc(m.nota):''}</div>
+        </div><div class="tot" style="color:${m.tipo==='entrada'?'var(--verde)':'var(--rojo)'}">${m.tipo==='entrada'?'+':'−'}${+m.cantidad||0}</div></div>
+      </div>`).join('')}`;
+  },
+
+  /* --- el formulario único: referencia + color + tallas, y decides qué es --- */
+  plnGrabar(tipo,planta,ref,color){
+    if(!this.plnPuedeGrabar()){ alert('Tu cargo puede consultar, pero no grabar.'); return; }
+    const plantas=(this._plantas||[]).filter(p=>p.activo!==false);
+    if(!plantas.length){ alert('Primero hay que cargar las plantas (botón 🏭 Plantas).'); return; }
+    this._plnTipo=tipo||'entrada';
+    const pSel=planta||this._plnSel||plantas[0].nombre;
+    const cats=Object.keys(this.TALLAS_CAT);
+    this.modal(`<h3>✍️ Grabar en planta</h3>
+      <div class="sub">Escoges la referencia y el color, escribes las tallas, y decides qué es</div>
+      <label>Planta</label>
+      <select id="pl_planta" class="field">${plantas.map(p=>`<option ${p.nombre===pSel?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>
+      <label>¿Qué vas a grabar?</label>
+      <div id="pl_tipos" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <div class="hint" id="pl_hint"></div>
+      <div class="row2">
+        <div><label>Referencia</label><input id="pl_ref" class="field" value="${esc(ref||'')}" placeholder="ej: 701" onchange="App._plnTraer()"></div>
+        <div><label>Color</label><input id="pl_col" class="field" value="${esc(color||'')}" placeholder="opcional" onchange="App._plnTraer()"></div>
+      </div>
+      <label>Tallaje</label>
+      <select id="pl_cat" class="field" onchange="App._plnGrid()">${cats.map(c=>`<option>${esc(c)}</option>`).join('')}</select>
+      <div class="grid-tallas" id="pl_grid"></div>
+      <div id="pl_nota_box"><label>Nota</label><input id="pl_nota" class="field" placeholder="de dónde vino o para dónde va (opcional)"></div>
+      <button class="btn btn-main" onclick="App.plnGuardar()">Guardar</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+    this._plnTipos(); this._plnGrid(); if(ref) this._plnTraer();
+  },
+  _plnTipos(){
+    const T=[['entrada','＋ Entrada','var(--verde)'],['salida','− Salida','var(--rojo)'],['foto','📸 Inventario actualizado','var(--azul)']];
+    const H={entrada:'Llegó mercancía. <b>Suma</b> al saldo y queda en el libro, en tiempo real.',
+             salida:'Salió mercancía. <b>Resta</b> del saldo y queda en el libro, en tiempo real.',
+             foto:'La foto de lo que hay hoy. <b>Reemplaza</b> lo que hubiera y es solo informativa: no se mueve sola.'};
+    const t=this._plnTipo;
+    const box=document.getElementById('pl_tipos'); if(!box) return;
+    box.innerHTML=T.map(([k,n,c])=>`<button onclick="App._plnTipo='${k}';App._plnTipos()" style="flex:1 0 auto;padding:10px 12px;border-radius:10px;border:2px solid ${t===k?c:'var(--linea)'};background:${t===k?c:'#fff'};color:${t===k?'#fff':'#555'};font-weight:700;font-size:12.5px;cursor:pointer">${n}</button>`).join('');
+    const h=document.getElementById('pl_hint'); if(h) h.innerHTML=H[t];
+    const nb=document.getElementById('pl_nota_box'); if(nb) nb.style.display = t==='foto' ? 'none' : '';
+    if(t==='foto') this._plnTraer();
+  },
+  _plnGrid(){
+    const cat=(document.getElementById('pl_cat')||{}).value;
+    const box=document.getElementById('pl_grid'); if(!box) return;
+    box.innerHTML=this._tallasDe(cat).map(t=>`<div class="t"><span>${esc(t)}</span><input type="number" min="0" inputmode="numeric" data-talla="${esc(t)}" placeholder="0"></div>`).join('');
+  },
+  /* Si esa referencia ya tiene foto, la trae para que se corrija en vez de
+     escribirla de nuevo. Solo aplica a la foto: entradas y salidas siempre en blanco. */
+  _plnTraer(){
+    if(this._plnTipo!=='foto') return;
+    const p=(document.getElementById('pl_planta')||{}).value;
+    const r=((document.getElementById('pl_ref')||{}).value||'').trim();
+    const c=((document.getElementById('pl_col')||{}).value||'').trim();
+    if(!r) return;
+    const filas=(this._plnFoto||[]).filter(x=>x.planta===p && x.referencia===r && (x.color||'')===c);
+    if(!filas.length) return;
+    document.querySelectorAll('#pl_grid input[data-talla]').forEach(i=>{
+      const f=filas.find(x=>String(x.talla)===i.dataset.talla);
+      i.value = f ? (+f.cantidad||0) : '';
+    });
+  },
+
+  async plnGuardar(){
+    const planta=(document.getElementById('pl_planta')||{}).value;
+    const ref=((document.getElementById('pl_ref')||{}).value||'').trim();
+    const color=((document.getElementById('pl_col')||{}).value||'').trim();
+    const nota=((document.getElementById('pl_nota')||{}).value||'').trim();
+    const tipo=this._plnTipo;
+    if(!ref){ alert('Falta la referencia.'); return; }
+    const filas=[];
+    document.querySelectorAll('#pl_grid input[data-talla]').forEach(i=>{
+      const v=String(i.value).trim();
+      if(v==='') return;                       // vacío = no lo tocaste
+      const n=parseInt(v,10); if(isNaN(n)||n<0) return;
+      if(tipo!=='foto' && n===0) return;       // una entrada de 0 no es un movimiento
+      filas.push({talla:i.dataset.talla, cantidad:n});
+    });
+    if(!filas.length){ alert('No escribiste cantidades en ninguna talla.'); return; }
+    const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+    try{
+      const yo=this._plnYo();
+      if(tipo==='foto'){
+        const rows=filas.map(f=>({planta, referencia:ref, color, talla:f.talla, cantidad:f.cantidad,
+                                  usuario:yo, actualizado_en:new Date().toISOString()}));
+        const { error } = await this.sb.from('ced_planta_inv').upsert(rows,{onConflict:'planta,referencia,color,talla'});
+        if(error){ alert('No se pudo guardar: '+error.message); return; }
+      }else{
+        const rows=filas.map(f=>({planta, referencia:ref, color, talla:f.talla, tipo,
+                                  cantidad:f.cantidad, nota:nota||null, usuario:yo}));
+        const { error } = await this.sb.from('ced_planta_movs').insert(rows);
+        if(error){ alert('No se pudo guardar: '+error.message); return; }
+      }
+      this.cerrarModal();
+      this.toast(tipo==='foto'?'📸 Inventario actualizado':(tipo==='entrada'?'↑ Entrada grabada':'↓ Salida grabada'));
+      this._plnModo = tipo==='foto' ? 'foto' : 'movs';
+      this.vConsulta();
+    } finally { if(btn){ btn.disabled=false; btn.textContent='Guardar'; } }
+  },
+
+  /* --- 📋 pegar el cuadro de Excel --- */
+  plnPegar(){
+    if(!this.plnPuedeGrabar()){ alert('Tu cargo puede consultar, pero no grabar.'); return; }
+    const plantas=(this._plantas||[]).filter(p=>p.activo!==false);
+    if(!plantas.length){ alert('Primero hay que cargar las plantas (botón 🏭 Plantas).'); return; }
+    const pSel=this._plnSel||plantas[0].nombre;
+    this.modal(`<h3>📋 Pegar de Excel</h3>
+      <div class="sub">Copias el cuadro en Excel (Ctrl+C) y lo pegas acá (Ctrl+V)</div>
+      <label>Planta</label>
+      <select id="pg_planta" class="field">${plantas.map(p=>`<option ${p.nombre===pSel?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>
+      <label>¿Qué es lo que estás pegando?</label>
+      <select id="pg_tipo" class="field">
+        <option value="foto">📸 Inventario actualizado (la foto)</option>
+        <option value="entrada">＋ Entradas</option>
+        <option value="salida">− Salidas</option>
+      </select>
+      <label>El cuadro</label>
+      <textarea id="pg_txt" class="field" rows="9" placeholder="Pega aquí…" oninput="App._plnLeerPega()"
+        style="font-family:monospace;font-size:13px"></textarea>
+      <div class="hint">Entiende las dos formas:<br>
+        · <b>Cuadro</b> — primera fila con las tallas y la primera columna con las referencias.<br>
+        · <b>Lista</b> — una fila por talla: referencia, color, talla, cantidad.</div>
+      <div id="pg_prev" style="margin-top:10px"></div>
+      <button class="btn btn-main" onclick="App.plnGuardarPega()">Guardar lo que se entendió</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+  },
+  /* Parte el texto pegado. Devuelve {filas:[{referencia,color,talla,cantidad}], modo, malas} */
+  _plnParse(txt){
+    /* Solo se recorta por la derecha: si un cuadro de Excel arranca con la
+       casilla de la esquina vacía, la fila empieza por tabulador y al recortar
+       por la izquierda se perdía la primera columna. */
+    const lineas=String(txt||'').split(/\r?\n/).map(l=>l.replace(/\s+$/,'')).filter(l=>l.trim());
+    const parte=l=>l.split(/\t|;|,(?=\s*\S)/).map(c=>c.trim());
+    if(!lineas.length) return {filas:[],modo:'',malas:0};
+    const universo=new Set(); Object.values(this.TALLAS_CAT).forEach(a=>a.forEach(t=>universo.add(String(t).toLowerCase())));
+    /* "TALLA 38", "T38" y "38" son lo mismo: se dejan todas como 38.
+       `limpia` conserva las mayúsculas (una talla M debe quedar M, no m);
+       `norm` es solo para comparar contra el tallaje conocido. */
+    const limpia = c => String(c||'').trim().replace(/^talla\s*/i,'').replace(/^t(?=\d)/i,'').trim();
+    const norm = c => limpia(c).toLowerCase();
+    const cab=parte(lineas[0]);
+    const hayColor = /^color$/i.test((cab[1]||'').trim());
+    const cand=cab.slice(hayColor?2:1).filter(c=>String(c).trim());
+    /* Cuadro solo si TODOS los encabezados son tallas de verdad. Con "la mitad
+       basta" una lista de 3 columnas (701 · 38 · 12) se leía como cuadro y
+       guardaba basura: el 39 quedaba de cantidad. */
+    const esCuadro = cand.length>=3 && cand.every(c=>universo.has(norm(c)));
+    const filas=[]; let malas=0;
+    if(esCuadro){
+      const tallas = cab.slice(hayColor?2:1).map(limpia);
+      for(let i=1;i<lineas.length;i++){
+        const c=parte(lineas[i]); const ref=(c[0]||'').trim();
+        if(!ref || /^total/i.test(ref)){ continue; }
+        const color = hayColor ? (c[1]||'').trim() : '';
+        tallas.forEach((t,j)=>{
+          const v=(c[(hayColor?2:1)+j]||'').replace(/[^\d-]/g,'');
+          if(v==='') return;
+          const n=parseInt(v,10); if(isNaN(n)||n<0){ malas++; return; }
+          if(!t) return;
+          filas.push({referencia:ref, color, talla:String(t), cantidad:n});
+        });
+      }
+      return {filas, modo:'cuadro', malas};
+    }
+    lineas.forEach((l,i)=>{
+      const c=parte(l);
+      if(c.length<3){ malas++; return; }
+      const nRaw=(c[c.length-1]||'').replace(/[^\d-]/g,'');
+      const n=parseInt(nRaw,10);
+      if(isNaN(n)||n<0){ if(i>0) malas++; return; }   // la fila 1 suele ser el encabezado
+      const ref=(c[0]||'').trim(); if(!ref){ malas++; return; }
+      const talla=String(c[c.length-2]||'').trim();
+      const color=c.length>=4 ? String(c[1]||'').trim() : '';
+      filas.push({referencia:ref, color, talla, cantidad:n});
+    });
+    return {filas, modo:'lista', malas};
+  },
+  _plnLeerPega(){
+    const r=this._plnParse((document.getElementById('pg_txt')||{}).value);
+    this._plnPega=r;
+    const box=document.getElementById('pg_prev'); if(!box) return;
+    if(!r.filas.length){ box.innerHTML=`<div class="hint" style="color:#b3261e">Todavía no se entiende nada de lo pegado.</div>`; return; }
+    const refs=[...new Set(r.filas.map(f=>f.referencia))];
+    const tot=r.filas.reduce((a,f)=>a+f.cantidad,0);
+    box.innerHTML=`<div class="card" style="margin:0;padding:11px;background:#e7f6ec;border-color:#bfe0cd">
+      <b style="color:#1c7a3e">Se entendieron ${r.filas.length} líneas</b>
+      <div style="font-size:12.5px;color:#3f6b52">${refs.length} referencia(s) · ${tot} unidades · leído como <b>${r.modo}</b>${r.malas?` · ${r.malas} fila(s) que no se pudieron leer`:''}</div>
+      <div style="font-size:11.5px;color:#4a6a5e;margin-top:5px">${esc(refs.slice(0,8).join(' · '))}${refs.length>8?' …':''}</div></div>`;
+  },
+  async plnGuardarPega(){
+    const r=this._plnPega||this._plnParse((document.getElementById('pg_txt')||{}).value);
+    if(!r.filas.length){ alert('No hay nada que se pueda leer en lo pegado.'); return; }
+    const planta=(document.getElementById('pg_planta')||{}).value;
+    const tipo=(document.getElementById('pg_tipo')||{}).value;
+    if(!confirm(`¿Guardar ${r.filas.length} líneas en ${planta}?`)) return;
+    const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+    try{
+      const yo=this._plnYo();
+      let error;
+      if(tipo==='foto'){
+        const rows=r.filas.map(f=>({planta, referencia:f.referencia, color:f.color||'', talla:f.talla,
+                                    cantidad:f.cantidad, usuario:yo, actualizado_en:new Date().toISOString()}));
+        ({ error } = await this.sb.from('ced_planta_inv').upsert(rows,{onConflict:'planta,referencia,color,talla'}));
+      }else{
+        const rows=r.filas.filter(f=>f.cantidad>0).map(f=>({planta, referencia:f.referencia, color:f.color||'',
+                                    talla:f.talla, tipo, cantidad:f.cantidad, nota:'pegado de Excel', usuario:yo}));
+        if(!rows.length){ alert('Todas las cantidades venían en cero: no hay movimiento que grabar.'); return; }
+        ({ error } = await this.sb.from('ced_planta_movs').insert(rows));
+      }
+      if(error){ alert('No se pudo guardar: '+error.message); return; }
+      this.cerrarModal(); this._plnPega=null;
+      this.toast('Guardado · '+r.filas.length+' líneas');
+      this._plnModo = tipo==='foto' ? 'foto' : 'movs';
+      this.vConsulta();
+    } finally { if(btn){ btn.disabled=false; btn.textContent='Guardar lo que se entendió'; } }
+  },
+
+  /* --- 🏭 la lista de plantas, editable desde acá --- */
+  plnPlantas(){
+    if(!this.plnPuedeGrabar()){ alert('Tu cargo puede consultar, pero no grabar.'); return; }
+    const ps=this._plantas||[];
+    this.modal(`<h3>🏭 Plantas de producción</h3>
+      <div class="sub">Las que producen y alimentan esta consulta</div>
+      ${ps.length?ps.map(p=>`<div class="item" style="padding:11px">
+        <div class="top"><div>
+          <div class="nom">${esc(p.nombre)} ${p.activo===false?'<span style="color:#dc2626;font-size:11px;font-weight:800">inactiva</span>':''}</div>
+          <div class="meta">${esc(p.ciudad||'sin ciudad')}</div>
+        </div>
+        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnBorrarPlanta('${p.id}')">🗑️</button></div>
+      </div>`).join(''):'<div class="empty">Todavía no hay ninguna.</div>'}
+      <div class="row2" style="margin-top:10px">
+        <div><label>Nombre de la planta</label><input id="pp_nom" class="field" placeholder="ej: Planta Bogotá"></div>
+        <div><label>Ciudad</label><input id="pp_ciu" class="field" placeholder="opcional"></div>
+      </div>
+      <button class="btn btn-main" onclick="App.plnAgregarPlanta()">＋ Agregar planta</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cerrar</button>`);
+  },
+  async plnAgregarPlanta(){
+    const nombre=((document.getElementById('pp_nom')||{}).value||'').trim();
+    const ciudad=((document.getElementById('pp_ciu')||{}).value||'').trim();
+    if(!nombre){ alert('Falta el nombre de la planta.'); return; }
+    const { error } = await this.sb.from('ced_plantas').insert({nombre, ciudad:ciudad||null, orden:(this._plantas||[]).length});
+    if(error){ alert(/duplicate|unique/i.test(error.message)?'Ya existe una planta con ese nombre.':'Error: '+error.message); return; }
+    const { data } = await this.sb.from('ced_plantas').select('*').order('orden').order('nombre');
+    this._plantas=data||[]; this.toast('Planta agregada'); this.plnPlantas();
+  },
+  async plnBorrarPlanta(id){
+    const p=(this._plantas||[]).find(x=>x.id===id)||{};
+    const conDatos=(this._plnFoto||[]).some(f=>f.planta===p.nombre)||(this._plnMovs||[]).some(m=>m.planta===p.nombre);
+    if(conDatos){
+      if(!confirm('Esta planta ya tiene inventario o movimientos grabados.\n\nSe deja INACTIVA (deja de aparecer para grabar) pero NO se borra lo que ya tiene. ¿Seguir?')) return;
+      const { error } = await this.sb.from('ced_plantas').update({activo:false}).eq('id',id);
+      if(error){ alert('Error: '+error.message); return; }
+    }else{
+      if(!confirm('¿Quitar esta planta? Todavía no tiene nada grabado.')) return;
+      const { error } = await this.sb.from('ced_plantas').delete().eq('id',id);
+      if(error){ alert('Error: '+error.message); return; }
+    }
+    const { data } = await this.sb.from('ced_plantas').select('*').order('orden').order('nombre');
+    this._plantas=data||[]; this.toast('Listo'); this.plnPlantas();
+  },
+
   async vInventario(){
     this.loading();
     const [ri,rm,rc,rp,rl,rf,rk] = await Promise.all([
