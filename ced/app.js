@@ -5663,12 +5663,14 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           <button onclick="App._plnModo='movs';App._plnRender()" style="flex:1;padding:11px 8px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;background:${modo==='movs'?'var(--naranja);color:#fff':'#eef1f5;color:#555'}">🔄 Con movimientos</button>
         </div>
       </div>
-      ${puede?`<div class="acciones-item" style="margin-bottom:12px">
-        <button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.plnGrabar()">✍️ Grabar</button>
-        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnPegar()">📋 Pegar de Excel</button>
+      <div class="acciones-item" style="margin-bottom:12px">
+        ${puede?`<button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.plnGrabar()">✍️ Grabar</button>
+        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnPegar()">📋 Pegar de Excel</button>`:''}
+        <!-- 📕 Referencias la ve TODO EL MUNDO: ahí se busca una referencia y se
+             ve lo que hay de ella. Es consulta, no es grabar. -->
         <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnRefs()">📕 Referencias</button>
-        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnPlantas()">🏭 Plantas</button>
-      </div>`:''}`;
+        ${puede?`<button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.plnPlantas()">🏭 Plantas</button>`:''}
+      </div>`;
 
     if(!plantas.length){
       this.set(cabeza+`<div class="card" style="text-align:center;padding:30px 16px">
@@ -5898,33 +5900,106 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     });
   },
 
-  /* --- 📕 el cajón de referencias, por planta --- */
+  /* --- 📕 el cajón de referencias, por planta ---
+     No es solo el catálogo: cada referencia muestra lo que hay de ella, porque
+     de nada sirve saber que existe la Peter Pan mujer si toca salirse a otra
+     pantalla para ver cuántas quedan. Con el buscador de arriba se aísla una
+     sola y ahí sí se abre talla por talla.
+     La puede ABRIR cualquiera (el consultador también); crear y corregir, no. */
+  _plnRefsUsados(planta){
+    const s=new Set();
+    (this._plnFoto||[]).forEach(r=>{ if(r.planta===planta) s.add(r.referencia); });
+    (this._plnMovs||[]).forEach(r=>{ if(r.planta===planta) s.add(r.referencia); });
+    return s;
+  },
+  /* Lo que hay de una referencia+color: la foto y el saldo, cada uno por talla. */
+  _plnInvDe(planta,ref,color){
+    const R=this._plnRef, mismo=(a,b)=>R(a)===R(b);
+    const foto={}; let fotoTot=0, fecha=null;
+    (this._plnFoto||[]).forEach(r=>{
+      if(r.planta!==planta || !mismo(r.referencia,ref) || !mismo(r.color,color)) return;
+      foto[r.talla]=(foto[r.talla]||0)+(+r.cantidad||0); fotoTot+=(+r.cantidad||0);
+      if(!fecha || r.actualizado_en>fecha) fecha=r.actualizado_en;
+    });
+    const mov={}; let ent=0, sal=0;
+    (this._plnMovs||[]).forEach(m=>{
+      if(m.planta!==planta || !mismo(m.referencia,ref) || !mismo(m.color,color)) return;
+      const t=m.talla||'—', c=+m.cantidad||0;
+      if(!mov[t]) mov[t]={e:0,s:0};
+      if(m.tipo==='entrada'){ mov[t].e+=c; ent+=c; } else { mov[t].s+=c; sal+=c; }
+    });
+    return {foto, fotoTot, fecha, mov, ent, sal, saldo:ent-sal, hay:fotoTot>0||ent>0||sal>0};
+  },
   plnRefs(planta){
-    if(!this.plnPuedeGrabar()){ alert('Tu cargo puede consultar, pero no grabar.'); return; }
     const plantas=(this._plantas||[]).filter(p=>p.activo!==false);
-    if(!plantas.length){ alert('Primero hay que cargar las plantas (botón 🏭 Plantas).'); return; }
+    if(!plantas.length){ alert('Todavía no hay plantas cargadas.'); return; }
+    const puede=this.plnPuedeGrabar();
     const pSel=planta||this._plnRefPlanta||this._plnSel||plantas[0].nombre;
+    if(planta!==undefined) this._plnRefQ='';     // al cambiar de planta se limpia el buscador
     this._plnRefPlanta=pSel;
     const cat=this._plnCat(pSel);
     /* Se agrupa por referencia: una fila por color se lee fatal cuando una bota
        viene en cuatro colores. */
     const gr={};
     cat.forEach(r=>{ (gr[r.referencia]=gr[r.referencia]||{cod:r.codigo, tallas:r.tallas, cats:r.categoria, cols:[]}).cols.push(r); });
-    const refs=Object.keys(gr).sort();
+    const todas=Object.keys(gr).sort();
+    const q=this._plnRefQ||'';
+    const refs=q?todas.filter(r=>r===q):todas;
+    const solaUna=refs.length===1;
+    const conInv=this._plnRefsUsados(pSel);
+
     this.modal(`<h3>📕 Referencias</h3>
-      <div class="sub">Lo que fabrica cada planta · de acá salen las listas al grabar</div>
+      <div class="sub">Lo que fabrica cada planta y lo que hay de cada una</div>
       <label>Planta</label>
       <select class="field" onchange="App.plnRefs(this.value)">${plantas.map(p=>`<option ${p.nombre===pSel?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select>
-      <button class="btn btn-main" onclick="App.plnRefModal()">＋ Crear referencia</button>
-      <div class="sub" style="margin:14px 0 8px">${refs.length} referencia${refs.length===1?'':'s'} · ${cat.length} con color</div>
-      ${refs.length?refs.map(r=>{const g=gr[r];
-        return `<div class="item" style="padding:11px">
+      <label>Referencia</label>
+      <select class="field" onchange="App._plnRefQ=this.value;App.plnRefs()">
+        <option value="">Todas · ${todas.length}</option>
+        ${todas.map(r=>`<option value="${esc(r)}" ${r===q?'selected':''}>${esc(r)}${gr[r].cod?' · '+esc(gr[r].cod):''}${conInv.has(r)?'':' (sin movimiento)'}</option>`).join('')}
+      </select>
+      ${puede?`<button class="btn btn-main" onclick="App.plnRefModal()">＋ Crear referencia</button>`:''}
+      <div class="sub" style="margin:14px 0 8px">${refs.length} referencia${refs.length===1?'':'s'} · ${refs.reduce((a,r)=>a+gr[r].cols.length,0)} con color</div>
+      ${refs.length?refs.map(r=>{
+        const g=gr[r];
+        const tot=g.cols.reduce((a,c)=>{const i=this._plnInvDe(pSel,r,c.color); return {f:a.f+i.fotoTot, s:a.s+i.saldo};},{f:0,s:0});
+        return `<div class="item" style="padding:12px">
           <div class="top"><div style="min-width:0;flex:1">
             <div class="nom">${esc(r)}${g.cod?`<span style="font-size:11px;color:var(--suave);font-weight:600"> · cód ${esc(g.cod)}</span>`:''}</div>
             <div class="meta">tallas ${esc(g.tallas||'—')} · ${esc(g.cats||'')}</div>
-            <div class="meta" style="margin-top:4px">${g.cols.map(c=>`<span style="display:inline-block;font-size:10px;font-weight:700;background:#eef1f5;color:#54636b;padding:2px 8px;border-radius:9px;margin:2px 3px 0 0;cursor:pointer" onclick="App.plnRefModal('${c.id}')">${esc(c.color||'sin color')} ✎</span>`).join('')}</div>
+          </div>
+          <div style="text-align:right;white-space:nowrap">
+            <div class="tot">${tot.s}</div><div class="meta">saldo</div>
           </div></div>
-        </div>`;}).join(''):'<div class="empty">Esta planta todavía no tiene referencias.<br>Toca “Crear referencia”.</div>'}
+          <div style="display:flex;gap:14px;margin-top:7px;font-size:12px">
+            <span style="color:var(--suave)">📸 foto <b style="color:var(--texto)">${tot.f}</b></span>
+            <span style="color:var(--suave)">🔄 saldo <b style="color:${tot.s<0?'var(--rojo)':'var(--texto)'}">${tot.s}</b></span>
+          </div>
+          ${g.cols.map(c=>{
+            const i=this._plnInvDe(pSel,r,c.color);
+            const cab=`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:9px;padding-top:8px;border-top:1px solid var(--linea)">
+                <div style="font-size:12.5px;font-weight:700">${esc(c.color||'sin color')}
+                  ${puede?`<span style="color:var(--azul);font-weight:400;cursor:pointer" onclick="App.plnRefModal('${c.id}')"> ✎</span>`:''}</div>
+                <div style="font-size:12px;color:var(--suave)">📸 ${i.fotoTot} · 🔄 <b style="color:${i.saldo<0?'var(--rojo)':'var(--texto)'}">${i.saldo}</b></div>
+              </div>`;
+            if(!solaUna) return cab;
+            const tallas=this._plnTallas(c.tallas,c.categoria);
+            const extra=Object.keys(i.mov).concat(Object.keys(i.foto)).filter(t=>tallas.indexOf(t)<0);
+            const cols=tallas.concat([...new Set(extra)]);
+            if(!i.hay) return cab+`<div class="hint">Todavía no hay nada grabado de este color.</div>`;
+            return cab+`<div style="overflow-x:auto;margin-top:6px">
+              <table style="border-collapse:collapse;font-size:12px;min-width:100%">
+                <tr><td style="color:var(--suave);font-weight:700;padding:3px 8px 3px 0">Talla</td>${cols.map(t=>`<td style="text-align:center;font-weight:700;padding:3px 7px">${esc(t)}</td>`).join('')}</tr>
+                <tr><td style="color:#3a48b3;font-weight:700;padding:3px 8px 3px 0">📸 Foto</td>${cols.map(t=>`<td style="text-align:center;padding:3px 7px">${i.foto[t]||''}</td>`).join('')}</tr>
+                <tr><td style="color:var(--verde);font-weight:700;padding:3px 8px 3px 0">Entra</td>${cols.map(t=>`<td style="text-align:center;padding:3px 7px">${(i.mov[t]&&i.mov[t].e)||''}</td>`).join('')}</tr>
+                <tr><td style="color:var(--rojo);font-weight:700;padding:3px 8px 3px 0">Sale</td>${cols.map(t=>`<td style="text-align:center;padding:3px 7px">${(i.mov[t]&&i.mov[t].s)||''}</td>`).join('')}</tr>
+                <tr style="border-top:1px solid var(--linea)"><td style="font-weight:800;padding:4px 8px 4px 0">Saldo</td>${cols.map(t=>{
+                  const m=i.mov[t]||{e:0,s:0}, s=m.e-m.s;
+                  return `<td style="text-align:center;font-weight:800;padding:4px 7px;color:${s<0?'var(--rojo)':(s>0?'var(--texto)':'#bcc3cc')}">${s}</td>`;}).join('')}</tr>
+              </table>
+              ${i.fecha?`<div class="hint">La foto es de ${esc(this._plnFecha(i.fecha))} · ${esc(this._plnHace(i.fecha))}. No se mueve sola.</div>`:''}
+            </div>`;
+          }).join('')}
+        </div>`;}).join(''):`<div class="empty">${todas.length?'Ninguna referencia con ese filtro.':'Esta planta todavía no tiene referencias.'+(puede?'<br>Toca “Crear referencia”.':'')}</div>`}
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cerrar</button>`);
   },
   plnRefModal(id){
@@ -5938,28 +6013,68 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       <label>Referencia</label>
       <input id="pr_ref" class="field" value="${esc(r.referencia||'')}" placeholder="como se le dice en bodega: PETER PAN MUJER">
       <div class="hint">Es el nombre que va a aparecer en el inventario. El número de la ficha va abajo.</div>
-      <div class="row2">
-        <div><label>Código</label><input id="pr_cod" class="field" value="${esc(r.codigo||'')}" placeholder="0722 · opcional"></div>
-        <div><label>Tallas</label><input id="pr_tal" class="field" value="${esc(r.tallas||'')}" placeholder="34-46"></div>
-      </div>
-      <div class="hint">Se puede poner un rango (<b>34-46</b>) o una lista (<b>S,M,L,XL</b>).</div>
+      <label>Código</label>
+      <input id="pr_cod" class="field" value="${esc(r.codigo||'')}" placeholder="0722 · opcional">
       <label>Color${id?'':'es'}</label>
       <input id="pr_col" class="field" value="${esc(r.color||'')}" placeholder="${id?'NEGRO':'NEGRO, CAFÉ, AZUL'}">
+      <div class="hint">Es el color de la <b>bota</b> — negro, blanco o café. El azul o el naranja
+        de la suela y el color de las costuras NO van acá: son la misma bota.</div>
       ${id?'<div class="hint">Un color por ficha. Para agregar otro, crea una referencia nueva con el mismo nombre.</div>'
           :'<div class="hint">Varios de una: sepáralos con coma y se crea una ficha por cada color.</div>'}
       <label>Tallaje</label>
-      <select id="pr_cat" class="field">${cats.map(c=>`<option ${r.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      <select id="pr_cat" class="field" onchange="App._plnCurva()">${cats.map(c=>`<option ${r.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+      <label>Curva · marca las tallas que sí maneja</label>
+      <div style="display:flex;gap:7px;margin-bottom:2px">
+        <button type="button" class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App._plnCurvaTodas(true)">Marcar todas</button>
+        <button type="button" class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App._plnCurvaTodas(false)">Ninguna</button>
+        <span id="pr_cuenta" class="hint" style="align-self:center;margin:0"></span>
+      </div>
+      <div class="grid-tallas" id="pr_curva"></div>
       <label>Descripción</label>
       <input id="pr_des" class="field" value="${esc(r.descripcion||'')}" placeholder="opcional">
       <button class="btn btn-main" onclick="App.plnRefGuardar('${id||''}')">Guardar</button>
       ${id?`<button class="btn" style="background:#fde8e8;color:#b3261e" onclick="App.plnRefBorrar('${id}')">Eliminar</button>`:''}
       <button class="btn btn-ghost" onclick="App.plnRefs()">Volver</button>`);
+    this._plnCurva(r.tallas);
+  },
+  /* La curva: una casilla por talla. Antes esto era una casilla de texto donde
+     tocaba escribir "34-46", y una referencia rara vez maneja el rango completo
+     — la Peter Pan mujer llega hasta 43. Marcando se ve de una cuáles sí. */
+  _plnCurva(preset){
+    const box=document.getElementById('pr_curva'); if(!box) return;
+    const cat=(document.getElementById('pr_cat')||{}).value||'Calzado';
+    const todas=this._tallasDe(cat);
+    /* Al cambiar de tallaje se conserva lo que ya estaba marcado si sigue existiendo;
+       si no hay nada marcado todavía, arranca con todas. */
+    const previo = preset!==undefined ? this._plnTallas(preset,cat)
+                 : [...document.querySelectorAll('#pr_curva input:checked')].map(i=>i.dataset.talla);
+    const marca = new Set(previo.length?previo:todas);
+    box.innerHTML=todas.map(t=>`<label class="t" style="cursor:pointer;display:block">
+      <span>${esc(t)}</span>
+      <input type="checkbox" data-talla="${esc(t)}" ${marca.has(String(t))?'checked':''}
+        onchange="App._plnCurvaCuenta()" style="width:20px;height:20px;margin-top:4px;accent-color:var(--naranja)">
+    </label>`).join('');
+    this._plnCurvaCuenta();
+  },
+  _plnCurvaTodas(si){
+    document.querySelectorAll('#pr_curva input[data-talla]').forEach(i=>{ i.checked=!!si; });
+    this._plnCurvaCuenta();
+  },
+  _plnCurvaCuenta(){
+    const n=document.querySelectorAll('#pr_curva input:checked').length;
+    const e=document.getElementById('pr_cuenta');
+    if(e) e.textContent = n?n+' talla'+(n===1?'':'s'):'⚠️ ninguna marcada';
+  },
+  _plnCurvaValor(){
+    return [...document.querySelectorAll('#pr_curva input:checked')].map(i=>i.dataset.talla).join(',');
   },
   async plnRefGuardar(id){
     const v=k=>((document.getElementById(k)||{}).value||'').trim();
     const planta=v('pr_planta'), ref=this._plnRef(v('pr_ref'));
     if(!ref){ alert('Falta la referencia.'); return; }
-    const base={ planta, referencia:ref, codigo:v('pr_cod')||null, tallas:v('pr_tal')||null,
+    const curva=this._plnCurvaValor();
+    if(!curva){ alert('Marca al menos una talla en la curva.'); return; }
+    const base={ planta, referencia:ref, codigo:v('pr_cod')||null, tallas:curva,
                  categoria:v('pr_cat')||'Calzado', descripcion:v('pr_des')||null, usuario:this._plnYo() };
     const colores=[...new Set(v('pr_col').split(',').map(c=>this._plnRef(c)))];
     const btn=event&&event.target; if(btn){ btn.disabled=true; btn.textContent='Guardando…'; }
