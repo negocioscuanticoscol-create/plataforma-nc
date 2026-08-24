@@ -5636,14 +5636,42 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     this._plnRender();
   },
 
+  /* Que referencias y colores se pueden escoger. Se juntan el catalogo y lo que
+     este grabado: si alguien grabo algo sin ficha, igual se tiene que poder
+     buscar — si no, hay saldo que nadie puede ver. */
+  _plnUniverso(planta){
+    const R=this._plnRef, pares=[];
+    const mete=(p,ref,col)=>{ if((!planta||p===planta)&&ref) pares.push([String(ref),String(col||'')]); };
+    (this._plnRefsCat||[]).forEach(r=>{ if(r.activo!==false) mete(r.planta,r.referencia,r.color); });
+    (this._plnFoto||[]).forEach(r=>mete(r.planta,r.referencia,r.color));
+    (this._plnMovs||[]).forEach(r=>mete(r.planta,r.referencia,r.color));
+    const refs=[...new Set(pares.map(x=>x[0]))].sort();
+    /* Las que de verdad tienen algo grabado, para poder avisar cuales estan vacias */
+    const hay=new Set();
+    (this._plnFoto||[]).forEach(r=>{ if(!planta||r.planta===planta) hay.add(R(r.referencia)); });
+    (this._plnMovs||[]).forEach(r=>{ if(!planta||r.planta===planta) hay.add(R(r.referencia)); });
+    const colsDe=ref=>[...new Set(pares.filter(x=>!ref||R(x[0])===R(ref)).map(x=>x[1]))].sort();
+    return {refs, hay, colsDe};
+  },
   _plnRender(){
     const plantas=(this._plantas||[]).filter(p=>p.activo!==false);
     const modo=this._plnModo||'foto';
     const sel=this._plnSel||'';
-    const q=(this._plnQ||'').trim().toLowerCase();
     const puede=this.plnPuedeGrabar();
+    /* Los dos desplegables de busqueda. Antes esto era una casilla de texto y
+       tocaba acordarse de como se escribia la referencia; ahora se escoge de lo
+       que hay. Las opciones salen del catalogo Y de lo que este grabado, para
+       que nada quede escondido por no tener ficha. */
+    const univ=this._plnUniverso(sel);
+    let refF=this._plnRefF||'';
+    if(refF && univ.refs.indexOf(refF)<0){ refF=''; this._plnRefF=''; }
+    const cols=univ.colsDe(refF);
+    let colF=this._plnColF||'';
+    if(colF && cols.indexOf(colF)<0){ colF=''; this._plnColF=''; }
+    const R=this._plnRef;
     const pasa = r => (!sel || r.planta===sel)
-      && (!q || (String(r.referencia||'')+' '+String(r.color||'')).toLowerCase().includes(q));
+      && (!refF || R(r.referencia)===R(refF))
+      && (!colF || R(r.color)===R(colF));
 
     const cabeza = `
       <h1>🔎 Consulta</h1>
@@ -5657,9 +5685,16 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           <option value="">Todas las plantas</option>
           ${plantas.map(p=>`<option value="${esc(p.nombre)}" ${sel===p.nombre?'selected':''}>${esc(p.nombre)}${p.ciudad?' · '+esc(p.ciudad):''}</option>`).join('')}
         </select>
-        <label>Buscar referencia o color</label>
-        <input class="field" id="pln_q" value="${esc(this._plnQ||'')}" placeholder="ej: 701, negro…"
-               oninput="App._plnQ=this.value;clearTimeout(App._plnT);App._plnT=setTimeout(()=>{App._plnRender();const e=document.getElementById('pln_q');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length)}},350)">
+        <label>Referencia</label>
+        <select class="field" id="pln_ref" onchange="App._plnRefF=this.value;App._plnColF='';App._plnRender()">
+          <option value="">Todas las referencias · ${univ.refs.length}</option>
+          ${univ.refs.map(r=>`<option value="${esc(r)}" ${r===refF?'selected':''}>${esc(r)}${univ.hay.has(this._plnRef(r))?'':' (sin nada grabado)'}</option>`).join('')}
+        </select>
+        <label>Color</label>
+        <select class="field" id="pln_col" onchange="App._plnColF=this.value;App._plnRender()">
+          <option value="">${refF?'Todos los colores':'Todos'} · ${cols.length}</option>
+          ${cols.map(c=>`<option value="${esc(c)}" ${c===colF?'selected':''}>${esc(c||'sin color')}</option>`).join('')}
+        </select>
         <div style="display:flex;gap:7px;margin-top:12px">
           <button onclick="App._plnModo='foto';App._plnRender()" style="flex:1;padding:11px 8px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;background:${modo==='foto'?'var(--naranja);color:#fff':'#eef1f5;color:#555'}">📸 Inventario actual</button>
           <button onclick="App._plnModo='movs';App._plnRender()" style="flex:1;padding:11px 8px;border-radius:10px;border:none;font-weight:700;font-size:13px;cursor:pointer;background:${modo==='movs'?'var(--naranja);color:#fff':'#eef1f5;color:#555'}">🔄 Con movimientos</button>
