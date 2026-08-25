@@ -380,7 +380,7 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
     <div id="errbanner2" style="display:none;background:#fff0f0;border:1px solid #d63031;border-radius:12px;padding:10px 14px;font-size:13px;color:#d63031;margin-bottom:10px"></div>
     <div class="field" style="margin-bottom:12px"><label>📋 Nivel de lista de precios *</label>
       <select id="lista-sel" onchange="setListaSel(this.value)" style="width:100%;padding:11px;border:1px solid #d9d9d9;border-radius:10px;font-size:14px">
-        <option value="0">L1 Muestras</option><option value="1">L2 Pyme</option><option value="2">L3 Mayorista</option><option value="3">L4 Distribuidor</option><option value="4">L5 Convenio</option>
+        <option value="0">L1 Muestras</option><option value="1">L2 Pyme</option><option value="2">L3 Mayorista</option><option value="3">L4 Distribuidor</option><option value="4">L5 Convenio</option><option value="5">L6 Empresa grande</option>
       </select>
       <div style="font-size:11.5px;color:#7a7a7a;margin-top:4px">Se carga la lista que usaste con este cliente. Cámbiala si aplica otro nivel.</div>
     </div>
@@ -501,7 +501,16 @@ const COLDOT = {transparente:'t', blanco:'b', negro:'n'};
 const KIT_PRECIO = 60000;
 const KIT_L2     = 60000;
 const KIT_COMISION = 8000;
-const LISTA_NAMES = ['L1 Muestras','L2 Pyme','L3 Mayorista','L4 Distribuidor','L5 Convenio'];
+const LISTA_NAMES = ['L1 Muestras','L2 Pyme','L3 Mayorista','L4 Distribuidor','L5 Convenio','L6 Empresa grande'];
+/* L6 no es un escalon mas de la escalera: es una lista MEZCLADA, pensada para
+   las empresas grandes. Por eso no existe t[5] en ningun producto — el precio
+   se arma tomando de las columnas que ya hay (ver precioLinea). */
+const L_CONVENIO = 4;                      // indice de L5 Convenio
+const L_DISTRIB  = 3;                      // indice de L4 Distribuidor
+const L_EMPRESA  = 5;                      // indice de L6 Empresa grande
+const EG_CONVENIO = ['f520','f1001'];      // en L6 estas dos van a precio convenio
+const EG_PCT = 0.035;                      // ...y dejan 3,5% de comision
+function esEgConv(s){ return EG_CONVENIO.indexOf(s.prod.id) >= 0; }
 const allProds = () => [...CAT.fp, ...CAT.pm, ...CAT.nr];
 
 let tipo = 'nat', envioDif = false, pedidoMuestras = false, tipoTransporte = 'incluido', kitTipo = '60';
@@ -936,10 +945,23 @@ const FLEX_CONVENIO_PCT = 0.035;   // 3,5% de comisión en Flexipack transparent
 // PET Multi 1000 ml: inventario que NO se repone. SIEMPRE precio mayorista (t[2]), sin importar la lista, y 3,5% de comisión en todo lado.
 const PETMULTI1000_PCT = 0.035;
 function esPetMulti1000(s){ return s.prod.id==='pm1000'; }
-function precioLinea(s){ return esPetMulti1000(s) ? s.prod.t[2] : s.prod.t[listaActiva]; }   // pm1000 SIEMPRE mayorista
+function precioLinea(s){
+  if(esPetMulti1000(s)) return s.prod.t[2];                                  // pm1000 SIEMPRE mayorista
+  if(listaActiva === L_EMPRESA) return s.prod.t[ esEgConv(s) ? L_CONVENIO : L_DISTRIB ];
+  return s.prod.t[listaActiva];
+}
 function calcComision(sel){
   let com;
-  if(listaActiva === 4){
+  if(listaActiva === L_EMPRESA){
+    /* Empresa grande: el 520 y el 1.000 se venden a convenio pero SI dejan 3,5%
+       (si no, ese precio no le dejaria nada a quien vende). El resto comisiona
+       como siempre: la diferencia contra el convenio. */
+    com = sel.reduce((a, s) => {
+      if(esPetMulti1000(s)) return a + s.qty*s.prod.t[2]*PETMULTI1000_PCT;
+      if(esEgConv(s))       return a + s.qty*s.prod.t[L_CONVENIO]*EG_PCT;
+      return a + s.qty*(s.prod.t[L_DISTRIB] - s.prod.t[L_CONVENIO]);
+    }, 0);
+  } else if(listaActiva === 4){
     // Convenio = precio base → normalmente 0 comisión. Excepciones: Flexipack transparente y PET Multi 1000 dejan 3,5%.
     com = sel.reduce((a,s)=> a + (esPetMulti1000(s) ? s.qty*s.prod.t[2]*PETMULTI1000_PCT : (esFlexTransparente(s) ? s.qty*s.prod.t[4]*FLEX_CONVENIO_PCT : 0)), 0);
   } else {
