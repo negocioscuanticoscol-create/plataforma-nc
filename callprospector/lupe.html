@@ -440,10 +440,19 @@ async function entrarApp(){
     <div class="s">Escoge con cuál base vas a trabajar hoy.</div>
     ${misBases.map((b,i)=>`<div class="bcard" onclick="abrirBase(misBases[${i}])">
       <div class="n">${esc(b.nombre)}</div>
-      <div class="d">Los interesados van a ${esc(b.cliente||'—')}</div>
-      <div class="q"><span>${esc((b.tarifas&&b.tarifas.Interesado)?('Interesado paga '+cop(b.tarifas.Interesado)):'')}</span>
-        <b>Entrar ›</b></div>
+      <div class="d">${esc(b.descripcion||'')}</div>
+      <div class="q"><span id="cnt_${esc(b.id)}">contando…</span><b>Entrar ›</b></div>
     </div>`).join('')}`;
+  /* Cuantos trae cada una. Sin esto el paso de escoger base es a ciegas: se
+     escoge un nombre y no hay como saber si abrio la correcta. */
+  misBases.forEach(async b=>{
+    try{
+      const r=await fetch(SB+'/rest/v1/mkr_leads?select=id&aplica=is.true&base_id=eq.'+b.id,
+        {headers:{...H,Prefer:'count=exact',Range:'0-0'}});
+      const c=(r.headers.get('content-range')||'').split('/').pop();
+      const e=$('cnt_'+b.id); if(e) e.textContent=(+c||0).toLocaleString('es-CO')+' por llamar';
+    }catch(err){ const e=$('cnt_'+b.id); if(e) e.textContent=''; }
+  });
 }
 function volverBases(){ if(misBases.length>1){ $('bases').style.display='block'; window.scrollTo(0,0); } }
 
@@ -477,7 +486,7 @@ async function abrirBase(b){
   $('bases').style.display='none';
   ['hd','main','rank','tarifas','ft'].forEach(id=>$(id).style.display='');
   $('yo').textContent=YO.nombre;
-  $('baseTag').textContent='📁 '+b.nombre+(misBases.length>1?' · cambiar':'');
+  $('baseTag').textContent='📁 '+b.nombre+' · '+leads.length.toLocaleString('es-CO')+(misBases.length>1?' · cambiar':'');
   pintarTarifas();
   render();
   sincronizar(); setInterval(sincronizar,4000);
