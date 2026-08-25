@@ -602,13 +602,21 @@ function abrirPanel(fila,l,tarifa){
     <!-- Guarda igual que arriba, pero ademas deja anotado que ya se le mando el
          catalogo. Asi el seguimiento sabe que a este ya se le enviO material y
          no se le vuelve a mandar lo mismo. -->
-    <button class="cat" onclick="guardarPanel(${fila.id},${tarifa},true)">📄 Catálogo enviado</button>
+    <button class="cat" onclick="guardarPanel(${fila.id},${tarifa},true)">📄 Catálogo enviado
+      <small style="display:block;font-weight:500;opacity:.8;font-size:11px">se guarda al ${esc(soloNum(l.cel))} y pasa al siguiente</small></button>
     </div>`;
   setTimeout(()=>{ const w=$('pW'); if(w)w.focus(); },60);
 }
 
 async function guardarPanel(id,tarifa,catalogo){
-  const c=($('pC')||{}).value||'', w=($('pW')||{}).value||'', m=($('pM')||{}).value||'';
+  const c=($('pC')||{}).value||'', m=($('pM')||{}).value||'';
+  let w=($('pW')||{}).value||'';
+  /* Si mando el catalogo y no escribio otro WhatsApp, es al numero que tiene en
+     pantalla: se lo acaba de mandar a ese. Pedirselo de nuevo es hacerlo teclear
+     lo que ya esta ahi. */
+  if(catalogo && !w.trim() && !m.trim()){
+    const l=leads[idx]; if(l && l.cel) w=soloNum(l.cel);
+  }
   if(!w.trim() && !m.trim()){ toast('Falta el WhatsApp o el correo',true); return; }
   try{
     const r=await fetch(SB+'/rest/v1/mkr_llamadas?id=eq.'+id,{method:'PATCH',
@@ -620,7 +628,7 @@ async function guardarPanel(id,tarifa,catalogo){
   }catch(e){ toast('Sin señal. Intenta otra vez.',true); return; }
   pendientes=Math.max(0,pendientes-1);
   miPlata+=tarifa; pintarPlata(true);
-  toast((catalogo?'📄 Catálogo enviado · contacto guardado · +':'✅ Contacto guardado · +')+cop(tarifa));
+  toast((catalogo?'📄 Catálogo enviado y guardado · siguiente · +':'✅ Contacto guardado · siguiente · +')+cop(tarifa));
   cerrarPanel();
 }
 function cerrarPanel(){
