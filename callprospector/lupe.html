@@ -481,10 +481,14 @@ async function abrirBase(b){
   SEG.forEach(k=>{ const v=b[k]; if(v&&v!=='todos') q+='&'+k+'=eq.'+encodeURIComponent(v); });
   /* Por prioridad: los mejores primero. Sin orden, PostgREST los devuelve como
      le quede comodo y el mejor prospecto podia quedar en la fila 900. */
-  q+='&order=prioridad.asc,nombre.asc&limit=20000';
+  /* Sin &limit: lo pone GETALL al paginar. Pedir limit=20000 NO servia — el
+     servidor corta en 1.000 filas y no avisa, asi que de una base de 3.621 solo
+     se veian las primeras 1.000 y el resto era inalcanzable. Pasaba en TODAS
+     las bases grandes (peluquerias 7.197, Tolima 2.380). */
+  q+='&order=prioridad.asc,nombre.asc';
 
   const [ls,ya]=await Promise.all([
-    GET(q),
+    GETALL(q),
     GETALL('mkr_llamadas?select=lead_id&base_id=eq.'+b.id+'&limit=20000')
   ]);
   if(!Array.isArray(ls)){ $('bases').innerHTML='<div class="vacio">No se pudieron cargar los prospectos.</div>'; return; }
