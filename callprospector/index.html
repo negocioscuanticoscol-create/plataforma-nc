@@ -222,7 +222,7 @@ const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K};
 const SALA='demo', META=36700;
 
-const PAGO={'Interesado':2500,'Competencia':600,'No contactar':250,'No interesado':350,'No contesta':150,'Equivocado':150};
+const PAGO={'Interesado':2500,'Competencia':600,'No contactar':250,'No interesado':350,'No contesta':150,'Equivocado':150,'Dato negativo':150};
 
 let AGENTE=localStorage.getItem('cp_agente')||'';
 let leads=[], lista=[], idx=0, marcados={}, miPlata=0, vistos=new Set(), primeraCarga=true;
@@ -293,6 +293,8 @@ function render(){
       <button class="r4" onclick="marcar('No contesta')">☎️ No contesta<small>$150</small></button>
       <button class="r2" onclick="marcar('Competencia')">🏭 Competencia<small>$600</small></button>
       <button class="r6" onclick="marcar('No contactar')">🚫 No contactar<small>$250</small></button>
+      <!-- El scraping lo trajo por error: no era del rubro que se estaba barriendo -->
+      <button class="r5" onclick="marcar('Dato negativo')">🗑️ Dato negativo<small>$150</small></button>
     </div>
     <div id="panel"></div>
     <div class="nav"><button onclick="mover(-1)">⏮ Anterior</button><button onclick="mover(1)">Siguiente ⏭</button></div>

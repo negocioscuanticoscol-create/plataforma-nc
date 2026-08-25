@@ -102,6 +102,8 @@ const RES=[
  {c:'interesado',t:'🔥 Interesado',p:600,col:'#d97706'},
  {c:'ordena',t:'🎁 Ordena muestra',p:800,col:'#7c3aed'},
  {c:'venta',t:'💰 Venta',p:1000,col:'#16a34a'},
+ // El dato no correspondia al rubro barrido: lo trajo el scraping por error.
+ {c:'dato_negativo',t:'🗑️ Dato negativo',p:100,col:'#78716c'},
 ];
 const PAY=Object.fromEntries(RES.map(r=>[r.c,r.p]));
 let OP=null, SECTOR=null, LEADS=[], IDX=0, GAN=0, hb=null;

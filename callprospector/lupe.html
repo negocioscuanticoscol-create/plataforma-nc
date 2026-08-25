@@ -277,7 +277,13 @@ let tt; function toast(m,mal){ const t=$('toast'); t.textContent=m;
 
 const NIVELES=['principiante','intermedio','avanzado','asesor'];
 const SEG=['cliente','marca','canal','sector','subsector','departamento','ciudad','barrio','ced'];
-const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫'};
+/* Los botones son los MISMOS en toda base, a proposito: si cambiaran por base,
+   dos agentes marcarian cosas distintas y el informe no se podria comparar.
+   Antes salian de BASE.botones — una columna que no existe en mkr_bases, asi que
+   aqui no aparecia NINGUN boton. */
+const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo'];
+const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150};
+const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️'};
 
 let YO=null, BASE=null, misBases=[], leads=[], idx=0, miPlata=0, pendientes=0;
 let PASO='inicio', ERR='', HALLADO=null, buscando=null;
@@ -468,8 +474,8 @@ async function abrirBase(b){
 }
 
 function pintarTarifas(){
-  const t=BASE.tarifas||{};
-  $('tarBody').innerHTML=(BASE.botones||[]).map(k=>
+  const t=Object.assign({},TARIFA_DEF,BASE.tarifas||{});
+  $('tarBody').innerHTML=RESULTADOS.map(k=>
     `<div class="t"><span>${ICONO[k]||''} ${esc(k)}</span><b>${cop(t[k])}</b></div>`).join('');
 }
 
@@ -484,8 +490,8 @@ function render(){
   if(idx>=leads.length) idx=0;
   if(idx<0) idx=leads.length-1;
   const l=leads[idx], cel=soloNum(l.cel);
-  const t=BASE.tarifas||{};
-  const botones=(BASE.botones||[]).map(k=>
+  const t=Object.assign({},TARIFA_DEF,BASE.tarifas||{});
+  const botones=RESULTADOS.map(k=>
     `<button class="b-${k.replace(/\s/g,'')}" onclick="marcar('${esc(k).replace(/'/g,'')}')">
       ${ICONO[k]||''} ${esc(k)}<small>${cop(t[k])}</small></button>`).join('');
 
@@ -510,7 +516,7 @@ function mover(d){ idx+=d; render(); window.scrollTo(0,0); }
 
 async function marcar(resultado){
   const l=leads[idx]; if(!l||!BASE) return;
-  const tarifa=+(BASE.tarifas||{})[resultado]||0;
+  const tarifa=+Object.assign({},TARIFA_DEF,BASE.tarifas||{})[resultado]||0;
   const esInteresado = resultado==='Interesado';
 
   // El interesado NO paga hasta que tenga contacto. Lo demás paga de una.
