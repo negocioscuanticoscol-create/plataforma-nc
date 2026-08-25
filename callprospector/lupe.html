@@ -596,13 +596,13 @@ function abrirPanel(fila,l,tarifa){
     <input id="pW" inputmode="tel" placeholder="WhatsApp de compras">
     <input id="pM" inputmode="email" placeholder="Correo">
     <div class="pb">
-      <button class="g" onclick="guardarPanel(${fila.id},${tarifa})">Guardar y cobrar</button>
+      <button class="g" onclick="guardarPanel('${fila.id}',${tarifa})">Guardar y cobrar</button>
       <button class="s" onclick="cerrarPanel()">No los dio</button>
     </div>
     <!-- Guarda igual que arriba, pero ademas deja anotado que ya se le mando el
          catalogo. Asi el seguimiento sabe que a este ya se le enviO material y
          no se le vuelve a mandar lo mismo. -->
-    <button class="cat" onclick="guardarPanel(${fila.id},${tarifa},true)">📄 Catálogo enviado
+    <button class="cat" onclick="guardarPanel('${fila.id}',${tarifa},true)">📄 Catálogo enviado
       <small style="display:block;font-weight:500;opacity:.8;font-size:11px">se guarda al ${esc(soloNum(l.cel))} y pasa al siguiente</small></button>
     </div>`;
   setTimeout(()=>{ const w=$('pW'); if(w)w.focus(); },60);
