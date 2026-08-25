@@ -104,6 +104,8 @@ const RES=[
  {c:'venta',t:'💰 Venta',p:1000,col:'#16a34a'},
  // El dato no correspondia al rubro barrido: lo trajo el scraping por error.
  {c:'dato_negativo',t:'🗑️ Dato negativo',p:100,col:'#78716c'},
+ {c:'habeas_data',t:'🛡️ Habeas data',p:100,col:'#1e40af'},
+ {c:'ya_cliente',t:'🤝 Ya es cliente',p:200,col:'#0f766e'},
 ];
 const PAY=Object.fromEntries(RES.map(r=>[r.c,r.p]));
 let OP=null, SECTOR=null, LEADS=[], IDX=0, GAN=0, hb=null;

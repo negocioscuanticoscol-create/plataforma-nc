@@ -281,9 +281,9 @@ const SEG=['cliente','marca','canal','sector','subsector','departamento','ciudad
    dos agentes marcarian cosas distintas y el informe no se podria comparar.
    Antes salian de BASE.botones — una columna que no existe en mkr_bases, asi que
    aqui no aparecia NINGUN boton. */
-const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo'];
-const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150};
-const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️'};
+const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente'];
+const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':250};
+const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝'};
 
 let YO=null, BASE=null, misBases=[], leads=[], idx=0, miPlata=0, pendientes=0;
 let PASO='inicio', ERR='', HALLADO=null, buscando=null;
@@ -536,6 +536,20 @@ async function marcar(resultado){
   if(!fila){
     toast('⚠️ No se guardó. Revisa la señal y vuelve a marcar.',true);
     return;                                  // el prospecto se queda ahí
+  }
+
+  /* Habeas data: la persona ejercio un derecho. No basta con quitarla de esta
+     base — se bloquea el telefono y la vista mkr_leads deja de mostrarlo en
+     cualquier base. Se hace DESPUES de guardar la llamada, para no perder el
+     registro si esto falla. */
+  if(resultado==='Habeas data'){
+    try{
+      await fetch(SB+'/rest/v1/mkr_no_llamar?on_conflict=telefono',{method:'POST',
+        headers:{...H,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify({telefono:soloNum(l.cel), motivo:'habeas data',
+          nombre:l.nombre||null, base_id:BASE.id, agente:YO.nombre})});
+      toast('🛡️ Queda bloqueado en todas las bases');
+    }catch(e){ toast('⚠️ Se guardó la llamada, pero no el bloqueo. Avisa.',true); }
   }
 
   if(esInteresado){ abrirPanel(fila,l,tarifa); return; }
