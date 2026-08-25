@@ -159,6 +159,11 @@ main{flex:1;padding:13px 15px 0}
 .nav{display:flex;gap:8px;margin-top:11px}
 .nav button{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--dim);border-radius:10px;
   padding:11px;font-size:13px;cursor:pointer;font-family:inherit}
+/* El desplegable de "va en otra base" se ve igual que los botones de al lado a
+   proposito: es una correccion de dato, no una accion destacada. */
+.nav select{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--dim);border-radius:10px;
+  padding:11px 9px;font-size:13px;cursor:pointer;font-family:inherit;appearance:none;text-align:center}
+.nav select:disabled{opacity:.5}
 .prog{text-align:center;font-size:11.5px;color:var(--faint);margin-top:10px}
 
 /* panel del interesado */
@@ -536,10 +541,46 @@ function render(){
     <!-- Volver al anterior: si uno se pasa de largo o quiere retomar al que
          acaba de dejar, sin tener que recorrer toda la lista otra vez. -->
     <div class="nav"><button onclick="mover(-1)">⏮ Anterior</button><button onclick="mover(1)">Saltar sin marcar ⏭</button></div>
+    <!-- Corregir el rubro NO es un resultado de llamada: no paga ni cuenta como
+         marcacion, y por eso NO va en el teclado de arriba (ese tiene que seguir
+         igual en toda base). Sirve para el caso de "aparece en Distribuidores
+         pero en realidad es una empresa que consume dotacion". -->
+    ${misBases.length>1?`<div class="nav"><select id="destBase" onchange="moverDeBase(this.value)">
+      <option value="">🏢 Está en la base equivocada…</option>
+      ${misBases.filter(b=>b.id!==BASE.id).map(b=>`<option value="${esc(b.id)}">Pasar a ${esc(b.nombre)}</option>`).join('')}
+    </select></div>`:''}
     <div class="prog">${num(idx+1)} de ${num(leads.length)} por llamar</div>
   </div>`;
 }
 function mover(d){ idx+=d; render(); window.scrollTo(0,0); }
+
+/* Pasa el prospecto a otra base. Escribe en mkr_empresas y NO en mkr_leads,
+   porque mkr_leads es una vista y no se puede actualizar.
+   Lee las notas antes de escribir: si se sobreescriben, se pierde de que rubro
+   venia (DOTACION, Metalmecanica...) y ya no habria como devolverlo. */
+async function moverDeBase(destino){
+  const sel=$('destBase');
+  if(!destino) return;
+  const l=leads[idx], dest=misBases.find(b=>b.id===destino);
+  if(!l||!dest){ if(sel) sel.value=''; return; }
+  if(sel) sel.disabled=true;
+  try{
+    let antes='';
+    const p=await fetch(SB+'/rest/v1/mkr_empresas?select=notas&id=eq.'+encodeURIComponent(l.id),{headers:H});
+    if(p.ok) antes=((await p.json())[0]||{}).notas||'';
+    const sello='Movida desde "'+BASE.nombre+'" por '+YO.nombre;
+    const r=await fetch(SB+'/rest/v1/mkr_empresas?id=eq.'+encodeURIComponent(l.id),
+      {method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},
+       body:JSON.stringify({base_id:destino, notas:(antes?antes+' · ':'')+sello})});
+    if(!r.ok) throw new Error(r.status);
+    leads.splice(idx,1);                      // se va de esta lista, no se vuelve a ver
+    toast('🏢 Pasó a '+dest.nombre);
+    render(); window.scrollTo(0,0);
+  }catch(e){
+    if(sel){ sel.disabled=false; sel.value=''; }
+    toast('⚠️ No se pudo mover. Revisa la señal.',true);
+  }
+}
 
 async function marcar(resultado){
   const l=leads[idx]; if(!l||!BASE) return;
