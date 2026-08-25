@@ -923,7 +923,7 @@ const App = {
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_inventario?empresa=eq.smart&order=fecha.desc,creado_en.desc&limit=3000',{headers:H}); const j=await r.json(); inv=Array.isArray(j)?j:[]; }catch(e){}
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.smart&estado=eq.pedido&select=datos,creado_en&limit=2000',{headers:H}); const j=await r.json(); peds=Array.isArray(j)?j:[]; }catch(e){}
     let vref=[];
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas_ref?empresa=eq.smart&select=mes,ref,unidades&limit=5000',{headers:H}); const j=await r.json(); vref=Array.isArray(j)?j:[]; }catch(e){}
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas_ref_v?empresa=eq.smart&select=mes,ref,unidades&limit=5000',{headers:H}); const j=await r.json(); vref=Array.isArray(j)?j:[]; }catch(e){}
     let metas=[], resumen=[], pend=[];
     try{ metas=await (await fetch(this._SBU()+'/rest/v1/nc_metas?empresa=eq.smart&order=mes_num',{headers:H})).json(); }catch(e){}
     try{ resumen=await (await fetch(this._SBU()+'/rest/v1/nc_resumen_mensual?empresa=eq.smart',{headers:H})).json(); }catch(e){}
@@ -1583,7 +1583,7 @@ const App = {
     this._ventasFaltantes=_peds.filter(p=>p.folio && !_vFol.has(p.folio));
     let metas=[]; try{ const rm=await fetch(this._SBU()+'/rest/v1/nc_metas?empresa=eq.smart&order=mes_num.asc',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jm=await rm.json(); metas=Array.isArray(jm)?jm:[]; }catch(e){}
     // 📦 envases vendidos (unidades) — del HISTÓRICO REAL (nc_ventas_ref), el dato alineado en todo lado
-    let vref=[]; try{ const rp=await fetch(this._SBU()+'/rest/v1/nc_ventas_ref?empresa=eq.smart&select=mes,unidades&limit=5000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jp=await rp.json(); vref=Array.isArray(jp)?jp:[]; }catch(e){}
+    let vref=[]; try{ const rp=await fetch(this._SBU()+'/rest/v1/nc_ventas_ref_v?empresa=eq.smart&select=mes,unidades&limit=5000',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const jp=await rp.json(); vref=Array.isArray(jp)?jp:[]; }catch(e){}
     const mesISO=new Date().toISOString().slice(0,7);
     const envTot=vref.reduce((a,x)=>a+(+x.unidades||0),0);
     const envMes=vref.filter(x=>(x.mes||'')===mesISO).reduce((a,x)=>a+(+x.unidades||0),0);
