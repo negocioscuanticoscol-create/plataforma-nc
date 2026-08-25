@@ -474,7 +474,9 @@ async function abrirBase(b){
   let q='mkr_leads?select=id,nombre,contacto,cel,extension,tipo_tel,ciudad,departamento,barrio,sector,direccion&aplica=is.true'
         +'&base_id=eq.'+encodeURIComponent(b.id);
   SEG.forEach(k=>{ const v=b[k]; if(v&&v!=='todos') q+='&'+k+'=eq.'+encodeURIComponent(v); });
-  q+='&limit=20000';
+  /* Por prioridad: los mejores primero. Sin orden, PostgREST los devuelve como
+     le quede comodo y el mejor prospecto podia quedar en la fila 900. */
+  q+='&order=prioridad.asc,nombre.asc&limit=20000';
 
   const [ls,ya]=await Promise.all([
     GET(q),
