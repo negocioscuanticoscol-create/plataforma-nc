@@ -294,7 +294,7 @@ const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equi
 const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50,'Info WhatsApp':350};
 const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
 
-let YO=null, BASE=null, misBases=[], leads=[], idx=0, miPlata=0, pendientes=0;
+let YO=null, BASE=null, misBases=[], leads=[], idx=0, miPlata=0, pendientes=0, misLlamadas=0;
 let PASO='inicio', ERR='', HALLADO=null, buscando=null;
 
 /* ==================== ENTRADA ==================== */
@@ -580,7 +580,7 @@ async function marcar(resultado){
   }
 
   if(esInteresado){ abrirPanel(fila,l,tarifa); return; }
-  miPlata+=tarifa; pintarPlata(true);
+  miPlata+=tarifa; misLlamadas++; pintarPlata(true);
   leads.splice(idx,1); render(); window.scrollTo(0,0);
 }
 
@@ -637,7 +637,9 @@ function cerrarPanel(){
 }
 
 function pintarPlata(bump){
-  const e=$('plata'); e.textContent=cop(miPlata);
+  /* El numero de marcaciones al lado de la plata: sin el, uno no sabe si el
+     dia rindio poco porque llamo poco o porque los resultados pagaron poco. */
+  const e=$('plata'); e.textContent=cop(miPlata)+(misLlamadas?'  ('+num(misLlamadas)+')':'');
   if(bump){ e.classList.add('bump'); setTimeout(()=>e.classList.remove('bump'),190); }
   $('pend').textContent = pendientes ? ('⏳ '+pendientes+' interesado(s) sin datos — no pagan todavía') : '';
 }
@@ -655,7 +657,7 @@ async function sincronizar(){
     const a=real[f.agente]=real[f.agente]||{agente:f.agente,llamadas:0,plata:0};
     a.llamadas++; if(f.validado) a.plata+=(+f.valor||0);
   });
-  if(real[YO.nombre]) miPlata=real[YO.nombre].plata;
+  if(real[YO.nombre]){ miPlata=real[YO.nombre].plata; misLlamadas=real[YO.nombre].llamadas; }
   pintarPlata(false);
 
   const todos=Object.values(real).sort((a,b)=>b.plata-a.plata);
