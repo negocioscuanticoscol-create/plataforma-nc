@@ -533,7 +533,9 @@ function render(){
     ${l.extension?`<div class="ext">Al contestar, marca la extensión <b>${esc(l.extension)}</b></div>`:''}
     <div class="res">${botones}</div>
     <div id="panel"></div>
-    <div class="nav"><button onclick="mover(1)">Saltar sin marcar ⏭</button></div>
+    <!-- Volver al anterior: si uno se pasa de largo o quiere retomar al que
+         acaba de dejar, sin tener que recorrer toda la lista otra vez. -->
+    <div class="nav"><button onclick="mover(-1)">⏮ Anterior</button><button onclick="mover(1)">Saltar sin marcar ⏭</button></div>
     <div class="prog">${num(idx+1)} de ${num(leads.length)} por llamar</div>
   </div>`;
 }
