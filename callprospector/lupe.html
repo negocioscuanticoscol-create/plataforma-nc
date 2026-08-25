@@ -454,7 +454,12 @@ async function abrirBase(b){
   // el filtro de la base, traducido a la consulta
   /* La vista mkr_leads ya deja por fuera a los que no tienen número marcable:
      el que no se puede llamar no aparece en el marcador. */
-  let q='mkr_leads?select=id,nombre,contacto,cel,extension,tipo_tel,ciudad,departamento,barrio,sector,direccion&aplica=is.true';
+  /* base_id PRIMERO. Sin esto la consulta no filtraba NADA: los campos de SEG
+     (cliente, sector, ciudad…) no existen como columnas en mkr_bases —solo `ced`,
+     y en todas dice 'todos'— asi que cualquier base cargaba los prospectos de
+     TODAS. Se abria "Lacteos" y salia una ferreteria del Tolima. */
+  let q='mkr_leads?select=id,nombre,contacto,cel,extension,tipo_tel,ciudad,departamento,barrio,sector,direccion&aplica=is.true'
+        +'&base_id=eq.'+encodeURIComponent(b.id);
   SEG.forEach(k=>{ const v=b[k]; if(v&&v!=='todos') q+='&'+k+'=eq.'+encodeURIComponent(v); });
   q+='&limit=20000';
 
