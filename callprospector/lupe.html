@@ -152,6 +152,7 @@ main{flex:1;padding:13px 15px 0}
 .b-Datonegativo{background:#78716C}
 .b-Habeasdata{background:#1E40AF}
 .b-Yaescliente{background:#0F766E}
+.b-InfoWhatsApp{background:#166534}
 .nav{display:flex;gap:8px;margin-top:11px}
 .nav button{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--dim);border-radius:10px;
   padding:11px;font-size:13px;cursor:pointer;font-family:inherit}
@@ -286,9 +287,9 @@ const SEG=['cliente','marca','canal','sector','subsector','departamento','ciudad
    dos agentes marcarian cosas distintas y el informe no se podria comparar.
    Antes salian de BASE.botones — una columna que no existe en mkr_bases, asi que
    aqui no aparecia NINGUN boton. */
-const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente'];
-const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50};
-const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝'};
+const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente','Info WhatsApp'];
+const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50,'Info WhatsApp':350};
+const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
 
 let YO=null, BASE=null, misBases=[], leads=[], idx=0, miPlata=0, pendientes=0;
 let PASO='inicio', ERR='', HALLADO=null, buscando=null;
