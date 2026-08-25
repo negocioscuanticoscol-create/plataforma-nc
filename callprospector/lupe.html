@@ -153,6 +153,9 @@ main{flex:1;padding:13px 15px 0}
 .b-Habeasdata{background:#1E40AF}
 .b-Yaescliente{background:#0F766E}
 .b-InfoWhatsApp{background:#166534}
+.pan .cat{width:100%;margin-top:9px;border:none;border-radius:11px;padding:13px;
+  background:#166534;color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit}
+.pan .cat:active{filter:brightness(.88)}
 .nav{display:flex;gap:8px;margin-top:11px}
 .nav button{flex:1;background:var(--card2);border:1px solid var(--line);color:var(--dim);border-radius:10px;
   padding:11px;font-size:13px;cursor:pointer;font-family:inherit}
@@ -591,23 +594,29 @@ function abrirPanel(fila,l,tarifa){
     <div class="pb">
       <button class="g" onclick="guardarPanel(${fila.id},${tarifa})">Guardar y cobrar</button>
       <button class="s" onclick="cerrarPanel()">No los dio</button>
-    </div></div>`;
+    </div>
+    <!-- Guarda igual que arriba, pero ademas deja anotado que ya se le mando el
+         catalogo. Asi el seguimiento sabe que a este ya se le enviO material y
+         no se le vuelve a mandar lo mismo. -->
+    <button class="cat" onclick="guardarPanel(${fila.id},${tarifa},true)">📄 Catálogo enviado</button>
+    </div>`;
   setTimeout(()=>{ const w=$('pW'); if(w)w.focus(); },60);
 }
 
-async function guardarPanel(id,tarifa){
+async function guardarPanel(id,tarifa,catalogo){
   const c=($('pC')||{}).value||'', w=($('pW')||{}).value||'', m=($('pM')||{}).value||'';
   if(!w.trim() && !m.trim()){ toast('Falta el WhatsApp o el correo',true); return; }
   try{
     const r=await fetch(SB+'/rest/v1/mkr_llamadas?id=eq.'+id,{method:'PATCH',
       headers:{...H,Prefer:'return=minimal'},
       body:JSON.stringify({contacto:c.trim()||null, whatsapp:soloNum(w)||null, correo:m.trim()||null,
-        datos:true, validado:true, valor:tarifa, actualizado:new Date().toISOString()})});
+        datos:true, validado:true, valor:tarifa, actualizado:new Date().toISOString(),
+        estado_venta: catalogo?'catalogo_enviado':'nuevo'})});
     if(!r.ok){ toast('No se pudo guardar. Intenta otra vez.',true); return; }
   }catch(e){ toast('Sin señal. Intenta otra vez.',true); return; }
   pendientes=Math.max(0,pendientes-1);
   miPlata+=tarifa; pintarPlata(true);
-  toast('✅ Contacto guardado · +'+cop(tarifa));
+  toast((catalogo?'📄 Catálogo enviado · contacto guardado · +':'✅ Contacto guardado · +')+cop(tarifa));
   cerrarPanel();
 }
 function cerrarPanel(){
