@@ -2746,9 +2746,15 @@ const App = {
     const emisor = c.factura_snap || {nombre:'INDUSTRIAS FEROZ SAS', nit:'902.072.014-3'};
     const sede = c.ced_snap || {nombre:c.ced_comercial || c.ced || ''};
     const sedeLinea = [sede.direccion, sede.ciudad, sede.telefono?'Tel '+sede.telefono:''].filter(Boolean).join(' · ');
+    const sinCuenta = !emisor.banco && !!c.factura_snap;
     const cuenta = emisor.banco
       ? `${emisor.banco} · ${emisor.tipo_cuenta||'Ahorros'} ${emisor.cuenta||''} · ${emisor.titular||emisor.nombre}`
-      : C.CUENTA;
+      : (sinCuenta ? `⚠️ ${emisor.nombre||'Este facturador'} todavía no tiene cuenta bancaria cargada.`
+                   : C.CUENTA);
+
+    /* Color de la marca que atiende. Estaba fijo en el naranja de Feroz, asi que
+       la proforma de Alpaca salia con los colores de otra marca. */
+    const AC = (sede.color && /^#[0-9a-fA-F]{6}$/.test(sede.color)) ? sede.color : '#E8620C';
     const txt=[`*PROFORMA ${c.numero||''}* - ${emisor.nombre||'INDUSTRIAS FEROZ SAS'}`,`Cliente: ${cl.nombre||''}${cl.nit?' NIT '+cl.nit:''}`];
     if(Array.isArray(c.items)&&c.items.length>1) c.items.forEach(it=>
       txt.push(`Ref. ${it.referencia||''}${it.color?' '+it.color:''} - ${it.pares||0} par(es) x ${money(it.precio_par||0)} = ${money(it.subtotal||0)}`));
@@ -2760,12 +2766,13 @@ const App = {
     return `<!doctype html><html><head><meta charset="utf-8"><title>Proforma ${esc(c.numero||'')}</title>
     <style>*{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}body{margin:0;padding:24px;color:#1a1a1a;background:#f3f4f6}
     .pf{max-width:720px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)}
-    .hd{background:#E8620C;color:#fff;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-start}
+    .hd{background:${AC};color:#fff;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-start}
     .hd h1{margin:0;font-size:26px;letter-spacing:1px}.hd .sub{font-size:12px;opacity:.95;margin-top:3px}
-    .pf-body{padding:22px 26px}.box{font-size:13px;line-height:1.5;margin-bottom:14px}.box b{color:#E8620C}
+    .pf-body{padding:22px 26px}.box{font-size:13px;line-height:1.5;margin-bottom:14px}.box b{color:${AC}}
     table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left}th{background:#faf7f4;font-size:12px}
-    .tot{margin-top:8px}.tot table td{border:none;padding:4px 10px}.tot .big{font-size:20px;font-weight:800;color:#E8620C}
+    .tot{margin-top:8px}.tot table td{border:none;padding:4px 10px}.tot .big{font-size:20px;font-weight:800;color:${AC}}
     .cuenta{margin-top:16px;background:#f0fff6;border:1.5px solid #16a34a;border-radius:8px;padding:12px 14px;font-size:13px}
+    .cuenta.falta{background:#fdecec;border-color:#c62828;color:#8a1c1c;font-weight:700}
     .acts{padding:0 26px 24px;display:flex;gap:10px}.acts a,.acts button{flex:1;text-align:center;padding:12px;border-radius:8px;border:none;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
     .b1{background:#111;color:#fff}.b2{background:#25D366;color:#fff}@media print{body{background:#fff;padding:0}.acts{display:none}.pf{box-shadow:none}}</style></head><body>
       <div class="pf">
@@ -2788,7 +2795,7 @@ const App = {
             <tr><td>IVA (19%)</td><td style="text-align:right">${money(iva)}</td></tr>
             <tr><td>🚚 Transporte</td><td style="text-align:right">${fl.val?money(fl.val):esc(fl.lbl)}</td></tr>
             <tr><td class="big">TOTAL</td><td style="text-align:right" class="big">${money(tot)}</td></tr></table></div>
-          <div class="cuenta"><b>💳 Para confirmar tu pedido, consigna en:</b><br><span style="font-family:'IBM Plex Mono',Consolas,'Courier New',monospace;letter-spacing:.5px;font-weight:600">${esc(cuenta)}</span><br><span style="color:#16a34a">Envía el comprobante por WhatsApp y lo despachamos.</span>
+          <div class="cuenta${sinCuenta?' falta':''}"><b>${sinCuenta?'⚠️ Falta la cuenta de quien factura':'💳 Para confirmar tu pedido, consigna en:'}</b><br><span style="font-family:'IBM Plex Mono',Consolas,'Courier New',monospace;letter-spacing:.5px;font-weight:600">${esc(cuenta)}</span><br><span style="color:#16a34a">Envía el comprobante por WhatsApp y lo despachamos.</span>
             ${sedeLinea?`<div style="margin-top:9px;padding-top:9px;border-top:1px dashed #86efac;color:#166534;font-size:12.5px"><b>Te atiende ${esc(sede.nombre||'')}</b> · ${esc(sedeLinea)}</div>`:''}</div>
         </div>
         <div class="acts"><button class="b1" onclick="window.print()">🖨️ Imprimir / PDF</button><a class="b2" href="${wa}" target="_blank">📱 Enviar por WhatsApp</a></div>
