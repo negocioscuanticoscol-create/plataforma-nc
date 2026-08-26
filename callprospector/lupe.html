@@ -253,7 +253,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260826-2';
+const VER='20260826-3';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -630,7 +630,7 @@ let INTER=[];
 async function cargarInteresados(){
   if(!YO) return;
   const d=await GETALL('mkr_llamadas?select=id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
-    +'creado_en,validado,estado_venta&resultado=eq.Interesado&trabajado=is.false'
+    +'whatsapp2,correo,creado_en,validado,estado_venta&resultado=eq.Interesado&trabajado=is.false'
     +'&agente_id=eq.'+YO.id+'&order=creado_en.desc');
   INTER=Array.isArray(d)?d:[];
   pintarInteresados();
@@ -642,17 +642,26 @@ function pintarInteresados(){
     b.innerHTML='<div class="vacio" style="padding:18px">Todo al día. Cuando marques un interesado aparece acá para mandarle la información.</div>';
     return;
   }
+  const lindo=t=>String(t||'').replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3');
   b.innerHTML=INTER.map(x=>{
-    const cel=soloNum(x.whatsapp||x.lead_cel||'');
-    const falta = !x.validado;   // no alcanzo a dar los datos: todavia no le pagan
-    return `<div class="rw" style="align-items:center">
-      <div class="nm" style="flex:1">${esc(x.lead_nombre||'(sin nombre)')}
-        <small>${esc(x.lead_ciudad||'')}${cel?' · '+esc(cel.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3')):' · sin teléfono'}
+    /* Los dos numeros, no uno: el marcado es por donde se llamo y el otro es el
+       que dieron para mandar la informacion. Si se muestra solo uno, toca
+       adivinar a cual escribirle. */
+    const nums=[...new Set([soloNum(x.whatsapp||x.lead_cel||''), soloNum(x.whatsapp2||'')])].filter(n=>n.length>=10);
+    const falta=!x.validado;
+    return `<div class="rw" style="align-items:flex-start;flex-wrap:wrap;gap:8px">
+      <div class="nm" style="flex:1;min-width:150px">${esc(x.lead_nombre||'(sin nombre)')}
+        <small>${esc(x.lead_ciudad||'')}
+        ${x.contacto?' · <b>'+esc(x.contacto)+'</b>':''}
+        ${x.correo?' · '+esc(x.correo):''}
         ${falta?' · <b style="color:#c2410c">sin datos, no ha pagado</b>':''}</small></div>
-      ${cel?`<a class="call" style="padding:8px 12px;margin:0;font-size:13px"
-             href="https://wa.me/57${esc(cel)}" target="_blank" rel="noopener">📲 WhatsApp</a>`:''}
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding-left:8px">
-        <input type="checkbox" onchange="trabajado('${esc(x.id)}')" style="width:20px;height:20px"> listo</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        ${nums.length?nums.map(n=>`<a class="call" style="padding:7px 11px;margin:0;font-size:12.5px"
+            href="https://wa.me/57${esc(n)}" target="_blank" rel="noopener">📲 ${esc(lindo(n))}</a>`).join('')
+          :'<span style="font-size:12px;color:#9aa4ae">sin teléfono</span>'}
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" onchange="trabajado('${esc(x.id)}')" style="width:20px;height:20px"> enviado</label>
+      </div>
     </div>`;}).join('');
 }
 async function trabajado(id){
@@ -746,7 +755,7 @@ async function marcar(resultado){
   const body={sala:BASE.cliente||'general', agente:YO.nombre,
     agente_id:YO.id||null, agente_cel:YO.celular||null, base_id:BASE.id, lead_id:l.id,
     lead_fila:String(l.id), lead_nombre:l.nombre||null, lead_ciudad:l.ciudad||null,
-    lead_cel:cel||null,
+    lead_cel:soloNum(l.cel)||null,
     resultado, valor: esInteresado?0:tarifa, datos:false,
     validado: !esInteresado, estado_venta:'nuevo'};
 
@@ -791,11 +800,15 @@ function abrirPanel(fila,l,tarifa){
     <div class="ps">Sin contacto no se puede vender, y por eso <b>este resultado todavía no paga</b>.
       Guarda los datos y se te abonan ${cop(tarifa)}.</div>
     <input id="pC" placeholder="Nombre de quien contestó" value="${esc(l.contacto||'')}">
-    <input id="pW" inputmode="tel" placeholder="WhatsApp de compras">
+    <!-- El WhatsApp viene puesto con el numero que se acaba de marcar: es al que
+         se llamo, y hacerla teclear lo que ya esta en pantalla cuesta tiempo que
+         en la llamada no hay. Si dan otro, va en la casilla de abajo. -->
+    <input id="pW" inputmode="tel" placeholder="WhatsApp" value="${esc(soloNum(l.cel))}">
+    <input id="pW2" inputmode="tel" placeholder="Otro celular (si dan uno distinto)">
     <input id="pM" inputmode="email" placeholder="Correo">
     <div class="pb">
-      <button class="g" onclick="guardarPanel('${fila.id}',${tarifa})">Guardar y cobrar</button>
-      <button class="s" onclick="cerrarPanel()">Ahora no · queda pendiente</button>
+      <button class="g" onclick="guardarPanel('${fila.id}',${tarifa})">📤 Enviar info</button>
+      <button class="s" onclick="cerrarPanel()">⏳ Pendiente</button>
     </div>
     <!-- Guarda igual que arriba, pero ademas deja anotado que ya se le mando el
          catalogo. Asi el seguimiento sabe que a este ya se le enviO material y
@@ -808,6 +821,7 @@ function abrirPanel(fila,l,tarifa){
 
 async function guardarPanel(id,tarifa,catalogo){
   const c=($('pC')||{}).value||'', m=($('pM')||{}).value||'';
+  const w2=($('pW2')||{}).value||'';
   let w=($('pW')||{}).value||'';
   /* Si mando el catalogo y no escribio otro WhatsApp, es al numero que tiene en
      pantalla: se lo acaba de mandar a ese. Pedirselo de nuevo es hacerlo teclear
@@ -819,7 +833,8 @@ async function guardarPanel(id,tarifa,catalogo){
   try{
     const r=await fetch(SB+'/rest/v1/mkr_llamadas?id=eq.'+id,{method:'PATCH',
       headers:{...H,Prefer:'return=minimal'},
-      body:JSON.stringify({contacto:c.trim()||null, whatsapp:soloNum(w)||null, correo:m.trim()||null,
+      body:JSON.stringify({contacto:c.trim()||null, whatsapp:soloNum(w)||null,
+        whatsapp2:soloNum(w2)||null, correo:m.trim()||null,
         datos:true, validado:true, valor:tarifa, actualizado:new Date().toISOString(),
         estado_venta: catalogo?'catalogo_enviado':'nuevo'})});
     if(!r.ok){ toast('No se pudo guardar. Intenta otra vez.',true); return; }
