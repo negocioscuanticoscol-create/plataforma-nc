@@ -2895,34 +2895,20 @@ const App = {
       </div>
 
       <div class="card" style="border-left:4px solid var(--verde)">
-        <label style="margin:0"><b>👟 Qué se cotiza *</b></label>
-        <!-- Eran dos desplegables bajo un solo rotulo que decia "Referencia":
-             el primero filtra por categoria y el segundo es la referencia con su
-             color. Sin rotulo propio, no se sabia cual era cual. -->
-        <div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 3px">1 · Categoría</div>
+        <label style="margin:0"><b>📦 Producto *</b></label>
+        <!-- Tres pasos y no uno: categoria, referencia y color son cosas
+             distintas y antes venian mezcladas en el mismo desplegable. Con la
+             misma bota en cuatro colores, la lista se volvia ilegible. -->
+        ${this._rotCot('1 · Categoría')}
         <select class="field" id="co_cat" onchange="App.cotFiltraRef()" style="margin:0">
           <option value="">Todas las categorías</option>
           ${this.CATEGORIAS.map(c=>`<option>${esc(c)}</option>`).join('')}
         </select>
-        <div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 3px">2 · Referencia y color</div>
-        <select class="field" id="co_ref" onchange="App.cotRefPrecio()" style="margin:0">
-          ${refsCot.length?refsCot.map(r=>`<option value="${esc(r.k)}">${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}${r.mostrarCed&&r.ced?'  ['+esc(r.ced)+']':''}</option>`).join('')
-            :`<option value="701||">701</option>`}
-        </select>
+        ${this._rotCot('2 · Referencia')}
+        <select class="field" id="co_ref" onchange="App.cotFiltraColor()" style="margin:0"></select>
+        ${this._rotCot('3 · Color')}
+        <select class="field" id="co_color" onchange="App.cotRefPrecio()" style="margin:0"></select>
         <div id="co_ref_precio" class="hint" style="margin-top:6px"></div>
-      </div>
-
-      <div class="card" style="border-left:4px solid var(--naranja)">
-        <label style="margin:0"><b>🚚 Transporte *</b></label>
-        <select class="field" id="co_transporte" onchange="App.cotTransporte()" style="margin-top:6px">
-          ${TRANSPORTES.map(t=>`<option value="${t.k}">${t.t}</option>`).join('')}
-        </select>
-        <div id="co_transp_wrap" style="display:none;margin-top:8px">
-          <label style="margin:0">Valor del envío</label>
-          <input class="field" id="co_transp_valor" inputmode="numeric" placeholder="Ej: 25000"
-                 oninput="App.calcCot&&App.calcCot()">
-          <div class="hint">Sale en la proforma y se suma al valor que el cliente consigna.</div>
-        </div>
       </div>
 
       <div class="card" id="co_curva_card">
@@ -2943,6 +2929,19 @@ const App = {
       </div>
       <div id="co_anexos"></div>
       <button class="btn" style="margin-bottom:12px;background:var(--azul);color:#fff" onclick="App.cotAnexar()">＋ Anexar otro producto</button>
+      <div class="card" style="border-left:4px solid var(--naranja)">
+        <label style="margin:0"><b>🚚 Transporte *</b></label>
+        <select class="field" id="co_transporte" onchange="App.cotTransporte()" style="margin-top:6px">
+          ${TRANSPORTES.map(t=>`<option value="${t.k}">${t.t}</option>`).join('')}
+        </select>
+        <div id="co_transp_wrap" style="display:none;margin-top:8px">
+          <label style="margin:0">Valor del envío</label>
+          <input class="field" id="co_transp_valor" inputmode="numeric" placeholder="Ej: 25000"
+                 oninput="App.calcCot&&App.calcCot()">
+          <div class="hint">Sale en la proforma y se suma al valor que el cliente consigna.</div>
+        </div>
+      </div>
+
       <div class="card" id="co_pie_box" style="display:none">
         <label>🎁 Muestra de pie (nono) — sin valor comercial</label>
         <div class="hint">Es un zapato suelto de muestra. No necesita curva de tallas.</div>
@@ -2958,7 +2957,10 @@ const App = {
     this._clientes = cli;
     $('co_grid').innerHTML = C.TALLAS.map(t=>`<div class="t"><span>Talla ${t}</span><input type="number" min="0" inputmode="numeric" data-talla="${t}" oninput="App.curva()"></div>`).join('');
     this._cotAnexos=[]; this._cotPintaAnexos();   // cada cotización arranca sin anexos
-    this.cotRefPrecio();   // pinta de una el precio de la referencia que salga elegida
+    /* Los tres desplegables se llenan en cadena: categoria -> referencia -> color.
+       Sin esta llamada arrancan vacios, porque las opciones ya no van escritas
+       en el HTML sino que las arma cotFiltraRef(). */
+    this.cotFiltraRef();   // llena referencia y color, y de paso pinta el precio
     this.curva();
     if(editId){
       const { data:ec } = await this.sb.from('cotizaciones').select('*').eq('id',editId).single();
@@ -3047,12 +3049,17 @@ const App = {
     const fichas={}; (rr.data||[]).forEach(f=>{ fichas[kk(f)]=f; });
     const red=this._veRed();
     const m={};
-    (ri.data||[]).forEach(x=>{ const k=kk(x);
-      if(!x.referencia || m[k]) return;
-      const f=fichas[k]||{};
+    /* Se cotiza desde el CATALOGO, no desde la bodega. Antes la lista salia solo
+       de 'inventario', asi que un CED sin existencias -Alpaca, recien abierto- no
+       podia cotizar NADA: sus 24 referencias estaban cargadas y no aparecian.
+       Ahora entran las dos fuentes; el inventario solo dice si hay o no hay. */
+    const meter=(x,f)=>{ const k=kk(x); if(!x.referencia || m[k]) return;
+      f=f||fichas[k]||{};
       m[k]={k, ced:x.ced||'', referencia:x.referencia, color:x.color||'',
             descripcion:f.descripcion||'', categoria:f.categoria||'', mostrarCed:red,
-            precios:[f.l1,f.l2,f.l3,f.l4].map(v=>+v||0)}; });
+            precios:[f.l1,f.l2,f.l3,f.l4].map(v=>+v||0)}; };
+    (rr.data||[]).forEach(f=>meter(f,f));      // el catalogo manda
+    (ri.data||[]).forEach(x=>meter(x));        // y lo que haya en bodega, tambien
     this._refsCot=Object.values(m).sort((a,b)=>
       (a.referencia+a.color+a.ced).localeCompare(b.referencia+b.color+b.ced,'es'));
     return this._refsCot; },
@@ -3061,7 +3068,9 @@ const App = {
      Si esa lista todavía no tiene precio cargado, se usa el de siempre y se
      avisa en pantalla: es preferible a cotizar en cero sin que nadie lo note. */
   _cotPrecioPar(){
-    const k=($('co_ref')||{}).value||'';
+    /* La llave completa la da el COLOR: la misma referencia en dos colores son
+       dos productos con su propio precio. */
+    const k=($('co_color')||{}).value||($('co_ref')||{}).value||'';
     const r=(this._refsCot||[]).find(x=>x.k===k);
     const cid=($('co_cliente')||{}).value;
     const cl=(this._clientes||[]).find(c=>c.id==cid)||{};
@@ -3072,15 +3081,43 @@ const App = {
   /* Repinta el desplegable de referencias dejando solo las de la categoría
      elegida. Si una referencia todavía no tiene categoría, sale siempre: es
      preferible a que desaparezca de la lista y nadie la encuentre. */
+  _rotCot(t){ return `<div style="font-size:11px;color:#8a93a6;font-weight:700;`
+    +`text-transform:uppercase;letter-spacing:.04em;margin:9px 0 3px">${esc(t)}</div>`; },
+
+  /* Paso 2: las REFERENCIAS de la categoria elegida, una sola vez cada una.
+     Antes la misma bota salia cuatro veces -una por color- y encontrar algo en
+     una lista de 24 era imposible. */
   cotFiltraRef(){
     const cat=(($('co_cat')||{}).value||'');
     const sel=$('co_ref'); if(!sel) return;
     const lista=(this._refsCot||[]).filter(r=>!cat || !r.categoria || r.categoria===cat);
+    const g={};
+    lista.forEach(r=>{ const g1=(r.ced||'')+'||'+r.referencia;
+      if(!g[g1]) g[g1]={g:g1, referencia:r.referencia, ced:r.ced, mostrarCed:r.mostrarCed,
+                        descripcion:r.descripcion, colores:[]};
+      g[g1].colores.push(r); });
+    const grupos=Object.values(g);
     const antes=sel.value;
-    sel.innerHTML = lista.length
-      ? lista.map(r=>`<option value="${esc(r.k)}">${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}${r.mostrarCed&&r.ced?'  ['+esc(r.ced)+']':''}</option>`).join('')
+    sel.innerHTML = grupos.length
+      ? grupos.map(x=>`<option value="${esc(x.g)}">${esc(x.referencia)}`
+          +`${x.descripcion?' — '+esc(x.descripcion):''}`
+          +`${x.mostrarCed&&x.ced?'  ['+esc(x.ced)+']':''}`
+          +`${x.colores.length>1?'  ('+x.colores.length+' colores)':''}</option>`).join('')
       : `<option value="">— no hay referencias en ${esc(cat||'esta lista')} —</option>`;
-    if(lista.some(r=>r.k===antes)) sel.value=antes;
+    if(grupos.some(x=>x.g===antes)) sel.value=antes;
+    this.cotFiltraColor(); },
+
+  /* Paso 3: los colores de ESA referencia. Si solo tiene uno, igual se muestra:
+     ver "NEGRO" y no un campo vacio evita la duda de si falta escoger algo. */
+  cotFiltraColor(){
+    const g1=(($('co_ref')||{}).value||'');
+    const sel=$('co_color'); if(!sel) return;
+    const cols=(this._refsCot||[]).filter(r=>((r.ced||'')+'||'+r.referencia)===g1);
+    const antes=sel.value;
+    sel.innerHTML = cols.length
+      ? cols.map(r=>`<option value="${esc(r.k)}">${esc(r.color||'sin color')}</option>`).join('')
+      : `<option value="">— sin colores —</option>`;
+    if(cols.some(r=>r.k===antes)) sel.value=antes;
     this.cotRefPrecio(); },
   cotRefPrecio(){
     const e=$('co_ref_precio'); if(!e) return;
