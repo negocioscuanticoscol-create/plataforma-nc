@@ -290,7 +290,12 @@ let tt; function toast(m,mal){ const t=$('toast'); t.textContent=m;
   clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),mal?3400:2200); }
 
 const NIVELES=['principiante','intermedio','avanzado','asesor'];
-const SEG=['cliente','marca','canal','sector','subsector','departamento','ciudad','barrio','ced'];
+/* 'ced' NO va aca. En mkr_bases el ced dice QUIEN PUEDE trabajar la base, no es
+   un dato de cada prospecto: en mkr_leads viene vacio siempre. Al meterlo como
+   filtro, la consulta pedia ced=eq.nido contra 313 filas con ced nulo y devolvia
+   CERO — la base de colchones se veia como "ya la trabajaste toda".
+   El permiso por CED ya se resuelve arriba, al escoger que bases se muestran. */
+const SEG=['cliente','marca','canal','sector','subsector','departamento','ciudad','barrio'];
 /* Los botones son los MISMOS en toda base, a proposito: si cambiaran por base,
    dos agentes marcarian cosas distintas y el informe no se podria comparar.
    Antes salian de BASE.botones — una columna que no existe en mkr_bases, asi que
