@@ -326,6 +326,7 @@ const App = {
       {v:'inventario', ic:'🗃️', t:'Inventario'},
       {v:'cartera', ic:'💳', t:'Cartera'},
       {v:'comisiones', ic:'🧾', t:'Comisiones'},
+      {v:'precios', ic:'🏷️', t:'Precios'},
       {v:'proveedores', ic:'🚚', t:'Proveedores'},
       {v:'pendientes', ic:'✅', t:'Pendientes'},
     ];
@@ -340,9 +341,9 @@ const App = {
     /* 'consulta' va en TODOS los roles a proposito: la consulta de plantas es de
        toda la organizacion, no de un area. Quien solo debe ver eso y nada mas
        lleva el cargo 'consultador', que en ced_permisos tiene unicamente consulta. */
-    const TODOS=['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','pendientes','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','pendientes'],
-      director:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores'],
+    const TODOS=['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','datos','admin','permisos'];
+    const DEF={admin:TODOS, gerente:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes'],
+      director:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios'],
       vendedor:['dashboard','consulta','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario'],
       facturacion:['panel','consulta','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','consulta','despachos','inventario'], planta:['dashboard','consulta','pedidos','planta','inventario']};
     /* De donde salen las pestañas, en orden:
@@ -424,7 +425,7 @@ const App = {
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
-      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario, pendientes:this.vPendientes}[view] || this.vDashboard).call(this);
+      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario, precios:this.vPrecios, pendientes:this.vPendientes}[view] || this.vDashboard).call(this);
   },
   set(html){ $('main').innerHTML = this._subnav() + html; },
   enConstruccion(view){
@@ -4578,6 +4579,146 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
      REFERENCIAS que maneja cada proveedor con su costo. */
   COND_PAGO:['Contado','Credito'],
   QUIEN_FLETE:['Proveedor','CED','Compartido'],
+
+  /* ---------- LISTAS DE PRECIOS ----------
+     Cada CED le pone SU precio a cada referencia. La misma bota puede costar
+     distinto en Feroz que en Alpaca o en Tolima: quien manda es la sucursal, no
+     la casa matriz. Por eso los precios viven en ced_prov_referencias, que ya
+     va filtrada por CED en la base.
+
+     Las cuatro listas salen de ced_listas y se mapean por su ORDEN a las
+     columnas l1..l4. Si mañana se renombra una lista, aquí no se toca nada.
+
+     Las referencias entran por dos caminos y los dos llegan a la misma tabla:
+       · las que se crean por proveedor (pestaña Proveedores)
+       · las que ya vienen creadas en las plantas (ced_planta_refs)
+     Por eso hay un botón para traer las de planta que todavía no estén. */
+  async vPrecios(){
+    this.set('<h1>Listas de precios</h1><div class="sub">Cargando…</div>');
+    const [rr, rl, rp, rpl] = await Promise.all([
+      this.sb.from('ced_prov_referencias').select('*').order('referencia'),
+      this.sb.from('ced_listas').select('*').eq('activo', true).order('orden'),
+      this.sb.from('ced_proveedores').select('id,nombre'),
+      this.sb.from('ced_planta_refs').select('*').eq('activo', true).order('referencia')
+    ]);
+    if (rr.error) {
+      this.set(`<h1>Listas de precios</h1>
+        <div class="card" style="border-color:#f0c4c4;background:#fdecec">
+          <b>No se pudieron leer las referencias.</b>
+          <div style="margin-top:6px;font-size:13.5px">${esc(rr.error.message || '')}</div>
+        </div>`); return;
+    }
+    this._pRefs = rr.data || [];
+    this._pListas = (rl.data || []).length ? rl.data
+      : [{nombre:'Redes',orden:1},{nombre:'Publico',orden:2},{nombre:'Mayoreo',orden:3},{nombre:'Distribuidor',orden:4}];
+    this._pProvs = rp.error ? [] : (rp.data || []);
+    this._pPlanta = rpl.error ? [] : (rpl.data || []);
+    this._precPaint();
+  },
+
+  _precPaint(){
+    const R = this._pRefs || [], L = this._pListas || [];
+    const q = (this._precQ || '').trim().toLowerCase();
+    const prov = {}; (this._pProvs || []).forEach(p => prov[p.id] = p.nombre);
+
+    const vis = q ? R.filter(r => (String(r.referencia||'') + ' ' + String(r.marca||'') + ' ' +
+                                   String(r.color||'')).toLowerCase().includes(q)) : R;
+
+    /* Cuántas están sin precio: es el número que de verdad importa, porque una
+       referencia sin precio se puede escoger al cotizar y sale en cero. */
+    const sinPrecio = R.filter(r => !L.some(l => +r['l' + l.orden] > 0)).length;
+
+    /* Las de planta que todavía no están en este CED. El cruce es por
+       referencia + color: la misma referencia en otro color es otro producto y
+       otro precio. */
+    const tengo = new Set(R.map(r => (String(r.referencia||'') + '|' + String(r.color||'')).toUpperCase()));
+    const faltan = (this._pPlanta || []).filter(p =>
+      !tengo.has((String(p.referencia||'') + '|' + String(p.color||'')).toUpperCase()));
+
+    const money = n => (+n || 0) ? '$' + Math.round(+n).toLocaleString('es-CO') : '';
+    const cab = L.map(l => `<th style="text-align:right;padding:8px 6px;font-size:11px;white-space:nowrap">${esc(l.nombre)}</th>`).join('');
+
+    const fila = r => {
+      const costo = +r.costo || 0;
+      const celdas = L.map(l => {
+        const val = +r['l' + l.orden] || 0;
+        /* El margen al lado del precio: sin él, poner un precio por debajo del
+           costo no se nota hasta que llega la factura. */
+        const mg = (costo > 0 && val > 0) ? Math.round((val - costo) / costo * 100) : null;
+        const col = mg === null ? '#8a93a6' : (mg < 0 ? '#c62828' : (mg < 10 ? '#c77700' : '#2e7d32'));
+        return `<td style="text-align:right;padding:4px 3px">
+          <input inputmode="numeric" value="${val || ''}" placeholder="0"
+            onchange="App.precGuardar('${esc(r.id)}','l${l.orden}',this.value)"
+            style="width:88px;padding:7px 8px;border:1.5px solid var(--linea);border-radius:8px;text-align:right;font-size:13px">
+          <div style="font-size:10px;color:${col};margin-top:2px">${mg === null ? '' : mg + '%'}</div></td>`;
+      }).join('');
+      return `<tr style="border-top:1px solid var(--linea)">
+        <td style="padding:8px 6px;min-width:150px">
+          <b style="font-size:13.5px">${esc(r.referencia || '(sin referencia)')}</b>
+          <div style="font-size:11px;color:#8a93a6">${esc(r.color || 'sin color')}
+            ${r.tallas ? ' · ' + esc(r.tallas) : ''}
+            ${r.proveedor_id && prov[r.proveedor_id] ? ' · ' + esc(prov[r.proveedor_id]) : ''}</div></td>
+        <td style="text-align:right;padding:4px 3px">
+          <input inputmode="numeric" value="${costo || ''}" placeholder="0"
+            onchange="App.precGuardar('${esc(r.id)}','costo',this.value)"
+            style="width:88px;padding:7px 8px;border:1.5px solid var(--linea);border-radius:8px;text-align:right;font-size:13px;background:#f7f8fa">
+        </td>${celdas}</tr>`;
+    };
+
+    this.set(`<h1>Listas de precios</h1>
+      <div class="sub">Cada CED le pone su propio precio a cada referencia. El porcentaje debajo es el margen contra el costo.</div>
+
+      ${sinPrecio ? `<div class="card" style="border-left:4px solid #c77700;background:#fff8ec">
+        <b>${sinPrecio} referencia${sinPrecio === 1 ? '' : 's'} sin precio.</b>
+        <div style="font-size:13px;margin-top:4px">Se pueden escoger al cotizar y la proforma sale en cero.</div>
+      </div>` : ''}
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0">
+        <input placeholder="Buscar referencia, marca o color…" value="${esc(this._precQ || '')}"
+          oninput="App._precQ=this.value;clearTimeout(App._precT);App._precT=setTimeout(()=>App._precPaint(),300)"
+          style="flex:1;min-width:150px;padding:11px;border:1.5px solid var(--linea);border-radius:10px">
+        ${faltan.length ? `<button class="btn btn-main" style="width:auto;margin:0;padding:11px 16px"
+          onclick="App.precTraerPlanta()">＋ Traer ${faltan.length} de planta</button>` : ''}
+      </div>
+
+      ${vis.length ? `<div class="card" style="padding:6px 10px;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:560px">
+          <tr style="color:#8a93a6;text-transform:uppercase;letter-spacing:.04em">
+            <th style="text-align:left;padding:8px 6px;font-size:11px">Referencia</th>
+            <th style="text-align:right;padding:8px 6px;font-size:11px">Costo</th>${cab}</tr>
+          ${vis.map(fila).join('')}
+        </table></div>`
+      : `<div class="empty">${q ? 'Nada con esa búsqueda.'
+          : 'Todavía no hay referencias en este CED. Créalas en Proveedores o tráelas de planta.'}</div>`}`);
+  },
+
+  async precGuardar(id, campo, valor){
+    const n = +String(valor).replace(/[^0-9]/g, '') || 0;
+    const r = (this._pRefs || []).find(x => x.id === id);
+    if (r) r[campo] = n;                       // se pinta de una, sin esperar al servidor
+    const q = await this.sb.from('ced_prov_referencias').update({[campo]: n}).eq('id', id);
+    if (q.error) { alert('No se pudo guardar: ' + q.error.message); return; }
+    this._precPaint();
+  },
+
+  async precTraerPlanta(){
+    const R = this._pRefs || [], P = this._pPlanta || [];
+    const tengo = new Set(R.map(r => (String(r.referencia||'') + '|' + String(r.color||'')).toUpperCase()));
+    const nuevas = P.filter(p => !tengo.has((String(p.referencia||'') + '|' + String(p.color||'')).toUpperCase()));
+    if (!nuevas.length) return;
+    if (!confirm(`Traer ${nuevas.length} referencia${nuevas.length === 1 ? '' : 's'} de planta a este CED?\n\nEntran sin precio: hay que ponérselo aquí.`)) return;
+    /* El 'ced' NO se manda: lo pone el trigger con mi_ced(). Si se mandara desde
+       el navegador, alguien podría crear referencias en otra sucursal. */
+    const filas = nuevas.map(p => ({
+      marca: p.planta || null, referencia: p.referencia, color: p.color || '',
+      tallas: p.tallas || null, unidad: 'par', costo: 0, precio_sug: 0, activo: true,
+      notas: 'Traída de la planta ' + (p.planta || '') + '. Falta el precio.'
+    }));
+    const q = await this.sb.from('ced_prov_referencias').insert(filas);
+    if (q.error) { alert('No se pudieron traer: ' + q.error.message); return; }
+    this.toast(nuevas.length + ' referencias traídas · ponles precio');
+    this.vPrecios();
+  },
 
   async vProveedores(){
     this.set('<h1>Proveedores</h1><div class="sub">Cargando…</div>');
