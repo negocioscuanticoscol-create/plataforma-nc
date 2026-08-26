@@ -255,7 +255,20 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     this._inv=this._decPrecios(await this._fetch('nido_inventario'));
     this._ped=this._decPedidos(await this._fetch('nido_pedidos'));
     this._prog=await this._fetch('nido_programacion');
+    /* El CRM de Nido junta dos fuentes: lo que se carga a mano aqui (nido_leads)
+       y lo que llega de Lupe por el embudo comun (nc_crm_embudo, empresa=nido).
+       No se copia la fila: el prospecto vive una sola vez en el embudo y aca se
+       lee. Por eso las de Lupe entran con origen 'Marcador' y no se pueden
+       editar desde este lado. */
     this._leads=await this._fetch('nido_leads');
+    try{
+      const emb=await this._fetch('nc_crm_embudo?empresa=eq.nido');
+      (emb||[]).forEach(e=>this._leads.push({
+        id:'emb_'+e.id, nombre:e.nombre||'(sin nombre)', telefono:e.telefono||'',
+        ciudad:e.ciudad||'', tipo:'Distribuidor', local_num:'',
+        etapa:'contactado', interes:e.base_origen||'Lupe',
+        creado_en:e.updated_at, origen:'Marcador', _emb:true }));
+    }catch(e){}
     this._lin=await this._fetch('nido_lineas');
     this._loc=await this._fetch('nido_locales');
     this._vend=await this._fetch('nido_vendedores');

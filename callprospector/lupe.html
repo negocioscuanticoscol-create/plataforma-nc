@@ -266,7 +266,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260826-7';
+const VER='20260826-8';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -769,6 +769,7 @@ async function alEmbudo(x){
         lead_key: tel,
         nombre:  x.lead_nombre || '',
         telefono: tel,
+        ciudad:  x.lead_ciudad || null,
         canal:   'lupe',
         etapa:   2,                                          // ya se le mando la informacion
         contactado_por: YO.nombre || null,
