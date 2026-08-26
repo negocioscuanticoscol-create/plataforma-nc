@@ -241,6 +241,12 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
 <div id="toast"></div>
 
 <script>
+/* Version de esta pagina. Se sube cada vez que se publica un cambio.
+   En el celular no existe Ctrl+F5 y nadie va a recargar a media jornada, asi
+   que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
+   compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
+   llamada le borraria el panel del interesado a quien esta escribiendo. */
+const VER='20260826-1';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -612,6 +618,28 @@ function filtrarCiudad(v){
         : TODOS.filter(l=>String(l.ciudad||'')===CIUDAD);
   idx=0; pintarTag(); render(); window.scrollTo(0,0);
 }
+let ultimoChequeo=0;
+async function mirarVersion(){
+  if(Date.now()-ultimoChequeo < 300000) return;      // cada 5 minutos, no mas
+  ultimoChequeo=Date.now();
+  try{
+    const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return;
+    const t=await r.text();
+    const m=t.match(/const VER='([^']+)'/);
+    if(m && m[1]!==VER && !$('nuevaVer')){
+      const d=document.createElement('div');
+      d.id='nuevaVer';
+      d.textContent='✨ Hay una versión nueva · toca aquí para actualizar';
+      d.onclick=()=>location.reload();
+      d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99999;padding:14px;'
+        +'background:#16a34a;color:#fff;text-align:center;font-weight:600;cursor:pointer;'
+        +'box-shadow:0 -4px 18px rgba(0,0,0,.3)';
+      document.body.appendChild(d);
+    }
+  }catch(e){}
+}
+
 function pintarTag(){
   if(!BASE) return;
   $('baseTag').textContent='📁 '+BASE.nombre+(CIUDAD?' · '+CIUDAD:'')+' · '
@@ -815,6 +843,8 @@ async function sincronizar(){
       }
     }
   }
+
+  mirarVersion();                                   // se vigila sola, sin molestar
 
   const todos=Object.values(real).sort((a,b)=>b.plata-a.plata||b.llamadas-a.llamadas);
   $('rkBody').innerHTML=todos.map((a,i)=>{
