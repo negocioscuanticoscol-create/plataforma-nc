@@ -279,6 +279,15 @@ async function GET(p){
     return r.ok?await r.json():null;
   }catch(e){ GET.estado=0; return null; }
 }
+/* Las claves ya NO viajan al navegador. Antes se traia la lista completa de
+   agentes con su clave en texto plano; ahora la base valida y devuelve solo la
+   ficha. Ver _PLAYBOOK/agentes_clave_fuera.sql */
+async function RPC(fn, args){
+  try{ const r=await fetch(SB+'/rest/v1/rpc/'+fn,{method:'POST',headers:H,body:JSON.stringify(args)});
+    RPC.estado=r.status; GET.estado=r.status;
+    return r.ok ? await r.json() : null;
+  }catch(e){ RPC.estado=0; GET.estado=0; return null; }
+}
 function porQueFallo(){
   if(GET.estado===404||GET.estado===400) return 'La base de datos todavía no está creada. Avísale al administrador.';
   if(GET.estado===0) return 'Sin señal. Revisa tu internet e intenta de nuevo.';
@@ -323,8 +332,8 @@ function pintarGate(){
       <div class="slogan">El pozo de bases de la red. Ninguna base es de nadie hasta que la marcas.</div>
       <label for="gCed">Tu centro</label>
       <select id="gCed"><option value="">Cargando centros…</option></select>
-      <label for="gU" style="margin-top:11px">Tu usuario</label>
-      <input id="gU" placeholder="Tu usuario" autocapitalize="none" autocomplete="username">
+      <label for="gU" style="margin-top:11px">Tu celular o tu usuario</label>
+      <input id="gU" placeholder="3001234567" autocapitalize="none" autocomplete="username">
       <label for="gP" style="margin-top:11px">Clave</label>
       <input id="gP" type="password" placeholder="Tu clave" autocomplete="current-password">
       <div id="gHallado"></div>
@@ -380,14 +389,13 @@ async function hacerEntrar(){
   if(!u){ errGate('Escribe tu usuario'); return; }
   if(!p){ errGate('Escribe tu clave'); return; }
 
-  /* La tabla usa 'usuario' + 'clave'. Antes se pedian 'celular' y 'password',
-     que no existen ahi: la consulta fallaba entera y no entraba nadie. */
-  const ags=await GET('mkr_agentes?select=id,nombre,usuario,clave,nivel,ced,activo&limit=500');
-  if(!Array.isArray(ags)){ errGate(porQueFallo()); return; }
-
-  const a=ags.find(x=>norm(x.usuario)===norm(u));
-  if(!a){ errGate('Ese usuario no está inscrito. Toca abajo para inscribirte.'); return; }
-  if(String(a.clave||'')!==p){ errGate('La clave no es correcta.'); return; }
+  /* La base valida y devuelve la ficha. Sirve el celular o el usuario: el
+     celular es el que de verdad identifica, porque el nombre se escribe libre
+     y la misma persona terminaba partida en varios agentes. */
+  const res=await RPC('mkr_entrar',{p_quien:u, p_clave:p});
+  if(!Array.isArray(res)){ errGate(porQueFallo()); return; }
+  const a=res[0];
+  if(!a){ errGate('El celular o la clave no coinciden. Si no estás inscrito, toca abajo.'); return; }
   if(a.activo===false){ errGate('Hola '+a.nombre+'. Todavía no estás habilitado: falta la capacitación y la prueba.'); return; }
   if(ced!=='todos' && a.ced && a.ced!=='todos' && a.ced!==ced){
     errGate('No perteneces a ese centro. El tuyo es '+a.ced+'.'); return; }
@@ -400,18 +408,21 @@ async function hacerEntrar(){
 async function hacerInscribir(){
   const n=($('iN')||{}).value||'', c=soloNum(($('iC')||{}).value||''), q=soloNum(($('iQ')||{}).value||'');
   if(norm(n).length<3){ gate('inscribir','Escribe tu nombre completo'); return; }
-  if(c.length<7){ gate('inscribir','Falta tu celular'); return; }
+  if(c.length<10){ gate('inscribir','El celular debe tener 10 números'); return; }
   try{
-    const r=await fetch(SB+'/rest/v1/mkr_agentes',{method:'POST',headers:{...H,Prefer:'return=minimal'},
-      /* usuario = el nombre normalizado · clave = el celular, como dice la pantalla.
-         Queda activo:false hasta que pase la capacitacion y la prueba. */
-      body:JSON.stringify({usuario:norm(n),clave:c,nombre:n.trim(),
-        nivel:'principiante',ced:'todos',activo:false})});
-    if(!r.ok){ const t=await r.text();
+    /* La inscripcion la hace la base: el CELULAR es la llave, no el nombre.
+       Antes el usuario salia del nombre normalizado, asi que la misma persona
+       escribiendo distinto creaba varios agentes. Queda activo:false hasta la
+       capacitacion y la prueba. */
+    const r0=await RPC('mkr_inscribir',{p_nombre:n.trim(), p_celular:c, p_nequi:q});
+    const est = Array.isArray(r0)?r0[0]:r0;
+    const r = { ok: est==='ok', status: RPC.estado };
+    if(!r.ok){
       gate('inscribir',
-        /duplicate|unique/i.test(t) ? 'Ya hay alguien inscrito con ese nombre.'
-        : (r.status===404||r.status===400) ? 'La base de datos todavía no está creada. Avísale al administrador.'
-        : 'No se pudo enviar (error '+r.status+'). Intenta de nuevo.');
+        est==='repetido' ? 'Ese celular ya está inscrito. Entra con él y tu clave.'
+        : est==='datos'  ? 'Revisa el nombre y el celular.'
+        : (RPC.estado===404||RPC.estado===400) ? 'La base de datos todavía no está creada. Avísale al administrador.'
+        : 'No se pudo enviar (error '+RPC.estado+'). Intenta de nuevo.');
       return; }
   }catch(e){ gate('inscribir','Sin señal. Intenta de nuevo.'); return; }
   gate('espera');
@@ -637,7 +648,10 @@ async function marcar(resultado){
   const esInteresado = resultado==='Interesado';
 
   // El interesado NO paga hasta que tenga contacto. Lo demás paga de una.
-  const body={sala:BASE.cliente||'general', agente:YO.nombre, base_id:BASE.id, lead_id:l.id,
+  /* agente_id y agente_cel son los que cuentan para pagar. 'agente' queda solo
+     para mostrar: escrito a mano se partia en "José", "Jose" y "JOSE". */
+  const body={sala:BASE.cliente||'general', agente:YO.nombre,
+    agente_id:YO.id||null, agente_cel:YO.celular||null, base_id:BASE.id, lead_id:l.id,
     lead_fila:String(l.id), lead_nombre:l.nombre||null, lead_ciudad:l.ciudad||null,
     resultado, valor: esInteresado?0:tarifa, datos:false,
     validado: !esInteresado, estado_venta:'nuevo'};
@@ -768,7 +782,7 @@ async function sincronizar(){
   if(g){
     try{
       const {id}=JSON.parse(g);
-      const ags=await GET('mkr_agentes?select=id,nombre,usuario,clave,nivel,ced,activo&id=eq.'+encodeURIComponent(id)+'&limit=1');
+      const ags=await GET('mkr_agentes?select=id,nombre,usuario,celular,nivel,ced,activo&id=eq.'+encodeURIComponent(id)+'&limit=1');
       if(Array.isArray(ags)&&ags[0]&&ags[0].activo!==false){ YO=ags[0]; await entrarApp(); return; }
     }catch(e){}
     localStorage.removeItem('cp_yo');
