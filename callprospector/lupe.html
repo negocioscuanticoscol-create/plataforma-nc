@@ -235,6 +235,13 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
 
 <main id="main" style="display:none"></main>
 <div class="rank" id="rank" style="display:none"><h3>🏆 Tablero <span id="rkInfo">—</span></h3><div id="rkBody"></div><div class="foot" id="rkTot">—</div></div>
+<!-- Entre el tablero y la tabla de pagos: en la llamada no hay tiempo de escribir
+     los datos del interesado, asi que aqui quedan todos a la mano para mandarles
+     la informacion despues. Se van de la lista al marcar la casilla. -->
+<div class="rank" id="inter" style="display:none">
+  <h3>🔥 Interesados <span id="inInfo">—</span></h3>
+  <div id="inBody"></div>
+</div>
 <div class="tarifas" id="tarifas" style="display:none"><h4>Lo que paga esta base</h4><div id="tarBody"></div></div>
 <footer id="ft" style="display:none">CallProspector · Negocios Cuánticos · Bogotá</footer>
 
@@ -246,7 +253,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260826-1';
+const VER='20260826-2';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -540,7 +547,7 @@ async function abrirBase(b){
   CIUDAD=''; leads=TODOS.slice(); idx=0;
 
   $('bases').style.display='none';
-  ['hd','main','rank','tarifas','ft'].forEach(id=>$(id).style.display='');
+  ['hd','main','rank','inter','tarifas','ft'].forEach(id=>$(id).style.display='');
   $('yo').textContent=YO.nombre;
   pintarTag();
   pintarTarifas();
@@ -618,6 +625,47 @@ function filtrarCiudad(v){
         : TODOS.filter(l=>String(l.ciudad||'')===CIUDAD);
   idx=0; pintarTag(); render(); window.scrollTo(0,0);
 }
+/* ---------- interesados por trabajar ---------- */
+let INTER=[];
+async function cargarInteresados(){
+  if(!YO) return;
+  const d=await GETALL('mkr_llamadas?select=id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
+    +'creado_en,validado,estado_venta&resultado=eq.Interesado&trabajado=is.false'
+    +'&agente_id=eq.'+YO.id+'&order=creado_en.desc');
+  INTER=Array.isArray(d)?d:[];
+  pintarInteresados();
+}
+function pintarInteresados(){
+  const b=$('inBody'), i=$('inInfo'); if(!b) return;
+  i.textContent = INTER.length ? INTER.length+(INTER.length===1?' por trabajar':' por trabajar') : 'ninguno pendiente';
+  if(!INTER.length){
+    b.innerHTML='<div class="vacio" style="padding:18px">Todo al día. Cuando marques un interesado aparece acá para mandarle la información.</div>';
+    return;
+  }
+  b.innerHTML=INTER.map(x=>{
+    const cel=soloNum(x.whatsapp||x.lead_cel||'');
+    const falta = !x.validado;   // no alcanzo a dar los datos: todavia no le pagan
+    return `<div class="rw" style="align-items:center">
+      <div class="nm" style="flex:1">${esc(x.lead_nombre||'(sin nombre)')}
+        <small>${esc(x.lead_ciudad||'')}${cel?' · '+esc(cel.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3')):' · sin teléfono'}
+        ${falta?' · <b style="color:#c2410c">sin datos, no ha pagado</b>':''}</small></div>
+      ${cel?`<a class="call" style="padding:8px 12px;margin:0;font-size:13px"
+             href="https://wa.me/57${esc(cel)}" target="_blank" rel="noopener">📲 WhatsApp</a>`:''}
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding-left:8px">
+        <input type="checkbox" onchange="trabajado('${esc(x.id)}')" style="width:20px;height:20px"> listo</label>
+    </div>`;}).join('');
+}
+async function trabajado(id){
+  const antes=INTER.slice();
+  INTER=INTER.filter(x=>x.id!==id); pintarInteresados();       // se va de una, sin esperar
+  try{
+    const r=await fetch(SB+'/rest/v1/mkr_llamadas?id=eq.'+encodeURIComponent(id),
+      {method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify({trabajado:true})});
+    if(!r.ok) throw new Error(r.status);
+    toast('✅ Marcado como trabajado');
+  }catch(e){ INTER=antes; pintarInteresados(); toast('⚠️ No se pudo guardar. Revisa la señal.',true); }
+}
+
 let ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-ultimoChequeo < 300000) return;      // cada 5 minutos, no mas
@@ -698,6 +746,7 @@ async function marcar(resultado){
   const body={sala:BASE.cliente||'general', agente:YO.nombre,
     agente_id:YO.id||null, agente_cel:YO.celular||null, base_id:BASE.id, lead_id:l.id,
     lead_fila:String(l.id), lead_nombre:l.nombre||null, lead_ciudad:l.ciudad||null,
+    lead_cel:cel||null,
     resultado, valor: esInteresado?0:tarifa, datos:false,
     validado: !esInteresado, estado_venta:'nuevo'};
 
@@ -746,7 +795,7 @@ function abrirPanel(fila,l,tarifa){
     <input id="pM" inputmode="email" placeholder="Correo">
     <div class="pb">
       <button class="g" onclick="guardarPanel('${fila.id}',${tarifa})">Guardar y cobrar</button>
-      <button class="s" onclick="cerrarPanel()">No los dio</button>
+      <button class="s" onclick="cerrarPanel()">Ahora no · queda pendiente</button>
     </div>
     <!-- Guarda igual que arriba, pero ademas deja anotado que ya se le mando el
          catalogo. Asi el seguimiento sabe que a este ya se le enviO material y
@@ -845,6 +894,7 @@ async function sincronizar(){
   }
 
   mirarVersion();                                   // se vigila sola, sin molestar
+  cargarInteresados();                              // los que quedaron por trabajar
 
   const todos=Object.values(real).sort((a,b)=>b.plata-a.plata||b.llamadas-a.llamadas);
   $('rkBody').innerHTML=todos.map((a,i)=>{
