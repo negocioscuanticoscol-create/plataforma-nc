@@ -304,7 +304,11 @@ const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equi
 const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50,'Info WhatsApp':350};
 const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
 
-let YO=null, BASE=null, misBases=[], leads=[], idx=0, miPlata=0, pendientes=0, misLlamadas=0;
+/* TODOS es la base completa; leads es lo que se esta viendo. Se separan porque
+   al filtrar por ciudad hay que poder volver a "todas" sin recargar, y porque al
+   marcar un prospecto tiene que salir de las DOS listas o reaparece al quitar el
+   filtro. */
+let YO=null, BASE=null, misBases=[], leads=[], TODOS=[], CIUDAD='', idx=0, miPlata=0, pendientes=0, misLlamadas=0;
 let PASO='inicio', ERR='', HALLADO=null, buscando=null;
 
 /* ==================== ENTRADA ==================== */
@@ -500,13 +504,13 @@ async function abrirBase(b){
 
   // los ya marcados NO vuelven a salir, aunque se recargue la página
   const hechos=new Set((ya||[]).map(x=>x.lead_id).filter(Boolean));
-  leads=ls.filter(l=>l.cel && !hechos.has(l.id));
-  idx=0;
+  TODOS=ls.filter(l=>l.cel && !hechos.has(l.id));
+  CIUDAD=''; leads=TODOS.slice(); idx=0;
 
   $('bases').style.display='none';
   ['hd','main','rank','tarifas','ft'].forEach(id=>$(id).style.display='');
   $('yo').textContent=YO.nombre;
-  $('baseTag').textContent='📁 '+b.nombre+' · '+leads.length.toLocaleString('es-CO')+(misBases.length>1?' · cambiar':'');
+  pintarTag();
   pintarTarifas();
   render();
   sincronizar(); setInterval(sincronizar,4000);
@@ -522,7 +526,10 @@ function pintarTarifas(){
 function render(){
   if(!leads.length){
     $('main').innerHTML=`<div class="card"><div class="emp">No quedan prospectos</div>
-      <div class="sub" style="margin-top:8px">Ya trabajaste toda esta base.</div>
+      <div class="sub" style="margin-top:8px">${CIUDAD
+        ? 'Ya trabajaste todo lo de <b>'+esc(CIUDAD)+'</b>. Quedan '+num(TODOS.length)+' en las demás ciudades.'
+        : 'Ya trabajaste toda esta base.'}</div>
+      ${CIUDAD?`<div class="nav"><button onclick="filtrarCiudad('')">🗺️ Ver todas las ciudades</button></div>`:''}
       ${misBases.length>1?'<div class="nav"><button onclick="volverBases()">Escoger otra base</button></div>':''}</div>`;
     return;
   }
@@ -535,6 +542,7 @@ function render(){
       ${ICONO[k]||''} ${esc(k)}<small>${cop(t[k])}</small></button>`).join('');
 
   $('main').innerHTML=`<div class="card">
+    ${selectorCiudad()}
     <div class="tags">
       ${l.ciudad&&l.ciudad!=='todos'?`<span class="tg ciu">${esc(l.ciudad)}</span>`:''}
       ${l.sector&&l.sector!=='todos'?`<span class="tg">${esc(l.sector)}</span>`:''}
@@ -563,6 +571,38 @@ function render(){
 }
 function mover(d){ idx+=d; render(); window.scrollTo(0,0); }
 
+/* Quita el prospecto de la vista Y de la base completa. Si solo se quitara de
+   leads, al volver a "todas las ciudades" reaparecería el que ya se marcó. */
+function sacarActual(){
+  const l=leads[idx]; if(!l) return;
+  const i=TODOS.indexOf(l); if(i>=0) TODOS.splice(i,1);
+  leads.splice(idx,1);
+}
+const cSin='(sin ciudad)';
+function filtrarCiudad(v){
+  CIUDAD=v||'';
+  leads = !CIUDAD ? TODOS.slice()
+        : CIUDAD===cSin ? TODOS.filter(l=>!String(l.ciudad||'').trim())
+        : TODOS.filter(l=>String(l.ciudad||'')===CIUDAD);
+  idx=0; pintarTag(); render(); window.scrollTo(0,0);
+}
+function pintarTag(){
+  if(!BASE) return;
+  $('baseTag').textContent='📁 '+BASE.nombre+(CIUDAD?' · '+CIUDAD:'')+' · '
+    +leads.length.toLocaleString('es-CO')+(misBases.length>1?' · cambiar':'');
+}
+/* Las ciudades salen de la base en memoria, no de otra consulta: asi el numero
+   de al lado es el que queda DE VERDAD por llamar, ya descontado lo marcado. */
+function selectorCiudad(){
+  const c={}; TODOS.forEach(l=>{ const k=String(l.ciudad||'').trim()||cSin; c[k]=(c[k]||0)+1; });
+  const orden=Object.keys(c).sort((a,b)=>c[b]-c[a]||a.localeCompare(b,'es'));
+  if(orden.length<2) return '';
+  return `<div class="nav"><select id="selCiudad" onchange="filtrarCiudad(this.value)">
+    <option value="">🗺️ Todas las ciudades (${num(TODOS.length)})</option>
+    ${orden.map(k=>`<option value="${esc(k)}"${k===CIUDAD?' selected':''}>${esc(k)} (${num(c[k])})</option>`).join('')}
+  </select></div>`;
+}
+
 /* Pasa el prospecto a otra base. Escribe en mkr_empresas y NO en mkr_leads,
    porque mkr_leads es una vista y no se puede actualizar.
    Lee las notas antes de escribir: si se sobreescriben, se pierde de que rubro
@@ -582,7 +622,7 @@ async function moverDeBase(destino){
       {method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},
        body:JSON.stringify({base_id:destino, notas:(antes?antes+' · ':'')+sello})});
     if(!r.ok) throw new Error(r.status);
-    leads.splice(idx,1);                      // se va de esta lista, no se vuelve a ver
+    sacarActual();                            // se va de las dos listas, no se vuelve a ver
     toast('🏢 Pasó a '+dest.nombre);
     render(); window.scrollTo(0,0);
   }catch(e){
@@ -631,7 +671,7 @@ async function marcar(resultado){
 
   if(esInteresado){ abrirPanel(fila,l,tarifa); return; }
   miPlata+=tarifa; misLlamadas++; pintarPlata(true);
-  leads.splice(idx,1); render(); window.scrollTo(0,0);
+  sacarActual(); render(); window.scrollTo(0,0);
 }
 
 /* ---------- panel del interesado: aquí SÍ se guarda el contacto ---------- */
@@ -683,7 +723,7 @@ async function guardarPanel(id,tarifa,catalogo){
 }
 function cerrarPanel(){
   const c=$('panel'); if(c) c.innerHTML='';
-  leads.splice(idx,1); render(); window.scrollTo(0,0);
+  sacarActual(); render(); window.scrollTo(0,0);
 }
 
 function pintarPlata(bump){
