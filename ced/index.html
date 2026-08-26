@@ -229,7 +229,7 @@
 <!-- Con la misma versión de arriba: sin el ?v= el navegador se queda con la
      copia vieja de estos tres y un arreglo acá no se ve nunca. -->
 <script>
-  ['../assets/notas.js','../assets/horas.js','../assets/plata.js'].forEach(function(s){
+  ['../assets/notas.js','../assets/horas.js'].forEach(function(s){
     document.write('<scr'+'ipt src="'+s+'?v='+NCVER+'"><\/scr'+'ipt>');
   });
 </script>
@@ -242,7 +242,6 @@
       var jefe=['jrcalderon@me.com','negocioscuanticoscol@gmail.com'].indexOf(yo)>=0;
       Notas.montar('ced:'+sede, true);
       Horas.montar('ced','CED', jefe);
-      Plata.montar('ced','CED', jefe);
       return;
     }
   }catch(e){}

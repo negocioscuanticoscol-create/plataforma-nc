@@ -83,3 +83,5 @@ tocar TODOS los archivos.
 - Entregar archivos completos de reemplazo, no parches parciales.
 - Español informal, directo.
 - No crear archivos de notas, README ni TODOs por iniciativa propia.
+- Todos los negocios deben tener su pestaña de Gastos aparte.
+

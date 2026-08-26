@@ -540,7 +540,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   async liqGasSave(){ const con=($('gx_con').value||'').trim();
     if(!con){ alert('Falta el concepto'); return; }
     const row={id:'g'+Date.now(),fecha:new Date().toISOString().slice(0,10),concepto:con,
-      monto:+$('gx_mon').value||0,tipo:$('gx_tip').value,nota:($('gx_not').value||'').trim()||null};
+      monto:+$('gx_mon').value||0,tipo:$('gx_tip').value,notas:($('gx_not').value||'').trim()||null};
     this._gas.unshift(row);
     await fetch(this.SB+'/rest/v1/superior_gastos',{method:'POST',
       headers:{...this._H(),'Content-Type':'application/json',Prefer:'return=minimal'},
@@ -2145,6 +2145,6 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
 <!-- Horas: el tiempo que NC le trabaja a este negocio. Va a nc_hora, la misma
      tabla de todas las apps, y el Centro de Mando lo suma sin registrar dos veces. -->
 <script src="../assets/horas.js"></script>
-<script src="../assets/plata.js"></script>
+<script src="../assets/gastos.js"></script>
 <script>try{var ok=function(){return App.rol==='admin'};
-Notas.montar('nido',ok);Horas.montar('nido','Colchones Nido',ok);Plata.montar('nido','Colchones Nido',ok)}catch(e){}</script>
+Notas.montar('nido',ok);Horas.montar('nido','Colchones Nido',ok);Gastos.montar('superior_gastos','Colchones Nido',ok);}catch(e){}</script>

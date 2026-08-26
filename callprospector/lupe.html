@@ -520,7 +520,17 @@ async function abrirBase(b){
   // los ya marcados NO vuelven a salir, aunque se recargue la página
   const hechos=new Set((ya||[]).map(x=>x.lead_id).filter(Boolean));
   TODOS=ls.filter(l=>l.cel && !hechos.has(l.id));
-  if(SENTIDO[b.id]==='fin') TODOS.reverse();     // esta empieza por el final
+  /* De que punta arranca cada quien. Con TRES en la misma base hacen falta tres
+     puntos de partida, no dos: 'medio' corre la lista para empezar por la mitad.
+     En una base de 1.223 eso deja unas 600 llamadas de distancia entre cada una
+     —cuatro dias de trabajo— y si alguna alcanza a otra, la sincronizacion ya
+     saca lo que la otra marco. */
+  const sen = SENTIDO[b.id];
+  if(sen==='fin') TODOS.reverse();
+  else if(sen==='medio'){
+    const m=Math.floor(TODOS.length/2);
+    TODOS=TODOS.slice(m).concat(TODOS.slice(0,m));
+  }
   CIUDAD=''; leads=TODOS.slice(); idx=0;
 
   $('bases').style.display='none';
@@ -606,7 +616,7 @@ function pintarTag(){
   if(!BASE) return;
   $('baseTag').textContent='📁 '+BASE.nombre+(CIUDAD?' · '+CIUDAD:'')+' · '
     +leads.length.toLocaleString('es-CO')
-    +(SENTIDO[BASE.id]==='fin'?' · desde el final':'')
+    +({fin:' · desde el final', medio:' · desde la mitad'}[SENTIDO[BASE.id]]||'')
     +(misBases.length>1?' · cambiar':'');
 }
 /* Las ciudades salen de la base en memoria, no de otra consulta: asi el numero
