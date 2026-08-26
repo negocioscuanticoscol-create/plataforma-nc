@@ -2895,12 +2895,17 @@ const App = {
       </div>
 
       <div class="card" style="border-left:4px solid var(--verde)">
-        <label style="margin:0"><b>👟 Referencia *</b></label>
-        <select class="field" id="co_cat" onchange="App.cotFiltraRef()" style="margin-top:6px">
+        <label style="margin:0"><b>👟 Qué se cotiza *</b></label>
+        <!-- Eran dos desplegables bajo un solo rotulo que decia "Referencia":
+             el primero filtra por categoria y el segundo es la referencia con su
+             color. Sin rotulo propio, no se sabia cual era cual. -->
+        <div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:8px 0 3px">1 · Categoría</div>
+        <select class="field" id="co_cat" onchange="App.cotFiltraRef()" style="margin:0">
           <option value="">Todas las categorías</option>
           ${this.CATEGORIAS.map(c=>`<option>${esc(c)}</option>`).join('')}
         </select>
-        <select class="field" id="co_ref" onchange="App.cotRefPrecio()" style="margin-top:6px">
+        <div style="font-size:11px;color:#8a93a6;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:10px 0 3px">2 · Referencia y color</div>
+        <select class="field" id="co_ref" onchange="App.cotRefPrecio()" style="margin:0">
           ${refsCot.length?refsCot.map(r=>`<option value="${esc(r.k)}">${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}${r.mostrarCed&&r.ced?'  ['+esc(r.ced)+']':''}</option>`).join('')
             :`<option value="701||">701</option>`}
         </select>
