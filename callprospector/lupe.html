@@ -202,6 +202,19 @@ main{flex:1;padding:13px 15px 0}
 .tarifas h4{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:9px;font-weight:700}
 .tarifas .t{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:var(--dim)}
 .tarifas .t b{color:var(--tx);font-weight:600}
+/* La fila del interesado NO usa .rw: esa es del tablero y lleva nowrap con
+   ellipsis, asi que cortaba el nombre de la empresa y el boton de WhatsApp se le
+   montaba encima. Aca el nombre manda y los botones bajan a su propia linea. */
+.iw{padding:10px 0;border-top:1px solid var(--line)}
+.iw .ie{font-size:13.5px;font-weight:600;color:var(--tx);line-height:1.3}
+.iw .id{font-size:11px;color:var(--faint);margin-top:2px;line-height:1.45}
+.iw .ib{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.iw .iwa{background:#25D366;color:#08130c;border-radius:9px;padding:7px 11px;font-size:12.5px;
+  font-weight:700;text-decoration:none;white-space:nowrap}
+.iw .ick{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);cursor:pointer}
+.iw .ick input{width:19px;height:19px}
+.iw.hecho{opacity:.5}
+.iw .falta{color:#f0a04b}
 
 #toast{position:fixed;left:50%;transform:translateX(-50%) translateY(-140%);top:calc(12px + env(safe-area-inset-top));
   background:var(--card2);border:1px solid var(--naranja);color:var(--tx);padding:11px 17px;border-radius:12px;
@@ -253,7 +266,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260826-4';
+const VER='20260826-5';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -406,7 +419,12 @@ async function hacerEntrar(){
      celular es el que de verdad identifica, porque el nombre se escribe libre
      y la misma persona terminaba partida en varios agentes. */
   const res=await RPC('mkr_entrar',{p_quien:u, p_clave:p});
-  if(!Array.isArray(res)){ errGate(porQueFallo()); return; }
+  if(!Array.isArray(res)){
+    /* Si el servidor contesta 400/404, casi siempre es una version vieja
+       guardada en el celular pidiendo algo que ya no existe. */
+    errGate(porQueFallo()+' Si sigue igual, cierra y vuelve a abrir el enlace.');
+    mirarVersion(); return;
+  }
   const a=res[0];
   if(!a){ errGate('El celular o la clave no coinciden. Si no estás inscrito, toca abajo.'); return; }
   if(a.activo===false){ errGate('Hola '+a.nombre+'. Todavía no estás habilitado: falta la capacitación y la prueba.'); return; }
@@ -662,7 +680,7 @@ let INTER=[];
 async function cargarInteresados(){
   if(!YO) return;
   const d=await GETALL('mkr_llamadas?select=id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
-    +'whatsapp2,correo,creado_en,validado,estado_venta&resultado=eq.Interesado&trabajado=is.false'
+    +'whatsapp2,correo,creado_en,validado,estado_venta&resultado=eq.Interesado&trabajado=is.false&base_id=not.is.null'
     +'&agente_id=eq.'+YO.id+'&order=creado_en.desc');
   INTER=Array.isArray(d)?d:[];
   pintarInteresados();
@@ -685,20 +703,24 @@ function filaInteresado(x){
   /* Los dos numeros, no uno: el marcado es por donde se llamo y el otro es el
      que dieron para mandar la informacion. Con uno solo toca adivinar. */
   const nums=[...new Set([soloNum(x.whatsapp||x.lead_cel||''), soloNum(x.whatsapp2||'')])].filter(n=>n.length>=10);
-  const falta=!x.validado, ya=!!x.trabajado;
-  return `<div class="rw" style="align-items:flex-start;flex-wrap:wrap;gap:8px${ya?';opacity:.55':''}">
-    <div class="nm" style="flex:1;min-width:150px">${esc(x.lead_nombre||'(sin nombre)')}
-      <small>${esc(x.lead_ciudad||'')}
-      ${x.contacto?' · <b>'+esc(x.contacto)+'</b>':''}
-      ${x.correo?' · '+esc(x.correo):''}
-      ${falta?' · <b style="color:#c2410c">sin datos, no ha pagado</b>':''}
-      ${ya?' · <b style="color:#15803d">enviado</b>':''}</small></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-      ${nums.length?nums.map(n=>`<a class="call" style="padding:7px 11px;margin:0;font-size:12.5px"
-          href="https://wa.me/57${esc(n)}" target="_blank" rel="noopener">📲 ${esc(lindo(n))}</a>`).join('')
-        :'<span style="font-size:12px;color:#9aa4ae">sin teléfono</span>'}
-      ${ya?'':`<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
-        <input type="checkbox" onchange="trabajado('${esc(x.id)}')" style="width:20px;height:20px"> enviado</label>`}
+  const ya=!!x.trabajado;
+  /* Se dice lo que FALTA, no se deja el hueco en blanco: si no se ve que falta
+     el nombre, nadie lo pregunta cuando escribe. */
+  const det=[x.lead_ciudad||'',
+             x.contacto ? '👤 '+esc(x.contacto) : '<span class="falta">sin nombre de contacto</span>',
+             x.correo ? '✉️ '+esc(x.correo) : '',
+             x.validado ? '' : '<span class="falta">sin datos · no ha pagado</span>',
+             ya ? '<b style="color:#25D366">enviado</b>' : ''
+            ].filter(Boolean).join(' · ');
+  return `<div class="iw${ya?' hecho':''}">
+    <div class="ie">${esc(x.lead_nombre||'(sin nombre)')}</div>
+    <div class="id">${det}</div>
+    <div class="ib">
+      ${nums.length ? nums.map(n=>`<a class="iwa" href="https://wa.me/57${esc(n)}"
+          target="_blank" rel="noopener">📲 ${esc(lindo(n))}</a>`).join('')
+        : '<span class="falta" style="font-size:12px">sin teléfono · hay que buscarlo</span>'}
+      ${ya ? '' : `<label class="ick"><input type="checkbox"
+          onchange="trabajado('${esc(x.id)}')"> enviado</label>`}
     </div>
   </div>`;
 }
@@ -976,6 +998,10 @@ async function sincronizar(){
     localStorage.removeItem('cp_yo');
   }
   pintarGate();
+  /* Tambien antes de entrar, y cada minuto: si alguien quedo con la pagina vieja
+     abierta en el celular, no puede entrar y no se entera. El aviso tiene que
+     alcanzarlo en la pantalla de ingreso, no despues. */
+  mirarVersion(); setInterval(mirarVersion, 60000);
 })();
 </script>
 </body>
