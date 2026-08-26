@@ -53,17 +53,16 @@ OJO — fes, zarrat y kruh NO son valores de `?empresa=`:
 ## Carpetas
 - assets/          recursos compartidos
 - catalogo/        catálogo
-- colchones/       COLCHONES NIDO — informe de ventas de los 3 almacenes
-                   (CERRADORA, NUEVO AMANECER, REY). Hoy NO usa Supabase:
-                   los datos salen de los Excel "MOV. *.xlsx" y viven
-                   congelados en colchones/datos.js (regenerar con
-                   colchones/generar_datos.py). Migrar a la base con
-                   colchones/migrar_a_base.js, después de pegar
-                   _PLAYBOOK/superior_nido-crear.sql en el SQL Editor.
-- superior/        COLCHONES NIDO — la fábrica (antes "El Nuevo Superior").
-                   Tablas superior_* en la base única. El prefijo se dejó
-                   en superior_ a propósito: la marca vive en la interfaz.
-                   Las dos carpetas son el MISMO negocio y se enlazan entre sí.
+- nido/            COLCHONES NIDO — LA ÚNICA app del negocio: fábrica,
+                   almacenes e informe de ventas. Tablas nido_* en la base.
+                   nido/informe.html es el informe de ventas de los 3 almacenes
+                   (CERRADORA, NUEVO AMANECER, REY); todavía NO usa Supabase:
+                   los datos viven congelados en nido/datos.js (se regeneran con
+                   _PLAYBOOK/nido_informe/generar_datos.py y se migrarían a la
+                   base con _PLAYBOOK/nido_informe/migrar_a_base.js).
+- colchones/       solo un redirect a nido/informe.html, para los enlaces viejos.
+- superior/        solo un redirect a nido/, para los enlaces viejos.
+                   Se llamaba así cuando la marca era "El Nuevo Superior".
 - cotizador-smart/ Smart Packaging Colombia
 - fesfueling/      combustible de aviación
 - kruh/            (por documentar)

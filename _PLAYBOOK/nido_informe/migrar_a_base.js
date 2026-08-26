@@ -1,7 +1,7 @@
 /* ============================================================================
  * COLCHONES NIDO · Etapa 2: subir el histórico de los 3 almacenes a la base.
  *
- * Requisito: haber pegado antes _PLAYBOOK/superior_nido-crear.sql en el
+ * Requisito: haber pegado antes _PLAYBOOK/nido_nido-crear.sql en el
  * SQL Editor de Supabase. Si las tablas no existen, este script no hace nada
  * y lo dice.
  *
@@ -98,23 +98,23 @@ async function subir(tabla, filas, lote = 500) {
 
   // ---- 2. ¿existen las tablas? -------------------------------------------
   const faltan = [];
-  for (const t of ['superior_sucursales', 'superior_referencias', 'superior_ventas', 'superior_precios']) {
+  for (const t of ['nido_sucursales', 'nido_referencias', 'nido_ventas', 'nido_precios']) {
     if (!(await existe(t))) faltan.push(t);
   }
   if (faltan.length) {
     console.log('\nFaltan estas tablas: ' + faltan.join(', '));
-    console.log('Pega primero _PLAYBOOK/superior_nido-crear.sql en el SQL Editor:');
+    console.log('Pega primero _PLAYBOOK/nido_nido-crear.sql en el SQL Editor:');
     console.log('  https://supabase.com/dashboard/project/fnayedgvamxktxfvywwl/sql/new');
     process.exit(1);
   }
 
   if (BORRAR) {
-    for (const t of ['superior_ventas', 'superior_referencias', 'superior_precios']) {
+    for (const t of ['nido_ventas', 'nido_referencias', 'nido_precios']) {
       const r = await api(t + '?origen=eq.' + ORIGEN, { method: 'DELETE' });
       console.log(`borrado de ${t}: ${r.status}`);
     }
-    // superior_referencias y precios no tienen 'origen': se limpian por completo
-    await api('superior_referencias?id=not.is.null', { method: 'DELETE' });
+    // nido_referencias y precios no tienen 'origen': se limpian por completo
+    await api('nido_referencias?id=not.is.null', { method: 'DELETE' });
     console.log('tablas limpias');
     process.exit(0);
   }
@@ -167,26 +167,26 @@ async function subir(tabla, filas, lote = 500) {
 
   // ---- 5. subir ----------------------------------------------------------
   console.log('\n--- subiendo ---');
-  const ya = await contar('superior_ventas');
+  const ya = await contar('nido_ventas');
   if (ya > 0) {
     console.log(`   había ${$(ya)} ventas de una corrida anterior, se borran primero`);
-    await api('superior_ventas?origen=eq.' + ORIGEN, { method: 'DELETE' });
-    await api('superior_referencias?id=not.is.null', { method: 'DELETE' });
+    await api('nido_ventas?origen=eq.' + ORIGEN, { method: 'DELETE' });
+    await api('nido_referencias?id=not.is.null', { method: 'DELETE' });
   }
-  await subir('superior_referencias', REF);
-  await subir('superior_ventas', V);
+  await subir('nido_referencias', REF);
+  await subir('nido_ventas', V);
 
   // ---- 6. verificar contra los Excel -------------------------------------
   console.log('\n--- verificando contra los Excel ---');
   let fallas = 0;
   const ok = (b, t) => { if (!b) fallas++; console.log(`   ${b ? 'OK  ' : 'MAL '} ${t}`); };
 
-  ok((await contar('superior_ventas')) === V.length, `hay ${$(V.length)} ventas en la base`);
-  ok((await contar('superior_referencias')) === REF.length, `hay ${$(REF.length)} referencias en la base`);
+  ok((await contar('nido_ventas')) === V.length, `hay ${$(V.length)} ventas en la base`);
+  ok((await contar('nido_referencias')) === REF.length, `hay ${$(REF.length)} referencias en la base`);
 
   for (const a of A) {
     const esperado = Math.round(V.filter(v => v.sucursal === a).reduce((s, v) => s + v.total, 0));
-    const r = await api(`superior_ventas?sucursal=eq.${encodeURIComponent(a)}&select=total&limit=20000`);
+    const r = await api(`nido_ventas?sucursal=eq.${encodeURIComponent(a)}&select=total&limit=20000`);
     const suma = Math.round((await r.json()).reduce((s, x) => s + (+x.total || 0), 0));
     ok(suma === esperado, `${a}: $${$(suma)} en la base = $${$(esperado)} del Excel`);
   }

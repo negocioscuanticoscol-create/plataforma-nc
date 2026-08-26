@@ -243,7 +243,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     let miss=local.filter(x=>x&&x.id&&!ids.has(x.id)&&x._nosync);
     const fantasmas=local.filter(x=>x&&x.id&&!ids.has(x.id)&&!x._nosync);
     if(fantasmas.length) this._saveLocal(t, local.filter(x=>!fantasmas.includes(x)));
-    if(t==='superior_inventario'){
+    if(t==='nido_inventario'){
       const fuera=miss.filter(x=>!this._seccion(x.referencia||x.nombre));
       if(fuera.length){ miss=miss.filter(x=>this._seccion(x.referencia||x.nombre));
         this._saveLocal(t,local.filter(x=>this._seccion(x.referencia||x.nombre)||ids.has(x.id))); }
@@ -251,19 +251,19 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     for(const row of miss){ try{ await fetch(this.SB+'/rest/v1/'+t+'?on_conflict=id',{method:'POST',headers:{...this._H(),Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(row)});}catch(e){} }
     const merged=miss.length?[...miss,...cloud]:cloud; merged.sort((a,b)=>String((b&&b.creado_en)||'').localeCompare(String((a&&a.creado_en)||''))); this._saveLocal(t,merged); return merged; },
   async _sync(){
-    this._cli=await this._fetch('superior_clientes');
-    this._inv=this._decPrecios(await this._fetch('superior_inventario'));
-    this._ped=this._decPedidos(await this._fetch('superior_pedidos'));
-    this._prog=await this._fetch('superior_programacion');
-    this._leads=await this._fetch('superior_leads');
-    this._lin=await this._fetch('superior_lineas');
-    this._loc=await this._fetch('superior_locales');
-    this._vend=await this._fetch('superior_vendedores');
+    this._cli=await this._fetch('nido_clientes');
+    this._inv=this._decPrecios(await this._fetch('nido_inventario'));
+    this._ped=this._decPedidos(await this._fetch('nido_pedidos'));
+    this._prog=await this._fetch('nido_programacion');
+    this._leads=await this._fetch('nido_leads');
+    this._lin=await this._fetch('nido_lineas');
+    this._loc=await this._fetch('nido_locales');
+    this._vend=await this._fetch('nido_vendedores');
     /* Liquidación: los gastos y los parámetros (comisiones, IVA, nombres). Sin esto
        la pestaña no puede calcular nada, así que se traen con lo demás. */
-    this._items=await this._fetch('superior_ped_items');
-    this._gas=await this._fetch('superior_gastos');
-    const par=await this._fetch('superior_liq_param');
+    this._items=await this._fetch('nido_ped_items');
+    this._gas=await this._fetch('nido_gastos');
+    const par=await this._fetch('nido_liq_param');
     this._lqp={}; (par||[]).forEach(x=>this._lqp[x.clave]=x.valor);
     this._online=Object.values(this._onl).some(Boolean);
   },
@@ -326,7 +326,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
              ['prod','Productos'],['clien','Clientes']];
     const nd=$('navdata');
     if(nd) nd.innerHTML=D.map(([v,t])=>
-      `<button onclick="window.open('../colchones/index.html#${v}','nido_data')">${t} ↗</button>`).join(''); },
+      `<button onclick="window.open('informe.html#${v}','nido_informe')">${t} ↗</button>`).join(''); },
   go(v){ this.view=v; document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); window.scrollTo(0,0);
     /* 'equipo' ya no está en el menú, pero se deja en el enrutador: el selector
        de Vendedor del pedido se alimenta de ahí, así que la pantalla sigue
@@ -483,7 +483,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
           if(this._liqPauta&&this.view==='liq') this.vLiq(); } }catch(e){} } },
   liqMes(v){ this._liqMes=v; this.vLiq(); },
   async liqIva(id,val){ const p=(this._ped||[]).find(x=>x.id===id); if(!p)return;
-    p.iva=!!val; await this._put('superior_pedidos',this._codPedido(p),this._ped); this.vLiq(); },
+    p.iva=!!val; await this._put('nido_pedidos',this._codPedido(p),this._ped); this.vLiq(); },
   liqDet(id){ const p=(this._ped||[]).find(x=>x.id===id); if(!p)return;
     const c=this._liqCalc(p), m=this.money.bind(this);
     const A=this._lp('socio_a','JVC'), B=this._lp('socio_b','Gloria');
@@ -520,7 +520,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   async liqParamsSave(){
     const K=['com_publico','com_distribuidor','iva_pct','socio_a','socio_b','vendedora','rec_cassata','rec_sensaflex'];
     for(const k of K){ const e=$('lp_'+k); if(!e)continue; this._lqp[k]=e.value;
-      await fetch(this.SB+'/rest/v1/superior_liq_param?on_conflict=clave',
+      await fetch(this.SB+'/rest/v1/nido_liq_param?on_conflict=clave',
         {method:'POST',headers:{...this._H(),'Content-Type':'application/json',
          Prefer:'resolution=merge-duplicates,return=minimal'},
          body:JSON.stringify({clave:k,valor:e.value})}); }
@@ -542,13 +542,13 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const row={id:'g'+Date.now(),fecha:new Date().toISOString().slice(0,10),concepto:con,
       monto:+$('gx_mon').value||0,tipo:$('gx_tip').value,notas:($('gx_not').value||'').trim()||null};
     this._gas.unshift(row);
-    await fetch(this.SB+'/rest/v1/superior_gastos',{method:'POST',
+    await fetch(this.SB+'/rest/v1/nido_gastos',{method:'POST',
       headers:{...this._H(),'Content-Type':'application/json',Prefer:'return=minimal'},
       body:JSON.stringify(row)});
     cerrar(); this.toast('Gasto guardado'); this.vLiq(); },
   async liqGasDel(id){ if(!confirm('¿Quitar este gasto?'))return;
     this._gas=this._gas.filter(x=>x.id!==id);
-    await fetch(this.SB+'/rest/v1/superior_gastos?id=eq.'+id,{method:'DELETE',headers:this._H()});
+    await fetch(this.SB+'/rest/v1/nido_gastos?id=eq.'+id,{method:'DELETE',headers:this._H()});
     this.vLiq(); },
   /* «Sacar todo»: la misma cuenta que se ve en pantalla, en CSV, para llevarla a Excel
      o mandársela a un contador sin que tenga que entrar a la app. */
@@ -800,15 +800,15 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       creado_en:(this._inv.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     if(!row.referencia&&!row.nombre){alert('Referencia o nombre');return;}
     const i=this._inv.findIndex(x=>x.id===row.id); if(i>=0)this._inv[i]=row; else this._inv.unshift(row);
-    const res=await this._put('superior_inventario',this._codPrecios(row),this._inv);
+    const res=await this._put('nido_inventario',this._codPrecios(row),this._inv);
     cerrar();
     if(res&&!res.ok) alert('No se pudo guardar en la base: '+(res.motivo||'')+
       '\n\nQuedó guardado en este equipo.');
     else this.toast('Guardado');
     this.vRef(); },
   async invMov(id,delta){ const p=this._inv.find(x=>x.id===id); if(!p)return; const v=prompt((delta>0?'Cuántas ENTRAN':'Cuántas SALEN')+':'); if(v===null)return; const q=+v||0; if(q<=0)return;
-    p.existencias=(+p.existencias||0)+delta*q; await this._put('superior_inventario',p,this._inv); this.toast('Stock actualizado'); this.vRef(); },
-  async invDel(id){ if(!confirm('¿Eliminar referencia?'))return; this._inv=this._inv.filter(x=>x.id!==id); await this._del('superior_inventario',id,this._inv); this.vRef(); },
+    p.existencias=(+p.existencias||0)+delta*q; await this._put('nido_inventario',p,this._inv); this.toast('Stock actualizado'); this.vRef(); },
+  async invDel(id){ if(!confirm('¿Eliminar referencia?'))return; this._inv=this._inv.filter(x=>x.id!==id); await this._del('nido_inventario',id,this._inv); this.vRef(); },
 
   /* ---------- REFERENCIAS (creación / catálogo de precios) ---------- */
   /* ---------- CATÁLOGO NIDO ----------
@@ -1009,7 +1009,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   async _migrarPrecios(){
     if(this._colFaltan&&this._colFaltan.length) return;
     const pend=(this._inv||[]).filter(p=>p._migrar);
-    for(const p of pend){ delete p._migrar; await this._put('superior_inventario',p,this._inv); }
+    for(const p of pend){ delete p._migrar; await this._put('nido_inventario',p,this._inv); }
     if(pend.length) this.toast(pend.length+' referencia(s) actualizadas'); },
 
   /* Pregunta a la base si ya existen las columnas. Si faltan, la pantalla lo
@@ -1018,7 +1018,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     if(this._colChk) return; this._colChk=true;
     const faltan=[];
     for(const c of ['precio_dist','com_dist','com_pub']){
-      try{ const r=await fetch(this.SB+'/rest/v1/superior_inventario?select='+c+'&limit=1',{headers:this._H()});
+      try{ const r=await fetch(this.SB+'/rest/v1/nido_inventario?select='+c+'&limit=1',{headers:this._H()});
         if(!r.ok) faltan.push(c); }catch(e){ return; }
     }
     this._colFaltan=faltan;
@@ -1082,7 +1082,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
           columnas propias para ellos, así que se guardan pegados a otro campo. Funciona y no se pierde
           nada, aunque desde fuera de la app esos números no se ven bien.</div>
         <div style="font-size:13px;margin-top:7px">Para dejarlo derecho, una sola vez: pega
-          <b>_PLAYBOOK/superior_precios-comision.sql</b> en el editor. Al volver a entrar, la app
+          <b>_PLAYBOOK/nido_precios-comision.sql</b> en el editor. Al volver a entrar, la app
           los pasa sola a su sitio.</div>
         <a class="btn gh" style="margin-top:9px;display:inline-block;text-decoration:none"
            href="https://supabase.com/dashboard/project/fnayedgvamxktxfvywwl/sql/new"
@@ -1278,8 +1278,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const row={id:id||('c'+Date.now()),nombre:g('c_nom'),tipo:$('c_tipo').value,local_num:g('c_loc'),telefono:g('c_tel'),direccion:g('c_dir'),ciudad:g('c_ciu'),nit:g('c_nit'),contacto:g('c_con'),email:g('c_email'),notas:g('c_not'),origen:($('c_org')||{}).value||'',creado_en:(this._cli.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     if(!row.nombre){alert('Nombre');return;}
     const i=this._cli.findIndex(x=>x.id===row.id); if(i>=0)this._cli[i]=row; else this._cli.unshift(row);
-    await this._put('superior_clientes',row,this._cli); cerrar(); this.toast('Guardado'); this.vCli(); },
-  async cliDel(id){ if(!confirm('¿Eliminar cliente?'))return; this._cli=this._cli.filter(x=>x.id!==id); await this._del('superior_clientes',id,this._cli); this.vCli(); },
+    await this._put('nido_clientes',row,this._cli); cerrar(); this.toast('Guardado'); this.vCli(); },
+  async cliDel(id){ if(!confirm('¿Eliminar cliente?'))return; this._cli=this._cli.filter(x=>x.id!==id); await this._del('nido_clientes',id,this._cli); this.vCli(); },
 
   /* ---------- EQUIPO (locales + vendedores) ---------- */
   vEquipo(){ const tab=this._eqTab||'locales'; this._eqTab=tab;
@@ -1312,8 +1312,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   async locSave(id){ const g=x=>($(x).value||'').trim();
     const row={id:id||('lo'+Date.now()),nombre:g('lo_nom'),direccion:g('lo_dir'),administrador:g('lo_adm'),admin_cel:g('lo_cel'),creado_en:(this._loc.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     if(!row.nombre){alert('Nombre');return;} const i=this._loc.findIndex(x=>x.id===row.id); if(i>=0)this._loc[i]=row; else this._loc.unshift(row);
-    await this._put('superior_locales',row,this._loc); cerrar(); this.toast('Local guardado'); this.vEquipo(); },
-  async locDel(id){ if(!confirm('¿Eliminar local?'))return; this._loc=this._loc.filter(x=>x.id!==id); await this._del('superior_locales',id,this._loc); this.vEquipo(); },
+    await this._put('nido_locales',row,this._loc); cerrar(); this.toast('Local guardado'); this.vEquipo(); },
+  async locDel(id){ if(!confirm('¿Eliminar local?'))return; this._loc=this._loc.filter(x=>x.id!==id); await this._del('nido_locales',id,this._loc); this.vEquipo(); },
   vendModal(id){ const v=this._vend.find(x=>x.id===id)||{};
     modal(`<h3 class="serif" style="color:var(--navy);margin-bottom:8px">${id?'Editar':'Nuevo'} vendedor</h3>
       <label>Nombre</label><input id="ve_nom" value="${this.esc(v.nombre||'')}">
@@ -1324,8 +1324,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   async vendSave(id){ const g=x=>($(x).value||'').trim(); const locId=$('ve_loc').value; const locNom=(this._loc.find(x=>x.id===locId)||{}).nombre||'';
     const row={id:id||('ve'+Date.now()),nombre:g('ve_nom'),celular:g('ve_cel'),cedula:g('ve_ced'),local_id:locId,local_nombre:locNom,creado_en:(this._vend.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     if(!row.nombre){alert('Nombre');return;} const i=this._vend.findIndex(x=>x.id===row.id); if(i>=0)this._vend[i]=row; else this._vend.unshift(row);
-    await this._put('superior_vendedores',row,this._vend); cerrar(); this.toast('Vendedor guardado'); this.vEquipo(); },
-  async vendDel(id){ if(!confirm('¿Eliminar vendedor?'))return; this._vend=this._vend.filter(x=>x.id!==id); await this._del('superior_vendedores',id,this._vend); this.vEquipo(); },
+    await this._put('nido_vendedores',row,this._vend); cerrar(); this.toast('Vendedor guardado'); this.vEquipo(); },
+  async vendDel(id){ if(!confirm('¿Eliminar vendedor?'))return; this._vend=this._vend.filter(x=>x.id!==id); await this._del('nido_vendedores',id,this._vend); this.vEquipo(); },
 
   /* ---------- CRM ---------- */
   ETAPAS:['contactado','interesado','pedido','cliente'],
@@ -1371,9 +1371,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       `<option>${t}</option>`).join('')}</select>
     <button class="btn gold full" onclick="App.leadSave()">Guardar</button>`); },
   async leadSave(){ const g=x=>($(x).value||'').trim(); const row={id:'l'+Date.now(),nombre:g('l_nom'),telefono:g('l_tel'),tipo:$('l_tipo').value,local_num:g('l_loc'),ciudad:g('l_ciu'),interes:g('l_int'),origen:($('l_org')||{}).value||'',etapa:'contactado',creado_en:new Date().toISOString()};
-    if(!row.nombre){alert('Nombre');return;} this._leads.unshift(row); await this._put('superior_leads',row,this._leads); cerrar(); this.toast('Registrado'); this.vCrm(); },
-  async leadEtapa(id,e){ const l=this._leads.find(x=>x.id===id); if(!l)return; l.etapa=e; await this._put('superior_leads',l,this._leads); this.vCrm(); },
-  async leadDel(id){ if(!confirm('¿Eliminar?'))return; this._leads=this._leads.filter(x=>x.id!==id); await this._del('superior_leads',id,this._leads); this.vCrm(); },
+    if(!row.nombre){alert('Nombre');return;} this._leads.unshift(row); await this._put('nido_leads',row,this._leads); cerrar(); this.toast('Registrado'); this.vCrm(); },
+  async leadEtapa(id,e){ const l=this._leads.find(x=>x.id===id); if(!l)return; l.etapa=e; await this._put('nido_leads',l,this._leads); this.vCrm(); },
+  async leadDel(id){ if(!confirm('¿Eliminar?'))return; this._leads=this._leads.filter(x=>x.id!==id); await this._del('nido_leads',id,this._leads); this.vCrm(); },
 
   /* ---------- PEDIDOS ---------- */
   /* ---------- EL CAMINO DE UN PEDIDO ----------
@@ -1521,7 +1521,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       p.hitos[k]=new Date().toISOString();
     }
     p.estado=this._est(p).k;
-    await this._put('superior_pedidos',this._codPedido(p),this._ped);
+    await this._put('nido_pedidos',this._codPedido(p),this._ped);
     this.vPed(); },
 
   /* Al tomar pedido solo se ofrecen las referencias del catálogo de Nido,
@@ -1819,11 +1819,11 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     let c=k.length>=7?(this._cli||[]).find(x=>this._telKey(x.telefono)===k):null;
     if(c){ const b={}; if(nom&&nom!==c.nombre)b.nombre=nom; if(dir&&dir!==c.direccion)b.direccion=dir;
       if(ciu&&ciu!==c.ciudad)b.ciudad=ciu; if(tipo!==c.tipo)b.tipo=tipo; if(org&&org!==c.origen)b.origen=org;
-      if(Object.keys(b).length){ Object.assign(c,b); await this._put('superior_clientes',c,this._cli); }
+      if(Object.keys(b).length){ Object.assign(c,b); await this._put('nido_clientes',c,this._cli); }
       return c; }
     c={id:'c'+Date.now(),nombre:nom,tipo:tipo,local_num:'',telefono:tel,direccion:dir,ciudad:ciu,
        nit:'',contacto:'',email:'',notas:'',origen:org,creado_en:new Date().toISOString()};
-    this._cli.unshift(c); await this._put('superior_clientes',c,this._cli);
+    this._cli.unshift(c); await this._put('nido_clientes',c,this._cli);
     this.toast('👤 '+nom+' quedó en el directorio');
     return c; },
   /* El modo solo rellena lo que se le cobra al cliente; el número que manda en la
@@ -1856,7 +1856,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const ant=this._ped.find(x=>x.id===id);
     row.hitos=(ant&&ant.hitos)?ant.hitos:{nuevo:row.creado_en};
     const i=this._ped.findIndex(x=>x.id===row.id); if(i>=0)this._ped[i]=row; else this._ped.unshift(row);
-    await this._put('superior_pedidos',this._codPedido(row),this._ped);
+    await this._put('nido_pedidos',this._codPedido(row),this._ped);
     await this._pedItemsSave(row.id);
     cerrar(); this.toast(id?'Pedido actualizado':'Pedido guardado'); this.go('ped'); },
   /* Los extras se reescriben enteros: se borran los del pedido y se suben los que
@@ -1866,9 +1866,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       .map((x,i)=>({id:'ix'+Date.now()+'_'+i,pedido_id:pid,referencia:(x.referencia||'').trim(),
         cantidad:+x.cantidad||1,precio_unit:+x.precio_unit||0,costo_unit:+x.costo_unit||0,orden:i}));
     try{
-      await fetch(this.SB+'/rest/v1/superior_ped_items?pedido_id=eq.'+encodeURIComponent(pid),
+      await fetch(this.SB+'/rest/v1/nido_ped_items?pedido_id=eq.'+encodeURIComponent(pid),
         {method:'DELETE',headers:this._H()});
-      if(nuevos.length) await fetch(this.SB+'/rest/v1/superior_ped_items',
+      if(nuevos.length) await fetch(this.SB+'/rest/v1/nido_ped_items',
         {method:'POST',headers:{...this._H(),Prefer:'return=minimal'},body:JSON.stringify(nuevos)});
     }catch(e){}
     this._items=(this._items||[]).filter(x=>x.pedido_id!==pid).concat(nuevos); },
@@ -2033,17 +2033,17 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     p.anulado=true; p.anulado_en=new Date().toISOString();
     p.anulado_por=(this.ROLES[this.rol]||{}).quien||(this.ROLES[this.rol]||{}).nombre||this.rol;
     p.anulado_nota=(m||'').trim()||null;
-    await this._put('superior_pedidos',this._codPedido(p),this._ped);
+    await this._put('nido_pedidos',this._codPedido(p),this._ped);
     this.toast('Pedido anulado · ya no cuenta en la liquidación'); this.vPed(); },
   async pedReactivar(id){ const p=this._ped.find(x=>x.id===id); if(!p)return;
     if(!confirm('¿Reactivar este pedido? Vuelve a contar en la liquidación.'))return;
     p.anulado=false; p.anulado_en=null; p.anulado_por=null; p.anulado_nota=null;
-    await this._put('superior_pedidos',this._codPedido(p),this._ped);
+    await this._put('nido_pedidos',this._codPedido(p),this._ped);
     this.toast('Pedido reactivado'); this.vPed(); },
   async pedDel(id){ const p=this._ped.find(x=>x.id===id);
     if(p&&!p.anulado){ return this.pedAnular(id); }   // nunca se borra de una
     if(!confirm('¿Borrar definitivamente este pedido? Se pierde el registro y no se puede deshacer.'))return;
-    this._ped=this._ped.filter(x=>x.id!==id); await this._del('superior_pedidos',id,this._ped); this.vPed(); },
+    this._ped=this._ped.filter(x=>x.id!==id); await this._del('nido_pedidos',id,this._ped); this.vPed(); },
   pedProgramar(id){ const p=this._ped.find(x=>x.id===id); if(!p)return; this.progModal('',{pedido_id:id,cliente:p.cliente,local_num:(this._cli.find(x=>x.id===p.cliente_id)||{}).local_num||'',referencia:p.referencia}); },
 
   /* ---------- PROGRAMACIÓN ---------- */
@@ -2118,11 +2118,11 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const rs=$('pg_ref'),ro=rs.options[rs.selectedIndex]; let refLab=''; if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
     const row={id:id||('pg'+Date.now()),pedido_id:pedId||'',cliente:g('pg_nom'),local_num:g('pg_loc'),referencia:refLab,cantidad:+$('pg_cant').value||1,tamano:$('pg_tam').value,alto:g('pg_alto'),tipo:$('pg_tipo').value,firmeza:$('pg_fir').value,estructura:g('pg_est'),tela:g('pg_tela'),color:g('pg_color'),pillow:$('pg_pil').value,observaciones:g('pg_obs'),estado:(this._prog.find(x=>x.id===id)||{}).estado||'pendiente',creado_en:(this._prog.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
     const i=this._prog.findIndex(x=>x.id===row.id); if(i>=0)this._prog[i]=row; else this._prog.unshift(row);
-    await this._put('superior_programacion',row,this._prog); cerrar(); this.toast('Programado'); this.vProg(); },
+    await this._put('nido_programacion',row,this._prog); cerrar(); this.toast('Programado'); this.vProg(); },
   async progEstado(id,e){ const p=this._prog.find(x=>x.id===id); if(!p)return; const ahora=new Date().toISOString();
     p.estado=e; p.historial=Array.isArray(p.historial)?p.historial:[]; p.historial.push({estado:e,ts:ahora});
     if(e==='entregado')p.entregado_en=ahora;
-    await this._put('superior_programacion',p,this._prog);
+    await this._put('nido_programacion',p,this._prog);
     if(e==='entregado')this._avisoVendedor(p); this.vProg(); },
   _avisoVendedor(p){ const cel=(p.vendedor_cel||'').replace(/\D/g,'');
     const msg=`Hola ${p.vendedor||''}, el pedido de ${p.cliente||'cliente'} (${p.referencia||''}) ya está DISPONIBLE ✅🛏️`;
@@ -2131,7 +2131,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       <a class="btn gold full" href="https://wa.me/57${cel}?text=${encodeURIComponent(msg)}" target="_blank">📱 Avisar por WhatsApp</a>
       <button class="btn gh full" onclick="cerrar()">Cerrar</button>`); }
     else this.toast('Entregado ✅ (sin celular de vendedor para avisar)'); },
-  async progDel(id){ if(!confirm('¿Eliminar programación?'))return; this._prog=this._prog.filter(x=>x.id!==id); await this._del('superior_programacion',id,this._prog); this.vProg(); },
+  async progDel(id){ if(!confirm('¿Eliminar programación?'))return; this._prog=this._prog.filter(x=>x.id!==id); await this._del('nido_programacion',id,this._prog); this.vProg(); },
 };
 (function(){ const q=new URLSearchParams(location.search);
   if(q.has('catalogo')||q.has('cat')){ App.catalogoPublico(); return; }
@@ -2147,4 +2147,4 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
 <script src="../assets/horas.js"></script>
 <script src="../assets/gastos.js"></script>
 <script>try{var ok=function(){return App.rol==='admin'};
-Notas.montar('nido',ok);Horas.montar('nido','Colchones Nido',ok);Gastos.montar('superior_gastos','Colchones Nido',ok);}catch(e){}</script>
+Notas.montar('nido',ok);Horas.montar('nido','Colchones Nido',ok);Gastos.montar('nido_gastos','Colchones Nido',ok);}catch(e){}</script>
