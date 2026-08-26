@@ -764,6 +764,26 @@ async function sincronizar(){
   if(real[YO.nombre]){ miPlata=real[YO.nombre].plata; misLlamadas=real[YO.nombre].llamadas; }
   pintarPlata(false);
 
+  /* Y lo que de verdad importa cuando hay DOS trabajando la misma base: sacar
+     de la lista lo que la otra ya marco. Antes esto solo se leia al entrar, asi
+     que las dos trabajaban sobre la foto que bajaron al abrir y terminaban
+     llamando a la misma empresa. No se toca la pantalla si hay un panel de
+     interesado abierto, para no borrarle lo que esta escribiendo. */
+  if(BASE && !($('panel')||{}).innerHTML){
+    const ya=await GETALL('mkr_llamadas?select=lead_id&base_id=eq.'+BASE.id);
+    if(Array.isArray(ya) && ya.length){
+      const hechos=new Set(ya.map(x=>x.lead_id).filter(Boolean));
+      const antes=leads.length, actual=leads[idx] && leads[idx].id;
+      TODOS=TODOS.filter(l=>!hechos.has(l.id));
+      leads=leads.filter(l=>!hechos.has(l.id));
+      if(leads.length!==antes){
+        const i=leads.findIndex(l=>l.id===actual);      // quedarse en el mismo si sigue
+        idx = i>=0 ? i : Math.min(idx, Math.max(0, leads.length-1));
+        pintarTag(); render();
+      }
+    }
+  }
+
   const todos=Object.values(real).sort((a,b)=>b.plata-a.plata);
   $('rkBody').innerHTML=todos.map((a,i)=>`<div class="rw ${a.agente===YO.nombre?'yo':''}">
       <div class="pos">${i+1}</div>
