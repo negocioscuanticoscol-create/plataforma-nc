@@ -317,7 +317,7 @@ const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No 
    al filtrar por ciudad hay que poder volver a "todas" sin recargar, y porque al
    marcar un prospecto tiene que salir de las DOS listas o reaparece al quitar el
    filtro. */
-let YO=null, BASE=null, misBases=[], leads=[], TODOS=[], CIUDAD='', idx=0, miPlata=0, pendientes=0, misLlamadas=0;
+let YO=null, BASE=null, misBases=[], leads=[], TODOS=[], CIUDAD='', SENTIDO={}, idx=0, miPlata=0, pendientes=0, misLlamadas=0;
 let PASO='inicio', ERR='', HALLADO=null, buscando=null;
 
 /* ==================== ENTRADA ==================== */
@@ -439,11 +439,15 @@ async function entrarApp(){
 
   const [bases,asign]=await Promise.all([
     GET('mkr_bases?select=*&activa=eq.true&order=nombre&limit=200'),
-    GET('mkr_asignaciones?select=base_id,agente_id&agente_id=eq.'+YO.id+'&limit=500')
+    GET('mkr_asignaciones?select=base_id,agente_id,sentido&agente_id=eq.'+YO.id+'&limit=500')
   ]);
   if(!Array.isArray(bases)){ $('bases').innerHTML='<div class="vacio">'+esc(porQueFallo())+'</div>'; return; }
 
   const mias=new Set((asign||[]).map(a=>a.base_id));
+  /* De que punta arranca cada quien. Con dos personas en la misma base, una va
+     de arriba hacia abajo y la otra al reves: no se encuentran hasta la mitad,
+     y para eso faltan cientos de llamadas. */
+  SENTIDO={}; (asign||[]).forEach(a=>{ SENTIDO[a.base_id]=a.sentido||'inicio'; });
   const miNivel=NIVELES.indexOf(YO.nivel||'principiante');
   const miCed=YO.ced||'todos';
   misBases=bases.filter(b=>{
@@ -516,6 +520,7 @@ async function abrirBase(b){
   // los ya marcados NO vuelven a salir, aunque se recargue la página
   const hechos=new Set((ya||[]).map(x=>x.lead_id).filter(Boolean));
   TODOS=ls.filter(l=>l.cel && !hechos.has(l.id));
+  if(SENTIDO[b.id]==='fin') TODOS.reverse();     // esta empieza por el final
   CIUDAD=''; leads=TODOS.slice(); idx=0;
 
   $('bases').style.display='none';
@@ -600,7 +605,9 @@ function filtrarCiudad(v){
 function pintarTag(){
   if(!BASE) return;
   $('baseTag').textContent='📁 '+BASE.nombre+(CIUDAD?' · '+CIUDAD:'')+' · '
-    +leads.length.toLocaleString('es-CO')+(misBases.length>1?' · cambiar':'');
+    +leads.length.toLocaleString('es-CO')
+    +(SENTIDO[BASE.id]==='fin'?' · desde el final':'')
+    +(misBases.length>1?' · cambiar':'');
 }
 /* Las ciudades salen de la base en memoria, no de otra consulta: asi el numero
    de al lado es el que queda DE VERDAD por llamar, ya descontado lo marcado. */
@@ -751,17 +758,32 @@ function pintarPlata(bump){
 /* ==================== TABLERO REAL ==================== */
 async function sincronizar(){
   const hoy=new Date(); hoy.setHours(0,0,0,0);
-  const filas=await GETALL('mkr_llamadas?select=agente,valor,validado,creado_en'+
+  /* Sin filtro de base a proposito: el tablero es de TODA la red. Da igual que
+     una este en Ibague y otra en calzado — compiten entre si, y eso es lo que
+     empuja a marcar. */
+  const filas=await GETALL('mkr_llamadas?select=agente,agente_id,valor,validado,creado_en'+
     '&creado_en=gte.'+hoy.toISOString()+'&order=creado_en.desc&limit=5000');
   if(!Array.isArray(filas)){ $('live').classList.add('off'); $('liveTx').textContent='sin señal'; return; }
   $('live').classList.remove('off'); $('liveTx').textContent='en vivo';
 
+  /* Se agrupa por agente_id, no por el nombre: el nombre se escribe libre y la
+     misma persona quedaba partida en varias filas del tablero. */
   const real={};
   filas.forEach(f=>{
-    const a=real[f.agente]=real[f.agente]||{agente:f.agente,llamadas:0,plata:0};
+    const k=f.agente_id||('n:'+f.agente);
+    const a=real[k]=real[k]||{id:f.agente_id||null,agente:f.agente,llamadas:0,plata:0};
     a.llamadas++; if(f.validado) a.plata+=(+f.valor||0);
   });
-  if(real[YO.nombre]){ miPlata=real[YO.nombre].plata; misLlamadas=real[YO.nombre].llamadas; }
+  /* Y entran TODAS las habilitadas, aunque todavia no hayan marcado. Si solo
+     aparece quien ya marco, el primero del dia no tiene contra quien competir. */
+  if(!sincronizar.agentes){
+    sincronizar.agentes = await GET('mkr_agentes?select=id,nombre&activo=is.true&limit=200') || [];
+  }
+  sincronizar.agentes.forEach(g=>{
+    if(!real[g.id]) real[g.id]={id:g.id, agente:g.nombre, llamadas:0, plata:0};
+  });
+  const yoKey = YO.id||('n:'+YO.nombre);
+  if(real[yoKey]){ miPlata=real[yoKey].plata; misLlamadas=real[yoKey].llamadas; }
   pintarPlata(false);
 
   /* Y lo que de verdad importa cuando hay DOS trabajando la misma base: sacar
@@ -784,14 +806,17 @@ async function sincronizar(){
     }
   }
 
-  const todos=Object.values(real).sort((a,b)=>b.plata-a.plata);
-  $('rkBody').innerHTML=todos.map((a,i)=>`<div class="rw ${a.agente===YO.nombre?'yo':''}">
+  const todos=Object.values(real).sort((a,b)=>b.plata-a.plata||b.llamadas-a.llamadas);
+  $('rkBody').innerHTML=todos.map((a,i)=>{
+    const soyYo=(a.id&&YO.id&&a.id===YO.id)||a.agente===YO.nombre;
+    return `<div class="rw ${soyYo?'yo':''}">
       <div class="pos">${i+1}</div>
-      <div class="nm">${esc(a.agente)}<small>${a.agente===YO.nombre?'tú':'en línea hoy'}</small></div>
+      <div class="nm">${esc(a.agente)}<small>${soyYo?'tú':(a.llamadas?'marcando':'todavía no marca')}</small></div>
       <div class="ll">${num(a.llamadas)} ll.</div>
       <div class="pl mono">${cop(a.plata)}</div>
-    </div>`).join('')||'<div class="vacio" style="padding:22px">Nadie ha marcado hoy.</div>';
-  $('rkInfo').textContent=todos.length+(todos.length===1?' persona hoy':' personas hoy');
+    </div>`;}).join('')||'<div class="vacio" style="padding:22px">Nadie ha marcado hoy.</div>';
+  const activas=todos.filter(a=>a.llamadas>0).length;
+  $('rkInfo').textContent=todos.length+' en la red · '+activas+(activas===1?' marcando':' marcando');
   $('rkTot').innerHTML='Solo cuenta lo validado · total del día <b style="color:var(--dim)">'+
     cop(todos.reduce((s,a)=>s+a.plata,0))+'</b>';
 }
