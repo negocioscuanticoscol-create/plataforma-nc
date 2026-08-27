@@ -344,7 +344,7 @@ const App = {
     const TODOS=['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','datos','admin','permisos'];
     const DEF={admin:TODOS, gerente:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes'],
       director:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios'],
-      vendedor:['dashboard','consulta','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario'],
+      vendedor:['dashboard','consulta','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario','precios'],
       facturacion:['panel','consulta','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','consulta','despachos','inventario'], planta:['dashboard','consulta','pedidos','planta','inventario']};
     /* De donde salen las pestañas, en orden:
        1. Si la persona entra por la red (tiene CARGO), manda ced_permisos —
@@ -4707,7 +4707,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
      Faltaban Inventario, Datos, Usuarios y Permisos. */
   CED_MODS:[['consulta','🔎 Consulta'],['crm','📇 CRM'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],
     ['despachos','🚚 Despachos'],['gastos','💸 Gastos'],['inventario','🗃️ Inventario'],
-    ['cartera','💳 Cartera'],['comisiones','🧾 Comisiones'],['proveedores','🚚 Proveedores'],
+    ['cartera','💳 Cartera'],['comisiones','🧾 Comisiones'],['precios','🏷️ Precios'],
+    ['proveedores','🚚 Proveedores'],['pendientes','✅ Pendientes'],
     ['panel','📈 Panel'],['planta','🏭 Planta'],['clientes','👥 Clientes'],
     ['datos','🗄️ Datos'],['admin','👤 Usuarios'],['permisos','🔐 Permisos']],
 
@@ -5479,7 +5480,14 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   },
 
   async guardarPermisos(){
-    const nuevo={}; this.CED_CARGOS.forEach(c=>nuevo[c]=[]);
+    /* Se arranca de lo que YA tiene cada cargo y solo se toca lo que sale en
+       pantalla. Antes se armaba la lista desde cero con las casillas: cualquier
+       pestaña que no estuviera en CED_MODS -Pendientes lo estuvo meses- se
+       borraba de todos los cargos con solo entrar acá y darle Guardar, sin que
+       nadie lo pidiera y sin aviso. */
+    const enPantalla=this.CED_MODS.map(m=>m[0]);
+    const nuevo={}; this.CED_CARGOS.forEach(c=>
+      nuevo[c]=((this._cedPerm&&this._cedPerm[c])||[]).filter(t=>!enPantalla.includes(t)));
     document.querySelectorAll('#main input[data-cargo]').forEach(i=>{ if(i.checked) nuevo[i.dataset.cargo].push(i.dataset.mod); });
     for(const cargo of this.CED_CARGOS){
       const { error } = await this.sb.from('ced_permisos').upsert({cargo, tabs:nuevo[cargo]},{onConflict:'cargo'});
