@@ -2907,7 +2907,9 @@ const App = {
         ${this._rotCot('2 · Referencia')}
         <select class="field" id="co_ref" onchange="App.cotFiltraColor()" style="margin:0"></select>
         ${this._rotCot('3 · Color')}
-        <select class="field" id="co_color" onchange="App.cotRefPrecio()" style="margin:0"></select>
+        <select class="field" id="co_color" onchange="App.cotFiltraLista(true)" style="margin:0"></select>
+        ${this._rotCot('4 · Lista de precios')}
+        <select class="field" id="co_lista" onchange="App.cotRefPrecio()" style="margin:0"></select>
         <div id="co_ref_precio" class="hint" style="margin-top:6px"></div>
       </div>
 
@@ -2972,6 +2974,26 @@ const App = {
         const ci=$('co_iva'); if(ci) ci.checked=(+ec.iva>0);
         const cv=ec.curva||{}; document.querySelectorAll('#co_grid input').forEach(i=>{ const t=i.dataset.talla; if(cv[t]!=null) i.value=cv[t]; });
         if(ec.muestra_tipo==='pie'){ const ks=Object.keys(cv); const pc=$('co_pie_cant'); if(pc) pc.value=ec.pares||1; const pt=$('co_pie_talla'); if(pt&&ks[0]) pt.value=ks[0]; }
+        /* Se vuelve a la MISMA referencia y a la MISMA lista con que se cotizó.
+           Sin esto el formulario arrancaba en la primera referencia de la lista
+           y al guardar el cambio la cotización salía con otro producto y otro
+           precio del que el cliente ya había visto. */
+        const it0=(ec.items&&ec.items[0])||{};
+        const rf0=it0.referencia||ec.referencia||'';
+        const r0=(this._refsCot||[]).find(x=>x.referencia===rf0 && (x.color||'')===(it0.color||'')
+                                             && (!it0.ced || x.ced===it0.ced))
+              || (this._refsCot||[]).find(x=>x.referencia===rf0);
+        if(r0){
+          const sc=$('co_cat'); if(sc) sc.value=r0.categoria||'';
+          this.cotFiltraRef();
+          const sr=$('co_ref');   if(sr) sr.value=(r0.ced||'')+'||'+r0.referencia;
+          this.cotFiltraColor();
+          const sk=$('co_color'); if(sk) sk.value=r0.k;
+          this.cotFiltraLista(true);
+        }
+        const sl=$('co_lista');
+        if(sl && ec.lista_precio && [].some.call(sl.options,o=>o.value===ec.lista_precio)){
+          sl.value=ec.lista_precio; this.cotRefPrecio(); }
         this.toggleCotMuestra(); this.curva();
       }
     }
@@ -3065,7 +3087,44 @@ const App = {
       (a.referencia+a.color+a.ced).localeCompare(b.referencia+b.color+b.ced,'es'));
     return this._refsCot; },
 
-  /* El precio por par de la referencia escogida, según la lista del cliente.
+  /* Las CUATRO listas con lo que vale esta referencia en cada una. El orden es
+     el de LISTAS y ese mismo orden amarra cada lista con su columna l1…l4. */
+  _cotListasDe(r){
+    return (this.LISTAS||[]).map((nombre,i)=>({nombre, orden:i, valor:(r&&+r.precios[i])||0})); },
+
+  /* Paso 4: con qué lista se cotiza. Antes el precio salía solo, amarrado a la
+     lista que tuviera la ficha del cliente, y para cotizarle por otra tocaba
+     irle a cambiar la ficha —lo que le cambiaba el precio a TODO lo demás de ese
+     cliente—. Acá se ven las cuatro con su valor y se escoge una.
+
+     La que viene marcada es la de la ficha del cliente, si esa tiene precio
+     cargado para esta referencia; si no, la primera que sí lo tenga. Se prefiere
+     una lista con precio a una en cero: cotizar en cero no lo nota nadie hasta
+     que sale la proforma.
+
+     `forzar` es para cuando cambia el cliente o la referencia: ahí sí se vuelve
+     al valor por defecto. Al repintar por otra razón se respeta lo que la
+     persona ya había escogido a mano. */
+  cotFiltraLista(forzar){
+    const sel=$('co_lista'); if(!sel) return;
+    const k=($('co_color')||{}).value||'';
+    const r=(this._refsCot||[]).find(x=>x.k===k);
+    const L=this._cotListasDe(r), conP=L.filter(l=>l.valor>0);
+    const cid=($('co_cliente')||{}).value;
+    const cl=(this._clientes||[]).find(c=>c.id==cid)||{};
+    const suya=cl.lista_precio||'Distribuidor';
+    const antes=forzar?'':sel.value;
+    const elegida = (antes && conP.some(l=>l.nombre===antes)) ? antes
+                  : (conP.some(l=>l.nombre===suya) ? suya
+                  : (conP.length ? conP[0].nombre : suya));
+    sel.innerHTML = L.map(l=>`<option value="${esc(l.nombre)}">${esc(l.nombre)}`
+      + (l.valor>0 ? ' — '+money(l.valor)+'/par' : ' — sin precio cargado')
+      + (l.nombre===suya ? '  ★ la del cliente' : '')
+      + `</option>`).join('');
+    sel.value=elegida;
+    this.cotRefPrecio(); },
+
+  /* El precio por par de la referencia escogida, según la lista ESCOGIDA.
      Si esa lista todavía no tiene precio cargado, se usa el de siempre y se
      avisa en pantalla: es preferible a cotizar en cero sin que nadie lo note. */
   _cotPrecioPar(){
@@ -3075,10 +3134,14 @@ const App = {
     const r=(this._refsCot||[]).find(x=>x.k===k);
     const cid=($('co_cliente')||{}).value;
     const cl=(this._clientes||[]).find(c=>c.id==cid)||{};
-    const i=this.LISTAS.indexOf(cl.lista_precio||'Distribuidor');
+    /* Manda la lista escogida arriba; la de la ficha del cliente es solo el
+       punto de partida y se devuelve aparte para poder avisar si no coinciden. */
+    const suya=cl.lista_precio||'Distribuidor';
+    const nom=(($('co_lista')||{}).value)||suya;
+    const i=this.LISTAS.indexOf(nom);
     const p=(r && i>=0) ? (r.precios[i]||0) : 0;
     return {valor: p>0?p:C.PRECIO_PAR, deLista: p>0,
-            lista: cl.lista_precio||'Distribuidor', ref:r||null}; },
+            lista: nom, suya, ref:r||null}; },
   /* Repinta el desplegable de referencias dejando solo las de la categoría
      elegida. Si una referencia todavía no tiene categoría, sale siempre: es
      preferible a que desaparezca de la lista y nadie la encuentre. */
@@ -3119,7 +3182,9 @@ const App = {
       ? cols.map(r=>`<option value="${esc(r.k)}">${esc(r.color||'sin color')}</option>`).join('')
       : `<option value="">— sin colores —</option>`;
     if(cols.some(r=>r.k===antes)) sel.value=antes;
-    this.cotRefPrecio(); },
+    /* Cada referencia y cada color tienen sus propios precios, así que al
+       cambiarlos hay que rearmar las listas antes de pintar el precio. */
+    this.cotFiltraLista(true); },
   cotRefPrecio(){
     const e=$('co_ref_precio'); if(!e) return;
     const p=this._cotPrecioPar();
@@ -3130,10 +3195,16 @@ const App = {
       ? '<img src="'+esc(p.ref.foto)+'" alt="" loading="lazy" style="width:56px;height:56px;'
         +'object-fit:cover;border-radius:9px;border:1px solid var(--linea);flex:0 0 auto">'
       : '';
-    const txt = p.deLista
+    /* Si se cotiza por una lista distinta a la de la ficha del cliente no se
+       bloquea —a veces es lo correcto— pero sí se dice, para que nadie le mande
+       precio de mayorista a un cliente de público sin darse cuenta. */
+    const ojo = (p.suya && p.lista!==p.suya)
+      ? `<div style="color:#b45309;font-size:11.5px;margin-top:3px">⚠️ La ficha de este cliente dice <b>${esc(p.suya)}</b>.</div>`
+      : '';
+    const txt = (p.deLista
       ? `Precio lista <b>${esc(p.lista)}</b>: <b>${money(p.valor)}</b>/par + IVA`
       : `<span style="color:#b45309">⚠️ Esta referencia no tiene precio en la lista <b>${esc(p.lista)}</b>.
-         Se usa ${money(C.PRECIO_PAR)}/par. Cárgalo en <b>Precios</b>.</span>`;
+         Se usa ${money(C.PRECIO_PAR)}/par. Cárgalo en <b>Precios</b>.</span>`) + ojo;
     e.innerHTML = f
       ? '<div style="display:flex;gap:10px;align-items:center">'+f+'<div>'+txt+'</div></div>'
       : txt;
@@ -3153,9 +3224,10 @@ const App = {
     const c=$('co_contacto'), t=$('co_contacto_tel');
     if(c && !c.value.trim()) c.value=o.dataset.con||'';
     if(t && !t.value.trim()) t.value=o.dataset.tel||'';
-    /* El precio depende de la lista del cliente, así que al cambiar de empresa
-       hay que recalcularlo. */
-    this.cotRefPrecio(); },
+    /* Al cambiar de empresa se vuelve a la lista de ESA empresa: si quedara la
+       del cliente anterior, el precio se le pasaría de uno a otro sin que se
+       vea. Si el vendedor la quiere cambiar, la cambia después a mano. */
+    this.cotFiltraLista(true); },
   /* ---------- PRODUCTOS ANEXADOS A LA COTIZACIÓN ----------
      El primer producto es el de arriba, con su curva y sus contadores de caja.
      Acá se agregan los demás: cada uno con su referencia y su propia curva de
@@ -3209,14 +3281,17 @@ const App = {
     const n=+v||0; if(n>0) a.tallas[t]=n; else delete a.tallas[t];
     this._cotAnexoInfo(a); this.calcCot&&this.calcCot();
   },
-  /* Precio del renglón: la lista del cliente sobre la referencia elegida. */
+  /* Precio del renglón. Va por la MISMA lista escogida arriba: una cotización
+     es una sola oferta, no puede tener la bota por mayoreo y la camisa por
+     público. */
   _cotAnexoPrecio(a){
     const r=(this._refsCot||[]).find(x=>x.k===a.k);
     const cid=($('co_cliente')||{}).value;
     const cl=(this._clientes||[]).find(c=>c.id==cid)||{};
-    const i=this.LISTAS.indexOf(cl.lista_precio||'Distribuidor');
+    const nom=(($('co_lista')||{}).value)||cl.lista_precio||'Distribuidor';
+    const i=this.LISTAS.indexOf(nom);
     const p=(r&&i>=0)?(r.precios[i]||0):0;
-    return {ref:r||null, valor:p>0?p:C.PRECIO_PAR, deLista:p>0, lista:cl.lista_precio||'Distribuidor'};
+    return {ref:r||null, valor:p>0?p:C.PRECIO_PAR, deLista:p>0, lista:nom};
   },
   _cotAnexoPares(a){ return Object.values(a.tallas||{}).reduce((s,n)=>s+(+n||0),0); },
   _cotAnexoInfo(a){
@@ -3330,6 +3405,9 @@ const App = {
               pares:cu.pares, curva:cu.tallas, subtotal:cu.pares*pp.valor},
              ...ax.items],
 flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this.user.id,
+      /* Con qué lista se cotizó. Sin este dato el precio por par no se puede
+         explicar después: la ficha del cliente pudo cambiar desde entonces. */
+      lista_precio:pp.lista,
       referencia:(pp.ref&&pp.ref.referencia)||cl.referencia||'701',valor_par_nc:vNC,valor_par_gpjr:vGPJR,recomendado:!!cl.recomendado,comision_nc:comNC,comision_gpjr:comGPJR,
       // quien factura + FOTO de sus datos. Se copia, no se referencia: si mañana
       // cambia la cuenta bancaria, esta cotizacion tiene que seguir mostrando
