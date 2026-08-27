@@ -234,6 +234,14 @@
       } catch (e) { return false; }
     },
     montar: function (nombreApp, permitido) {
+      /* Embebida en otra pagina, no. La plataforma abre el cotizador de Smart
+         dentro de un iframe: ahi esta pagina no tiene barra de abajo, asi que el
+         boton se volvia un circulo flotante ENCIMA de la cotizacion, y encima
+         repetido, porque la pagina de afuera ya lo tiene en su barra. Manda la
+         de afuera, que es la que tiene barra y sesion.
+         El try es porque leer window.top de otro dominio revienta; y si revienta
+         es justamente porque estamos embebidos. */
+      try { if (window.top !== window.self) return; } catch (e) { return; }
       /* El permiso puede llegar despues: varias apps piden clave y solo ahi se sabe
          quien entro. Si viene una funcion, se le vuelve a preguntar hasta 30 segundos
          en vez de decidir una sola vez al cargar y dejar la pestana sin aparecer. */

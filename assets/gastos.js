@@ -248,6 +248,14 @@
       try { return localStorage.getItem('nc_notas_ok') === '1'; } catch (e) { return false; }
     },
     montar: function (tabla, nombre, permitido) {
+      /* Embebida en otra pagina, no. La plataforma abre el cotizador de Smart
+         dentro de un iframe: ahi esta pagina no tiene barra de abajo, asi que el
+         boton se volvia un circulo flotante ENCIMA de la cotizacion, y encima
+         repetido, porque la pagina de afuera ya lo tiene en su barra. Manda la
+         de afuera, que es la que tiene barra y sesion.
+         El try es porque leer window.top de otro dominio revienta; y si revienta
+         es justamente porque estamos embebidos. */
+      try { if (window.top !== window.self) return; } catch (e) { return; }
       if (typeof permitido === 'function') {
         var veces = 0, self = this, args = arguments;
         (function reintenta() {
