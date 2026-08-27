@@ -3040,7 +3040,7 @@ const App = {
   async _cotRefs(){
     const [ri,rr]=await Promise.all([
       this.sb.from('inventario').select('ced,referencia,color'),
-      this.sb.from('ced_prov_referencias').select('ced,referencia,color,descripcion,categoria,l1,l2,l3,l4').eq('activo',true)
+      this.sb.from('ced_prov_referencias').select('ced,referencia,color,descripcion,categoria,foto_url,l1,l2,l3,l4').eq('activo',true)
     ]);
     /* La SEDE entra en la llave. Sin ella, la 701 de Feroz y la 701 de Ibagué
        se fundían en una sola opción para quien ve toda la red: se perdía una de
@@ -3057,6 +3057,7 @@ const App = {
       f=f||fichas[k]||{};
       m[k]={k, ced:x.ced||'', referencia:x.referencia, color:x.color||'',
             descripcion:f.descripcion||'', categoria:f.categoria||'', mostrarCed:red,
+            foto:f.foto_url||'',
             precios:[f.l1,f.l2,f.l3,f.l4].map(v=>+v||0)}; };
     (rr.data||[]).forEach(f=>meter(f,f));      // el catalogo manda
     (ri.data||[]).forEach(x=>meter(x));        // y lo que haya en bodega, tambien
@@ -3122,10 +3123,20 @@ const App = {
   cotRefPrecio(){
     const e=$('co_ref_precio'); if(!e) return;
     const p=this._cotPrecioPar();
-    e.innerHTML = p.deLista
+    /* La foto al lado del precio: el mismo modelo cambia mucho de un color a
+       otro, y ver la bota evita cotizar la que no era. Solo sale si la sede la
+       cargo; si no, no se deja hueco. */
+    const f = p.ref && p.ref.foto
+      ? '<img src="'+esc(p.ref.foto)+'" alt="" loading="lazy" style="width:56px;height:56px;'
+        +'object-fit:cover;border-radius:9px;border:1px solid var(--linea);flex:0 0 auto">'
+      : '';
+    const txt = p.deLista
       ? `Precio lista <b>${esc(p.lista)}</b>: <b>${money(p.valor)}</b>/par + IVA`
       : `<span style="color:#b45309">⚠️ Esta referencia no tiene precio en la lista <b>${esc(p.lista)}</b>.
-         Se usa ${money(C.PRECIO_PAR)}/par. Cárgalo en Inventario → Ingresar inventario.</span>`;
+         Se usa ${money(C.PRECIO_PAR)}/par. Cárgalo en <b>Precios</b>.</span>`;
+    e.innerHTML = f
+      ? '<div style="display:flex;gap:10px;align-items:center">'+f+'<div>'+txt+'</div></div>'
+      : txt;
     if(this.calcCot) this.calcCot(); },
   toggleCotMuestra(){ const v=this._cotTipoM(); const esPie=(v==='pie');
     const grid=$('co_curva_card'), pie=$('co_pie_box');
@@ -4715,10 +4726,24 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           + ' style="width:86px;padding:7px 8px;border:1.5px solid var(--linea);border-radius:8px;text-align:right;font-size:13px;' + apagado + '">'
           + '<div style="font-size:10px;color:' + col + ';margin-top:2px">' + (mg === null ? '' : mg + '%') + '</div></td>';
       }).join('');
+      /* La foto va pegada al nombre, no en columna aparte: asi se ve de que
+         color se habla sin tener que leer. */
+      const foto = m && m.foto_url
+        ? '<img src="' + esc(m.foto_url) + '" alt="" loading="lazy"'
+          + ' onclick="App.precQuitarFoto(\'' + esc(r.referencia) + '\',\'' + esc(r.color) + '\')"'
+          + ' title="Clic para quitarla"'
+          + ' style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--linea);cursor:pointer">'
+        : (on
+          ? '<label style="width:44px;height:44px;border:1.5px dashed var(--linea);border-radius:8px;'
+            + 'display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px" title="Subir foto">📷'
+            + '<input type="file" accept="image/*" style="display:none"'
+            + ' onchange="App.precFoto(\'' + esc(r.referencia) + '\',\'' + esc(r.color) + '\',this)"></label>'
+          : '<div style="width:44px;height:44px"></div>');
       return '<tr style="border-top:1px solid var(--linea);' + (on ? '' : 'opacity:.62') + '">'
         + '<td style="padding:8px 6px;text-align:center;width:38px">'
         + '<input type="checkbox" ' + (on ? 'checked' : '') + ' style="width:20px;height:20px;cursor:pointer"'
         + ' onchange="App.precMarcar(\'' + esc(r.referencia) + '\',\'' + esc(r.color) + '\',this.checked)"></td>'
+        + '<td style="padding:6px 4px;width:52px">' + foto + '</td>'
         + '<td style="padding:8px 6px;min-width:150px"><b style="font-size:13.5px">' + esc(r.referencia || '(sin referencia)') + '</b>'
         + '<div style="font-size:11px;color:#8a93a6">' + esc(r.color || 'sin color')
         + (r.tallas ? ' · ' + esc(r.tallas) : '') + ' · ' + esc(r.origen)
@@ -4753,6 +4778,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           + '<table style="width:100%;border-collapse:collapse;min-width:600px">'
           + '<tr style="color:#8a93a6;text-transform:uppercase;letter-spacing:.04em">'
           + '<th style="padding:8px 6px;font-size:11px">✓</th>'
+          + '<th style="padding:8px 6px;font-size:11px">Foto</th>'
           + '<th style="text-align:left;padding:8px 6px;font-size:11px">Referencia</th>'
           + '<th style="text-align:right;padding:8px 6px;font-size:11px">Costo</th>' + cab + '</tr>'
           + vis.map(fila).join('') + '</table></div>'
@@ -4788,6 +4814,83 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       if (q.error) { alert('No se pudo: ' + q.error.message); return; }
       if (q.data && q.data[0]) this._pMias.push(q.data[0]);
     }
+    this._precPaint();
+  },
+
+  /* ---------- FOTO DE LA REFERENCIA ----------
+     Va por referencia Y color: el mismo modelo en cafe y en negro se ve
+     distinto, y esa es justo la razon de tener foto.
+
+     Se ACHICA en el celular antes de subir. Una foto de camara pesa 3 a 8 MB;
+     en el cotizador se ve a 60 px. Subirla entera cuesta datos al que la sube,
+     tiempo al que la mira y espacio en el deposito, sin verse mejor. A 640 px de
+     ancho y calidad 0.78 queda en 40-80 KB, y a ese tamaño se sigue viendo bien
+     en pantalla completa. */
+  _fotoAchicar(file, maxAncho){
+    maxAncho = maxAncho || 640;
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onerror = () => reject(new Error('No se pudo leer la imagen'));
+      fr.onload = () => {
+        const img = new Image();
+        img.onerror = () => reject(new Error('El archivo no es una imagen'));
+        img.onload = () => {
+          const esc = Math.min(1, maxAncho / (img.width || maxAncho));
+          const w = Math.round((img.width || maxAncho) * esc);
+          const h = Math.round((img.height || maxAncho) * esc);
+          const cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          const cx = cv.getContext('2d');
+          /* Fondo blanco: los PNG con transparencia salen con el fondo en negro
+             al pasarlos a JPG, y una bota sobre negro no se distingue. */
+          cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);
+          cx.drawImage(img, 0, 0, w, h);
+          cv.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo procesar')),
+                    'image/jpeg', 0.78);
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  },
+
+  async precFoto(ref, color, input){
+    const f = input && input.files && input.files[0];
+    if (!f) return;
+    const m = this._precBuscar(ref, color);
+    if (!m) { alert('Marca primero la casilla para manejar esta referencia.'); return; }
+    const cel = input.parentNode;
+    if (cel) cel.style.opacity = '.5';
+    try {
+      const chico = await this._fotoAchicar(f, 640);
+      /* El nombre lleva la hora: si se reemplaza la foto y el archivo se llamara
+         igual, el navegador seguiria mostrando la vieja de su cache. */
+      const limpio = x => String(x||'').normalize('NFD').replace(/[̀-ͯ]/g,'')
+                            .replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase();
+      const ruta = limpio(m.ced || 'ced') + '/' + limpio(ref) + '_' + limpio(color || 'sin') +
+                   '_' + Date.now() + '.jpg';
+      const up = await this.sb.storage.from('ced-fotos')
+        .upload(ruta, chico, {contentType: 'image/jpeg', upsert: true});
+      if (up.error) throw up.error;
+      const url = this.sb.storage.from('ced-fotos').getPublicUrl(ruta).data.publicUrl;
+      const q = await this.sb.from('ced_prov_referencias').update({foto_url: url}).eq('id', m.id);
+      if (q.error) throw q.error;
+      m.foto_url = url;
+      this.toast('Foto guardada · ' + Math.round(chico.size / 1024) + ' KB');
+    } catch (e) {
+      alert('No se pudo subir la foto: ' + (e.message || e));
+    }
+    if (cel) cel.style.opacity = '';
+    this._precPaint();
+  },
+
+  async precQuitarFoto(ref, color){
+    const m = this._precBuscar(ref, color);
+    if (!m || !m.foto_url) return;
+    if (!confirm('¿Quitar la foto de esta referencia?')) return;
+    const q = await this.sb.from('ced_prov_referencias').update({foto_url: null}).eq('id', m.id);
+    if (q.error) { alert('No se pudo: ' + q.error.message); return; }
+    m.foto_url = null;
     this._precPaint();
   },
 
