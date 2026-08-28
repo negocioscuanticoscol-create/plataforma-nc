@@ -266,7 +266,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260826-8';
+const VER='20260828-2';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -344,6 +344,12 @@ const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No 
    marcar un prospecto tiene que salir de las DOS listas o reaparece al quitar el
    filtro. */
 let YO=null, BASE=null, misBases=[], leads=[], TODOS=[], CIUDAD='', SENTIDO={}, idx=0, miPlata=0, pendientes=0, misLlamadas=0;
+/* Tarjeta trabada: mientras se guarda una marcacion —y mientras el panel del
+   interesado esta abierto— no se puede volver a marcar. Sin esto la tarjeta se
+   quedaba en pantalla con los diez botones vivos y cada toque de mas guardaba
+   OTRA llamada de la misma empresa: el 28-ago quedaron 13 filas seguidas de
+   "Dotaciones Exito Ag". */
+let MARCANDO=false;
 let PASO='inicio', ERR='', HALLADO=null, buscando=null;
 
 /* ==================== ENTRADA ==================== */
@@ -624,7 +630,15 @@ async function verCategoria(k, mantener){
 }
 
 /* ==================== MARCAR ==================== */
+function trabarTarjeta(trabada){
+  MARCANDO=trabada;
+  document.querySelectorAll('#main .res button, #main .nav button, #main .nav select')
+    .forEach(b=>b.disabled=trabada);
+}
 function render(){
+  /* Cada vez que se repinta la tarjeta los botones nacen nuevos y prendidos:
+     aqui se destraba, no en cada salida de marcar(). */
+  MARCANDO=false;
   if(!leads.length){
     $('main').innerHTML=`<div class="card"><div class="emp">No quedan prospectos</div>
       <div class="sub" style="margin-top:8px">${CIUDAD
@@ -764,7 +778,11 @@ async function alEmbudo(x){
     await fetch(SB+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',{method:'POST',
       headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},
       body:JSON.stringify({
-        empresa: BASE.destino_app,
+        /* CED guarda su embudo con empresa='feroz' —NC_EMPRESA se quedo en
+           'feroz' a proposito, ver ced/index.html— asi que si Lupe estampa
+           'ced' el CRM de CED no lo encuentra nunca. Se traduce aqui, sin
+           tocar el dato de la base. */
+        empresa: ({ced:'feroz'})[BASE.destino_app] || BASE.destino_app,
         ced:     BASE.destino_ced || null,
         lead_key: tel,
         nombre:  x.lead_nombre || '',
@@ -851,7 +869,9 @@ async function moverDeBase(destino){
 }
 
 async function marcar(resultado){
+  if(MARCANDO) return;                       // doble toque = una sola llamada
   const l=leads[idx]; if(!l||!BASE) return;
+  trabarTarjeta(true);
   const tarifa=+Object.assign({},TARIFA_DEF,BASE.tarifas||{})[resultado]||0;
   const esInteresado = resultado==='Interesado';
 
@@ -874,6 +894,7 @@ async function marcar(resultado){
   }catch(e){ fila=null; }
 
   if(!fila){
+    trabarTarjeta(false);                    // no se guardo: se puede volver a marcar
     toast('⚠️ No se guardó. Revisa la señal y vuelve a marcar.',true);
     return;                                  // el prospecto se queda ahí
   }
@@ -892,6 +913,8 @@ async function marcar(resultado){
     }catch(e){ toast('⚠️ Se guardó la llamada, pero no el bloqueo. Avisa.',true); }
   }
 
+  /* Interesado: la tarjeta QUEDA trabada. La unica salida es el panel de abajo
+     —Enviar info, Pendiente o Catalogo enviado—, que es el que pasa al siguiente. */
   if(esInteresado){ abrirPanel(fila,l,tarifa); return; }
   miPlata+=tarifa; misLlamadas++; pintarPlata(true);
   sacarActual(); render(); window.scrollTo(0,0);
@@ -922,7 +945,11 @@ function abrirPanel(fila,l,tarifa){
     <button class="cat" onclick="guardarPanel('${fila.id}',${tarifa},true)">📄 Catálogo enviado
       <small style="display:block;font-weight:500;opacity:.8;font-size:11px">se guarda al ${esc(soloNum(l.cel))} y pasa al siguiente</small></button>
     </div>`;
-  setTimeout(()=>{ const w=$('pW'); if(w)w.focus(); },60);
+  /* El panel sale DEBAJO de los botones: si la pantalla no baja sola, parece
+     que el boton no hizo nada. */
+  setTimeout(()=>{ c.scrollIntoView({behavior:'smooth',block:'center'});
+                   const w=$('pW'); if(w)w.focus(); },60);
+  toast('👇 Llena los datos abajo para pasar al siguiente');
 }
 
 async function guardarPanel(id,tarifa,catalogo){
