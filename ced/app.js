@@ -167,6 +167,9 @@ const App = {
   },
   miCargo(){ return (this.cedUser&&this.cedUser.cargo)||null; },
   miSede(){ return (this.cedUser&&this.cedUser.ced)||null; },
+  /* Sufijo de los titulos. Estaban quemados en "Feroz", asi que el CED de
+     Alpaca veia el nombre de otra marca en Cartera, Ventas y CRM. */
+  sufCed(){ const s=this.miSede(); return s?(" · "+esc(s)):""; },
 
   /* Filtro de sede para las consultas que van con la llave publica.
      Las tablas del marcador y del bot estan ABIERTAS a proposito (las leen
@@ -1706,11 +1709,11 @@ const App = {
       return { mes:MES[m], ventas_libro:v, u_bruta:v*BRUTA, comision:com, comision_nc:d.cNC, comision_gpjr:d.cG, herramientas:herr, gastos:gas,
         utilidad_neta:v*BRUTA-com-herr-gas, unidades:d.pares,
         clientes_registrados:acumMes[m], clientes_nuevos:nuevosMes[m]||0, clientes_recurrentes:rec }; });
-    this._renderPanelFin(rows, {titulo:'Feroz', unidLabel:'Pares', splitComision:true, hasGPJR,
+    this._renderPanelFin(rows, {titulo:(this.miSede()||"Feroz"), unidLabel:'Pares', splitComision:true, hasGPJR,
       nVentas:peds.length, muestras:{vend:muVend, gratis:muGratis},
       costoFilas:[['Gastos de la sucursal','gastos','lo grabado']],
       sub:'EN VIVO desde pedidos reales · '+(HERR?'herramientas $4.000.000/mes (desde julio) · ':'')+'costos = lo que grabó la sucursal en Gastos · U.bruta 20%',
-      vacio:'Aún no hay pedidos con valor en Feroz. A medida que se vendan, aparecen aquí.'});
+      vacio:"Aún no hay pedidos con valor en "+(this.miSede()||"este CED")+". A medida que se vendan, aparecen aquí."});
   },
   _renderPanelFin(rows, cfg){   // renderizador COMPARTIDO (Smart y Feroz)
     const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO'), nm=n=>Math.round(n||0).toLocaleString('es-CO');
@@ -3556,7 +3559,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const money=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     const totalCobrar=cartera.reduce((a,p)=>a+(+p.total||0),0);
     const dias=p=>{ const d=p.autorizado_en||p.despachado_en||p.creado_en; if(!d) return ''; const n=Math.floor((Date.now()-new Date(d).getTime())/86400000); return n+' día'+(n===1?'':'s'); };
-    this.set(`<h1>💳 Cartera · Feroz</h1><div class="sub">Ventas a crédito pendientes de cobro · marca "pagado" cuando el cliente consigne</div>
+    this.set(`<h1>💳 Cartera${this.sufCed()}</h1><div class="sub">Ventas a crédito pendientes de cobro · marca "pagado" cuando el cliente consigne</div>
       <div class="card" style="background:linear-gradient(135deg,#b45309,#d97706);color:#fff;border:none"><div style="font-size:12px;opacity:.85">💰 Total por cobrar</div><div style="font-size:25px;font-weight:800;margin-top:2px">${money(totalCobrar)}</div><div style="font-size:11px;opacity:.8">${cartera.length} pedido(s) a crédito sin pagar</div></div>
       ${cartera.length?cartera.map(p=>{const nom=(p.cliente_snap||{}).nombre||'—';return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(nom)}</div><div class="meta">${esc(p.numero||'')} · ${p.pares||0} pares · ${dias(p)}${p.factura_num?' · Fact '+esc(p.factura_num):''}</div></div><div style="text-align:right"><div style="font-weight:800;color:#b45309">${money(p.total)}</div><div style="font-size:10px;color:#8a93a6">${ESTADOS[p.estado]||p.estado}</div></div></div><div style="margin-top:8px;text-align:right"><button class="btn-sm" style="background:#16a34a;color:#fff" onclick="App.cartMarcarPagado('${p.id}')">💰 Marcar pagado</button></div></div>`}).join(''):'<div class="empty">Sin cartera pendiente. Las ventas a <b>crédito</b> aparecen aquí (con su total por cobrar) hasta que el cliente consigne.</div>'}`);
   },
@@ -3581,7 +3584,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const porMes={};
     v.forEach(p=>{ const d=new Date(p.creado_en), m=MESES[d.getMonth()]+'-'+d.getFullYear(); (porMes[m]=porMes[m]||{v:0,c:0,n:0,p:0}); porMes[m].v+=+p.total||0; porMes[m].c+=+p.comision_nc||0; porMes[m].n++; porMes[m].p+=+p.pares||0; });
     const metaMes=+((metas.find(m=>m.mes===mesActual)||{}).meta||0), logMes=(porMes[mesActual]&&porMes[mesActual].v)||0, avMes=metaMes?logMes/metaMes*100:0, okMes=avMes>=100;
-    this.set(`<h1>Ventas · Feroz</h1><div class="sub">Pedidos reales (con valor) · comisión por par NC ${totG>0?'+ GPJR':''}</div>
+    this.set(`<h1>Ventas${this.sufCed()}</h1><div class="sub">Pedidos reales (con valor) · comisión por par NC ${totG>0?'+ GPJR':''}</div>
       <div class="kpis">
         <div class="kpi naranja"><b>${money(totV)}</b><span>Ventas 2026 (acum.)</span></div>
         <div class="kpi verde"><b>${money(totNC)}</b><span>Comisión NC</span></div>
@@ -3595,7 +3598,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         <div style="height:16px;background:var(--gris);border-radius:8px;overflow:hidden;margin-top:8px"><div style="height:100%;width:${Math.min(100,avMes).toFixed(1)}%;background:${okMes?'#2563eb':'#dc2626'};display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800">${avMes.toFixed(0)}%</div></div></div>
       <div class="card"><h2 style="font-size:15px;margin-bottom:2px">🎯 Meta vs logrado por mes</h2><div style="font-size:11.5px;color:#667;margin-bottom:10px">🔵 cumplió · 🔴 no cumplió</div>
         ${metas.filter(m=>m.mes_num<=curN && (+m.meta||0)>0).sort((a,b)=>b.mes_num-a.mes_num).map(m=>{ const meta=+m.meta||0, log=(porMes[m.mes]&&porMes[m.mes].v)||0, pct=meta?log/meta*100:0, ok=pct>=100; return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:13px"><span><b>${m.mes}</b></span><span>logrado <b>${money(log)}</b> / meta ${money(meta)} · <b style="color:${ok?'#2563eb':'#dc2626'}">${pct.toFixed(0)}%</b></span></div><div style="height:11px;background:var(--gris);border-radius:6px;margin-top:3px;overflow:hidden"><div style="height:100%;width:${Math.min(100,pct).toFixed(0)}%;background:${ok?'#2563eb':'#dc2626'}"></div></div></div>`;}).join('')||'<div class="empty">Sin datos</div>'}
-      </div>`:`<div class="card" style="border-left:4px solid #f0a500"><div style="font-size:12.5px;color:#7a5800">🎯 Aún no has cargado las <b>metas de Feroz</b>. Dime la meta en $ por mes y las activo igual que en Smart.</div></div>`}
+      </div>`:`<div class="card" style="border-left:4px solid #f0a500"><div style="font-size:12.5px;color:#7a5800">🎯 Aún no has cargado las <b>metas de ${esc(this.miSede()||"este CED")}</b>. Dime la meta en $ por mes y las activo igual que en Smart.</div></div>`}
       <div class="card"><h2 style="font-size:15px;margin-bottom:6px">🧾 Ventas reales (${v.length})</h2>
         ${v.length?v.slice().sort((a,b)=>new Date(b.creado_en)-new Date(a.creado_en)).map(p=>{const cl=p.cliente_snap||{}; return `<div class="item"><div class="top"><div><div class="nom">${esc(cl.nombre||'Cliente')} ${(+p.comision_gpjr||0)>0?'<span style="color:#b8860b">⭐</span>':''}</div><div class="meta">${esc(p.numero||'')} · ${p.pares} pares · 📅 ${new Date(p.creado_en).toLocaleDateString('es-CO')}${p.guia?(' · guía '+esc(p.guia)):''}</div></div><div style="text-align:right"><div class="tot">${money(p.total)}</div><div class="meta" style="color:var(--verde)">NC ${money(p.comision_nc||0)}</div>${(+p.comision_gpjr||0)>0?`<div class="meta" style="color:#b8860b">⭐ GPJR ${money(p.comision_gpjr)}</div>`:''}</div></div></div>`;}).join(''):'<div class="empty">Aún no hay ventas reales.</div>'}
       </div>`);
@@ -3945,6 +3948,26 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     let bot=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000'+this.fCed(),{headers:H}); const j=await r.json(); bot=Array.isArray(j)?j:[]; }catch(e){}
     let cots=[]; try{ const r=await this.sb.from('cotizaciones').select('id,cliente_id,numero,total,estado,es_muestra,creado_en').order('creado_en',{ascending:false}); cots=r.data||[]; }catch(e){}
     const cotByCli={}; cots.forEach(q=>{ if(q.cliente_id && !cotByCli[q.cliente_id]) cotByCli[q.cliente_id]=q; }); this._crmFCots=cotByCli;
+    /* 🐭 Lupe: las bases del pozo amarradas a ESTE CED. Cada base es un cajon.
+       El filtro NO es fCed() —mkr_bases guarda la sede en 'destino_ced', no en
+       'ced'—, asi que va aparte. La Principal las ve todas. */
+    const _sede=this.miSede();
+    const _fBase=(!_sede||this._esPrincipal)?'':'&destino_ced=eq.'+encodeURIComponent(_sede);
+    let lbs=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/mkr_bases?select=id,nombre,descripcion,destino_ced&destino_app=eq.ced&activa=is.true&order=nombre'+_fBase,{headers:H}); const j=await r.json(); lbs=Array.isArray(j)?j:[]; }catch(e){}
+    let lla=[];
+    if(lbs.length){
+      const _ids=lbs.map(b=>b.id).join(',');
+      const _cols='id,base_id,resultado,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,whatsapp2,correo,agente,creado_en,validado,datos,trabajado,estado_venta';
+      /* Por paginas: PostgREST corta en 1.000 filas y no avisa. Con una base
+         grande dejaria de contar justo la gestion mas nueva. */
+      for(let d=0; d<40; d++){
+        let pg=[];
+        try{ const r=await fetch(this._SBU()+'/rest/v1/mkr_llamadas?select='+_cols+'&base_id=in.('+_ids+')&order=creado_en.desc&limit=1000&offset='+(d*1000),{headers:H}); const j=await r.json(); pg=Array.isArray(j)?j:[]; }catch(e){}
+        lla=lla.concat(pg); if(pg.length<1000) break;
+      }
+    }
+    this._lupeBases=lbs; this._lupeLlam=lla;
+
     const cnt=async(mundo)=>{ try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_leads?mundo=eq.'+mundo+'&select=fila&limit=1'+this.fCed(),{headers:{...H,'Prefer':'count=exact'}}); return +((r.headers.get('content-range')||'').split('/')[1])||0; }catch(e){ return 0; } };
     const nEmp=await cnt('empresa'), nDist=await cnt('distribuidor');
     const prosp=cli.filter(c=>c.embudo!=='cliente');   // prospectos = aún no compran
@@ -3959,16 +3982,19 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const estOf=b=>{ const v=(b.etiqueta||'').toLowerCase(); return /cotiz/.test(v)?'cotiz':/interes/.test(v)?'interesado':'curioso'; };
     const orgLeads=bot.filter(b=>/organic|seo|red/i.test(b.origen||b.canal||''));
     const oCnt={curioso:0,interesado:0,cotiz:0}; orgLeads.forEach(b=>oCnt[estOf(b)]++);
-    const PUERTAS=[['prospectos','🎯 Prospectos'],['marcador','☎️ Marcador'],['digital','💬 Digital'],['organico','🌱 Orgánico']];
+    const PUERTAS=[['prospectos','🎯 Prospectos'],['marcador','🐭 Lupe'],['digital','💬 Digital'],['organico','🌱 Orgánico']];
     const CAJ={prospectos:[['inter',`🔥 Interesados ${intRaw.length}`],['nc',`👤 NC ${nc.length}`],['gpjr',`⭐ GPJR ${gpjr.length}`],['esp',`⭐⭐ Especiales ${esp.length}`]],
-      marcador:[['emp',`🏭 Empresas ${nEmp.toLocaleString('es-CO')}`],['dist',`🏪 Distribuidores ${nDist.toLocaleString('es-CO')}`]],
+      /* Un cajon por base de Lupe asignada a este CED, con lo gestionado entre
+         parentesis. Antes eran dos cajones fijos del marcador viejo. */
+      marcador: lbs.length ? lbs.map(b=>[b.id, `📂 ${esc(b.nombre)} (${lla.filter(x=>x.base_id===b.id).length})`])
+                           : [['sin','📂 Sin bases asignadas']],
       /* 'curioso' es la llave interna con la que ya está clasificado todo el
          histórico: NO se cambia. Solo se cambia lo que se lee en pantalla. */
       digital:[['curioso',`🎯 Cliente objetivo ${dCnt.curioso}`],['interesado',`🔥 Interesados ${dCnt.interesado}`],['distribuidor',`🏪 Distribuidores ${dCnt.distribuidor}`]],
       organico:[['curioso',`🎯 Cliente objetivo ${oCnt.curioso}`],['interesado',`🔥 Interesados ${oCnt.interesado}`],['cotiz',`📝 Cotización ${oCnt.cotiz}`]]};
     const canal=this._crmFCanal||'prospectos'; this._crmFCanal=canal;
     const cajones=CAJ[canal]; let cajon=this._crmFCajon; if(!cajones.find(c=>c[0]===cajon)) cajon=cajones[0][0]; this._crmFCajon=cajon;
-    this.set(`<h1>📇 CRM · Feroz</h1><div class="sub">4 puertas → cajones (bases de Feroz)</div>
+    this.set(`<h1>📇 CRM${this.sufCed()}</h1><div class="sub">4 puertas → cajones (tus bases)</div>
       <div style="display:flex;gap:6px;margin:10px 0;flex-wrap:wrap">${PUERTAS.map(([v,n])=>`<button class="btn-sm" style="flex:1;min-width:88px;padding:11px;font-weight:700;background:${v===canal?'var(--naranja);color:#fff':'#e5e7eb'}" onclick="App.crmFCanal('${v}')">${n}</button>`).join('')}</div>
       <button class="btn-sm" style="width:100%;background:var(--verde);color:#fff;padding:12px;margin-bottom:10px;font-size:14px;font-weight:700" onclick="App.modalCliente(()=>App.vCrm())">🔎 Registrar / Editar contacto · valida en tus bases</button>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">${cajones.map(([v,n])=>`<button class="btn-sm" style="background:${v===cajon?'#0b1f2a;color:#fff':'#eef2ff;color:#3a48b3'}" onclick="App.crmFCajon('${v}')">${n}</button>`).join('')}</div>
@@ -4073,37 +4099,58 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         </div>`; }).join('');
     }
     if(canal==='marcador'){
-      const mundo=cajon==='dist'?'distribuidor':'empresa';
-      const total=cajon==='dist'?this._crmFCnt.dist:this._crmFCnt.emp;
-      const res=(this._crmFRes||[]).filter(r=>(r.mundo||'empresa')===mundo);
-      const trab=res.length, cubrir=Math.max(0,total-trab);
+      /* 🐭 Lupe. El cajon es una BASE del pozo amarrada a este CED, y adentro se
+         ve la gestion real de quien llamo, contada por resultado. Arranca en
+         Interesado, que es el unico que tiene embudo que trabajar.
+         Antes esta puerta mostraba el marcador viejo (feroz_marcador_leads) con
+         dos cajones fijos, Empresas y Distribuidores. */
+      const bases=this._lupeBases||[], llam=this._lupeLlam||[];
+      if(!bases.length) return '<div class="empty">Todavía no hay bases de <b>Lupe</b> amarradas a este CED. Cada base se amarra con <b>destino_ced</b>, y desde ahí empieza a caer aquí todo lo que marquen.</div>';
+      const bs=bases.find(x=>x.id===cajon)||bases[0];
+      const res=llam.filter(x=>x.base_id===bs.id);
+      const ICO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
+      const ORD=['Interesado','Info WhatsApp','Ya es cliente','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data'];
       const byCal={}; res.forEach(r=>{ const k=r.resultado||'—'; byCal[k]=(byCal[k]||0)+1; });
-      const calBadge=r=>{ const v=(r.resultado||'').toLowerCase(); const c=/interes/.test(v)?'b-aceptada':/venta|muestra/.test(v)?'b-despachado':/no contesta|equiv|buz/.test(v)?'b-cotizada':'b-entregado'; return `<span class="badge ${c}">${esc(r.resultado||'—')}</span>`; };
-      const cat=this._crmMarcCat||null;
-      const cats=Object.entries(byCal).sort((a,b)=>b[1]-a[1]);
-      const botones=cats.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${cats.map(([k,v])=>`<button class="btn-sm" style="font-weight:800;padding:9px 13px;background:${k===cat?'#0b1f2a':'#eef2ff'};color:${k===cat?'#fff':'#3a48b3'}" onclick="App.crmMarcCat('${(k||'').replace(/'/g,'')}')">${esc(k)} <b>${v}</b></button>`).join('')}</div>`:'';
+      const cats=Object.entries(byCal).sort((x,y)=>{ const a=ORD.indexOf(x[0]), c=ORD.indexOf(y[0]); return (a<0?99:a)-(c<0?99:c); });
+      /* Por defecto Interesado. Si esa base no tiene ninguno, el primero que haya. */
+      let cat=this._crmMarcCat; if(!cat||!byCal[cat]) cat = byCal['Interesado'] ? 'Interesado' : (cats[0]?cats[0][0]:null);
+      const nInt=byCal['Interesado']||0;
+      const quien=[...new Set(res.map(r=>r.agente).filter(Boolean))].join(', ');
+      const botones=cats.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${cats.map(([k,v])=>`<button class="btn-sm" style="font-weight:800;padding:9px 13px;background:${k===cat?'#0b1f2a':'#eef2ff'};color:${k===cat?'#fff':'#3a48b3'}" onclick="App.crmMarcCat('${(k||'').replace(/'/g,'')}')">${ICO[k]||''} ${esc(k)} <b>(${v})</b></button>`).join('')}</div>`:'';
       const resumen=`<div class="card" style="border-left:4px solid var(--naranja)">
-        <div style="font-size:12px;color:#667;margin-bottom:8px">👤 Asesor: <b>NC</b> <span style="color:#9aa3b0">(por ahora trabaja todo · filtro por asesor/ciudad/base: próximamente)</span></div>
-        <div class="kpis"><div class="kpi"><b>${total.toLocaleString('es-CO')}</b><span>Total ${mundo==='distribuidor'?'distribuidores':'empresas'}</span></div>
-          <div class="kpi verde"><b>${trab.toLocaleString('es-CO')}</b><span>Trabajados</span></div>
-          <div class="kpi naranja"><b>${cubrir.toLocaleString('es-CO')}</b><span>Por cubrir</span></div></div>
+        <div style="font-size:12px;color:#667;margin-bottom:8px">🐭 <b>${esc(bs.nombre)}</b>${bs.destino_ced?' · CED '+esc(bs.destino_ced):''}${quien?' · 👤 '+esc(quien):''}</div>
+        <div class="kpis"><div class="kpi"><b>${res.length.toLocaleString('es-CO')}</b><span>Gestionados</span></div>
+          <div class="kpi verde"><b>${nInt.toLocaleString('es-CO')}</b><span>🔥 Interesados</span></div>
+          <div class="kpi naranja"><b>${res.filter(r=>r.datos).length.toLocaleString('es-CO')}</b><span>Con datos</span></div></div>
         ${botones}
-        ${cats.length?`<div style="font-size:11px;color:#9aa3b0;margin-top:8px">👆 Toca una categoría para ver esos contactos</div>`:''}
+        ${bs.descripcion?`<div style="font-size:11px;color:#9aa3b0;margin-top:8px">${esc(bs.descripcion)}</div>`:''}
       </div>`;
-      let lista='';
-      if(!cats.length){ lista='<div class="empty">Aún sin trabajados. Se llenan desde el <b>Marcador</b> (power-dialer). Los 🔥 Interesado caen a Prospectos → Interesados.</div>'; }
-      else if(cat){ const sel=res.filter(r=>(r.resultado||'—')===cat);
-        lista=sel.length? sel.map(r=>{ const key='m'+((r.cel||r.nombre)+'').replace(/[^a-z0-9]/gi,'').slice(0,26); const base=-1; return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(r.nombre||'—')}</div><div class="meta">📱 ${esc(r.cel||'')}${r.fecha?' · 📅 '+esc((r.fecha||'').slice(0,10)):''}</div></div>${calBadge(r)}</div>${this._emb(key,base,'marcador',r.nombre,r.cel)}</div>`; }).join('')
-          : '<div class="empty">Sin contactos en esta categoría.</div>'; }
-      return resumen+lista;
+      if(!cats.length) return resumen+'<div class="empty">Esta base todavía no tiene gestión. Aparece apenas marquen en Lupe.</div>';
+      const sel=res.filter(r=>(r.resultado||'—')===cat);
+      const lista=sel.map(r=>{
+        const tel=String(r.whatsapp||r.lead_cel||'').replace(/[^0-9]/g,'');
+        /* La llave es el telefono pelado, la MISMA que estampa Lupe en
+           nc_crm_embudo: asi el circulo de aca y la etapa que dejo la
+           telemercaderista son el mismo lead y no dos. */
+        const key=tel||('l'+String(r.id||'').replace(/[^a-z0-9]/gi,'').slice(0,26));
+        const w2=String(r.whatsapp2||'').replace(/[^0-9]/g,'');
+        const falta=(cat==='Interesado'&&!r.datos)?'<span style="background:#fee2e2;color:#b91c1c;font-size:10.5px;padding:1px 7px;border-radius:9px">sin datos · no pagó</span>':'';
+        return `<div class="item" style="display:block"><div class="top">
+          <div><div class="nom">${esc(r.lead_nombre||'—')}</div>
+            <div class="meta">${tel?'📱 '+esc(tel):'<span style="color:#b91c1c">sin teléfono</span>'}${w2&&w2!==tel?' / '+esc(w2):''}${r.lead_ciudad?' · 📍 '+esc(r.lead_ciudad):''}${r.contacto?' · 👤 '+esc(r.contacto):''}${r.correo?' · ✉️ '+esc(r.correo):''}</div>
+            <div class="meta">${r.creado_en?'📅 '+esc(String(r.creado_en).slice(0,10)):''}${r.agente?' · '+esc(r.agente):''} ${falta}</div></div>
+          <span class="badge ${cat==='Interesado'?'b-aceptada':'b-entregado'}">${ICO[cat]||''} ${esc(cat)}</span></div>
+          ${tel?`<div style="display:flex;gap:5px;margin-top:7px"><a class="btn-sm" style="background:var(--azul);color:#fff;text-decoration:none" href="tel:+57${esc(tel)}">📞</a><button class="btn-sm" style="background:#25D366;color:#fff" onclick="window.open('https://wa.me/57${esc(tel)}','_blank')">📲 WhatsApp</button></div>`:''}
+          ${this._emb(key,-1,'marcador',r.lead_nombre,tel)}</div>`; }).join('');
+      return resumen+(lista||'<div class="empty">Sin contactos en esta categoría.</div>');
     }
     if(canal==='digital'){
       const etOf=b=>{ const v=(b.etiqueta||'').toLowerCase(); return /distribu/.test(v)?'distribuidor':/interes/.test(v)?'interesado':'curioso'; };
       const arr=(bot||[]).filter(b=>etOf(b)===cajon); this._crmFLeadShown=arr;
       const nom={curioso:'Clientes objetivo',interesado:'Interesados',distribuidor:'Distribuidores'}[cajon]||'Digital';
       const cur=(bot||[]).filter(b=>/curios/i.test(b.etiqueta||'')).length, intr=(bot||[]).filter(b=>/interes|distribu/i.test(b.etiqueta||'')).length;
-      const head=`<div class="card" style="border-left:4px solid var(--naranja)"><div style="font-size:12px;color:#667">💬 WhatsApp Feroz (Sofía) · <b>${nom}</b></div><div class="kpis" style="margin-top:6px"><div class="kpi"><b>${(bot||[]).length}</b><span>Leads totales</span></div><div class="kpi"><b>${cur}</b><span>🎯 Cliente objetivo</span></div><div class="kpi naranja"><b>${intr}</b><span>🔥 Calientes</span></div></div></div>`;
-      if(!arr.length) return head+'<div class="empty">Aún sin leads en este estado. Los llena Sofía (el bot de Feroz) en tiempo real.</div>';
+      const head=`<div class="card" style="border-left:4px solid var(--naranja)"><div style="font-size:12px;color:#667">💬 WhatsApp (bot) · <b>${nom}</b></div><div class="kpis" style="margin-top:6px"><div class="kpi"><b>${(bot||[]).length}</b><span>Leads totales</span></div><div class="kpi"><b>${cur}</b><span>🎯 Cliente objetivo</span></div><div class="kpi naranja"><b>${intr}</b><span>🔥 Calientes</span></div></div></div>`;
+      if(!arr.length) return head+'<div class="empty">Aún sin leads en este estado. Los llena el bot de WhatsApp en tiempo real.</div>';
       return head+arr.map((b,i)=>this._cardLead(b,i,'digital',cajon)).join('');
     }
     if(canal==='organico'){
