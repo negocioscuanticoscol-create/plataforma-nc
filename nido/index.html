@@ -1395,7 +1395,12 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
      columna para eso, así que las fechas van pegadas al campo 'estado' detrás
      de una marca, igual que los precios; la app las separa al leer. */
   ESTPED:[
-    {k:'nuevo',        t:'Tomado',               e:'📝'},
+    /* Los DOS primeros pasos: el pedido se toma como cotización, y no se manda a
+       fabricar hasta que el cliente la aprueba. Antes el primer paso se llamaba
+       'nuevo' (Tomado) y de ahí saltaba derecho a producción, sin que quedara
+       registrado quién ni cuándo dio el visto bueno. */
+    {k:'cotizacion',   t:'Cotización',           e:'📝'},
+    {k:'aprobado',     t:'Aprobado',             e:'✅'},
     {k:'produccion',   t:'Enviado a producción', e:'🏭'},
     {k:'pago_fabrica', t:'Pagado a fábrica',     e:'🧾'},
     {k:'pago_nido',    t:'Pagado a Nido',        e:'💰'},
@@ -1407,13 +1412,15 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       p.hitos = {};
       if(i>=0){ try{ p.hitos=JSON.parse(s.slice(i+this._MARCA.length))||{}; }catch(e){}
         p.estado=s.slice(0,i); }
-      // Los pedidos viejos no tienen hitos: el de "tomado" es su fecha de creación
-      if(!p.hitos.nuevo&&p.creado_en) p.hitos.nuevo=p.creado_en;
+      // Lo que se guardó cuando el primer paso se llamaba 'nuevo' entra como cotización
+      if(p.hitos.nuevo&&!p.hitos.cotizacion){ p.hitos.cotizacion=p.hitos.nuevo; delete p.hitos.nuevo; }
+      // Los pedidos viejos no tienen hitos: el primero es su fecha de creación
+      if(!p.hitos.cotizacion&&p.creado_en) p.hitos.cotizacion=p.creado_en;
     });
     return arr; },
   _codPedido(row){
     const r={...row};
-    r.estado=String(row.estado||'nuevo').split(this._MARCA)[0]
+    r.estado=String(row.estado||'cotizacion').split(this._MARCA)[0]
       +this._MARCA+JSON.stringify(row.hitos||{});
     delete r.hitos;
     return r; },
@@ -1422,7 +1429,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const h=p.hitos||{};
     let ultimo=this.ESTPED[0];
     this.ESTPED.forEach(x=>{ if(h[x.k]) ultimo=x; });
-    if(!Object.keys(h).length){ const k=String(p.estado||'nuevo').split(this._MARCA)[0];
+    if(!Object.keys(h).length){ const k=String(p.estado||'cotizacion').split(this._MARCA)[0];
       return this.ESTPED.find(x=>x.k===k)||this.ESTPED[0]; }
     return ultimo; },
   _fechaCorta(f){ if(!f) return ''; const d=new Date(f); if(isNaN(d)) return '';
@@ -1473,7 +1480,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         const h=p.hitos||{}, e=this._est(p), i=this.ESTPED.findIndex(x=>x.k===e.k);
         const sig=this.ESTPED.find(x=>!h[x.k]);
         const cerrado=this.ESTPED.every(x=>h[x.k]);
-        const desde=h.nuevo, hasta=h[this.ESTPED[this.ESTPED.length-1].k];
+        const desde=h.cotizacion, hasta=h[this.ESTPED[this.ESTPED.length-1].k];
         const anu=!!p.anulado;
         return `<div class="item"${anu?' style="opacity:.55;border-left:4px solid var(--bad)"':''}><div class="top"><div style="min-width:0;flex:1">
         <div class="nm"${anu?' style="text-decoration:line-through"':''}>${
@@ -1864,10 +1871,10 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const rs=$('p_ref'),ro=rs.options[rs.selectedIndex]; const medida=rs.value==='__medida__';
     let refLab=''; if(medida)refLab='A la medida'; else if(ro){ refLab=ro.dataset&&ro.dataset.lab?ro.dataset.lab:(rs.value===''&&/^—/.test(ro.textContent)?'':ro.textContent); }
     if(!refLab){alert('Selecciona una referencia');return;}
-    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,vendedor_id:vId,vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',tipo_transporte:$('p_tra').value,valor_transporte:+($('p_tratot')||{}).value||0,transp_modo:($('p_tramod')||{}).value||null,transp_cobrado:+($('p_tracob')||{}).value||0,iva:!!($('p_iva')||{}).checked,forma_pago:$('p_pag').value,total:Math.round(this._pedBruto()*(1-this._pedDescPct()/100)),descuento_pct:this._pedDescPct(),cantidad:+($('p_cant')||{}).value||1,tipo_venta:($('p_lst')||{}).value||'Fábrica',estado:'nuevo',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
-    // Se conservan las gestiones ya marcadas; si es nuevo, queda «Tomado» con la hora
+    const row={id:id||('p'+Date.now()),referencia:refLab,cliente_id:cliId,cliente:cliNom,vendedor_id:vId,vendedor:vObj.nombre||'',vendedor_cel:vObj.celular||'',tipo_transporte:$('p_tra').value,valor_transporte:+($('p_tratot')||{}).value||0,transp_modo:($('p_tramod')||{}).value||null,transp_cobrado:+($('p_tracob')||{}).value||0,iva:!!($('p_iva')||{}).checked,forma_pago:$('p_pag').value,total:Math.round(this._pedBruto()*(1-this._pedDescPct()/100)),descuento_pct:this._pedDescPct(),cantidad:+($('p_cant')||{}).value||1,tipo_venta:($('p_lst')||{}).value||'Fábrica',estado:'cotizacion',creado_en:(this._ped.find(x=>x.id===id)||{}).creado_en||new Date().toISOString()};
+    // Se conservan las gestiones ya marcadas; si es nuevo, queda «Cotización» con la hora
     const ant=this._ped.find(x=>x.id===id);
-    row.hitos=(ant&&ant.hitos)?ant.hitos:{nuevo:row.creado_en};
+    row.hitos=(ant&&ant.hitos)?ant.hitos:{cotizacion:row.creado_en};
     const i=this._ped.findIndex(x=>x.id===row.id); if(i>=0)this._ped[i]=row; else this._ped.unshift(row);
     await this._put('nido_pedidos',this._codPedido(row),this._ped);
     await this._pedItemsSave(row.id);
