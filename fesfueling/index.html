@@ -600,6 +600,9 @@ vInicio: safe(async function(){
   const carteraVencida=vencidas.reduce((s,d)=>s+saldo(d),0);
   const bajos=refs.filter(r=>r.activo&&(+r.existencias||0)<=(+r.inv_min||0)&&(+r.inv_min||0)>0);
   const valorInv=refs.reduce((s,r)=>s+(+r.existencias||0)*(+r.costo_promedio||0),0);
+  /* Lo mismo pero a precio de venta: lo que vale la bodega si se vende todo.
+     La diferencia contra el costo es la ganancia que está quieta en el estante. */
+  const valorVta=refs.reduce((s,r)=>s+(+r.existencias||0)*(+r.precio_venta||0),0);
   const compMes=compras.filter(c=>(c.fecha||'').slice(0,7)===mesAct()&&c.estado!=='anulada').reduce((s,c)=>s+(+c.total||0),0);
   // top vendidos del mes
   const cnt={};
@@ -614,6 +617,7 @@ vInicio: safe(async function(){
     <div class="kpi ${bajos.length?'rojo':''}"><div class="v">${bajos.length}</div><div class="l">Referencias en inventario bajo</div></div>
     <div class="kpi"><div class="v">${money(compMes)}</div><div class="l">Compras del mes</div></div>
     <div class="kpi"><div class="v">${money(valorInv)}</div><div class="l">Valor del inventario (a costo)</div></div>
+    <div class="kpi verde"><div class="v">${money(valorVta)}</div><div class="l">Valor del inventario (a precio de venta)${valorVta>valorInv?` · ganancia ${money(valorVta-valorInv)}`:''}</div></div>
     <div class="kpi"><div class="v">${refs.filter(r=>r.activo).length}</div><div class="l">Referencias activas</div></div>
   </div>
   <div class="card"><b>🏆 Más vendidos del mes</b>
@@ -708,6 +712,60 @@ vInventario: safe(async function(){
       <td class="num">${money(cp)}</td><td class="num">${money(r.ultimo_costo)}</td><td class="num">${money(pv)}</td>
       <td class="num">${mg}%</td><td>${esc(r.ubicacion||'')}</td>
       <td><button class="btn sm sec" onclick="App.ajusteForm(${r.id})">± Ajustar</button></td></tr>`; }).join('')}</tbody></table></div>`;
+  } else if(sub==='resumen'){
+    /* Resumen mes a mes: lo que entró arriba, lo que salió abajo y lo que queda.
+       Sale de ff_movimientos, que es donde de verdad se mueve el inventario.
+       El tipo manda, no el signo: las ventas se guardan con cantidad positiva. */
+    const movs=await api('ff_movimientos?order=creado_en.asc&limit=3000');
+    const nom=id=>{ const r=refs.find(x=>x.id===id); return r?r.codigo+' · '+r.nombre:'#'+id; };
+    const MS=['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const mk=s=>String(s||'').slice(0,7);
+    const meses=[...new Set(movs.map(m=>mk(m.creado_en)))].filter(Boolean).sort();
+    const ent={}, sal={}, ids=new Set();
+    movs.forEach(m=>{ const k=mk(m.creado_en), q=+m.cantidad||0; if(!k) return; ids.add(m.ref_id);
+      const sale = m.tipo==='venta' || m.tipo==='traslado' || q<0;
+      const D = sale?sal:ent; (D[m.ref_id]=D[m.ref_id]||{});
+      D[m.ref_id][k]=(D[m.ref_id][k]||0)+Math.abs(q); });
+    const suma=(D,id)=>Object.values(D[id]||{}).reduce((a,b)=>a+b,0);
+    const orden=[...ids].sort((a,b)=>(suma(ent,b)+suma(sal,b))-(suma(ent,a)+suma(sal,a)));
+    const cols=meses.map(k=>`<th class="num">${MS[+k.slice(5)]}<span class="mini"> ${k.slice(2,4)}</span></th>`).join('');
+    const fila=(id,D,clase)=>{ const r=D[id]||{}; const t=suma(D,id); if(!t) return '';
+      return `<tr class="${clase}"><td>${esc(nom(id))}</td>${meses.map(k=>
+        `<td class="num">${r[k]?r[k]:'<span class="z">·</span>'}</td>`).join('')}<td class="num tt">${t}</td></tr>`; };
+    const totMes=D=>meses.map(k=>`<td class="num">${[...ids].reduce((a,id)=>a+((D[id]||{})[k]||0),0)||'<span class="z">·</span>'}</td>`).join('');
+    const gran=D=>[...ids].reduce((a,id)=>a+suma(D,id),0);
+    const filasSaldo=orden.map(id=>{ const e=suma(ent,id), s=suma(sal,id), q=e-s;
+      const ref=refs.find(x=>x.id===id)||{}; const exi=+ref.existencias||0;
+      const desc = q!==exi;
+      return `<tr><td>${esc(nom(id))}</td><td class="num">${e}</td><td class="num">${s}</td>
+        <td class="num tt">${q}</td><td class="num">${exi}</td>
+        <td class="num">${desc?`<span style="color:var(--rojo)">${q-exi>0?'+':''}${q-exi}</span>`:'<span class="z">ok</span>'}</td></tr>`;}).join('');
+    const nDesc=orden.filter(id=>(suma(ent,id)-suma(sal,id))!==(+(refs.find(x=>x.id===id)||{}).existencias||0)).length;
+    cuerpo=`<style>
+        .rsm td,.rsm th{padding:5px 8px;font-size:12px}
+        .rsm .z{color:#c3cad6} .rsm .tt{font-weight:800;background:#f6f8fb}
+        .rsm .sec td{background:#0b1f2a;color:#fff;font-weight:700;font-size:11.5px;letter-spacing:.06em}
+        .rsm .tot td{border-top:2px solid #16202b;font-weight:800;background:#f8fafc}
+      </style>
+      <div class="card" style="padding:0;overflow-x:auto"><table class="rsm">
+      <thead><tr><th>Referencia</th>${cols}<th class="num">Total</th></tr></thead><tbody>
+        <tr class="sec"><td colspan="${meses.length+2}">▼ ENTRADAS (compras y devoluciones)</td></tr>
+        ${orden.map(id=>fila(id,ent,'')).join('')||`<tr><td colspan="${meses.length+2}" class="empty">Sin entradas</td></tr>`}
+        <tr class="tot"><td>Total entradas</td>${totMes(ent)}<td class="num">${gran(ent)}</td></tr>
+        <tr class="sec"><td colspan="${meses.length+2}">▲ SALIDAS (ventas y traslados)</td></tr>
+        ${orden.map(id=>fila(id,sal,'')).join('')||`<tr><td colspan="${meses.length+2}" class="empty">Sin salidas</td></tr>`}
+        <tr class="tot"><td>Total salidas</td>${totMes(sal)}<td class="num">${gran(sal)}</td></tr>
+      </tbody></table></div>
+      <div class="card" style="padding:0;overflow-x:auto;margin-top:12px"><table class="rsm">
+        <thead><tr><th>Referencia</th><th class="num">Entró</th><th class="num">Salió</th>
+          <th class="num">Queda</th><th class="num">En catálogo</th><th class="num">Diferencia</th></tr></thead>
+        <tbody>${filasSaldo}</tbody>
+        <tfoot><tr class="tot"><td>TOTAL</td><td class="num">${gran(ent)}</td><td class="num">${gran(sal)}</td>
+          <td class="num">${gran(ent)-gran(sal)}</td><td class="num"></td><td class="num"></td></tr></tfoot>
+      </table></div>
+      ${nDesc?`<div class="card" style="border-left:4px solid var(--rojo)"><b style="color:var(--rojo)">⚠️ ${nDesc} referencia(s) descuadrada(s)</b>
+        <div class="mini">Lo que dicen los movimientos no coincide con las existencias del catálogo. Una de las dos está mal: o falta cargar un movimiento, o alguien editó las existencias a mano.</div></div>`
+        :'<div class="mini" style="margin-top:8px">✅ Los movimientos cuadran con las existencias del catálogo.</div>'}`;
   } else {
     const movs=await api('ff_movimientos?order=creado_en.desc&limit=300');
     const nom=id=>{ const r=refs.find(x=>x.id===id); return r?r.codigo+' '+r.nombre:'#'+id; };
@@ -721,6 +779,7 @@ vInventario: safe(async function(){
   this.set(`<h1>📊 Inventario</h1><div class="sub2">Existencias, costos y movimientos</div>
   <div class="tabs2">
     <button class="${sub==='exist'?'on':''}" onclick="App._invTab='exist';App.vInventario()">Existencias</button>
+    <button class="${sub==='resumen'?'on':''}" onclick="App._invTab='resumen';App.vInventario()">Resumen mes a mes</button>
     <button class="${sub==='mov'?'on':''}" onclick="App._invTab='mov';App.vInventario()">Movimientos</button>
   </div>${cuerpo}`);
 },'el inventario'),
