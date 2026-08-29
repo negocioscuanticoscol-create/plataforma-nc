@@ -734,12 +734,23 @@ vInventario: safe(async function(){
         `<td class="num">${r[k]?r[k]:'<span class="z">·</span>'}</td>`).join('')}<td class="num tt">${t}</td></tr>`; };
     const totMes=D=>meses.map(k=>`<td class="num">${[...ids].reduce((a,id)=>a+((D[id]||{})[k]||0),0)||'<span class="z">·</span>'}</td>`).join('');
     const gran=D=>[...ids].reduce((a,id)=>a+suma(D,id),0);
-    const filasSaldo=orden.map(id=>{ const e=suma(ent,id), s=suma(sal,id), q=e-s;
-      const ref=refs.find(x=>x.id===id)||{}; const exi=+ref.existencias||0;
-      const desc = q!==exi;
-      return `<tr><td>${esc(nom(id))}</td><td class="num">${e}</td><td class="num">${s}</td>
-        <td class="num tt">${q}</td><td class="num">${exi}</td>
-        <td class="num">${desc?`<span style="color:var(--rojo)">${q-exi>0?'+':''}${q-exi}</span>`:'<span class="z">ok</span>'}</td></tr>`;}).join('');
+    /* Lo que queda, valorado a precio de venta y ordenado de mayor a menor:
+       arriba sale dónde está la plata quieta, que es donde hay que salir a vender. */
+    const conVal=orden.map(id=>{ const e=suma(ent,id), s=suma(sal,id), q=e-s;
+      const ref=refs.find(x=>x.id===id)||{}; const pv=+ref.precio_venta||0;
+      return {id,e,s,q,pv,val:q*pv,exi:+ref.existencias||0}; });
+    const totVal=conVal.reduce((a,x)=>a+(x.q>0?x.val:0),0);
+    const filasSaldo=conVal.slice().sort((a,b)=>b.val-a.val).map(x=>{
+      const desc = x.q!==x.exi;
+      const pct = totVal&&x.q>0 ? x.val/totVal*100 : 0;
+      return `<tr><td>${esc(nom(x.id))}</td><td class="num">${x.e}</td><td class="num">${x.s}</td>
+        <td class="num tt">${x.q}</td>
+        <td class="num">${x.pv?money(x.pv):'<span style="color:var(--rojo)">sin precio</span>'}</td>
+        <td class="num tt">${x.q>0&&x.pv?money(x.val):'<span class="z">·</span>'}</td>
+        <td class="num">${pct>=1?pct.toFixed(0)+'%':'<span class="z">·</span>'}</td>
+        <td class="num">${x.exi}</td>
+        <td class="num">${desc?`<span style="color:var(--rojo)">${x.q-x.exi>0?'+':''}${x.q-x.exi}</span>`:'<span class="z">ok</span>'}</td></tr>`;}).join('');
+    const sinPrecio=conVal.filter(x=>x.q>0&&!x.pv);
     const nDesc=orden.filter(id=>(suma(ent,id)-suma(sal,id))!==(+(refs.find(x=>x.id===id)||{}).existencias||0)).length;
     cuerpo=`<style>
         .rsm td,.rsm th{padding:5px 8px;font-size:12px}
@@ -756,13 +767,20 @@ vInventario: safe(async function(){
         ${orden.map(id=>fila(id,sal,'')).join('')||`<tr><td colspan="${meses.length+2}" class="empty">Sin salidas</td></tr>`}
         <tr class="tot"><td>Total salidas</td>${totMes(sal)}<td class="num">${gran(sal)}</td></tr>
       </tbody></table></div>
-      <div class="card" style="padding:0;overflow-x:auto;margin-top:12px"><table class="rsm">
+      <div class="card" style="padding:9px 13px;margin-top:12px;border-left:4px solid var(--ok)">
+        <b>💰 Lo que queda en bodega vale ${money(totVal)} a precio de venta.</b>
+        <div class="mini">Ordenado de mayor a menor: arriba está la plata quieta, y ahí es donde hay que salir a vender.</div></div>
+      <div class="card" style="padding:0;overflow-x:auto"><table class="rsm">
         <thead><tr><th>Referencia</th><th class="num">Entró</th><th class="num">Salió</th>
-          <th class="num">Queda</th><th class="num">En catálogo</th><th class="num">Diferencia</th></tr></thead>
+          <th class="num">Queda</th><th class="num">P. venta c/u</th><th class="num">Valor a venta</th>
+          <th class="num">% del total</th><th class="num">En catálogo</th><th class="num">Diferencia</th></tr></thead>
         <tbody>${filasSaldo}</tbody>
         <tfoot><tr class="tot"><td>TOTAL</td><td class="num">${gran(ent)}</td><td class="num">${gran(sal)}</td>
-          <td class="num">${gran(ent)-gran(sal)}</td><td class="num"></td><td class="num"></td></tr></tfoot>
+          <td class="num">${gran(ent)-gran(sal)}</td><td></td><td class="num">${money(totVal)}</td>
+          <td class="num">100%</td><td class="num"></td><td class="num"></td></tr></tfoot>
       </table></div>
+      ${sinPrecio.length?`<div class="card" style="border-left:4px solid var(--rojo)"><b style="color:var(--rojo)">⚠️ ${sinPrecio.length} referencia(s) con stock pero sin precio de venta</b>
+        <div class="mini">No suman al valor de arriba, así que la bodega vale más de lo que dice: ${sinPrecio.map(x=>esc(nom(x.id))+' ('+x.q+' u)').join(' · ')}</div></div>`:''}
       ${nDesc?`<div class="card" style="border-left:4px solid var(--rojo)"><b style="color:var(--rojo)">⚠️ ${nDesc} referencia(s) descuadrada(s)</b>
         <div class="mini">Lo que dicen los movimientos no coincide con las existencias del catálogo. Una de las dos está mal: o falta cargar un movimiento, o alguien editó las existencias a mano.</div></div>`
         :'<div class="mini" style="margin-top:8px">✅ Los movimientos cuadran con las existencias del catálogo.</div>'}`;
