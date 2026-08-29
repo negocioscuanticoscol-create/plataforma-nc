@@ -1591,6 +1591,7 @@ const App = {
     all.forEach(x=>{ const k=x.cliente||'s/cliente'; (byCli[k]=byCli[k]||[]).push(x); });   // agrupa TODOS (así aparece Mateo aunque esté cancelado)
     const clientes=Object.entries(byCli).sort((a,b)=>b[1].reduce((s,x)=>s+(esCancel(x)?0:(+x.total_vendido||0)),0)-a[1].reduce((s,x)=>s+(esCancel(x)?0:(+x.total_vendido||0)),0));
     this.set(`<button class="btn-sm" onclick="App.vVentasSmart()" style="margin-bottom:10px;background:var(--gris)">← Volver a Ventas</button>
+      <button class="btn-sm" onclick="App.cuentaCobro('${mes}')" style="margin-bottom:10px;background:#16a34a;color:#fff;font-weight:700">🧾 Liquidar y generar cuenta de cobro</button>
       <h1>Ventas · ${esc(mes)}</h1><div class="sub">Detalle por cliente (auditoría) · ${v.length} ventas${nCanc?` · ${nCanc} canceladas (no suman)`:''}</div>
       <div class="kpis"><div class="kpi naranja"><b>${cl(totV)}</b><span>Ventas del mes (s/IVA)</span></div><div class="kpi verde"><b>${cl(totC)}</b><span>Comisión del mes</span></div><div class="kpi"><b style="color:#2563eb">${nFact}</b><span>🧾 Pedidos (facturas)</span></div><div class="kpi"><b style="color:#b45309">${nKits}</b><span>🧪 Kits totales</span></div></div>
       ${clientes.map(([cliente,arr])=>{ const sv=arr.reduce((s,x)=>s+(esCancel(x)?0:(+x.total_vendido||0)),0), sc=arr.reduce((s,x)=>s+(esCancel(x)?0:(+x.comision_bruta||0)),0);
@@ -1602,6 +1603,129 @@ const App = {
             ${x.notas?`<div style="color:#8a93a6;font-size:11px;margin-top:2px">${esc(String(x.notas).slice(0,160))}</div>`:''}
           </div>`;}).join('')}
         </div>`;}).join('')||'<div class="empty">Sin ventas este mes.</div>'}`);
+  },
+  /* ---------- Cuenta de cobro de comisiones ----------
+     Liquida el mes y saca la proforma lista para radicar. Sale de la MISMA
+     nc_ventas del tablero: por cada venta, a qué lista se hizo, cuánto costó
+     a convenio (compra), en cuánto se vendió y cuánta comisión dejó.
+     Las canceladas no entran: no generan comisión.
+     Los datos de las partes no cambian de un mes a otro → viven en COBRO. */
+  _cobroDatos(){
+    return {
+      ciudad:'Bogotá D.C.',
+      cobra:'JOSÉ CALDERÓN', cobraMarca:'Negocios Cuánticos',
+      cobraDoc:'', cobraMail:'negocioscuanticoscol@gmail.com',
+      cliente:'MARTÍN GUEVARA', clienteDoc:'',
+      pagoBanco:'Nequi', pagoNum:'350 224 1852', pagoTit:'José Calderón'
+    };
+  },
+  /* Número a letras en español, para el renglón de la suma. */
+  _enLetras(n){
+    n=Math.round(Math.abs(+n||0)); if(!n) return 'CERO';
+    const U=['','UNO','DOS','TRES','CUATRO','CINCO','SEIS','SIETE','OCHO','NUEVE','DIEZ',
+             'ONCE','DOCE','TRECE','CATORCE','QUINCE','DIECISÉIS','DIECISIETE','DIECIOCHO','DIECINUEVE','VEINTE'];
+    const D=['','','','TREINTA','CUARENTA','CINCUENTA','SESENTA','SETENTA','OCHENTA','NOVENTA'];
+    const C=['','CIENTO','DOSCIENTOS','TRESCIENTOS','CUATROCIENTOS','QUINIENTOS','SEISCIENTOS','SETECIENTOS','OCHOCIENTOS','NOVECIENTOS'];
+    const dos=x=>{ if(x<=20) return U[x]; if(x<30) return 'VEINTI'+U[x-20];
+      const d=Math.floor(x/10), u=x%10; return D[d]+(u?' Y '+U[u]:''); };
+    const tres=x=>{ if(x===100) return 'CIEN'; const c=Math.floor(x/100), r=x%100;
+      return (c?C[c]:'')+(c&&r?' ':'')+(r?dos(r):''); };
+    const mil=x=>{ if(x<1000) return tres(x); const m=Math.floor(x/1000), r=x%1000;
+      return (m===1?'MIL':tres(m).replace(/UNO$/,'UN')+' MIL')+(r?' '+tres(r):''); };
+    if(n<1000000) return mil(n);
+    const M=Math.floor(n/1000000), r=n%1000000;
+    return (M===1?'UN MILLÓN':mil(M).replace(/UNO$/,'UN')+' MILLONES')+(r?' '+mil(r):'');
+  },
+  cuentaCobro(mes,consec){
+    const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
+    const esCancel=x=>/cancel|anula/i.test(x.estado_pago||'');
+    const D=this._cobroDatos();
+    const v=(this._ventas||[]).filter(x=>x.mes===mes && !esCancel(x))
+      .sort((a,b)=>String(a.cliente||'').localeCompare(String(b.cliente||''),'es'));
+    const totCom=v.reduce((a,x)=>a+(+x.total_convenio||0),0);   // costó a convenio
+    const totVen=v.reduce((a,x)=>a+(+x.total_vendido||0),0);    // se vendió
+    const totCms=v.reduce((a,x)=>a+(+x.comision_bruta||0),0);   // la comisión
+    const pctProm=totVen?(totCms/totVen*100):0;
+    const nCli=new Set(v.map(x=>String(x.cliente||'').trim().toLowerCase())).size;
+    const sinConv=v.filter(x=>!(+x.total_convenio)).length;
+    // Periodo y consecutivo salen del mes ('ago-2026' → 202608-SM-01)
+    const MO={ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12};
+    const NOM=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const p=String(mes||'').split('-'), mNum=MO[(p[0]||'').toLowerCase()]||0, anio=+(p[1]||0);
+    const ultDia=mNum?new Date(anio,mNum,0).getDate():30;
+    const per=mNum?`1 al ${ultDia} de ${NOM[mNum]} de ${anio}`:esc(mes);
+    const nn=String(consec||this._cobroConsec||1).padStart(2,'0');
+    const numero=mNum?`${anio}${String(mNum).padStart(2,'0')}-SM-${nn}`:'—';
+    const falta=t=>t?esc(t):'<span style="background:#fff3cd;padding:0 22px;border-radius:3px">&nbsp;</span>';
+    this.set(`<style>
+        #cta{max-width:880px}
+        #cta table{border-collapse:collapse;width:100%;font-size:11.5px;margin-top:8px}
+        #cta th{background:#eef2f7;text-align:left;padding:6px 7px;border-bottom:2px solid #c9d2de;white-space:nowrap}
+        #cta td{padding:5px 7px;border-bottom:1px solid #edf1f6}
+        #cta .n{text-align:right;white-space:nowrap}
+        #cta .c{color:#12704a;font-weight:700}
+        #cta tfoot td{border-top:2px solid #16202b;font-weight:800;background:#f8fafc}
+        #cta .et{font-size:11px;letter-spacing:.12em;color:#5b6675;text-transform:uppercase;margin-bottom:2px}
+        #cta .val{font-size:15px;font-weight:700}
+        #cta .suma{border:2px solid #16202b;border-radius:8px;padding:12px 16px;margin:18px 0;background:#f8fafc}
+        #cta .kit{font-size:9.5px;color:#a2560a;background:#fdf0e0;padding:1px 4px;border-radius:3px}
+        #cta .pago{border-left:4px solid #12704a;background:#f2fbf6;padding:11px 15px;border-radius:0 7px 7px 0;margin:18px 0}
+        #cta .firma{margin-top:48px;border-top:1px solid #16202b;width:290px;padding-top:6px;font-size:13px}
+        @media print{ .noprint{display:none!important} #cta{max-width:none} }
+      </style>
+      <div class="noprint" style="margin-bottom:12px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <button class="btn-sm" onclick="App.ventasMes('${mes}')" style="background:var(--gris)">← Volver al detalle</button>
+        <button class="btn-sm" onclick="window.print()" style="background:#0b1f2a;color:#fff;font-weight:700">🖨️ Imprimir / PDF</button>
+        <span style="font-size:12px;color:#667">N° consecutivo:</span>
+        <input type="number" min="1" value="${+nn}" style="width:62px;padding:5px;border:1px solid var(--linea);border-radius:6px"
+          onchange="App._cobroConsec=this.value;App.cuentaCobro('${mes}',this.value)">
+      </div>
+      <div id="cta">
+        <div class="et">Cuenta de cobro N° ${numero}</div>
+        <h1 style="margin:2px 0 4px">CUENTA DE COBRO</h1>
+        <div class="sub" style="margin-bottom:20px">${D.ciudad}, ${ultDia} de ${NOM[mNum]||''} de ${anio}</div>
+
+        <div style="margin:14px 0"><div class="et">Señor(es)</div>
+          <div class="val">${esc(D.cliente)}</div>
+          <div style="font-size:13px;color:#43506a">C.C./NIT ${falta(D.clienteDoc)}</div></div>
+
+        <div style="margin:14px 0"><div class="et">Debe a</div>
+          <div class="val">${esc(D.cobra)} · ${esc(D.cobraMarca)}</div>
+          <div style="font-size:13px;color:#43506a">C.C. ${falta(D.cobraDoc)} · ${esc(D.cobraMail)}</div></div>
+
+        <div class="suma"><div class="et">La suma de</div>
+          <div style="font-size:26px;font-weight:800">${cl(totCms)}</div>
+          <div style="font-size:12.5px;color:#43506a;margin-top:2px">${this._enLetras(totCms)} PESOS M/CTE.</div></div>
+
+        <div style="margin:14px 0"><div class="et">Por concepto de</div>
+          <div style="font-size:14px">Comisiones sobre ventas del <b>${per}</b> — Smart Envases.<br>
+          <span style="font-size:12.5px;color:#43506a">${v.length} ventas a ${nCli} clientes por ${cl(totVen)}. La comisión es la diferencia entre el precio de convenio y el precio efectivamente cobrado, antes de IVA.</span></div></div>
+
+        <div class="et" style="margin-top:20px">Relación de ventas del periodo</div>
+        <table>
+          <thead><tr><th>Cliente</th><th>Documento</th><th>Folio</th><th>Lista</th>
+            <th class="n">Precio compra</th><th class="n">Precio venta</th><th class="n">Comisión</th><th class="n">%</th></tr></thead>
+          <tbody>${v.map(x=>{ const tv=+x.total_vendido||0, tc=+x.total_convenio||0, cm=+x.comision_bruta||0;
+            return `<tr>
+              <td>${esc(x.cliente||'s/cliente')}${x.es_kit?' <span class="kit">kit</span>':''}</td>
+              <td>${esc(x.documento||'—')}</td><td>${esc(x.folio||'—')}</td><td>${esc(x.lista||'—')}</td>
+              <td class="n">${tc?cl(tc):'<span style="color:#c00">—</span>'}</td>
+              <td class="n">${cl(tv)}</td><td class="n c">${cl(cm)}</td>
+              <td class="n">${(+x.pct_comision||0).toFixed(1)}%</td></tr>`;}).join('')
+            ||'<tr><td colspan="8" style="padding:14px;text-align:center;color:#8a93a6">Sin ventas en este periodo.</td></tr>'}</tbody>
+          <tfoot><tr><td colspan="4">TOTALES · ${v.length} ventas</td>
+            <td class="n">${cl(totCom)}</td><td class="n">${cl(totVen)}</td>
+            <td class="n c">${cl(totCms)}</td><td class="n">${pctProm.toFixed(1)}%</td></tr></tfoot>
+        </table>
+        <div style="font-size:11px;color:#8792a4;margin-top:6px">Las ventas canceladas o anuladas no se relacionan: no generan comisión. Los kits van marcados.</div>
+        ${sinConv?`<div style="margin-top:8px;font-size:11.5px;color:#b45309">⚠️ ${sinConv} venta(s) sin precio de compra cargado — sale en rojo y no suma al total de compra. La comisión sí está completa.</div>`:''}
+
+        <div class="pago"><div class="et">Forma de pago</div>
+          <div style="font-size:15px;font-weight:700">${esc(D.pagoBanco)} · ${esc(D.pagoNum)}</div>
+          <div style="font-size:12.5px;color:#43506a">A nombre de ${esc(D.pagoTit)}</div></div>
+
+        <div class="firma">${esc(D.cobra)}<br><span style="font-size:12px;color:#5b6675">C.C. ${falta(D.cobraDoc)}</span></div>
+      </div>`);
   },
   async vDatos(tabla){
     this.loading();
