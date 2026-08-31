@@ -247,7 +247,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
 </header>
 
 <main id="main" style="display:none"></main>
-<div class="rank" id="rank" style="display:none"><h3>🏆 Tablero <span id="rkInfo">—</span></h3><div id="rkBody"></div><div class="foot" id="rkTot">—</div></div>
+<div class="rank" id="rank" style="display:none"><h3>🏆 Tablero <span id="rkInfo">—</span></h3><div id="rkBody"></div><div class="foot" id="rkTot">—</div><div id="semanas"></div></div>
 <!-- Entre el tablero y la tabla de pagos: en la llamada no hay tiempo de escribir
      los datos del interesado, asi que aqui quedan todos a la mano para mandarles
      la informacion despues. Se van de la lista al marcar la casilla. -->
@@ -1047,9 +1047,9 @@ async function sincronizar(){
   const todos=Object.values(real).sort((a,b)=>b.plata-a.plata||b.llamadas-a.llamadas);
   $('rkBody').innerHTML=todos.map((a,i)=>{
     const soyYo=(a.id&&YO.id&&a.id===YO.id)||a.agente===YO.nombre;
-    return `<div class="rw ${soyYo?'yo':''}">
+    return `<div class="rw ${soyYo?'yo':''}" style="cursor:pointer" onclick="verSemanas('${a.id||''}','${esc(a.agente).replace(/'/g,'')}')" title="Toca para ver semana por semana">
       <div class="pos">${i+1}</div>
-      <div class="nm">${esc(a.agente)}<small>${soyYo?'tú':(a.llamadas?'marcando':'todavía no marca')}</small></div>
+      <div class="nm">${esc(a.agente)}<small>${soyYo?'tú':(a.llamadas?'marcando':'todavía no marca')} · toca para ver tus semanas</small></div>
       <div class="ll">${num(a.llamadas)} ll.</div>
       <div class="pl mono">${cop(a.plata)}</div>
     </div>`;}).join('')||'<div class="vacio" style="padding:22px">Nadie ha marcado hoy.</div>';
@@ -1057,6 +1057,68 @@ async function sincronizar(){
   $('rkInfo').textContent=todos.length+' en la red · '+activas+(activas===1?' marcando':' marcando');
   $('rkTot').innerHTML='Solo cuenta lo validado · total del día <b style="color:var(--dim)">'+
     cop(todos.reduce((s,a)=>s+a.plata,0))+'</b>';
+}
+
+/* ==================== SEMANA POR SEMANA ====================
+   El tablero se reinicia cada dia, asi que la persona no tenia forma de ver
+   cuanto lleva hecho ni que ya le pagaron. Tocando el nombre se abre esto:
+   una fila por semana con lo producido, lo pagado y lo que queda debiendo.
+   La semana se calcula ISO (lunes a domingo), la misma que usa mkr_pagos. */
+function semanaISO(f){
+  const t=new Date(Date.UTC(f.getFullYear(),f.getMonth(),f.getDate()));
+  const dia=t.getUTCDay()||7;                       // domingo=7, no 0
+  t.setUTCDate(t.getUTCDate()+4-dia);               // al jueves de esa semana
+  const ene1=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  const n=Math.ceil(((t-ene1)/86400000+1)/7);
+  return t.getUTCFullYear()+'-W'+String(n).padStart(2,'0');
+}
+let semAbierta=null;
+async function verSemanas(id,nombre){
+  const cont=$('semanas'); if(!cont) return;
+  if(semAbierta===(id||nombre)){ cont.innerHTML=''; semAbierta=null; return; }   // segundo toque, cierra
+  semAbierta=id||nombre;
+  cont.innerHTML='<div style="padding:14px;text-align:center;color:var(--dim)">cargando…</div>';
+  const filtro = id ? 'agente_id=eq.'+encodeURIComponent(id)
+                    : 'agente=eq.'+encodeURIComponent(nombre);
+  const [ll,pg]=await Promise.all([
+    GETALL('mkr_llamadas?select=valor,validado,creado_en&'+filtro+'&order=creado_en.desc&limit=20000'),
+    id ? GETALL('mkr_pagos?select=semana,valor,fecha_pago,medio&agente_id=eq.'+encodeURIComponent(id)) : []
+  ]);
+  if(!Array.isArray(ll)){ cont.innerHTML='<div class="foot">No se pudo leer el historial.</div>'; return; }
+  const pagado={}; (Array.isArray(pg)?pg:[]).forEach(p=>{ pagado[p.semana]=(pagado[p.semana]||0)+(+p.valor||0); });
+  const sem={};
+  ll.forEach(f=>{
+    const k=semanaISO(new Date(f.creado_en));
+    const s=sem[k]=sem[k]||{ll:0,plata:0};
+    s.ll++; if(f.validado) s.plata+=(+f.valor||0);
+  });
+  Object.keys(pagado).forEach(k=>{ if(!sem[k]) sem[k]={ll:0,plata:0}; });   // semanas pagadas sin marcaciones
+  const claves=Object.keys(sem).sort().reverse();
+  if(!claves.length){ cont.innerHTML='<div class="foot">'+esc(nombre)+' todavía no tiene semanas registradas.</div>'; return; }
+  const actual=semanaISO(new Date());
+  let tp=0,tg=0;
+  const filas=claves.map(k=>{
+    const s=sem[k], pa=pagado[k]||0, debe=s.plata-pa;
+    tp+=s.plata; tg+=pa;
+    const nSem=+k.slice(6), esta=k===actual;
+    return `<div style="display:grid;grid-template-columns:86px 1fr auto auto;gap:8px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.07)${esta?';background:rgba(255,255,255,.05)':''}">
+      <div style="font-weight:800">Semana ${nSem}${esta?' <small style="opacity:.7">· esta</small>':''}<br><small style="opacity:.55">${k.slice(0,4)}</small></div>
+      <div style="font-size:12px;opacity:.7">${num(s.ll)} llamada${s.ll===1?'':'s'}</div>
+      <div class="mono" style="font-weight:800;text-align:right">${cop(s.plata)}</div>
+      <div class="mono" style="text-align:right;font-size:12px;min-width:96px">${
+        pa>=s.plata && s.plata>0 ? '<span style="color:#22c55e">✔ pagada</span>'
+        : pa>0 ? '<span style="color:#f59e0b">abonado '+cop(pa)+'<br><small>falta '+cop(debe)+'</small></span>'
+        : (s.plata>0?'<span style="opacity:.6">por pagar</span>':'<span style="opacity:.35">—</span>')}</div>
+    </div>`;}).join('');
+  cont.innerHTML=`<div style="margin-top:12px;border-top:2px solid rgba(255,255,255,.14);padding-top:10px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+      <b>📅 ${esc(nombre)} · semana por semana</b>
+      <span style="font-size:12px;opacity:.6;cursor:pointer" onclick="verSemanas('${id||''}','${esc(nombre).replace(/'/g,'')}')">cerrar ✕</span>
+    </div>
+    ${filas}
+    <div class="foot" style="margin-top:8px">Producido <b class="mono">${cop(tp)}</b> · pagado <b class="mono" style="color:#22c55e">${cop(tg)}</b>${
+      tp-tg>0?' · <b class="mono" style="color:#f59e0b">le deben '+cop(tp-tg)+'</b>':''}</div>
+  </div>`;
 }
 
 /* ==================== ARRANQUE ==================== */
