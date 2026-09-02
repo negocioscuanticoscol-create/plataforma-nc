@@ -80,6 +80,17 @@
     '.gs-deb{color:#b45309}.gs-pag{color:#15803d}' +
     '.gs-cat{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;color:#4b5563}' +
     '.gs-vacio{padding:24px;text-align:center;color:#6b7280}' +
+    '.gs-mes{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 11px;' +
+    'border:1px solid #e6eaef;border-radius:9px;margin-bottom:6px;cursor:pointer;background:#fff}' +
+    '.gs-mes:hover{border-color:#c9d2db;background:#fafbfc}' +
+    '.gs-mes.on{border-color:#8a3d3d;background:#fdf2f2}' +
+    '.gs-mes span{display:flex;flex-direction:column;font-weight:600;text-transform:capitalize}' +
+    '.gs-mes small{font-weight:400;color:#6b7280;text-transform:none}' +
+    '.gs-mes b{font-variant-numeric:tabular-nums;white-space:nowrap}' +
+    '.gs-ver{width:100%;margin-top:18px;padding:12px;border:1px solid #d7dce2;border-radius:10px;' +
+    'background:#f6f8fa;color:#374151;font:600 14px/1 inherit;cursor:pointer;text-align:left}' +
+    '.gs-ver:hover{background:#eef1f5}' +
+    '.gs-det{margin-top:12px;padding-top:4px}' +
     '#gs-tab{}';
 
   /* Igual que en Plata: si el #nav está en columna, los botones extra van en su
@@ -150,6 +161,27 @@
     var p = m.split('-'); return M[+p[1] - 1] + ' ' + p[0];
   }
 
+  /* La lista arranca cerrada. El panel se abre para REGISTRAR, que es lo que se
+     hace diez veces al dia; consultar lo viejo es de vez en cuando. Antes salia
+     todo el mes de una y el registro nuevo quedaba enterrado. */
+  var verLista = false;
+
+  /* Cuanto se gasto en cada mes, del mas nuevo al mas viejo. Sin esto un mes
+     con gastos cargados quedaba invisible: el panel abria en el mes actual y
+     nada decia que atras habia algo. */
+  function porMes() {
+    var m = {};
+    filas.forEach(function (f) {
+      var k = String(f.fecha || '').slice(0, 7);
+      if (!k) return;
+      if (!m[k]) m[k] = { n: 0, t: 0 };
+      m[k].n++; m[k].t += (+f.monto || 0);
+    });
+    return Object.keys(m).sort().reverse().map(function (k) {
+      return { mes: k, n: m[k].n, t: m[k].t };
+    });
+  }
+
   function pinta() {
     var b = $('gs-body'); if (!b) return;
     var delMes = filas.filter(function (f) { return String(f.fecha || '').slice(0, 7) === mes; });
@@ -165,28 +197,62 @@
     });
     var cats = Object.keys(porCat).sort(function (a, c) { return porCat[c] - porCat[a]; });
 
+    var meses_ = porMes();
+    var totTodo = filas.reduce(function (s2, f) { return s2 + (+f.monto || 0); }, 0);
+
     b.innerHTML =
       '<div class="gs-tot"><small>' + esc(nombreMes(mes).toUpperCase()) + '</small>' +
         '<b>' + pl(total) + '</b>' +
         '<small>' + (debe ? 'Sin pagar ' + pl(debe) + ' · ' : '') +
         (iva ? 'IVA ' + pl(iva) : 'sin IVA registrado') + '</small></div>' +
 
-      '<select id="gs-mes" style="width:100%;padding:9px 10px;border:1px solid #d7dce2;border-radius:9px;font:inherit;margin-bottom:12px">' +
-        meses().map(function (m) {
-          return '<option value="' + m + '"' + (m === mes ? ' selected' : '') + '>' + esc(nombreMes(m)) + '</option>';
-        }).join('') + '</select>' +
-
+      '<div style="margin:2px 0 4px;font-size:11px;letter-spacing:.05em;color:#6b7280">REGISTRAR UN GASTO NUEVO</div>' +
       formulario() +
 
-      (cats.length ? '<div style="margin:16px 0 6px;font-size:11px;letter-spacing:.05em;color:#6b7280">EN QUÉ SE FUE</div>' +
-        cats.map(function (c) {
-          return '<div class="gs-cat"><span>' + esc(c) + '</span><b>' + pl(porCat[c]) + '</b></div>';
-        }).join('') : '') +
+      /* Resumen de todos los meses, debajo del registro nuevo. Se toca uno y se
+         abre ese mes. */
+      (meses_.length
+        ? '<div style="margin:20px 0 6px;font-size:11px;letter-spacing:.05em;color:#6b7280">LO GASTADO CADA MES</div>' +
+          meses_.map(function (x) {
+            return '<div class="gs-mes' + (x.mes === mes ? ' on' : '') + '" data-mes="' + x.mes + '">' +
+              '<span>' + esc(nombreMes(x.mes)) +
+              '<small>' + x.n + (x.n === 1 ? ' gasto' : ' gastos') + '</small></span>' +
+              '<b>' + pl(x.t) + '</b></div>';
+          }).join('') +
+          '<div class="gs-cat" style="border-top:1px solid #eef1f4;margin-top:6px;padding-top:8px;font-weight:600">' +
+            '<span>Todo lo registrado</span><b>' + pl(totTodo) + '</b></div>'
+        : '') +
 
-      '<div style="margin:16px 0 2px;font-size:11px;letter-spacing:.05em;color:#6b7280">GASTOS DEL MES</div>' +
-      (delMes.length ? delMes.map(fila).join('')
-        : '<div class="gs-vacio">Este mes no tiene gastos cargados.</div>');
+      /* Botón para ver el detalle. Cerrado por defecto. */
+      '<button id="gs-ver" class="gs-ver">' + (verLista ? '▾' : '▸') + ' Gastos generados</button>' +
 
+      (!verLista ? '' :
+        '<div class="gs-det">' +
+        '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#6b7280;margin-bottom:4px">Mes que quieres ver</label>' +
+        '<select id="gs-mes" style="width:100%;padding:9px 10px;border:1px solid #d7dce2;border-radius:9px;font:inherit;margin-bottom:12px">' +
+          meses().map(function (m) {
+            return '<option value="' + m + '"' + (m === mes ? ' selected' : '') + '>' + esc(nombreMes(m)) + '</option>';
+          }).join('') + '</select>' +
+
+        (cats.length ? '<div style="margin:8px 0 6px;font-size:11px;letter-spacing:.05em;color:#6b7280">EN QUÉ SE FUE</div>' +
+          cats.map(function (c) {
+            return '<div class="gs-cat"><span>' + esc(c) + '</span><b>' + pl(porCat[c]) + '</b></div>';
+          }).join('') : '') +
+
+        '<div style="margin:16px 0 2px;font-size:11px;letter-spacing:.05em;color:#6b7280">GASTOS DE ' +
+          esc(nombreMes(mes).toUpperCase()) + '</div>' +
+        (delMes.length ? delMes.map(fila).join('')
+          : '<div class="gs-vacio">Este mes no tiene gastos cargados.</div>') +
+        '</div>');
+
+    var v = $('gs-ver');
+    if (v) v.onclick = function () { verLista = !verLista; editando = null; pinta(); };
+    /* Tocar un mes del resumen lo abre de una, sin pasar por el desplegable. */
+    Array.prototype.forEach.call(b.querySelectorAll('.gs-mes'), function (el) {
+      el.onclick = function () {
+        mes = el.getAttribute('data-mes'); verLista = true; editando = null; pinta();
+      };
+    });
     var s = $('gs-mes');
     if (s) s.onchange = function () { mes = this.value; editando = null; pinta(); };
     var iv = $('gs_iva');
