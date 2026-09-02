@@ -1741,8 +1741,19 @@ const App={
     const n=await POST('kruh_gastos',{concepto:'',proveedor:'',factura:'',rubro:cat,tiene_iva:false,base:0,iva:0,monto:0,fecha:this._diaDef(mes),forma_pago:'Efectivo',pagado:false});
     if(!n){ toast('⚠️ No se pudo crear la compra'); return; }
     await this.vProveedores();
-    const f=document.querySelectorAll('#main .tb tbody tr'), u=f[f.length-1];
-    if(u){ const i=u.querySelectorAll('input')[1]; if(i){i.focus(); i.scrollIntoView({block:'center'});} } },
+    /* Se busca la fila POR SU ID, no la ultima de la tabla. La tabla va ordenada
+       por fecha, y en un mes que ya paso la fila nueva nace el dia 1: o sea que
+       queda ARRIBA, no al final. Antes se hacia foco en la ultima fila de la
+       tabla -la compra mas reciente ya guardada- y el usuario terminaba
+       escribiendo ENCIMA de una compra vieja, creyendo que era el renglon nuevo.
+       Cada clic dejaba ademas un renglon vacio suelto al principio del mes. */
+    const tr=document.querySelector('#main tr[data-id="'+n.id+'"]');
+    if(!tr){ toast('Se creó el renglón, pero quedó en otro mes o categoría'); return; }
+    const antes=tr.style.background;
+    tr.style.background='var(--okbg)';                       // que se vea cual es
+    setTimeout(function(){ tr.style.background=antes||''; },2200);
+    const i=tr.querySelectorAll('input')[1];                 // el proveedor
+    if(i){ i.focus(); i.scrollIntoView({block:'center'}); } },
   _catProv(p){ const c=String(p.categoria||'').toLowerCase();
     if(/empaq|envase|frasco|desechab|bandeja/.test(c))return 'Empaques';
     if(/aseo|limpiez|consumib/.test(c))return 'Consumibles aseo';
