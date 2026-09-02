@@ -450,7 +450,7 @@ const App = {
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&limit=3000',{headers:H}); const j=await r.json(); ventas=Array.isArray(j)?j:[]; }catch(e){}
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads?empresa=eq.smart&order=ultima_fecha.desc&limit=2000',{headers:H}); const j=await r.json(); this._crmBot=Array.isArray(j)?j:[]; }catch(e){ this._crmBot=[]; }
     try{ const r=await fetch(this._SBU()+'/rest/v1/smart_marcador_leads?select=nombre,ciudad,depto,cel,fijo,estado,prioridad,esp,aplica,nota,web&limit=5000',{headers:H}); const j=await r.json(); window.LEADS=(Array.isArray(j)?j:[]).map(l=>({empresa:l.nombre,ciudad:l.ciudad,depto:l.depto,cel:l.cel,fijo:l.fijo,estado:l.estado,prioridad:l.prioridad,esp:l.esp,aplica:l.aplica,nota:l.nota,web:l.web})); }catch(e){}
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.smart&limit=5000',{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmQuien={}; this._crmEmbRows.forEach(x=>{this._crmEmb[x.lead_key]=x.etapa; if(x.contactado_por) this._crmQuien[x.lead_key]=x.contactado_por;}); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; this._crmQuien={}; }
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.smart&limit=5000',{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmQuien={}; this._crmFechas={}; this._crmEmbRows.forEach(x=>{this._crmEmb[x.lead_key]=x.etapa; this._crmFechas[x.lead_key]=x.fechas||{}; if(x.contactado_por) this._crmQuien[x.lead_key]=x.contactado_por;}); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; this._crmQuien={}; this._crmFechas={}; }
     const norm=s=>(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\b(sas|ltda|sa|eu)\b/g,'').replace(/\s+/g,' ').trim();
     const esTest=s=>{ const n=norm(s); return !n||n.includes('prueba')||n==='smart'||n==='test'; };
     const compradores=new Set();   // ya compraron (venta NO-kit no cancelada, o un pedido) → salen del Kit
@@ -497,7 +497,10 @@ const App = {
   crmCanal(c){ this._crmCanal=c; this._crmCajon=null; this.vCrmSmart(); },
   crmCajon(s){ this._crmCajon=s; this.vCrmSmart(); },
   _embStages(canal){
-    if(canal==='marcador') return ['👋 Contactado','💡 Interesado','✅ Calificado'];
+    /* Lupe: el lead llega YA contactado por telefono. Lo que sigue es la venta,
+       asi que los pasos son los del vendedor -no los del telemercadeo- y cada
+       uno queda con su fecha para ver cuanto lleva quieto. */
+    if(canal==='marcador') return ['👋 Contactado','🔔 Seguimiento','🎁 Muestras','🛒 Primer pedido'];
     if(canal==='digital')  return (window.NC_EMPRESA==='feroz')?['💡 Interesado','🎁 Muestra','✅ Calificado']:['💡 Interesado','📦 Kit','✅ Calificado'];
     if(canal==='organico') return ['🤔 Curioso','💡 Interesado','📦 Kit'];
     return ['👋 Contactado','💡 Interesado','📦 Kit','🛒 1ª Compra'];
@@ -559,7 +562,12 @@ const App = {
     }
     const st=(this._crmEmb&&this._crmEmb[key]!=null)?this._crmEmb[key]:(base!=null?base:-1);
     const S=this._embStages(canal);
-    return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px;display:flex;gap:8px;flex-wrap:wrap" onclick="event.stopPropagation()">${S.map((s,i)=>`<span onclick="App.crmAvanzar('${key}',${i})" title="Marcar: ${s}" style="cursor:pointer;font-size:10px;font-weight:${i<=st?700:500};color:${i<=st?'#0f7a33':'#6b7686'};white-space:nowrap">${dot(i<=st)} ${s}</span>`).join('')}</div>${this._quienBtns(key)}`;
+    const fs=(this._crmFechas&&this._crmFechas[key])||{};
+    /* El nombre de quien contacto sale de una lista quemada (Sandra/Jose/Boso)
+       que es de la panaderia, no de la red. En Lupe estorba: el lead ya llega
+       con el nombre de la telemercaderista que lo marco. */
+    const quien = canal==='marcador' ? '' : this._quienBtns(key);
+    return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px;display:flex;gap:12px;flex-wrap:wrap" onclick="event.stopPropagation()">${S.map((s,i)=>`<span onclick="App.crmAvanzar('${key}',${i})" title="Marcar: ${s}" style="cursor:pointer;display:inline-flex;flex-direction:column;gap:1px;font-size:10px;font-weight:${i<=st?700:500};color:${i<=st?'#0f7a33':'#6b7686'};white-space:nowrap"><span>${dot(i<=st)} ${s}</span>${fs[i]?`<span style="font-size:9.5px;color:#8a93a6;font-weight:600;padding-left:17px">${esc(this._fCorta(fs[i]))}</span>`:''}</span>`).join('')}</div>${quien}`;
   },
   async crmSeg(key){
     const info=(this._crmLeadInfo||{})[key]||{};
@@ -582,10 +590,17 @@ const App = {
     try{ await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:window.NC_EMPRESA||'smart',lead_key:key,nombre:info.nombre||'',telefono:info.telefono||'',canal:info.canal||'',etapa:-2})}); }catch(e){}
     (window.NC_EMPRESA==='feroz'&&this.vCrm)?this.vCrm():this.vCrmSmart();
   },
+  /* '2026-09-02' -> '02/09/26'. Solo para mostrar; lo guardado sigue siendo ISO. */
+  _fCorta(f){ const t=String(f||'').slice(0,10).split('-'); return t.length===3?(t[2]+'/'+t[1]+'/'+t[0].slice(2)):String(f||''); },
   async crmAvanzar(key,etapa){
     const info=(this._crmLeadInfo||{})[key]||{};
     (this._crmEmb=this._crmEmb||{})[key]=etapa;
-    try{ await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:window.NC_EMPRESA||'smart',lead_key:key,nombre:info.nombre||'',telefono:info.telefono||'',canal:info.canal||'',etapa})}); }catch(e){}
+    /* La fecha de un paso se pone UNA vez: es el dia en que se llego ahi. Si se
+       vuelve a tocar para corregir la etapa, la fecha vieja no se pisa. */
+    const fs=Object.assign({},(this._crmFechas||{})[key]||{});
+    if(!fs[etapa]) fs[etapa]=new Date().toISOString().slice(0,10);
+    (this._crmFechas=this._crmFechas||{})[key]=fs;
+    try{ await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:window.NC_EMPRESA||'smart',lead_key:key,nombre:info.nombre||'',telefono:info.telefono||'',canal:info.canal||'',etapa,fechas:fs})}); }catch(e){}
     (window.NC_EMPRESA==='feroz' && this.vCrm)?this.vCrm():this.vCrmSmart();
   },
   _crmDigitalLeads(cajon){
@@ -2829,10 +2844,15 @@ const App = {
       <h1>${editId?'✏️ Editar':'Nueva'} cotización</h1>
       <div class="sub">${esc(nomCed)} · Bota Ref. 701 · ${money(C.PRECIO_PAR)}/par + IVA</div>
       <div class="card">
+        <label style="margin-top:0">Cédula / NIT</label>
+        <input class="field" id="co_doc" list="coDocDL" inputmode="numeric" autocomplete="off"
+               placeholder="Escríbelo y se llenan los datos solos" oninput="App.cotBuscarPorDoc()">
+        <datalist id="coDocDL">${cli.filter(c=>c.nit).map(c=>`<option value="${esc(c.nit)}">${esc(c.nombre)}</option>`).join('')}</datalist>
+        <div class="hint" id="co_doc_aviso" style="margin-top:5px">Si el cliente ya está registrado se escoge la empresa sola y se traen sus datos. Si no aparece, usa "+ Cliente nuevo".</div>
         <label>Empresa *</label>
         <select class="field" id="co_cliente" onchange="App.cotContactoAuto()">
           <option value="">— Selecciona —</option>
-          ${cli.map(c=>`<option value="${c.id}" data-con="${esc(c.contacto1||'')}" data-tel="${esc(c.tel||'')}">${esc(c.nombre)}${c.nombre_comercial?' · '+esc(c.nombre_comercial):''} (${esc(c.nit||'')})</option>`).join('')}
+          ${cli.map(c=>`<option value="${c.id}" data-con="${esc(c.contacto1||'')}" data-tel="${esc(c.tel||'')}" data-nit="${esc(c.nit||'')}">${esc(c.nombre)}${c.nombre_comercial?' · '+esc(c.nombre_comercial):''} (${esc(c.nit||'')})</option>`).join('')}
         </select>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button class="btn-sm" style="background:var(--negro);color:#fff" onclick="App.nuevoClienteDesdeCot()">+ Cliente nuevo</button>
@@ -2971,6 +2991,8 @@ const App = {
       const { data:ec } = await this.sb.from('cotizaciones').select('*').eq('id',editId).single();
       if(ec){ this._editCot=ec;
         const s=$('co_cliente'); if(s) s.value=ec.cliente_id;
+        const so=s&&s.options[s.selectedIndex], cd=$('co_doc');
+        if(cd&&so&&so.dataset) cd.value=so.dataset.nit||'';
         const cc=$('co_contacto');     if(cc) cc.value=ec.contacto||'';
         const ct=$('co_contacto_tel'); if(ct) ct.value=ec.contacto_tel||'';
         const mt=$('co_muestra_tipo'); if(mt) mt.value=ec.es_muestra?(ec.muestra_tipo==='pie'?'pie':(ec.muestra_tipo==='nono'?'svc':'par')):'';
@@ -3012,8 +3034,11 @@ const App = {
   nuevoClienteDesdeCot(){
     this.modalCliente(c=>{ this._clientes.push(c); const s=$('co_cliente');
       const o=document.createElement('option'); o.value=c.id; o.textContent=`${c.nombre} (${c.nit||''})`;
-      o.dataset.con=c.contacto1||''; o.dataset.tel=c.tel||'';
-      o.selected=true; s.appendChild(o); this.cotContactoAuto(); });
+      o.dataset.con=c.contacto1||''; o.dataset.tel=c.tel||''; o.dataset.nit=c.nit||'';
+      o.selected=true; s.appendChild(o);
+      const dl=$('coDocDL');
+      if(dl&&c.nit){ const d=document.createElement('option'); d.value=c.nit; d.textContent=c.nombre||''; dl.appendChild(d); }
+      this.cotContactoAuto(); });
   },
   /* Corregir la empresa sin salirse de la cotización. Al guardar, guardarCliente
      ya propaga el cambio a las cotizaciones y pedidos que tengan su foto, así que
@@ -3222,8 +3247,33 @@ const App = {
     const h=$('co_muestra_hint'); if(h){ h.style.display = (v && !esPie) ? 'block' : 'none'; } },
   /* Al escoger la empresa se trae su contacto, pero solo si el campo está vacío:
      si el vendedor ya escribió otro nombre no se le borra. */
+  /* Un NIT se guarda de varias formas ("900123456-7", "900.123.456"). Se compara
+     por dígitos, y el NIT con guión vale tanto con dígito de verificación como sin él:
+     el vendedor casi siempre escribe el número sin el DV. */
+  _docKeys(nit){
+    const t=(nit||'').toString().trim(); if(!t) return [];
+    const full=t.replace(/\D/g,''), base=t.split('-')[0].replace(/\D/g,'');
+    return [full,base].filter((x,i,a)=>x.length>=5&&a.indexOf(x)===i); },
+  /* Cédula/NIT → cliente. Igual que en el cotizador de Smart: si el documento
+     está en la base, se selecciona la empresa y se traen contacto, celular y
+     su lista de precios. Si no está, lo dice y no toca nada. */
+  cotBuscarPorDoc(){
+    const inp=$('co_doc'), av=$('co_doc_aviso'); if(!inp) return;
+    const q=(inp.value||'').replace(/\D/g,'');
+    const decir=(txt,col)=>{ if(av){ av.textContent=txt; av.style.color=col||''; } };
+    if(q.length<5) return decir('Si el cliente ya está registrado se escoge la empresa sola y se traen sus datos. Si no aparece, usa "+ Cliente nuevo".');
+    const hit=(this._clientes||[]).find(c=>this._docKeys(c.nit).indexOf(q)>=0);
+    if(!hit) return decir('Ningún cliente con ese documento. Usa "+ Cliente nuevo" para registrarlo.','#b3261e');
+    const s=$('co_cliente'); if(s) s.value=hit.id;
+    /* se vacían primero porque cotContactoAuto respeta lo que ya esté escrito,
+       y acá el vendedor pidió expresamente los datos de ESTE documento */
+    const cc=$('co_contacto'), ct=$('co_contacto_tel');
+    if(cc) cc.value=''; if(ct) ct.value='';
+    this.cotContactoAuto();
+    decir('✓ '+(hit.nombre||'')+(hit.ciudad?' · '+hit.ciudad:'')+' — datos cargados.','#1c7a3e'); },
   cotContactoAuto(){
     const s=$('co_cliente'), o=s&&s.options[s.selectedIndex]; if(!o||!o.dataset) return;
+    const d=$('co_doc'); if(d) d.value=o.dataset.nit||'';
     const c=$('co_contacto'), t=$('co_contacto_tel');
     if(c && !c.value.trim()) c.value=o.dataset.con||'';
     if(t && !t.value.trim()) t.value=o.dataset.tel||'';
@@ -3943,7 +3993,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
     let cli=[]; try{ const r=await this.sb.from('clientes').select('*').order('creado_en',{ascending:false}); cli=r.data||[]; }catch(e){}
     let res=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_resultados?select=fila,nombre,cel,ciudad,resultado,mundo,fecha&order=fecha.desc&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); res=Array.isArray(j)?j:[]; }catch(e){}
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.feroz&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmQuien={}; this._crmEmbRows.forEach(x=>{this._crmEmb[x.lead_key]=x.etapa; if(x.contactado_por) this._crmQuien[x.lead_key]=x.contactado_por;}); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; this._crmQuien={}; }
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.feroz&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmQuien={}; this._crmFechas={}; this._crmEmbRows.forEach(x=>{this._crmEmb[x.lead_key]=x.etapa; this._crmFechas[x.lead_key]=x.fechas||{}; if(x.contactado_por) this._crmQuien[x.lead_key]=x.contactado_por;}); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; this._crmQuien={}; this._crmFechas={}; }
     this._crmFRes=res; const inter=res.filter(r=>/interes/i.test(r.resultado||''));
     let bot=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000'+this.fCed(),{headers:H}); const j=await r.json(); bot=Array.isArray(j)?j:[]; }catch(e){}
     let cots=[]; try{ const r=await this.sb.from('cotizaciones').select('id,cliente_id,numero,total,estado,es_muestra,creado_en').order('creado_en',{ascending:false}); cots=r.data||[]; }catch(e){}
@@ -4140,7 +4190,6 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
             <div class="meta">${tel?'📱 '+esc(tel):'<span style="color:#b91c1c">sin teléfono</span>'}${w2&&w2!==tel?' / '+esc(w2):''}${r.lead_ciudad?' · 📍 '+esc(r.lead_ciudad):''}${r.contacto?' · 👤 '+esc(r.contacto):''}${r.correo?' · ✉️ '+esc(r.correo):''}</div>
             <div class="meta">${r.creado_en?'📅 '+esc(String(r.creado_en).slice(0,10)):''}${r.agente?' · '+esc(r.agente):''} ${falta}</div></div>
           <span class="badge ${cat==='Interesado'?'b-aceptada':'b-entregado'}">${ICO[cat]||''} ${esc(cat)}</span></div>
-          ${tel?`<div style="display:flex;gap:5px;margin-top:7px"><a class="btn-sm" style="background:var(--azul);color:#fff;text-decoration:none" href="tel:+57${esc(tel)}">📞</a><button class="btn-sm" style="background:#25D366;color:#fff" onclick="window.open('https://wa.me/57${esc(tel)}','_blank')">📲 WhatsApp</button></div>`:''}
           ${this._emb(key,-1,'marcador',r.lead_nombre,tel)}</div>`; }).join('');
       return resumen+(lista||'<div class="empty">Sin contactos en esta categoría.</div>');
     }
