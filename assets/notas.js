@@ -67,6 +67,16 @@
     var d = soloDia(f);
     return d ? d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '';
   }
+  /* La fecha completa, dd/mm/aa. En el pie de la nota van fechas de verdad y no
+     "hoy" o "ayer": son un compromiso con dia, y hay que poder compararlas
+     contra la de entrega de un vistazo. */
+  function fDia(f) {
+    if (!f) return '';
+    var d = String(f).length <= 10 ? soloDia(f) : new Date(f);
+    if (!d || isNaN(d)) return '';
+    var p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + String(d.getFullYear()).slice(2);
+  }
   /* Cuanto falta para la entrega. Negativo = ya se vencio. */
   function faltan(f) {
     var d = soloDia(f);
@@ -117,6 +127,7 @@
     '.nt-resp{display:inline-block;background:#eef2ff;color:#3a48b3;border-radius:20px;padding:1px 8px;' +
     'font-size:11px;font-weight:700;margin-right:5px}' +
     '.nt-vence{color:#c0392b;font-weight:700}' +
+    '.nt-sinf{color:#b45309}' +
     '.nt-fin{display:inline-block;background:#eaf6f0;color:#1c7a3e;border:1px solid #bfe3ce;border-radius:7px;' +
     'padding:4px 10px;cursor:pointer;font-weight:700;font-size:11.5px;margin-top:6px;text-decoration:none}' +
     '.nt-it.ok .nt-t .nt-fin,.nt-it.ok .nt-t .nt-resp{text-decoration:none}' +
@@ -192,9 +203,10 @@
          despues deja ver que se quedo estancado. */
       var pie =
         (n.responsable ? '<span class="nt-resp">👤 ' + esc(n.responsable) + '</span>' : '') +
-        'puesta ' + fecha(n.creado_en) +
-        (n.entrega ? ' · entrega ' + fCorta(n.entrega) + (ok ? '' : ' · ' + plazo(n.entrega)) : '') +
-        (ok ? ' · concluida ' + fecha(n.resuelto_en) + ' · ' + dias(n.creado_en, n.resuelto_en)
+        'creada ' + fDia(n.creado_en) +
+        (n.entrega ? ' · entrega ' + fDia(n.entrega) + (ok ? '' : ' · ' + plazo(n.entrega))
+                   : ' · <span class="nt-sinf">sin fecha de entrega</span>') +
+        (ok ? ' · concluida ' + fDia(n.resuelto_en) + ' · ' + dias(n.creado_en, n.resuelto_en)
             : ' · ' + llevan(n.creado_en));
       if (editando === n.id) {
         return '<div class="nt-it nt-ed">' +
