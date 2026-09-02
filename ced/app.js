@@ -567,7 +567,15 @@ const App = {
        que es de la panaderia, no de la red. En Lupe estorba: el lead ya llega
        con el nombre de la telemercaderista que lo marco. */
     const quien = canal==='marcador' ? '' : this._quienBtns(key);
-    return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px;display:flex;gap:12px;flex-wrap:wrap" onclick="event.stopPropagation()">${S.map((s,i)=>`<span onclick="App.crmAvanzar('${key}',${i})" title="Marcar: ${s}" style="cursor:pointer;display:inline-flex;flex-direction:column;gap:1px;font-size:10px;font-weight:${i<=st?700:500};color:${i<=st?'#0f7a33':'#6b7686'};white-space:nowrap"><span>${dot(i<=st)} ${s}</span>${fs[i]?`<span style="font-size:9.5px;color:#8a93a6;font-weight:600;padding-left:17px">${esc(this._fCorta(fs[i]))}</span>`:''}</span>`).join('')}</div>${quien}`;
+    /* En Lupe cada circulo se marca SOLO, y se pinta unicamente si tiene fecha.
+       Antes se rellenaban todos los pasos anteriores al que iba el lead, asi que
+       aparecian llenos pasos que nadie hizo: marcar Seguimiento pintaba
+       Contactado sin que nadie lo hubiera contactado. En los otros canales el
+       embudo si es acumulado -la etapa la pone el bot-, y ahi no se toca. */
+    const porFecha = canal==='marcador';
+    const lleno=i=>porFecha ? fs[i]!=null : i<=st;
+    const toca=i=>porFecha ? `App.crmPaso('${key}',${i})` : `App.crmAvanzar('${key}',${i})`;
+    return `<div style="margin-top:7px;border-top:1px dashed var(--linea);padding-top:7px;display:flex;gap:12px;flex-wrap:wrap" onclick="event.stopPropagation()">${S.map((s,i)=>`<span onclick="${toca(i)}" title="${porFecha&&fs[i]?'Quitar':'Marcar'}: ${s}" style="cursor:pointer;display:inline-flex;flex-direction:column;gap:1px;font-size:10px;font-weight:${lleno(i)?700:500};color:${lleno(i)?'#0f7a33':'#6b7686'};white-space:nowrap"><span>${dot(lleno(i))} ${s}</span>${fs[i]?`<span style="font-size:9.5px;color:#8a93a6;font-weight:600;padding-left:17px">${esc(this._fCorta(fs[i]))}</span>`:''}</span>`).join('')}</div>${quien}`;
   },
   async crmSeg(key){
     const info=(this._crmLeadInfo||{})[key]||{};
@@ -589,6 +597,22 @@ const App = {
     (this._crmEmb=this._crmEmb||{})[key]=-2;
     try{ await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:window.NC_EMPRESA||'smart',lead_key:key,nombre:info.nombre||'',telefono:info.telefono||'',canal:info.canal||'',etapa:-2})}); }catch(e){}
     (window.NC_EMPRESA==='feroz'&&this.vCrm)?this.vCrm():this.vCrmSmart();
+  },
+  /* Un paso del embudo de Lupe. Se marca uno por uno: al tocarlo queda con la
+     fecha de hoy, y al volver a tocarlo se borra -para deshacer un mal toque-.
+     No arrastra a los demas: cada paso dice si de verdad se hizo. */
+  async crmPaso(key,i){
+    const info=(this._crmLeadInfo||{})[key]||{};
+    const fs=Object.assign({},(this._crmFechas||{})[key]||{});
+    if(fs[i]) delete fs[i]; else fs[i]=new Date().toISOString().slice(0,10);
+    (this._crmFechas=this._crmFechas||{})[key]=fs;
+    /* 'etapa' se queda como el paso mas adelantado que este marcado: es lo que
+       leen los contadores y el resto del CRM, que no saben de fechas. */
+    const ks=Object.keys(fs).map(Number).filter(n=>!isNaN(n));
+    const etapa=ks.length?Math.max.apply(null,ks):-1;
+    (this._crmEmb=this._crmEmb||{})[key]=etapa;
+    try{ await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:window.NC_EMPRESA||'smart',lead_key:key,nombre:info.nombre||'',telefono:info.telefono||'',canal:info.canal||'',etapa,fechas:fs})}); }catch(e){}
+    (window.NC_EMPRESA==='feroz' && this.vCrm)?this.vCrm():this.vCrmSmart();
   },
   /* '2026-09-02' -> '02/09/26'. Solo para mostrar; lo guardado sigue siendo ISO. */
   _fCorta(f){ const t=String(f||'').slice(0,10).split('-'); return t.length===3?(t[2]+'/'+t[1]+'/'+t[0].slice(2)):String(f||''); },
