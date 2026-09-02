@@ -209,8 +209,13 @@ main{flex:1;padding:13px 15px 0}
 .iw .ie{font-size:13.5px;font-weight:600;color:var(--tx);line-height:1.3}
 .iw .id{font-size:11px;color:var(--faint);margin-top:2px;line-height:1.45}
 .iw .ib{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px}
-.iw .iwa{background:#25D366;color:#08130c;border-radius:9px;padding:7px 11px;font-size:12.5px;
-  font-weight:700;text-decoration:none;white-space:nowrap}
+/* El celular va como TEXTO, no como boton de WhatsApp: se copia y se escribe
+   despues, cuando haya con que. Con el enlace se salia de la app en mitad de la
+   jornada. user-select:all = un toque selecciona el numero entero. */
+.iw .inum{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:9px;
+  padding:7px 11px;font-size:13px;font-weight:700;white-space:nowrap;letter-spacing:.02em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  -webkit-user-select:all;user-select:all;cursor:text}
 .iw .ick{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dim);cursor:pointer}
 .iw .ick input{width:19px;height:19px}
 .iw.hecho{opacity:.5}
@@ -266,7 +271,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260828-2';
+const VER='20260902-num';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -742,8 +747,7 @@ function filaInteresado(x){
     <div class="ie">${esc(x.lead_nombre||'(sin nombre)')}</div>
     <div class="id">${det}</div>
     <div class="ib">
-      ${nums.length ? nums.map(n=>`<a class="iwa" href="https://wa.me/57${esc(n)}"
-          target="_blank" rel="noopener">📲 ${esc(lindo(n))}</a>`).join('')
+      ${nums.length ? nums.map(n=>`<span class="inum">${esc(lindo(n))}</span>`).join('')
         : '<span class="falta" style="font-size:12px">sin teléfono · hay que buscarlo</span>'}
       ${ya ? '' : `<label class="ick"><input type="checkbox"
           onchange="trabajado('${esc(x.id)}')"> enviado</label>`}
