@@ -22,7 +22,7 @@
   var KEY = 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
   var H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
 
-  var app = null, notas = [], tab = 'pendiente', abierto = false, editando = 0;
+  var app = null, notas = [], tab = 'pendiente', abierto = false, editando = 0, filtro = '';
 
   function api(path, opt) {
     opt = opt || {};
@@ -56,6 +56,41 @@
     var n = Math.round((new Date(b) - new Date(a)) / 86400000);
     return n <= 0 ? 'el mismo día' : (n === 1 ? 'en 1 día' : 'en ' + n + ' días');
   }
+  /* La entrega llega como '2026-09-10' pelado. Se le pega el mediodia para que el
+     navegador no la corra un dia hacia atras por la zona horaria. */
+  function soloDia(f) {
+    if (!f) return null;
+    var t = String(f).slice(0, 10).split('-');
+    return t.length === 3 ? new Date(+t[0], +t[1] - 1, +t[2]) : null;
+  }
+  function fCorta(f) {
+    var d = soloDia(f);
+    return d ? d.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) : '';
+  }
+  /* Cuanto falta para la entrega. Negativo = ya se vencio. */
+  function faltan(f) {
+    var d = soloDia(f);
+    if (!d) return null;
+    var h = new Date();
+    return Math.round((d - new Date(h.getFullYear(), h.getMonth(), h.getDate())) / 86400000);
+  }
+  /* Lo que se lee al lado de la fecha de entrega. En rojo si ya paso. */
+  function plazo(f) {
+    var n = faltan(f);
+    if (n === null) return '';
+    if (n < 0) return '<b class="nt-vence">vencida hace ' + (-n) + (n === -1 ? ' día' : ' días') + '</b>';
+    if (n === 0) return '<b class="nt-vence">es hoy</b>';
+    return n === 1 ? 'falta 1 día' : 'faltan ' + n + ' días';
+  }
+  /* Los responsables que ya se han usado en esta app, para no reescribirlos. */
+  function responsables() {
+    var v = [], i;
+    for (i = 0; i < notas.length; i++) {
+      var r = (notas[i].responsable || '').trim();
+      if (r && v.indexOf(r) < 0) v.push(r);
+    }
+    return v.sort(function (a, b) { return a.localeCompare(b, 'es'); });
+  }
 
   var CSS = '' +
     '#nt-btn{position:fixed;right:18px;bottom:18px;z-index:9998;width:52px;height:52px;border-radius:50%;' +
@@ -74,7 +109,18 @@
     '#nt-tabs button{flex:1;background:#f1f3f6;border:none;padding:8px;border-radius:8px;cursor:pointer;' +
     'font-size:13px;font-weight:700;color:#4b5563}' +
     '#nt-tabs button.on{background:#1f2937;color:#fff}' +
-    '#nt-add{padding:0 18px 12px;display:flex;gap:8px}' +
+    '#nt-add{padding:0 18px 12px;display:flex;flex-direction:column;gap:7px}' +
+    '.nt-fila{display:flex;gap:7px}' +
+    '.nt-fila input{flex:1;min-width:0;border:1px solid #d9dee5;border-radius:9px;padding:8px 10px;font:inherit;color:#16202b}' +
+    '#nt-filtro{padding:0 18px 11px}' +
+    '#nt-filtro select{width:100%;border:1px solid #d9dee5;border-radius:9px;padding:8px 10px;font:inherit;background:#fff;color:#16202b}' +
+    '.nt-resp{display:inline-block;background:#eef2ff;color:#3a48b3;border-radius:20px;padding:1px 8px;' +
+    'font-size:11px;font-weight:700;margin-right:5px}' +
+    '.nt-vence{color:#c0392b;font-weight:700}' +
+    '.nt-fin{display:inline-block;background:#eaf6f0;color:#1c7a3e;border:1px solid #bfe3ce;border-radius:7px;' +
+    'padding:4px 10px;cursor:pointer;font-weight:700;font-size:11.5px;margin-top:6px;text-decoration:none}' +
+    '.nt-it.ok .nt-t .nt-fin,.nt-it.ok .nt-t .nt-resp{text-decoration:none}' +
+    '.nt-fin.re{background:#f1f3f6;color:#4b5563;border-color:#dde2e8}' +
     '#nt-add textarea{flex:1;border:1px solid #d9dee5;border-radius:9px;padding:9px 11px;font:inherit;' +
     'resize:vertical;min-height:44px;max-height:150px}' +
     '#nt-add button{background:#1f2937;color:#fff;border:none;border-radius:9px;padding:0 15px;' +
@@ -103,7 +149,13 @@
     '@media(max-width:560px){#nt-box{width:100%}}';
 
   function pinta() {
-    var L = notas.filter(function (n) { return n.estado === tab; });
+    /* De la mas vieja a la mas nueva: lo que lleva mas tiempo abierto es lo que
+       hay que mirar primero. Antes salia al reves, por numero descendente. */
+    var L = notas.filter(function (n) {
+      return n.estado === tab && (!filtro || (n.responsable || '') === filtro);
+    }).sort(function (a, b) {
+      return String(a.creado_en || '').localeCompare(String(b.creado_en || ''));
+    });
     var pend = notas.filter(function (n) { return n.estado === 'pendiente'; }).length;
     var b = document.getElementById('nt-btn');
     if (b) b.innerHTML = '📝' + (pend ? '<b>' + pend + '</b>' : '');
@@ -114,6 +166,20 @@
     document.getElementById('nt-tp').className = tab === 'pendiente' ? 'on' : '';
     document.getElementById('nt-tr').className = tab === 'resuelto' ? 'on' : '';
     document.getElementById('nt-add').style.display = tab === 'pendiente' ? 'flex' : 'none';
+    var fr = document.getElementById('nt-filtro');
+    if (fr) {
+      var rs = responsables();
+      /* El filtro solo aparece cuando hay a quien filtrar: con un responsable
+         -o ninguno- es un desplegable que estorba. */
+      fr.style.display = rs.length > 1 ? 'block' : 'none';
+      fr.innerHTML = '<select onchange="Notas.filtrar(this.value)">' +
+        '<option value="">Todos los responsables</option>' +
+        rs.map(function (r) {
+          return '<option value="' + esc(r) + '"' + (filtro === r ? ' selected' : '') + '>👤 ' + esc(r) + '</option>';
+        }).join('') + '</select>';
+    }
+    var dl = document.getElementById('nt-resps');
+    if (dl) dl.innerHTML = responsables().map(function (r) { return '<option value="' + esc(r) + '">'; }).join('');
     if (!L.length) {
       cont.innerHTML = '<div class="nt-vacio">' + (tab === 'pendiente'
         ? 'Nada pendiente por acá.' : 'Todavía no has cerrado ninguna.') + '</div>';
@@ -121,23 +187,35 @@
     }
     cont.innerHTML = L.map(function (n) {
       var ok = n.estado === 'resuelto';
-      /* Siempre se muestra cuando empezo; si ya cerro, tambien cuando y cuanto
-         tomo. Eso es lo que despues deja ver que se quedo estancado. */
-      var pie = ok
-        ? 'inicio ' + fecha(n.creado_en) + ' · fin ' + fecha(n.resuelto_en) + ' · ' + dias(n.creado_en, n.resuelto_en)
-        : 'inicio ' + fecha(n.creado_en) + ' · ' + llevan(n.creado_en);
+      /* Quien responde, cuando se puso y para cuando quedo. Si ya se cerro, se
+         cambia el plazo por la fecha de cierre y lo que tomo: eso es lo que
+         despues deja ver que se quedo estancado. */
+      var pie =
+        (n.responsable ? '<span class="nt-resp">👤 ' + esc(n.responsable) + '</span>' : '') +
+        'puesta ' + fecha(n.creado_en) +
+        (n.entrega ? ' · entrega ' + fCorta(n.entrega) + (ok ? '' : ' · ' + plazo(n.entrega)) : '') +
+        (ok ? ' · concluida ' + fecha(n.resuelto_en) + ' · ' + dias(n.creado_en, n.resuelto_en)
+            : ' · ' + llevan(n.creado_en));
       if (editando === n.id) {
         return '<div class="nt-it nt-ed">' +
           '<span class="nt-n">' + n.num + '</span>' +
           '<div class="nt-t"><textarea id="nt-e' + n.id + '">' + esc(n.texto) + '</textarea>' +
+          '<div class="nt-fila" style="margin-top:7px">' +
+            '<input id="nt-r' + n.id + '" list="nt-resps" placeholder="👤 Responsable" value="' + esc(n.responsable || '') + '">' +
+            '<input id="nt-f' + n.id + '" type="date" title="Entrega estimada" value="' + esc(String(n.entrega || '').slice(0, 10)) + '">' +
+          '</div>' +
           '<div class="nt-bts"><button class="nt-ok" onclick="Notas.guardar(' + n.id + ')">Guardar</button>' +
           '<button class="nt-can" onclick="Notas.editar(0)">Cancelar</button></div></div></div>';
       }
+      /* El boton dice lo que hace. La casilla sola no se leia como "concluir",
+         y en el celular era un blanco muy chiquito para el dedo. */
+      var fin = '<button class="nt-fin' + (ok ? ' re' : '') + '" onclick="event.stopPropagation();Notas.marcar(' +
+        n.id + ',' + (ok ? 'false' : 'true') + ')">' + (ok ? '↩ Reabrir' : '✓ Concluido') + '</button>';
       return '<div class="nt-it' + (ok ? ' ok' : '') + '">' +
         '<input type="checkbox"' + (ok ? ' checked' : '') + ' onchange="Notas.marcar(' + n.id + ',this.checked)">' +
         '<span class="nt-n">' + n.num + '</span>' +
         '<span class="nt-t" title="Clic para editar" onclick="Notas.editar(' + n.id + ')">' +
-          esc(n.texto) + '<i>' + pie + '</i></span>' +
+          esc(n.texto) + '<i>' + pie + '</i>' + fin + '</span>' +
         '<button class="nt-del" title="Editar" onclick="Notas.editar(' + n.id + ')">✏️</button>' +
         '<button class="nt-del" title="Borrar" onclick="Notas.borrar(' + n.id + ')">✕</button></div>';
     }).join('');
@@ -149,7 +227,7 @@
 
   function cargar() {
     return api('nc_notas?app=eq.' + encodeURIComponent(app) +
-      '&select=*&order=estado,num.desc&limit=500').then(function (d) {
+      '&select=*&order=creado_en.asc&limit=500').then(function (d) {
         notas = d || []; pinta();
       });
   }
@@ -273,7 +351,11 @@
         '<div id="nt-tabs"><button id="nt-tp" onclick="Notas.ver(\'pendiente\')">Pendientes</button>' +
         '<button id="nt-tr" onclick="Notas.ver(\'resuelto\')">Resueltos</button></div>' +
         '<div id="nt-add"><textarea id="nt-txt" placeholder="Qué falta por hacer acá…"></textarea>' +
+        '<div class="nt-fila"><input id="nt-resp" list="nt-resps" placeholder="👤 Responsable">' +
+        '<input id="nt-ent" type="date" title="Entrega estimada">' +
         '<button onclick="Notas.agregar()">Guardar</button></div>' +
+        '<datalist id="nt-resps"></datalist></div>' +
+        '<div id="nt-filtro"></div>' +
         '<div id="nt-list"></div></div>';
       document.body.appendChild(c);
       pinta();
@@ -296,9 +378,14 @@
       if (!v) return;
       /* El número es por app y no se reusa: si se borra la 7, la siguiente es la 8 */
       var num = notas.reduce(function (a, n) { return Math.max(a, +n.num || 0); }, 0) + 1;
-      t.value = ''; t.focus();
-      api('nc_notas', { method: 'POST', body: JSON.stringify({ app: app, num: num, texto: v }) })
-        .then(cargar);
+      var r = document.getElementById('nt-resp'), f = document.getElementById('nt-ent');
+      var cuerpo = { app: app, num: num, texto: v,
+        responsable: (r && r.value || '').trim() || null,
+        entrega: (f && f.value) || null };
+      /* El responsable NO se borra al guardar: casi siempre se escriben varias
+         seguidas para la misma persona. La fecha si, que cambia en cada una. */
+      t.value = ''; if (f) f.value = ''; t.focus();
+      api('nc_notas', { method: 'POST', body: JSON.stringify(cuerpo) }).then(cargar);
     },
     marcar: function (id, listo) {
       var b = { estado: listo ? 'resuelto' : 'pendiente', resuelto_en: listo ? new Date().toISOString() : null };
@@ -308,12 +395,19 @@
     guardar: function (id) {
       var e = document.getElementById('nt-e' + id), v = (e && e.value || '').trim();
       if (!v) { alert('La nota no puede quedar vacía.'); return; }
+      var r = document.getElementById('nt-r' + id), f = document.getElementById('nt-f' + id);
+      var resp = (r && r.value || '').trim() || null, ent = (f && f.value) || null;
       var n = notas.filter(function (x) { return x.id === id; })[0];
       editando = 0;
-      if (n && n.texto === v) { pinta(); return; }   // no toco nada
-      if (n) n.texto = v; pinta();
-      api('nc_notas?id=eq.' + id, { method: 'PATCH', body: JSON.stringify({ texto: v }) }).then(cargar);
+      var igual = n && n.texto === v && (n.responsable || null) === resp &&
+        (String(n.entrega || '').slice(0, 10) || null) === ent;
+      if (igual) { pinta(); return; }   // no toco nada
+      if (n) { n.texto = v; n.responsable = resp; n.entrega = ent; }
+      pinta();
+      api('nc_notas?id=eq.' + id, { method: 'PATCH',
+        body: JSON.stringify({ texto: v, responsable: resp, entrega: ent }) }).then(cargar);
     },
+    filtrar: function (v) { filtro = v || ''; pinta(); },
     borrar: function (id) {
       if (!confirm('¿Borrar esta nota?')) return;
       api('nc_notas?id=eq.' + id, { method: 'DELETE' }).then(cargar);
