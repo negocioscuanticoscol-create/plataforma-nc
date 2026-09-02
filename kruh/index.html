@@ -2816,6 +2816,9 @@ const App={
     'Nómina y aportes':'nomina',
     'Domicilios':'variables','Transporte':'variables','Mantenimiento y locativos':'variables','Equipos y menaje':'variables','Papelería':'variables'},
   _cajonDe(g){ return this.RUBRO_CAJON[g.rubro]||'otros'; },
+  /* Los rubros que se sugieren: los 12 de siempre mas los que alguien ya haya
+     escrito. Asi el segundo gasto de un rubro nuevo se escoge de la lista. */
+  _rubrosTodos(){ return [...new Set(this.CATGASTO.concat((this._gastos||[]).map(g=>g.rubro).filter(Boolean)))]; },
   _gasFecha(g){ return (g.fecha||g.creado_en||'').slice(0,10); },
   _ymNom(ym){ return this.MESNOM[+String(ym||'').slice(5,7)]||''; },
   _diaDef(ym){ const h=new Date(), hoy=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0'); return hoy.slice(0,7)===ym?hoy:ym+'-01'; },
@@ -2895,7 +2898,7 @@ const App={
           <b>${money(tc[k].t)}</b>${t}<div style="font-size:11px;opacity:.75">${tc[k].n} registro(s)</div></div>`).join('')}</div>
       ${enCompras.length?`<div class="card" style="border-left:4px solid var(--acc2);font-size:13px">🛒 <b>${enCompras.length} registro(s)</b> de ${esc(nom)} por ${money(enCompras.reduce((a,g)=>a+(+g.monto||0),0))} quedaron fuera de Gastos: son materia prima, empaques, consumibles de aseo o etiquetas y esos van en <b>Compras</b>.</div>`:''}
       ${!caj?`<div class="empty">👆 Toca un cajón para abrirlo y ver sus gastos.</div>`:`
-      ${this._tbFacturas(filas,{ro,cerrado,rubros:this.CATGASTO,vacio:`Este cajón no tiene gastos en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> y escoge su rubro.`,
+      ${this._tbFacturas(filas,{ro,cerrado,libre:true,rubros:this.CATGASTO,vacio:`Este cajón no tiene gastos en ${esc(nom)}. Dale a <b>＋ Nuevo gasto</b> y escoge su rubro.`,
         titulo:caj==='todos'?'TOTALES DEL MES':'TOTALES DE '+esc(nomCaj).toUpperCase(),tBase,tIva,total,pagado,pend})}
       ${filas.length?`<h1 style="font-size:17px;margin-top:20px">Resumen por rubro</h1>
       <div class="tbwrap"><table class="tb" style="min-width:460px">
@@ -2928,7 +2931,14 @@ const App={
           <td><input type="date" value="${esc(g.fecha||this._gasFecha(g))}" ${cel(g,'fecha')}></td>
           <td><input value="${esc(g.proveedor||'')}" placeholder="Nombre del proveedor" ${cel(g,'proveedor')}></td>
           <td><input value="${esc(g.factura||'')}" placeholder="N°" ${cel(g,'factura')}></td>
-          <td><select ${cel(g,'rubro')}><option value="" ${g.rubro?'':'selected'}>— sin rubro —</option>${rubros.map(c=>`<option ${g.rubro===c?'selected':''}>${esc(c)}</option>`).join('')}${g.rubro&&!rubros.includes(g.rubro)?`<option selected>${esc(g.rubro)}</option>`:''}</select></td>
+          <td>${o.libre
+            /* En Gastos el rubro se ESCRIBE: la lista de 12 se quedaba corta y
+               todo lo que no cabia terminaba en "Otros". La lista sigue saliendo
+               como sugerencia. En Compras no, porque ahi el rubro decide si la
+               fila es compra o gasto: si se pudiera escribir libre, la fila se
+               saltaria de pestana sin que nadie entienda por que. */
+            ? `<input list="g_cats" value="${esc(g.rubro||'')}" placeholder="Escribe o escoge" ${cel(g,'rubro')}>`
+            : `<select ${cel(g,'rubro')}><option value="" ${g.rubro?'':'selected'}>— sin rubro —</option>${rubros.map(c=>`<option ${g.rubro===c?'selected':''}>${esc(c)}</option>`).join('')}${g.rubro&&!rubros.includes(g.rubro)?`<option selected>${esc(g.rubro)}</option>`:''}</select>`}</td>
           <td><input value="${esc(g.concepto||'')}" placeholder="${esc(o.phConcepto||'Qué se pagó')}" ${cel(g,'concepto')}></td>
           <td><select ${cel(g,'tiene_iva')}><option value="false" ${g.tiene_iva?'':'selected'}>No</option><option value="true" ${g.tiene_iva?'selected':''}>Sí</option></select></td>
           <td><input type="number" data-f="base" value="${g.base||''}" placeholder="0" ${cel(g,'base','oninput="App.gasSuma()"')}></td>
@@ -2979,7 +2989,8 @@ const App={
     const rub=this.CATGASTO.includes(this._gasCajon)?this._gasCajon:'';
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">Nuevo gasto</h3>
       <div class="g2"><div><label>Fecha</label><input id="n_fecha" type="date" value="${esc(hoy)}"></div>
-      <div><label>Rubro</label><select id="n_rubro"><option value="">— escoge el rubro —</option>${this.CATGASTO.map(c=>`<option ${c===rub?'selected':''}>${esc(c)}</option>`).join('')}</select></div></div>
+      <div><label>Rubro</label><input id="n_rubro" list="n_rubros" value="${esc(rub)}" placeholder="Escribe uno nuevo o escoge">
+      <datalist id="n_rubros">${this._rubrosTodos().map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div></div>
       <div class="g2"><div><label>Proveedor / entidad</label><input id="n_prov" placeholder="Enel, Vanti, arrendador…"></div>
       <div><label>N° factura</label><input id="n_fact" placeholder="Opcional"></div></div>
       <label>Descripción</label><input id="n_desc" placeholder="Qué se pagó">
