@@ -92,8 +92,21 @@
     if (n === 0) return '<b class="nt-vence">es hoy</b>';
     return n === 1 ? 'falta 1 día' : 'faltan ' + n + ' días';
   }
-  /* Los responsables que ya se han usado en esta app, para no reescribirlos. */
+  /* El equipo. Sale siempre aunque todavia no tengan ninguna nota, que es lo que
+     pasa el primer dia. El campo igual deja escribir otro nombre. */
+  var EQUIPO = ['Sandra', 'Boso', 'Laura', 'Jose'];
+  /* Para sugerir: el equipo mas cualquier otro nombre ya usado en esta app. */
   function responsables() {
+    var v = EQUIPO.slice(), i;
+    for (i = 0; i < notas.length; i++) {
+      var r = (notas[i].responsable || '').trim();
+      if (r && v.indexOf(r) < 0) v.push(r);
+    }
+    return v.sort(function (a, b) { return a.localeCompare(b, 'es'); });
+  }
+  /* Para FILTRAR: solo los que de verdad tienen notas. Filtrar por alguien sin
+     una sola nota deja la lista en blanco y parece que se daño. */
+  function respConNotas() {
     var v = [], i;
     for (i = 0; i < notas.length; i++) {
       var r = (notas[i].responsable || '').trim();
@@ -122,6 +135,9 @@
     '#nt-add{padding:0 18px 12px;display:flex;flex-direction:column;gap:7px}' +
     '.nt-fila{display:flex;gap:7px}' +
     '.nt-fila input{flex:1;min-width:0;border:1px solid #d9dee5;border-radius:9px;padding:8px 10px;font:inherit;color:#16202b}' +
+    '.nt-lb{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-size:10px;' +
+    'font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.04em}' +
+    '.nt-lb input{width:100%;flex:none}' +
     '#nt-filtro{padding:0 18px 11px}' +
     '#nt-filtro select{width:100%;border:1px solid #d9dee5;border-radius:9px;padding:8px 10px;font:inherit;background:#fff;color:#16202b}' +
     '.nt-resp{display:inline-block;background:#eef2ff;color:#3a48b3;border-radius:20px;padding:1px 8px;' +
@@ -179,7 +195,7 @@
     document.getElementById('nt-add').style.display = tab === 'pendiente' ? 'flex' : 'none';
     var fr = document.getElementById('nt-filtro');
     if (fr) {
-      var rs = responsables();
+      var rs = respConNotas();
       /* El filtro solo aparece cuando hay a quien filtrar: con un responsable
          -o ninguno- es un desplegable que estorba. */
       fr.style.display = rs.length > 1 ? 'block' : 'none';
@@ -214,7 +230,9 @@
           '<div class="nt-t"><textarea id="nt-e' + n.id + '">' + esc(n.texto) + '</textarea>' +
           '<div class="nt-fila" style="margin-top:7px">' +
             '<input id="nt-r' + n.id + '" list="nt-resps" placeholder="👤 Responsable" value="' + esc(n.responsable || '') + '">' +
-            '<input id="nt-f' + n.id + '" type="date" title="Entrega estimada" value="' + esc(String(n.entrega || '').slice(0, 10)) + '">' +
+          '</div>' +
+          '<div class="nt-fila" style="margin-top:6px">' +
+            '<label class="nt-lb">Fecha de entrega<input id="nt-f' + n.id + '" type="date" value="' + esc(String(n.entrega || '').slice(0, 10)) + '"></label>' +
           '</div>' +
           '<div class="nt-bts"><button class="nt-ok" onclick="Notas.guardar(' + n.id + ')">Guardar</button>' +
           '<button class="nt-can" onclick="Notas.editar(0)">Cancelar</button></div></div></div>';
@@ -363,8 +381,9 @@
         '<div id="nt-tabs"><button id="nt-tp" onclick="Notas.ver(\'pendiente\')">Pendientes</button>' +
         '<button id="nt-tr" onclick="Notas.ver(\'resuelto\')">Resueltos</button></div>' +
         '<div id="nt-add"><textarea id="nt-txt" placeholder="Qué falta por hacer acá…"></textarea>' +
-        '<div class="nt-fila"><input id="nt-resp" list="nt-resps" placeholder="👤 Responsable">' +
-        '<input id="nt-ent" type="date" title="Entrega estimada">' +
+        '<div class="nt-fila"><input id="nt-resp" list="nt-resps" placeholder="👤 Responsable"></div>' +
+        '<div class="nt-fila" style="align-items:flex-end">' +
+        '<label class="nt-lb">Fecha de entrega<input id="nt-ent" type="date"></label>' +
         '<button onclick="Notas.agregar()">Guardar</button></div>' +
         '<datalist id="nt-resps"></datalist></div>' +
         '<div id="nt-filtro"></div>' +
