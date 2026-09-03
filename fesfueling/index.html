@@ -617,7 +617,7 @@ vInicio: safe(async function(){
     <div class="kpi ${bajos.length?'rojo':''}"><div class="v">${bajos.length}</div><div class="l">Referencias en inventario bajo</div></div>
     <div class="kpi"><div class="v">${money(compMes)}</div><div class="l">Compras del mes</div></div>
     <div class="kpi"><div class="v">${money(valorInv)}</div><div class="l">Valor del inventario (a costo)</div></div>
-    <div class="kpi verde"><div class="v">${money(valorVta)}</div><div class="l">Valor del inventario (a precio de venta)${valorVta>valorInv?` · ganancia ${money(valorVta-valorInv)}`:''}</div></div>
+    <div class="kpi verde"><div class="v">${money(valorVta)}</div><div class="l">Valor del inventario (a precio de venta, sin IVA)${valorVta>valorInv?` · ganancia ${money(valorVta-valorInv)}`:''}</div></div>
     <div class="kpi"><div class="v">${refs.filter(r=>r.activo).length}</div><div class="l">Referencias activas</div></div>
   </div>
   <div class="card"><b>🏆 Más vendidos del mes</b>
@@ -640,7 +640,7 @@ vCatalogo: safe(async function(){
     <button class="btn" onclick="App.refForm()">➕ Nueva referencia</button>
   </div>
   <div class="card" style="padding:0;overflow-x:auto"><table>
-  <thead><tr><th></th><th>Código</th><th>Referencia</th><th>Part #</th><th>Marca</th><th>Categoría</th><th class="num">Exist.</th><th class="num">Precio venta</th><th></th></tr></thead>
+  <thead><tr><th></th><th>Código</th><th>Referencia</th><th>Part #</th><th>Marca</th><th>Categoría</th><th class="num">Exist.</th><th class="num">Precio venta<div class="mini">sin IVA</div></th><th></th></tr></thead>
   <tbody>${list.map(r=>`<tr>
     <td>${this._miniFoto(r)}</td>
     <td><b>${esc(r.codigo)}</b>${r.activo?'':' <span class="badge b-gris">inactivo</span>'}</td>
@@ -659,7 +659,7 @@ refForm(id){
     ${F('categoria','Categoría')}${F('subcategoria','Subcategoría')}${F('nombre','Nombre comercial')}${F('unidad','Unidad de medida')}
     ${F('peso','Peso (kg)','number')}${F('pais_origen','País de origen')}${F('ubicacion','Ubicación en bodega')}${F('lote','Lote (opcional)')}
     ${F('inv_min','Inventario mínimo','number')}${F('inv_max','Inventario máximo','number')}
-    ${F('precio_venta','Precio de venta','number')}${F('ultimo_costo','Último costo','number')}
+    ${F('precio_venta','Precio de venta (sin IVA)','number')}${F('ultimo_costo','Último costo','number')}
   </div>
   <label>Descripción técnica</label><textarea id="rf_descripcion" rows="2">${esc(r.descripcion||'')}</textarea>
   <label>Compatibilidad (marca y modelo del vehículo)</label><textarea id="rf_compatibilidad" rows="2">${esc(r.compatibilidad||'')}</textarea>
@@ -704,9 +704,9 @@ vInventario: safe(async function(){
   let cuerpo='';
   if(sub==='exist'){
     cuerpo=`<div class="card" style="padding:0;overflow-x:auto"><table>
-    <thead><tr><th></th><th>Código</th><th>Referencia</th><th class="num">Exist.</th><th class="num">Mín</th><th class="num">Costo compra</th><th class="num">Últ. costo</th><th class="num">P. venta</th><th class="num">Margen</th><th>Ubicación</th><th></th></tr></thead><tbody>
+    <thead><tr><th></th><th>Código</th><th>Referencia</th><th class="num">Exist.</th><th class="num">Mín</th><th class="num">Costo compra</th><th class="num">Últ. costo</th><th class="num">P. venta<div class="mini">sin IVA</div></th><th class="num">Margen<div class="mini">sobre el costo</div></th><th>Ubicación</th><th></th></tr></thead><tbody>
     ${activos.map(r=>{ const e=+r.existencias||0, cp=+r.costo_promedio||0, pv=+r.precio_venta||0;
-      const mg=pv>0?Math.round((1-cp/pv)*100):0; const low=e<=(+r.inv_min||0)&&(+r.inv_min||0)>0;
+      const mg=cp>0?Math.round((pv/cp-1)*100):0;   /* sobre el COSTO, igual que la ficha y la calculadora */ const low=e<=(+r.inv_min||0)&&(+r.inv_min||0)>0;
       return `<tr><td>${this._miniFoto(r)}</td><td><b>${esc(r.codigo)}</b></td><td>${esc(r.nombre)}</td>
       <td class="num ${low?'low':''}">${e}${low?' ⚠️':''}</td><td class="num">${+r.inv_min||0}</td>
       <td class="num">${money(cp)}</td><td class="num">${money(r.ultimo_costo)}</td><td class="num">${money(pv)}</td>
@@ -768,7 +768,7 @@ vInventario: safe(async function(){
         <tr class="tot"><td>Total salidas</td>${totMes(sal)}<td class="num">${gran(sal)}</td></tr>
       </tbody></table></div>
       <div class="card" style="padding:9px 13px;margin-top:12px;border-left:4px solid var(--ok)">
-        <b>💰 Lo que queda en bodega vale ${money(totVal)} a precio de venta.</b>
+        <b>💰 Lo que queda en bodega vale ${money(totVal)} a precio de venta, sin IVA.</b>
         <div class="mini">Ordenado de mayor a menor: arriba está la plata quieta, y ahí es donde hay que salir a vender.</div></div>
       <div class="card" style="padding:0;overflow-x:auto"><table class="rsm">
         <thead><tr><th>Referencia</th><th class="num">Entró</th><th class="num">Salió</th>
