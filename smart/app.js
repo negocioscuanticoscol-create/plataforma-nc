@@ -1189,16 +1189,16 @@ const App = {
       </div>
       <div style="display:flex;gap:6px;margin-bottom:8px"><input id="cotq" placeholder="🔍 Nombre o celular (clientes · distribuidores · empresas)" style="flex:1;padding:11px;border:1px solid var(--linea);border-radius:10px" onkeydown="if(event.key==='Enter')App.cotBuscarBases()"><button class="btn-sm" style="background:var(--negro);color:#fff;white-space:nowrap" onclick="App.cotBuscarBases()">Buscar</button></div>
       <div id="cotbusres" style="margin-bottom:10px"></div>
+      ${muestras.length?`<div style="margin-bottom:14px">
+        <div onclick="App.cotToggleMuestras()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 14px">
+          <span style="font-weight:700;color:#c2410c">🧪 Muestras (kits) · ${muestras.length}</span><span id="cotMuestrasArrow" style="color:#c2410c;font-size:16px">▾</span></div>
+        <div id="cotMuestrasBox" style="margin-top:8px">${muestras.map(c=>this._cotItemHTML(c)).join('')}</div>
+      </div>`:''}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
         <h2 style="font-size:15px;margin:0">📝 Cotizaciones de pedidos · ${cotsPed.length}${this._cotsOcultas?` <span style="font-size:11px;color:#8a93a6;font-weight:400">· ${this._cotsOcultas} ya en ventas (ocultas)</span>`:''}</h2>
         ${cots.filter(c=>c.contactado).length?`<button class="btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;white-space:nowrap" onclick="App.cotResetContactados()" title="Apaga todos los círculos de contactado para empezar la semana">🔄 Reiniciar contactados (${cots.filter(c=>c.contactado).length})</button>`:''}
       </div>
       ${cotsPed.length? cotsPed.map(c=>this._cotItemHTML(c)).join('') : '<div class="empty">No hay cotizaciones de pedidos en cola.</div>'}
-      ${muestras.length?`<div style="margin-top:14px">
-        <div onclick="App.cotToggleMuestras()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 14px">
-          <span style="font-weight:700;color:#c2410c">🧪 Muestras (kits) · ${muestras.length}</span><span id="cotMuestrasArrow" style="color:#c2410c;font-size:16px">▸</span></div>
-        <div id="cotMuestrasBox" style="display:none;margin-top:8px">${muestras.map(c=>this._cotItemHTML(c)).join('')}</div>
-      </div>`:''}
     `);
   },
   _cotItemHTML(c){
