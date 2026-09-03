@@ -1286,7 +1286,7 @@ ORIGENES:['banco','efectivo','prestamo'],
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
    retiro baja la utilidad repartible, el prestamo es una cuenta por cobrar. */
 SOCIOS:['Bancario','FES','Proveedores','JVC retiros','JVC retiros carro','JVC cadena de oro','JVC prestamos','JJR retiros','JJR prestamos','JJR pago prestamo','Socios','MARY'],
-CLASES_CAJA:['Cobro de cliente','Pago a proveedor','Giro al exterior','Retiro de efectivo',
+CLASES_CAJA:['Cobro de cliente','Pago a proveedor','UPS envíos','Giro al exterior','Retiro de efectivo',
   'Compras con tarjeta','Traslado entre cuentas','Impuesto 4x1000','Comisiones bancarias',
   'Rendimientos','Retefuente','Aporte de socio','Prestamo','Gasto operativo','Por clasificar'],
 async cajaMovs(){ this._cmov=await GETALL('ff_banco_mov?order=fecha.desc&limit=5000'); return this._cmov; },
