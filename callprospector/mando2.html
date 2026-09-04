@@ -75,6 +75,16 @@ h2{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--fa
 .est.ok{background:rgba(37,192,138,.18);color:#7FE3BE;border:1px solid rgba(37,192,138,.45)}
 .est.rev{background:rgba(240,167,60,.16);color:#FFD08A;border:1px solid rgba(240,167,60,.42)}
 .est.no{background:rgba(240,96,77,.16);color:#FF9A8B;border:1px solid rgba(240,96,77,.42)}
+/* Ganado, pagado y saldo, uno al lado del otro. Lo tachado es lo crudo:
+   lo que marco menos lo que no paso el filtro de calidad. */
+.plata3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:11px}
+.plata3 div{background:rgba(255,255,255,.035);border-radius:11px;padding:8px 9px}
+.plata3 b{display:block;font-size:19px;font-weight:800;letter-spacing:-.03em}
+.plata3 b.ok{color:var(--ok)} .plata3 b.pag{color:#60a5fa}
+.plata3 b.deb{color:#f59e0b} .plata3 b.dia{color:var(--faint)}
+.plata3 i{display:block;font-size:11px;font-style:normal;opacity:.4;text-decoration:line-through;margin-top:1px}
+.plata3 span{display:block;font-size:10.5px;color:var(--faint);margin-top:3px}
+@media(max-width:520px){ .plata3 b{font-size:16px} }
 .plt{display:flex;align-items:baseline;gap:9px;margin-bottom:11px}
 .plt .val{font-size:26px;font-weight:800;letter-spacing:-.035em;color:var(--ok)}
 .plt .val.cero{color:var(--faint)}
@@ -221,14 +231,18 @@ const NIVELES=['principiante','intermedio','avanzado','asesor'];
    se cerraba solo a los pocos segundos de abrirlo. */
 let LLAM_ABIERTA='';
 const M={
-  vista:'calidad', base:'', filas:[], agentes:[], bases:[],
+  vista:'calidad', base:'', filas:[], agentes:[], bases:[], pagos:[],
 
   async cargar(){
-    const [f,a,b]=await Promise.all([
+    const [f,a,b,pg]=await Promise.all([
       GETALL('mkr_llamadas?select=id,agente,resultado,valor,datos,validado,estado_venta,base_id,lead_nombre,contacto,whatsapp,whatsapp2,correo,creado_en,lead_cel,lead_ciudad&order=creado_en.asc&limit=8000'),
       GET('mkr_agentes?select=*&order=nombre&limit=300'),
-      GET('mkr_bases?select=id,nombre,cliente&order=nombre&limit=200')
+      GET('mkr_bases?select=id,nombre,cliente&order=nombre&limit=200'),
+      /* Lo que ya se le pago a cada quien. Va aparte de las llamadas: lo
+         producido es historia y no se reescribe, el pago se suma encima. */
+      GETALL('mkr_pagos?select=agente_id,valor,semana,fecha_pago&limit=3000')
     ]);
+    this.pagos=Array.isArray(pg)?pg:[];
     if(!Array.isArray(f)){ $('live').classList.add('off'); $('liveTx').textContent='sin señal';
       $('main').innerHTML='<div class="aviso"><b>Faltan las tablas.</b><br>Todavía no se ha corrido el SQL. Esta pantalla funciona apenas exista <b>mkr_llamadas</b> con sus columnas nuevas.</div>'; return; }
     $('live').classList.remove('off'); $('liveTx').textContent='en vivo';
@@ -269,7 +283,12 @@ const M={
       if(pctRap>=50||(ints.length&&sinDatos===ints.length)) est='no';
       else if(pctRap>=15||sinDatos>0||pctInt<META_INT) est='rev';
       const ficha=this.agentes.find(a=>a.nombre===n)||{};
-      return {n,total,rapidas,pctRap,ritmo,ints:ints.length,sinDatos,pctInt,cruda,validado,est,ficha};
+      /* Lo pagado se cruza por la ficha del agente. Quien no tenga ficha en
+         mkr_agentes no tiene a quien cargarle pagos: queda en cero. */
+      const pagado=ficha.id
+        ? this.pagos.filter(p=>p.agente_id===ficha.id).reduce((t,p)=>t+(+p.valor||0),0) : 0;
+      const debe=Math.max(0, validado-pagado);
+      return {n,total,rapidas,pctRap,ritmo,ints:ints.length,sinDatos,pctInt,cruda,validado,est,ficha,pagado,debe};
     }).sort((x,y)=>y.validado-x.validado||y.total-x.total);
   },
 
@@ -330,9 +349,14 @@ const M={
       return `<div class="ag">
         <div class="agh"><div class="n">${esc(a.n)}<small>${esc(f.nivel||'—')}${f.estado&&f.estado!=='activo'?' · '+esc(f.estado):''}</small></div>
           <div class="est ${a.est}">${ESTX[a.est]}</div></div>
-        <div class="plt"><div class="val mono ${a.validado?'':'cero'}">${cop(a.validado)}</div>
-          ${a.cruda!==a.validado?`<div class="tach mono">${cop(a.cruda)}</div>`:''}
-          <div class="lbl">Plata<br>validada</div></div>
+        <div class="plata3">
+          <div><b class="mono ok">${cop(a.validado)}</b>
+            ${a.cruda!==a.validado?`<i class="mono">${cop(a.cruda)}</i>`:''}
+            <span>Ganado · validado</span></div>
+          <div><b class="mono pag">${cop(a.pagado)}</b><span>Pagado</span></div>
+          <div><b class="mono ${a.debe?'deb':'dia'}">${cop(a.debe)}</b>
+            <span>${a.debe?'Le deben':'Al día'}</span></div>
+        </div>
         <div class="mets">
           <div style="cursor:pointer" onclick="M.verLlamadas(${esc(JSON.stringify(a.n))})"
                title="Ver día, hora y teléfono de cada llamada">
