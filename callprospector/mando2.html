@@ -397,8 +397,56 @@ const M={
 
     caja.innerHTML=`<div class="lldet">
       <div class="llcab">📞 ${esc(n)} · ${f.length} marcaciones
-        <span onclick="M.verLlamadas(${esc(JSON.stringify(n))})">cerrar ✕</span></div>
+        <span><b style="cursor:pointer;margin-right:12px;opacity:.9"
+          onclick="M.bajarLlamadas(${esc(JSON.stringify(n))})">⬇ Bajar a Excel</b>
+        <span onclick="M.verLlamadas(${esc(JSON.stringify(n))})">cerrar ✕</span></span></div>
       ${filas}</div>`;
+  },
+
+  /* Baja el detalle a un CSV que Excel abre bien: separador ; como usa
+     Colombia, y BOM adelante para que no parta las tildes. */
+  bajarLlamadas(n){
+    const CRLF=String.fromCharCode(13,10);
+    const f=this.datos().filter(x=>String(x.agente)===String(n))
+      .sort((a,b)=>String(b.creado_en).localeCompare(String(a.creado_en)));
+    if(!f.length){ toast('Esa persona no tiene llamadas en esta base.',true); return; }
+
+    const fecha=t=>new Date(t).toLocaleDateString('es-CO');
+    const hora=t=>new Date(t).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const dias=t=>new Date(t).toLocaleDateString('es-CO',{weekday:'long'});
+    const limpio=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+
+    // los segundos se miden contra la marcacion anterior del MISMO dia
+    const porDia={};
+    f.forEach(x=>{ const k=String(x.creado_en).slice(0,10); (porDia[k]=porDia[k]||[]).push(x); });
+
+    const filas=[];
+    Object.keys(porDia).sort().reverse().forEach(k=>{
+      const ll=porDia[k];
+      ll.forEach((x,i)=>{
+        const sig=ll[i+1];
+        const seg=sig ? Math.round((new Date(x.creado_en)-new Date(sig.creado_en))/1000) : '';
+        filas.push([fecha(x.creado_en), dias(x.creado_en), hora(x.creado_en),
+          String(x.lead_cel||x.whatsapp||x.whatsapp2||'').replace(/\D/g,''),
+          x.lead_nombre||'', x.lead_ciudad||'', x.resultado||'',
+          x.contacto||'', x.whatsapp||'', x.correo||'',
+          x.validado?'si':'no', seg,
+          (seg!=='' && seg<MIN_SEG) ? 'DEMASIADO RAPIDA' : ''
+        ].map(limpio).join(';'));
+      });
+    });
+
+    const cab=['Fecha','Dia','Hora','Telefono marcado','Empresa','Ciudad','Resultado',
+               'Contacto','WhatsApp','Correo','Validada','Segundos desde la anterior','Alerta'];
+    const csv='﻿'+cab.map(limpio).join(';')+CRLF+filas.join(CRLF);
+
+    const hoy=new Date().toISOString().slice(0,10);
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+    a.download='Llamadas '+String(n).replace(/[^\w\s-]/g,'')+' '+hoy+'.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    toast('Bajando '+f.length+' llamadas de '+n);
   },
 
   vInteresados(){
