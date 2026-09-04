@@ -149,9 +149,33 @@
 
 <script>
 const $=id=>document.getElementById(id);
-function modal(h){ $('modalbox').innerHTML=h; $('modal').classList.remove('hide'); }
-function cerrar(){ $('modal').classList.add('hide'); }
-$('modal').addEventListener('click',e=>{ if(e.target.id==='modal')cerrar(); });
+/* Los modales donde se ESCRIBE (tomar pedido) se abren con modal(html,true).
+   Ese true los protege: no se cierran por darle Enter, ni por tocar por fuera,
+   ni por irse a otra pantalla sin avisar. Se perdian cotizaciones enteras. */
+let _modalOjo=false;
+function modal(h,cuidado){ $('modalbox').innerHTML=h; _modalOjo=!!cuidado; $('modal').classList.remove('hide'); }
+function cerrar(){ _modalOjo=false; $('modal').classList.add('hide'); }
+/* Devuelve true si de verdad se puede salir */
+function salirModal(){
+  if(_modalOjo && !confirm('¿Salir sin guardar?\n\nSe pierde lo que llevas de esta cotización.')) return false;
+  cerrar(); return true;
+}
+$('modal').addEventListener('click',e=>{ if(e.target.id==='modal')salirModal(); });
+/* ENTER NO CIERRA NI GUARDA: dentro de un campo pasa al siguiente, y ya.
+   Antes, según dónde quedara el foco, sacaba del pedido y se perdía todo. */
+$('modal').addEventListener('keydown',e=>{
+  if(e.key!=='Enter') return;
+  const t=e.target, tag=(t&&t.tagName)||'';
+  if(tag==='TEXTAREA') return;                    // ahí sí sirve para saltar renglón
+  if(tag==='BUTTON') return;                      // si tocó un botón, que haga lo suyo
+  if(tag!=='INPUT' && tag!=='SELECT') { e.preventDefault(); return; }
+  e.preventDefault();
+  const campos=[...$('modalbox').querySelectorAll('input,select,textarea')]
+    .filter(x=>!x.disabled && x.type!=='hidden');
+  const i=campos.indexOf(t);
+  if(i>=0 && i<campos.length-1){ campos[i+1].focus(); if(campos[i+1].select) try{campos[i+1].select();}catch(_){} }
+  else if(t.blur) t.blur();
+});
 
 /* Las cuatro medidas estandar, escritas como se llaman de verdad. Antes iban
    como numeros pelados ('100','120') y en inventario como 'Sencilla 100x190':
@@ -167,16 +191,18 @@ const App={
      a propósito: así al abrir DATA en otra pestaña del navegador no vuelve a
      pedir la clave, y con una sola salida se cierran las dos. */
   PASS:{ 'superioradmin2026':'admin', 'gloria2026':'facturacion', 'diana2026':'ventas' },
-  /* editarPed: corregir un pedido ya tomado. Es de facturación (Gloria) y del
-     administrador; ventas toma pedidos pero no los reescribe. */
+  /* editarPed: corregir un pedido ya tomado (el lápiz ✎ de la lista, que abre el
+     mismo formulario y de ahí sale la proforma). Lo tienen los tres: ventas
+     también, porque Diana necesita corregir la proforma que ella misma tomó
+     (pedido de José, 4 sep 2026). Borrar sigue siendo solo del administrador. */
   ROLES:{
     admin:      {nombre:'Administrador', quien:'',       data:true,  usuarios:true,  editarPed:true},
     facturacion:{nombre:'Facturación',   quien:'Gloria', data:true,  usuarios:false, editarPed:true},
-    ventas:     {nombre:'Ventas',        quien:'Diana',  data:false, usuarios:false, editarPed:false},
+    ventas:     {nombre:'Ventas',        quien:'Diana',  data:false, usuarios:false, editarPed:true},
   },
   puede(q){ const r=this.ROLES[this.rol]||{}; return !!r[q]; },
   TIPOS:['Cliente final','Local','Distribuidor'],
-  TRANSPORTE:['Transporte propio','Yango','Transportadora','Recoge en fábrica','Domicilio'],
+  TRANSPORTE:['Transporte propio','Yango','Transportadora','Recoge en fábrica','Domicilio','Incluido'],
   PAGO:['Efectivo','Transferencia','Tarjeta crédito','Nequi','Crédito'],
   TAMANOS:['Sencilla 100x190','Semidoble 120x190','Doble 140x190','Queen 160x190','King 200x200','Especial (a medida)'],
   TIPOCOL:['Resortado','Espuma','Híbrido','Ortopédico','Pillow top'],
@@ -399,10 +425,25 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     let cob=+p.transp_cobrado||0;
     if(!cob){ if(mo==='cobrado') cob=cos; else if(mo==='mitades') cob=cos/2; }
     return {cos,cob,res:cob-cos}; },
+  /* EL IVA NO SE COMPORTA IGUAL EN LAS DOS LISTAS (regla de José, 4 sep 2026):
+       · Precio público (fábrica) → el IVA YA VA DENTRO del precio: se extrae.
+       · Precio distribuidor      → el IVA se SUMA encima: el precio es la base.
+     Por eso 'base' es lo nuestro, 'iva' lo de la DIAN y 'cobra' lo que paga el
+     cliente. Antes se extraía siempre, y al distribuidor le quedaba el precio
+     19% por debajo de lo acordado. */
+  _ivaPed(p){
+    const t=+p.total||0, pct=this._lpn('iva_pct',19);
+    if(!p.iva) return {base:t, iva:0, cobra:t, suma:false};
+    if(this._pedLista(p)==='Distribuidor'){
+      const iva=Math.round(t*pct/100);
+      return {base:t, iva, cobra:t+iva, suma:true};
+    }
+    const base=t/(1+pct/100);
+    return {base, iva:t-base, cobra:t, suma:false}; },
   /* Una sola cuenta por pedido; todo lo demás son sumas de esto. */
   _liqCalc(p){
-    const venta=+p.total||0, pct=this._lpn('iva_pct',19);
-    const base=p.iva?venta/(1+pct/100):venta, iva=venta-base;
+    const _i=this._ivaPed(p);
+    const base=_i.base, iva=_i.iva, venta=_i.cobra;
     const costo=this._liqCosto(p);
     const t=this._liqTransp(p), tCos=t.cos, tCob=t.cob, tRes=t.res;
     const com=this._liqCom(p), util=base-costo+tRes, rep=util-com;
@@ -1671,7 +1712,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     return c.tipo==='Distribuidor'?'Distribuidor':'Fábrica'; },
   /* Cambiar de lista repone el precio de la referencia principal y el de cada extra
      que este en el inventario. Los precios escritos a mano se respetan. */
-  pedListaSet(){ this.pedPrecioLista();
+  pedListaSet(){ setTimeout(()=>this.pedIvaPinta(),0); this.pedPrecioLista();
     const dist=((($('p_lst')||{}).value)||'')==='Distribuidor';
     (this._pedIt||[]).forEach(x=>{
       const inv=(this._inv||[]).find(y=>((y.referencia||'')+(y.tamano?' · '+y.tamano:'')).trim()===(x.referencia||'').trim());
@@ -1714,7 +1755,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   _pedBruto(){ const pr=(+(($('p_tot')||{}).value)||0)*(+(($('p_cant')||{}).value)||1);
     return pr+(this._pedIt||[]).reduce((s,x)=>s+(+x.cantidad||0)*(+x.precio_unit||0),0); },
   _pedDescPct(){ return Math.min(100,Math.max(0,+(($('p_desc')||{}).value)||0)); },
-  pedItemCalc(){ const e=$('pi_total'); if(!e) return;
+  pedItemCalc(){ this.pedIvaPinta(); const e=$('pi_total'); if(!e) return;
     const pr=(+(($('p_tot')||{}).value)||0)*(+(($('p_cant')||{}).value)||1),
           br=this._pedBruto(), d=this._pedDescPct();
     const ex=br-pr, des=br*d/100, fin=br-des;
@@ -1722,7 +1763,19 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     if(ex) h+=`Referencia principal ${this.money(pr)} + otros ${this.money(ex)} = ${this.money(br)}<br>`;
     if(d)  h+=`<span style="color:var(--bad)">− descuento ${d}% (${this.money(des)})</span><br>`;
     h+=`<span style="font-size:16px">TOTAL DEL PEDIDO ${this.money(fin)}</span>`;
+    /* al distribuidor el IVA va ENCIMA: hay que verlo mientras se cotiza, no
+       después en la proforma */
+    const i=this._ivaPed({total:fin, iva:!!($('p_iva')||{}).checked,
+                          tipo_venta:($('p_lst')||{}).value||'Fábrica'});
+    if(i.suma) h+=`<br><span style="font-size:13px;color:var(--navy)">+ IVA ${this._lp('iva_pct','19')}% ${
+      this.money(i.iva)} = <b>${this.money(i.cobra)}</b> a pagar</span>`;
     e.innerHTML=h; },
+  /* El texto del check cambia según la lista, para que nadie tenga que acordarse */
+  pedIvaPinta(){ const e=$('p_ivahint'); if(!e) return;
+    const dist=(($('p_lst')||{}).value||'Fábrica')==='Distribuidor', pct=this._lp('iva_pct','19');
+    e.innerHTML = dist
+      ? `Distribuidor: marcado, el <b>${pct}% se SUMA</b> al precio y el cliente paga el total con IVA.`
+      : `Precio público: el ${pct}% <b>ya va dentro</b> del precio. Marcado se discrimina para la DIAN; sin marcar queda para nosotros.`; },
   pedModal(id){ const p=this._ped.find(x=>x.id===id)||{};
     this._pedIt=this._pedItemsDe(id).map(x=>({...x}));
     const cAct=(this._cli||[]).find(x=>x.id===p.cliente_id)||{};   // datos del cliente del pedido
@@ -1816,7 +1869,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <div><label>¿De dónde llegó?</label><select id="p_org">${this.ORIGEN.map(t=>`<option ${cAct.origen===t?'selected':''}>${t}</option>`).join('')}</select></div></div>
         <div class="hint">Con el teléfono se busca en el directorio. Si no está, se registra solo al guardar el pedido.</div>
       </div>
-      <label>Vendedor <a onclick="cerrar();App.go('equipo')" style="cursor:pointer;color:var(--gold);font-weight:600;text-transform:none;letter-spacing:0">· administrar</a></label>
+      <label>Vendedor <a onclick="if(salirModal())App.go('equipo')" style="cursor:pointer;color:var(--gold);font-weight:600;text-transform:none;letter-spacing:0">· administrar</a></label>
       <select id="p_vend"><option value="">— sin vendedor —</option>${this._vend.map(v=>`<option value="${v.id}" ${p.vendedor_id===v.id?'selected':''}>${this.esc(v.nombre)}${v.local_nombre?' · '+this.esc(v.local_nombre):''}</option>`).join('')}</select>
       <div class="g2"><div><label>Tipo de transporte</label><select id="p_tra">${this.TRANSPORTE.map(t=>`<option ${p.tipo_transporte===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div><label>¿Cuánto cuesta el flete?</label><input id="p_tratot" type="number" value="${p.valor_transporte||0}" oninput="App.pedTraModo()">
@@ -1832,10 +1885,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       <div><label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">
         <input type="checkbox" id="p_iva" ${p.iva?'checked':''} style="width:auto;margin:0">
         Discriminar IVA del precio</label>
-        <div class="hint">Marcado: se le saca el ${this._lp('iva_pct','19')}% al precio y va para la DIAN.
-          Sin marcar: ese ${this._lp('iva_pct','19')}% queda para nosotros.</div></div>
+        <div class="hint" id="p_ivahint"></div></div>
       <div><label>Forma de pago</label><select id="p_pag">${this.PAGO.map(t=>`<option ${p.forma_pago===t?'selected':''}>${t}</option>`).join('')}</select></div>
-      <button class="btn gold full" onclick="App.pedSave('${id||''}')">Guardar pedido</button>`);
+      <button class="btn gold full" onclick="App.pedSave('${id||''}')">Guardar pedido</button>`, true);
     this.pedItemPinta(); },
   /* El bloque de medidas sale con «A la medida» y también cuando la referencia
      elegida del catálogo es una casilla de medida especial. */
@@ -2067,10 +2119,14 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       ${desc?`<tr><td>Subtotal</td><td class="n">${m(bruto)}</td></tr>
         <tr><td>Descuento ${desc}%</td><td class="n">− ${m(bruto-(+p.total||0))}</td></tr>`:''}
       <tr><td>Producto${extras.length?'s':''}</td><td class="n">${m(p.total)}</td></tr>
+      ${(()=>{ /* al distribuidor el IVA se le suma; al público ya le iba dentro */
+        const i=this._ivaPed(p);
+        return i.suma?`<tr><td>IVA ${this._lp('iva_pct','19')}%</td><td class="n">${m(i.iva)}</td></tr>`
+          :(p.iva?`<tr><td>IVA ${this._lp('iva_pct','19')}% (incluido en el precio)</td><td class="n">${m(i.iva)}</td></tr>`:''); })()}
       ${transporte?`<tr><td>Transporte · ${e(modoTxt)}${p.tipo_transporte?' ('+e(p.tipo_transporte)+')':''}</td>
         <td class="n">${m(transporte)}</td></tr>`
        :`<tr><td>Transporte · ${e(modoTxt)}</td><td class="n">sin costo para usted</td></tr>`}
-      <tr class="grande"><td>Total</td><td class="n">${m((+p.total||0)+transporte)}</td></tr>
+      <tr class="grande"><td>Total</td><td class="n">${m(this._ivaPed(p).cobra+transporte)}</td></tr>
     </table>
     <table style="margin-top:12px">
       ${fila('Forma de pago', p.forma_pago||'')}

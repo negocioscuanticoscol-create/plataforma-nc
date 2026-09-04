@@ -650,7 +650,7 @@ const App={
   _nomKey(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .toLowerCase().replace(/\s+/g,' ').trim(); },
   /* al escribir el NOMBRE se busca igual que con el telefono y se rellena lo que exista */
-  pedNomLookup(v){ this._cartCli=v;
+  pedNomLookup(v){ this._cartCli=v; this._sugerido=null;
     const q=this._nomKey(v);
     if(q.length<3){ this._cartHallado=''; this._pintaHallado(); return; }
     const lista=this._nomList||[];
@@ -658,19 +658,32 @@ const App={
     let m=lista.filter(l=>l._k===q);
     if(!m.length) m=lista.filter(l=>l._k.startsWith(q));
     if(!m.length) m=lista.filter(l=>l._k.includes(q));
-    if(!m.length){ this._cartHallado='＋ No está en el CRM — se registra como cliente nuevo';
+    if(!m.length){ this._sugerido=null;
+      this._cartHallado='＋ Ese nombre NO está en la base — escribe el celular y queda registrado';
       this._cartTipo='nuevo'; if($('pd_tipo'))$('pd_tipo').value='nuevo';
       this._pintaHallado(); return; }
-    if(m.length>1){ this._cartHallado='⚠️ '+m.length+' clientes con ese nombre · escribe más o usa el teléfono';
+    if(m.length>1){ this._sugerido=null;
+      this._cartHallado='⚠️ '+m.length+' clientes con ese nombre · escribe más o usa el teléfono';
       this._pintaHallado(); return; }
     const l=m[0];
-    this._cartTel=l.telefono||''; this._cartDir=l.direccion||'';
+    /* OJO: escribir el nombre NO rellena el celular. Antes sí lo hacía, y ese
+       fue el bug que revolvió 68 celulares: la cajera escribía "Tatiana", se
+       le metía el celular de Tatiana Castillo, terminaba de escribir "Tatiana
+       Serna" y la venta salía con el celular de la otra. El CELULAR es la
+       identidad: se escribe a mano o se toca el botón de sugerencia. */
+    this._sugerido=l;
+    this._cartHallado='✓ '+l.nombre+' — ya está en el CRM';
+    this._pintaHallado(); },
+  /* la cajera confirma que sí es esa persona y ahí sí se trae su celular */
+  usarSugerido(){ const l=this._sugerido; if(!l) return;
+    this._cartTel=l.telefono||''; this._cartCli=l.nombre||''; this._cartDir=l.direccion||'';
     this._cartPromo=!!l.infopromos; this._cartTipo=l.tipo||'comunidad';
     if($('pd_tel'))$('pd_tel').value=this._cartTel;
+    if($('pd_cli'))$('pd_cli').value=this._cartCli;
     if($('pd_dir'))$('pd_dir').value=this._cartDir;
     if($('pd_promo'))$('pd_promo').checked=this._cartPromo;
     if($('pd_tipo'))$('pd_tipo').value=this._cartTipo;
-    this._cartHallado='✓ '+l.nombre+' — ya está en el CRM';
+    this._sugerido=null; this._cartHallado='';
     this._pintaHallado(); },
   /* Semáforo del teléfono. La idea es que la cajera sepa SIEMPRE en qué va:
      cuántos dígitos faltan, si el cliente ya existe, y qué le falta a su ficha.
@@ -681,7 +694,15 @@ const App={
        sobran hay que contar los crudos. Con los de _telKey nunca daría >10. */
     const raw=this._cartTel||'', crudo=String(raw).replace(/\D/g,''), d=this._telKey(raw);
     let html='', col='';
-    if(this._cartHallado){ html=esc(this._cartHallado); col='var(--acc)'; }
+    if(this._cartHallado){ html=esc(this._cartHallado); col='var(--acc)';
+      /* si el nombre coincidió con una ficha, se ofrece su celular — pero lo
+         mete la cajera al tocarlo, nunca solo */
+      const sg=this._sugerido;
+      if(sg && this._telKey(sg.telefono).length>=10 && this._telKey(raw)!==this._telKey(sg.telefono)){
+        html+='<br><button type="button" onclick="App.usarSugerido()" style="margin-top:5px;padding:5px 10px;'
+            +'border:1px solid var(--acc);background:#fff;color:var(--acc);border-radius:7px;font:inherit;'
+            +'font-size:12px;font-weight:700;cursor:pointer">Usar su celular '+esc(this._telKey(sg.telefono))+'</button>';
+      } }
     else if(!crudo.length){ html=''; }
     else if(crudo===this.TEL_ANONIMO){
       html='🕶️ <b>Cliente anónimo</b> — no se guarda ficha. Solo para quien no quiere dejar datos.'; col='var(--mut)'; }
@@ -815,6 +836,15 @@ const App={
     for(const id in cart){ const q=cart[id], p=prods.find(x=>x.id===id); if(!p)continue; const line=(+p.precio||0)*q; bruto+=line; items.push({producto_id:id,nombre:p.nombre,qty:q,precio:+p.precio||0});
       if(esTar){ const base=line/(1+(+p.iva_pct||0)/100); sub+=base; iva+=line-base; } else sub+=line; }
     if(!items.length)return; const cli=(this._cartCli||'').trim(), tel=(this._cartTel||'').trim(), dom=+(this._cartDom||0);
+    /* El celular manda. Si NO está en la base, se le confirma a la cajera antes
+       de abrir ficha nueva: así no se cuelan clientes repetidos ni mal pegados. */
+    const _k=this._telKey(tel);
+    if(cli && _k!==this.TEL_ANONIMO && !this._findLeadMatch(tel,cli)){
+      const msg = _k.length>=10
+        ? 'El celular '+_k+' NO está en la base, y «'+cli+'» tampoco.\n\n¿Lo creo como cliente nuevo?'
+        : 'A «'+cli+'» le falta el celular completo, así que NO va a quedar en la base y después no lo vas a poder buscar.\n\n¿Guardo el pedido así?';
+      if(!confirm(msg)) return;
+    }
     const desc=Math.min(Math.max(0,+(this._cartDesc||0)),bruto);
     const fac=bruto>0?(bruto-desc)/bruto:1; sub*=fac; iva*=fac;
     const total=bruto-desc+dom;
