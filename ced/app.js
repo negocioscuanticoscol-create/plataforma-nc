@@ -500,7 +500,10 @@ const App = {
     /* Lupe: el lead llega YA contactado por telefono. Lo que sigue es la venta,
        asi que los pasos son los del vendedor -no los del telemercadeo- y cada
        uno queda con su fecha para ver cuanto lleva quieto. */
-    if(canal==='marcador') return ['👋 Contactado','🔔 Seguimiento','🎁 Muestras','🛒 Primer pedido'];
+    /* Los definio Jose el 03/09/2026: Contactado es la llamada de Lupe y
+       llega con su fecha; la segunda es del vendedor; y no se mandan
+       muestras, se cotiza. Los mismos que usa Nido. */
+    if(canal==='marcador') return ['👋 Contactado','🔔 2ª llamada','📄 Cotización','🛒 Primer pedido'];
     if(canal==='digital')  return (window.NC_EMPRESA==='feroz')?['💡 Interesado','🎁 Muestra','✅ Calificado']:['💡 Interesado','📦 Kit','✅ Calificado'];
     if(canal==='organico') return ['🤔 Curioso','💡 Interesado','📦 Kit'];
     return ['👋 Contactado','💡 Interesado','📦 Kit','🛒 1ª Compra'];
