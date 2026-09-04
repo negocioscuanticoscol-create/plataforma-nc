@@ -136,16 +136,18 @@ footer b{color:var(--dim)}
 .lldia{display:flex;justify-content:space-between;margin:8px 0 3px;padding-top:5px;
   border-top:1px dashed rgba(128,128,128,.28);font-size:11.5px;text-transform:capitalize}
 .lldia span{opacity:.55}
-.llf{display:grid;grid-template-columns:46px 96px 1fr 84px 46px;gap:7px;align-items:center;
+.llf{display:grid;grid-template-columns:46px 96px 1fr 84px 62px 46px;gap:7px;align-items:center;
   padding:3px 0;border-bottom:1px solid rgba(128,128,128,.10)}
 .llf .e{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.8}
 .llf .r{opacity:.7;font-size:11px;text-align:right}
 .llf .s{opacity:.5;font-size:11px;text-align:right}
+.llf .v{font-size:11px;text-align:right;color:#22c55e;font-weight:700}
+.llf .v.nov{color:inherit;opacity:.35;text-decoration:line-through;font-weight:400}
 .llf.veloz{background:rgba(239,68,68,.10)}
 .llf.veloz .s{color:#ef4444;opacity:1;font-weight:700}
 @media(max-width:640px){
   .llf{grid-template-columns:42px 92px 1fr;row-gap:0}
-  .llf .r,.llf .s{grid-column:2/4;text-align:left;padding-bottom:2px}
+  .llf .r,.llf .v,.llf .s{grid-column:2/4;text-align:left;padding-bottom:2px}
 }
 </style>
 </head>
@@ -388,6 +390,7 @@ const M={
           <span class="t mono">${tel||'<i style="opacity:.5">sin teléfono</i>'}</span>
           <span class="e">${esc(x.lead_nombre||'')}</span>
           <span class="r">${esc(x.resultado||'')}</span>
+          <span class="v mono ${x.validado?'':'nov'}">${cop(x.valor)}</span>
           <span class="s mono">${seg===null?'':(veloz?'⚡':'')+seg+'s'}</span>
         </div>`;
       }).join('');
@@ -396,7 +399,7 @@ const M={
     }).join('');
 
     caja.innerHTML=`<div class="lldet">
-      <div class="llcab">📞 ${esc(n)} · ${f.length} marcaciones
+      <div class="llcab">📞 ${esc(n)} · ${f.length} marcaciones · ${cop(f.reduce((t,x)=>t+(x.validado?(+x.valor||0):0),0))} validados
         <span><b style="cursor:pointer;margin-right:12px;opacity:.9"
           onclick="M.bajarLlamadas(${esc(JSON.stringify(n))})">⬇ Bajar a Excel</b>
         <span onclick="M.verLlamadas(${esc(JSON.stringify(n))})">cerrar ✕</span></span></div>
@@ -429,6 +432,7 @@ const M={
         filas.push([fecha(x.creado_en), dias(x.creado_en), hora(x.creado_en),
           String(x.lead_cel||x.whatsapp||x.whatsapp2||'').replace(/\D/g,''),
           x.lead_nombre||'', x.lead_ciudad||'', x.resultado||'',
+          (+x.valor||0), (x.validado?(+x.valor||0):0),
           x.contacto||'', x.whatsapp||'', x.correo||'',
           x.validado?'si':'no', seg,
           (seg!=='' && seg<MIN_SEG) ? 'DEMASIADO RAPIDA' : ''
@@ -437,6 +441,7 @@ const M={
     });
 
     const cab=['Fecha','Dia','Hora','Telefono marcado','Empresa','Ciudad','Resultado',
+               'Valor de la accion','Valor que se paga',
                'Contacto','WhatsApp','Correo','Validada','Segundos desde la anterior','Alerta'];
     const csv='﻿'+cab.map(limpio).join(';')+CRLF+filas.join(CRLF);
 
