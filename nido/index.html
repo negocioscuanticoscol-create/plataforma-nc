@@ -262,7 +262,16 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
        editar desde este lado. */
     this._leads=await this._fetch('nido_leads');
     try{
-      const emb=await this._fetch('nc_crm_embudo?empresa=eq.nido');
+      /* Aca NO se puede usar _fetch: ese le pega "?select=*&order=creado_en.desc"
+         a la URL, y como esta ya trae "?empresa=eq.nido" quedaba con dos signos
+         de interrogacion. Encima nc_crm_embudo no tiene creado_en sino
+         updated_at, asi que el orden tambien fallaba. Entre las dos cosas el
+         servidor devolvia 400 y el catch se lo tragaba callado: por eso la
+         pestaña Marcador siempre salia en cero. */
+      const _r=await fetch(this.SB+'/rest/v1/nc_crm_embudo'
+        +'?empresa=eq.nido&select=*&order=updated_at.desc&limit=2000',{headers:this._H()});
+      if(!_r.ok) throw new Error('embudo '+_r.status);
+      const emb=await _r.json();
       (emb||[]).forEach(e=>this._leads.push({
         id:'emb_'+e.id, nombre:e.nombre||'(sin nombre)', telefono:e.telefono||'',
         ciudad:e.ciudad||'', tipo:'Distribuidor', local_num:'',
