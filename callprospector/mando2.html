@@ -209,7 +209,6 @@ const MIN_SEG=25, META_INT=8;
 const VENTA=[['nuevo','Nuevo'],['contactado','Contactado'],['cotizo','Cotizó'],['compro','Compró'],['perdido','Perdido']];
 const NIVELES=['principiante','intermedio','avanzado','asesor'];
 
-let LLAM_ABIERTA='';
 const M={
   vista:'calidad', base:'', filas:[], agentes:[], bases:[],
 
@@ -324,9 +323,9 @@ const M={
           ${a.cruda!==a.validado?`<div class="tach mono">${cop(a.cruda)}</div>`:''}
           <div class="lbl">Plata<br>validada</div></div>
         <div class="mets">
-          <div style="cursor:pointer" onclick="M.verLlamadas('${esc(a.n).replace(/'/g,"\'")}')"
+          <div style="cursor:pointer" onclick="M.verLlamadas(${esc(JSON.stringify(a.n))})"
                title="Ver día, hora y teléfono de cada llamada">
-            <b class="mono">${num(a.total)}</b><span>Llamadas ${LLAM_ABIERTA===a.n?'▾':'▸'}</span></div>
+            <b class="mono">${num(a.total)}</b><span>Llamadas ▸</span></div>
           <div class="${cRit}"><b class="mono">${a.ritmo===null?'—':a.ritmo+'s'}</b><span>Ritmo</span></div>
           <div class="${cInt}"><b class="mono">${a.pctInt}%</b><span>Interesado</span></div>
           <div class="${cRap}"><b class="mono">${a.pctRap}%</b><span>Dudosas</span></div>
@@ -347,36 +346,37 @@ const M={
      telefono de cada marcacion, en orden. Sirve para ver si de verdad estuvo
      llamando o si metio veinte en cinco minutos. */
   verLlamadas(n){
-    LLAM_ABIERTA = (LLAM_ABIERTA===n) ? '' : n;
-    this.pintar();
-    if(!LLAM_ABIERTA) return;
-    const caja=document.getElementById('ll_'+n.replace(/[^a-zA-Z0-9]/g,''));
-    if(!caja) return;
-    const f=this.datos().filter(x=>x.agente===n)
-      .sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
-    if(!f.length){ caja.innerHTML='<div class="lldet">Sin llamadas.</div>'; return; }
+    /* Solo abre y cierra el cajon de esa persona. NO se repinta la pantalla:
+       antes se llamaba a pintar() aqui y el cajon nacia de nuevo vacio. */
+    const idc='ll_'+String(n).replace(/[^a-zA-Z0-9]/g,'');
+    const caja=document.getElementById(idc);
+    if(!caja){ console.warn('No encuentro el cajon',idc); return; }
+    if(caja.innerHTML.trim()){ caja.innerHTML=''; return; }   // segundo toque, cierra
+
+    const f=this.datos().filter(x=>String(x.agente)===String(n))
+      .sort((a,b)=>String(b.creado_en).localeCompare(String(a.creado_en)));
+    if(!f.length){ caja.innerHTML='<div class="lldet">Sin llamadas en esta base.</div>'; return; }
 
     const lindo=t=>String(t||'').replace(/\D/g,'').replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3');
-    const dia=t=>{ const d=new Date(t); return d.toLocaleDateString('es-CO',{weekday:'short',day:'2-digit',month:'short'}); };
-    const hora=t=>{ const d=new Date(t); return d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}); };
+    const dia=t=>new Date(t).toLocaleDateString('es-CO',{weekday:'long',day:'2-digit',month:'short'});
+    const hora=t=>new Date(t).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
 
-    // Se agrupa por dia para que se lea como una jornada, no como una lista suelta
+    /* Agrupado por dia para que se lea como una jornada. Dentro de cada dia
+       van de la mas nueva a la mas vieja, y al lado los segundos que pasaron
+       desde la marcacion anterior: ahi se ve si de verdad estuvo llamando. */
     const porDia={};
     f.forEach(x=>{ const k=String(x.creado_en).slice(0,10); (porDia[k]=porDia[k]||[]).push(x); });
 
-    let prev=null;
     const filas=Object.keys(porDia).sort().reverse().map(k=>{
       const ll=porDia[k];
-      const cuerpo=ll.slice().reverse().map((x,i)=>{
-        // segundos contra la marcacion anterior de ese mismo dia
-        const orden=ll.slice().reverse();
-        const sig=orden[i+1];
+      const cuerpo=ll.map((x,i)=>{
+        const sig=ll[i+1];
         const seg=sig ? Math.round((new Date(x.creado_en)-new Date(sig.creado_en))/1000) : null;
         const veloz = seg!==null && seg<MIN_SEG;
-        const tel = lindo(x.lead_cel||x.whatsapp||'');
+        const tel=lindo(x.lead_cel||x.whatsapp||x.whatsapp2||'');
         return `<div class="llf${veloz?' veloz':''}">
           <span class="h mono">${hora(x.creado_en)}</span>
-          <span class="t mono">${tel||'<i>sin teléfono</i>'}</span>
+          <span class="t mono">${tel||'<i style="opacity:.5">sin teléfono</i>'}</span>
           <span class="e">${esc(x.lead_nombre||'')}</span>
           <span class="r">${esc(x.resultado||'')}</span>
           <span class="s mono">${seg===null?'':(veloz?'⚡':'')+seg+'s'}</span>
@@ -387,8 +387,8 @@ const M={
     }).join('');
 
     caja.innerHTML=`<div class="lldet">
-      <div class="llcab">📞 ${esc(n)} · ${f.length} marcaciones · día, hora y teléfono
-        <span onclick="M.verLlamadas('${esc(n).replace(/'/g,"\'")}')">cerrar ✕</span></div>
+      <div class="llcab">📞 ${esc(n)} · ${f.length} marcaciones
+        <span onclick="document.getElementById('${idc}').innerHTML=''">cerrar ✕</span></div>
       ${filas}</div>`;
   },
 
