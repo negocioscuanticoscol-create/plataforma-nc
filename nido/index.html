@@ -1357,10 +1357,13 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   /* ---------- CRM ---------- */
   ETAPAS:['contactado','interesado','pedido','cliente'],
   EM:{contactado:'👋 Contactado',interesado:'💡 Interesado',pedido:'📋 Pedido',cliente:'🛒 Cliente'},
-  /* Los pasos del que llega de Lupe. Son los del VENDEDOR, no los del
-     telemercadeo: el lead ya llego contactado por telefono. Misma lista que
-     usa CED para el canal marcador, para que no haya dos embudos distintos. */
-  PASOS_LUPE:['👋 Contactado','🔔 Seguimiento','🎁 Muestras','🛒 Primer pedido'],
+  /* Los pasos del que llega de Lupe, como los definio Jose:
+       Contactado  · la llamada de Lupe. Llega marcado, con la fecha real de
+                     esa llamada -no la de cuando entro al CRM-.
+       Seguimiento · la SEGUNDA llamada, ya del vendedor.
+       Cotizacion  · aca no van muestras: se cotiza.
+       Primer pedido · cerro. */
+  PASOS_LUPE:['👋 Contactado','🔔 2ª llamada','📄 Cotización','🛒 Primer pedido'],
 
   /* Marca o desmarca un paso. Cada circulo se marca SOLO y queda con su fecha;
      al volver a tocarlo se borra, para deshacer un mal toque. No arrastra a los

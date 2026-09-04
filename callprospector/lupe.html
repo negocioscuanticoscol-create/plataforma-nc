@@ -832,6 +832,10 @@ async function alEmbudo(x){
         telefono: tel,
         ciudad:  x.lead_ciudad || null,
         canal:   'lupe',
+        /* El primer paso del embudo ya esta hecho: esta llamada ES el
+           contacto. Se estampa con la fecha de hoy para que el CRM no lo
+           pida otra vez ni lo muestre vacio. */
+        fechas:  {0: new Date().toISOString().slice(0,10)},
         etapa:   2,                                          // ya se le mando la informacion
         contactado_por: YO.nombre || null,
         base_origen: BASE.nombre,
