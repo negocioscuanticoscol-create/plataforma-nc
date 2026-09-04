@@ -271,7 +271,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260902-liquidar';
+const VER='20260903-jefe-ve-equipo';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -619,19 +619,44 @@ async function verCategoria(k, mantener){
   if(!mantener) pintarTarifas();
   const c2=$('cat_'+k.replace(/\s/g,'_')); if(!c2) return;
   c2.innerHTML='<div style="padding:8px 0;font-size:12px;color:var(--faint)">Buscando…</div>';
+  /* El jefe puede mirar lo de todo el equipo; los demas solo lo suyo. El
+     filtro por agente se quita SOLO cuando esJefe() lo permite, para que
+     nadie vea los interesados de otro. */
+  const equipo = esJefe() && VER_EQUIPO;
   const d=await GETALL('mkr_llamadas?select=id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
-    +'whatsapp2,correo,creado_en,validado,trabajado&resultado=eq.'+encodeURIComponent(k)
-    +'&agente_id=eq.'+YO.id+'&order=creado_en.desc');
+    +'whatsapp2,correo,creado_en,validado,trabajado,agente&resultado=eq.'+encodeURIComponent(k)
+    +(equipo?'':'&agente_id=eq.'+YO.id)+'&order=creado_en.desc');
   const filas=Array.isArray(d)?d:[];
   const cnt=$('cnt_cat_'+k.replace(/\s/g,'_')); if(cnt) cnt.textContent=' · '+num(filas.length);
   const c3=$('cat_'+k.replace(/\s/g,'_')); if(!c3) return;
-  if(!filas.length){ c3.innerHTML='<div style="padding:8px 0;font-size:12px;color:var(--faint)">Todavía no has marcado ninguna así.</div>'; return; }
-  c3.innerHTML = (k==='Interesado') ? filas.map(filaInteresado).join('')
+  /* El boton de "todo el equipo" solo se dibuja para el jefe. */
+  const sw = esJefe()
+    ? `<div style="padding:7px 0;border-top:1px solid var(--line)">
+         <button onclick="verEquipo('${esc(k).replace(/'/g,'')}')"
+           style="font-size:12px;padding:5px 10px;border-radius:8px;cursor:pointer;
+                  border:1px solid var(--line);background:${equipo?'#0b1f2a':'transparent'};
+                  color:${equipo?'#fff':'inherit'}">
+           ${equipo?'👥 Viendo todo el equipo':'👤 Solo los míos'}
+         </button>
+       </div>` : '';
+  if(!filas.length){ c3.innerHTML=sw+'<div style="padding:8px 0;font-size:12px;color:var(--faint)">'
+      +(equipo?'Nadie ha marcado ninguna así.':'Todavía no has marcado ninguna así.')+'</div>'; return; }
+  c3.innerHTML = sw + ((k==='Interesado') ? filas.map(x=>filaInteresado(x,equipo)).join('')
     : filas.map(x=>`<div style="display:flex;gap:8px;padding:5px 0;border-top:1px solid var(--line);font-size:12px">
         <div style="flex:1;min-width:0">${esc(x.lead_nombre||'(sin nombre)')}
-          <span style="color:var(--faint)">${esc(x.lead_ciudad||'')}</span></div>
+          <span style="color:var(--faint)">${esc(x.lead_ciudad||'')}</span>
+          ${equipo&&x.agente?'<span style="color:var(--faint)"> · '+esc(x.agente)+'</span>':''}</div>
         <div style="color:var(--faint);white-space:nowrap">${esc(String(x.creado_en||'').slice(0,10))}</div>
-      </div>`).join('');
+      </div>`).join(''));
+}
+
+/* Prende y apaga la vista de todo el equipo. Solo responde si es jefe: si
+   alguien la llama desde la consola sin serlo, no pasa nada. */
+let VER_EQUIPO=false;
+function verEquipo(k){
+  if(!esJefe()) return;
+  VER_EQUIPO=!VER_EQUIPO;
+  verCategoria(k, true);
 }
 
 /* ==================== MARCAR ==================== */
@@ -729,7 +754,7 @@ function pintarInteresados(){
 /* Una sola forma de pintar el interesado, usada por la lista de arriba Y por la
    categoria desplegada: si se pintaran distinto, en un lado faltaria el segundo
    celular o la casilla, y nadie se daria cuenta. */
-function filaInteresado(x){
+function filaInteresado(x, equipo){
   const lindo=t=>String(t||'').replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3');
   /* Los dos numeros, no uno: el marcado es por donde se llamo y el otro es el
      que dieron para mandar la informacion. Con uno solo toca adivinar. */
@@ -738,6 +763,7 @@ function filaInteresado(x){
   /* Se dice lo que FALTA, no se deja el hueco en blanco: si no se ve que falta
      el nombre, nadie lo pregunta cuando escribe. */
   const det=[x.lead_ciudad||'',
+             (equipo && x.agente) ? '📞 '+esc(x.agente) : '',
              x.contacto ? '👤 '+esc(x.contacto) : '<span class="falta">sin nombre de contacto</span>',
              x.correo ? '✉️ '+esc(x.correo) : '',
              x.validado ? '' : '<span class="falta">sin datos · no ha pagado</span>',
