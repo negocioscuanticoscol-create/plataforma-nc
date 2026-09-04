@@ -143,6 +143,11 @@ footer b{color:var(--dim)}
 .llf .s{opacity:.5;font-size:11px;text-align:right}
 .llf .v{font-size:11px;text-align:right;color:#22c55e;font-weight:700}
 .llf .v.nov{color:inherit;opacity:.35;text-decoration:line-through;font-weight:400}
+.lltot{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  padding:5px 0 7px;border-top:1px solid rgba(128,128,128,.30);font-size:12px}
+.lltot span{opacity:.7}
+.lltot b{color:#22c55e;font-size:13px}
+.lltot i{opacity:.4;text-decoration:line-through;font-style:normal;font-size:11.5px}
 .llf.veloz{background:rgba(239,68,68,.10)}
 .llf.veloz .s{color:#ef4444;opacity:1;font-weight:700}
 @media(max-width:640px){
@@ -394,8 +399,18 @@ const M={
           <span class="s mono">${seg===null?'':(veloz?'⚡':'')+seg+'s'}</span>
         </div>`;
       }).join('');
+      const paga=ll.reduce((t,x)=>t+(x.validado?(+x.valor||0):0),0);
+      const cruda=ll.reduce((t,x)=>t+(+x.valor||0),0);
+      const rapidas=ll.filter((x,i)=>{ const g=ll[i+1];
+        return g && Math.round((new Date(x.creado_en)-new Date(g.creado_en))/1000)<MIN_SEG; }).length;
+      const desde=ll[ll.length-1], hasta=ll[0];
       return `<div class="lldia"><b>${dia(k+'T12:00:00')}</b>
-        <span>${ll.length} llamada${ll.length===1?'':'s'}</span></div>${cuerpo}`;
+        <span>${hora(desde.creado_en)} a ${hora(hasta.creado_en)} · ${ll.length} llamada${ll.length===1?'':'s'}</span></div>
+        ${cuerpo}
+        <div class="lltot">
+          <span>Total del día · ${ll.length} marcaciones${rapidas?' · <b style="color:#ef4444">'+rapidas+' demasiado rápidas</b>':''}</span>
+          <b class="mono">${cop(paga)}</b>${cruda!==paga?`<i class="mono">${cop(cruda)}</i>`:''}
+        </div>`;
     }).join('');
 
     caja.innerHTML=`<div class="lldet">
