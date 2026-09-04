@@ -209,6 +209,10 @@ const MIN_SEG=25, META_INT=8;
 const VENTA=[['nuevo','Nuevo'],['contactado','Contactado'],['cotizo','Cotizó'],['compro','Compró'],['perdido','Perdido']];
 const NIVELES=['principiante','intermedio','avanzado','asesor'];
 
+/* A quien se le tiene abierto el detalle de llamadas. Hay que recordarlo
+   porque la pantalla se repinta sola cada 8 segundos: sin esto, el cajon
+   se cerraba solo a los pocos segundos de abrirlo. */
+let LLAM_ABIERTA='';
 const M={
   vista:'calidad', base:'', filas:[], agentes:[], bases:[],
 
@@ -273,7 +277,7 @@ const M={
 
     if(!d.length){ $('main').innerHTML='<div class="vacio">Todavía nadie ha marcado en esta base.</div>'; return; }
     if(this.vista==='calidad')    return this.vCalidad(ag);
-    if(this.vista==='personas')   return this.vPersonas(ag);
+    if(this.vista==='personas'){ this.vPersonas(ag); this.pintarLlamadas(); return; }
     if(this.vista==='interesados')return this.vInteresados();
   },
 
@@ -325,7 +329,7 @@ const M={
         <div class="mets">
           <div style="cursor:pointer" onclick="M.verLlamadas(${esc(JSON.stringify(a.n))})"
                title="Ver día, hora y teléfono de cada llamada">
-            <b class="mono">${num(a.total)}</b><span>Llamadas ▸</span></div>
+            <b class="mono">${num(a.total)}</b><span>Llamadas ${LLAM_ABIERTA===a.n?'▾':'▸'}</span></div>
           <div class="${cRit}"><b class="mono">${a.ritmo===null?'—':a.ritmo+'s'}</b><span>Ritmo</span></div>
           <div class="${cInt}"><b class="mono">${a.pctInt}%</b><span>Interesado</span></div>
           <div class="${cRap}"><b class="mono">${a.pctRap}%</b><span>Dudosas</span></div>
@@ -346,14 +350,19 @@ const M={
      telefono de cada marcacion, en orden. Sirve para ver si de verdad estuvo
      llamando o si metio veinte en cinco minutos. */
   verLlamadas(n){
-    /* Solo abre y cierra el cajon de esa persona. NO se repinta la pantalla:
-       antes se llamaba a pintar() aqui y el cajon nacia de nuevo vacio. */
-    const idc='ll_'+String(n).replace(/[^a-zA-Z0-9]/g,'');
-    const caja=document.getElementById(idc);
-    if(!caja){ console.warn('No encuentro el cajon',idc); return; }
-    if(caja.innerHTML.trim()){ caja.innerHTML=''; return; }   // segundo toque, cierra
+    LLAM_ABIERTA = (LLAM_ABIERTA===String(n)) ? '' : String(n);   // segundo toque, cierra
+    this.pintarLlamadas();
+  },
 
-    const f=this.datos().filter(x=>String(x.agente)===String(n))
+  /* Llena el cajon del agente que este abierto. Se llama tambien despues de
+     cada repintado, para que el detalle no se cierre solo. */
+  pintarLlamadas(){
+    document.querySelectorAll('[id^="ll_"]').forEach(c=>{ c.innerHTML=''; });
+    const n=LLAM_ABIERTA; if(!n) return;
+    const idc='ll_'+n.replace(/[^a-zA-Z0-9]/g,'');
+    const caja=document.getElementById(idc); if(!caja) return;
+
+    const f=this.datos().filter(x=>String(x.agente)===n)
       .sort((a,b)=>String(b.creado_en).localeCompare(String(a.creado_en)));
     if(!f.length){ caja.innerHTML='<div class="lldet">Sin llamadas en esta base.</div>'; return; }
 
@@ -361,9 +370,9 @@ const M={
     const dia=t=>new Date(t).toLocaleDateString('es-CO',{weekday:'long',day:'2-digit',month:'short'});
     const hora=t=>new Date(t).toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
 
-    /* Agrupado por dia para que se lea como una jornada. Dentro de cada dia
-       van de la mas nueva a la mas vieja, y al lado los segundos que pasaron
-       desde la marcacion anterior: ahi se ve si de verdad estuvo llamando. */
+    /* Agrupado por dia para que se lea como una jornada. Al lado de cada
+       marcacion van los segundos desde la anterior: ahi se ve si de verdad
+       estuvo llamando o si metio veinte seguidas. */
     const porDia={};
     f.forEach(x=>{ const k=String(x.creado_en).slice(0,10); (porDia[k]=porDia[k]||[]).push(x); });
 
@@ -388,7 +397,7 @@ const M={
 
     caja.innerHTML=`<div class="lldet">
       <div class="llcab">📞 ${esc(n)} · ${f.length} marcaciones
-        <span onclick="document.getElementById('${idc}').innerHTML=''">cerrar ✕</span></div>
+        <span onclick="M.verLlamadas(${esc(JSON.stringify(n))})">cerrar ✕</span></div>
       ${filas}</div>`;
   },
 
