@@ -1435,9 +1435,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <div class="nm">${this.esc(l.nombre||'—')} <span class="chip tipo">${this.esc(l.tipo||'—')}</span>
           <span class="chip">${this.ORIGICO[l.origen]||'❔'} ${this.esc(l.origen||'sin origen')}</span></div>
         <div class="mt">${l.telefono?'📞 '+this.esc(l.telefono):''}${l.local_num?' · 🏬 Local '+this.esc(l.local_num):''}${l.ciudad?' · '+this.esc(l.ciudad):''}${l.interes?' · '+this.esc(l.interes):''}</div></div>
-        ${l._emb?`<a href="https://wa.me/57${String(l.telefono||'').replace(/\D/g,'')}" target="_blank"
-             style="text-decoration:none;font-size:18px" title="Escribirle por WhatsApp">📱</a>`
-          :`<a onclick="App.leadDel('${l.id}')" style="cursor:pointer;color:var(--bad)">✕</a>`}</div>
+        ${l._emb?'':`<a onclick="App.leadDel('${l.id}')" style="cursor:pointer;color:var(--bad)">✕</a>`}</div>
         ${l._emb ? this._embLupe(l)
           : `<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${this.ETAPAS.map(e=>`<span class="et ${l.etapa===e?'on':''}" onclick="App.leadEtapa('${l.id}','${e}')">${this.EM[e]}</span>`).join('')}</div>`}</div>`).join('')
         :`<div class="empty">${f==='todos'?'Todavía no hay contactos. Marca la base de Lupe y van entrando solos.'
