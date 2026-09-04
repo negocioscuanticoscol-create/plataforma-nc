@@ -141,9 +141,9 @@ const App = {
       {v:'admin', ic:'⚙️', t:'Equipo'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats'],
-      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats'],
+    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats','datos','admin','permisos','itinerario'];
+    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats','itinerario'],
+      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats','itinerario'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
       facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
@@ -163,6 +163,7 @@ const App = {
   },
   _GRUPOS:{
     panel:[['panel','📈','Panel'],['dashboard','📊','Resultados']],
+    despachos:[['despachos','🚚','Despachos'],['itinerario','🚐','Itinerario']],
     clientes:[['clientes','👥','Clientes'],['cobertura','🗺️','Cobertura'],['ventas','💰','Ventas'],['autopedido','🛒','Autopedido']],
   },
   _grupoDe(view){ for(const g in this._GRUPOS){ if(this._GRUPOS[g].some(i=>i[0]===view)) return g; } return null; },
@@ -190,6 +191,7 @@ const App = {
     if(window.NC_EMPRESA==='smart' && view==='despachos') return this.vDespachosSmart();
     if(window.NC_EMPRESA==='smart' && view==='autopedido') return this.vAutoPedidosSmart();
     if(view==='comisiones') return this.vComisiones();
+    if(view==='itinerario') return this.vItinerario();
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
@@ -3952,6 +3954,82 @@ const App = {
     const { error } = await this.sb.from('config').update({value:nuevo, updated_at:new Date().toISOString()}).eq('key','nav_permisos');
     if(error){ alert('Error: '+error.message); return; }
     this._permisos=nuevo; this.pintarNav(); this.toast('Permisos guardados ✅');
+  },
+
+  /* ===================== ITINERARIO DEL CAMION =====================
+     Que dia sale el camion propio para cada ciudad. Lo lee el cotizador
+     (cotizador-smart) cuando el vendedor elige "Transporte Smart", para
+     recordarle al cliente cuando sale el despacho. Tabla: nc_itinerario. */
+  _DIAS:['lunes','martes','miércoles','jueves','viernes','sábado','domingo'],
+
+  async vItinerario(){
+    this.loading();
+    const { data:rows } = await this.sb.from('nc_itinerario').select('*').eq('empresa','smart').order('ciudad');
+    this._itin = rows || [];
+    this._itinEd = null;
+    this.set(this._itinHTML());
+  },
+  _itinHTML(){
+    const ed = this._itinEd ? (this._itin.find(r=>r.id===this._itinEd) || null) : null;
+    const dias = ed ? (ed.dias||[]) : [];
+    const chips = this._DIAS.map(d=>`<label style="display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid var(--linea);border-radius:16px;font-size:12.5px;cursor:pointer;margin:0 6px 6px 0"><input type="checkbox" class="it-dia" value="${d}" ${dias.includes(d)?'checked':''} style="accent-color:var(--naranja)">${d}</label>`).join('');
+    const lista = this._itin.length ? this._itin.map(r=>{
+      const ds=(r.dias||[]).join(' · ')||'sin día';
+      return `<div class="card" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+        <div>
+          <div style="font-weight:700;font-size:15px">${esc(r.ciudad)}${r.depto?` <span style="font-weight:400;color:var(--suave);font-size:12.5px">· ${esc(r.depto)}</span>`:''}${r.activo?'':' <span style="color:#b3261e;font-size:11.5px">(inactiva)</span>'}</div>
+          <div style="font-size:13px;color:var(--naranja);font-weight:600;margin-top:3px">🚐 sale los ${esc(ds)}</div>
+          ${r.nota?`<div class="hint">${esc(r.nota)}</div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;flex:0 0 auto">
+          <button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.itinEditar('${r.id}')">✏️</button>
+          <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.itinBorrar('${r.id}')">🗑️</button>
+        </div>
+      </div>`;
+    }).join('') : '<div class="hint">Todavía no hay ninguna ciudad en el itinerario.</div>';
+
+    return `<h1>🚐 Itinerario del camión</h1>
+      <div class="sub">Qué día sale el camión propio para cada ciudad</div>
+      <div class="hint" style="margin-bottom:12px">Esto es lo que ve el vendedor en el cotizador cuando elige <b>Transporte Smart</b>. Si una ciudad no está acá, el cotizador avisa que no hay ruta pero igual deja cotizar.</div>
+      <div class="card">
+        <label>Ciudad *</label>
+        <input type="text" id="it-ciudad" placeholder="Pereira" value="${ed?esc(ed.ciudad):''}">
+        <label style="margin-top:10px">Departamento</label>
+        <input type="text" id="it-depto" placeholder="Risaralda" value="${ed&&ed.depto?esc(ed.depto):''}">
+        <label style="margin-top:10px">Días que sale el camión *</label>
+        <div style="margin:4px 0 6px">${chips}</div>
+        <label style="margin-top:6px">Nota (opcional)</label>
+        <input type="text" id="it-nota" placeholder="Ej: pedidos hasta el lunes 3 pm" value="${ed&&ed.nota?esc(ed.nota):''}">
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-main" style="flex:1" onclick="App.itinGuardar()">${ed?'Guardar cambios':'＋ Agregar ciudad'}</button>
+          ${ed?`<button class="btn btn-ghost" onclick="App.itinCancelar()">Cancelar</button>`:''}
+        </div>
+      </div>
+      ${lista}`;
+  },
+  itinEditar(id){ this._itinEd=id; this.set(this._itinHTML()); window.scrollTo(0,0); },
+  itinCancelar(){ this._itinEd=null; this.set(this._itinHTML()); },
+  async itinGuardar(){
+    const ciudad=($('it-ciudad').value||'').trim();
+    const depto=($('it-depto').value||'').trim();
+    const nota=($('it-nota').value||'').trim();
+    const dias=[...document.querySelectorAll('.it-dia:checked')].map(c=>c.value);
+    if(!ciudad){ alert('Falta la ciudad.'); return; }
+    if(!dias.length){ alert('Marca al menos un día de salida.'); return; }
+    const fila={empresa:'smart', ciudad, depto:depto||null, dias, nota:nota||null, activo:true, actualizado_en:new Date().toISOString()};
+    let error;
+    if(this._itinEd){ ({ error } = await this.sb.from('nc_itinerario').update(fila).eq('id',this._itinEd)); }
+    else { ({ error } = await this.sb.from('nc_itinerario').insert(fila)); }
+    if(error){ alert('No se pudo guardar: '+error.message); return; }
+    this.toast(this._itinEd?'Itinerario actualizado ✅':'Ciudad agregada ✅');
+    this._itinEd=null; await this.vItinerario();
+  },
+  async itinBorrar(id){
+    const r=this._itin.find(x=>x.id===id);
+    if(!confirm('¿Quitar '+((r&&r.ciudad)||'esta ciudad')+' del itinerario?\n\nEl cotizador dejará de mostrar el día para esa ciudad.')) return;
+    const { error } = await this.sb.from('nc_itinerario').delete().eq('id',id);
+    if(error){ alert('No se pudo borrar: '+error.message); return; }
+    this.toast('Ciudad quitada'); await this.vItinerario();
   },
 
   /* ---------- ADMIN (equipo) ---------- */

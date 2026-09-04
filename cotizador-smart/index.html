@@ -147,8 +147,17 @@ a{text-decoration:none;color:inherit}
 .fbox{background:var(--gl);border:1px solid rgba(45,158,95,.25);border-radius:var(--r);padding:11px 14px;margin-bottom:13px;font-size:12px;color:var(--green);line-height:1.6}
 
 .transp-label{font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.05em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;margin-bottom:8px;margin-top:14px;display:block}
-.transp-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.transp-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+@media(max-width:620px){.transp-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:400px){.transp-grid{grid-template-columns:1fr}}
+/* Transporte Smart: caja del itinerario + valor a mano */
+#smartbox{display:none;border:2px solid var(--gm);border-radius:var(--r);background:var(--gl);padding:12px 14px;margin:-6px 0 14px}
+#smartbox.on{display:block}
+#smartbox .sb-dia{font-size:13px;font-weight:700;color:var(--green);display:flex;align-items:center;gap:7px;margin-bottom:3px}
+#smartbox .sb-nota{font-size:11.5px;color:var(--t3);line-height:1.45;margin-bottom:10px}
+#smartbox .sb-warn{color:#b45309}
+#smartbox label{display:block;font-size:11.5px;font-weight:600;color:var(--t);margin-bottom:4px}
+#smartbox input{width:100%;padding:10px 12px;border:1px solid var(--bd);border-radius:9px;font-size:15px;font-weight:700;font-family:inherit;box-sizing:border-box}
 .transp-card{border:2px solid var(--bd);border-radius:var(--r);padding:12px 10px;text-align:center;cursor:pointer;transition:all .15s;background:white}
 .transp-card.tsel{border-color:var(--gm);background:var(--gl)}
 .transp-card .tc-icon{font-size:22px;margin-bottom:5px}
@@ -343,6 +352,17 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
         <div class="tc-title">Transporte propio</div>
         <div class="tc-desc">Flete $0 — recoge el cliente</div>
       </div>
+      <div class="transp-card" id="tr-smart" onclick="setTransporte('smart')">
+        <div class="tc-icon">🚐</div>
+        <div class="tc-title">Transporte Smart</div>
+        <div class="tc-desc">Camión propio — según itinerario</div>
+      </div>
+    </div>
+    <div id="smartbox">
+      <div class="sb-dia" id="sb-dia">🗓️ Escribe la ciudad de entrega para ver el día</div>
+      <div class="sb-nota" id="sb-nota"></div>
+      <label for="sb-valor">Valor del transporte (lo escribes tú) *</label>
+      <input type="text" id="sb-valor" inputmode="numeric" placeholder="Ej: 120.000" oninput="onFleteSmart()">
     </div>
     <div class="toggle-envio" id="toggle-envio" onclick="toggleEnvioDif()">
       <div><div class="te-label">Enviar a dirección diferente</div><div class="te-sub" id="envio-sub">Toca para ingresar otra dirección de entrega</div></div>
@@ -515,18 +535,95 @@ const allProds = () => [...CAT.fp, ...CAT.pm, ...CAT.nr];
 
 let tipo = 'nat', envioDif = false, pedidoMuestras = false, tipoTransporte = 'incluido', kitTipo = '60';
 
+/* ===================== TRANSPORTE SMART (camion propio) =====================
+   El itinerario (que dia sale el camion para cada ciudad) NO vive aca: vive en
+   la tabla nc_itinerario y se edita en la plataforma (Despachos > Itinerario).
+   Aca solo se lee. Si la ciudad no tiene ruta, avisa pero deja cotizar igual.  */
+let ITINERARIO = [];
+let fleteSmart = 0;
+
+async function loadItinerario(){
+  try{
+    const r = await fetch(SBU+'/rest/v1/nc_itinerario?empresa=eq.smart&activo=eq.true&select=ciudad,depto,dias,nota&limit=1000',
+                          {headers:{apikey:SBK, Authorization:'Bearer '+SBK}});
+    const j = await r.json();
+    ITINERARIO = Array.isArray(j) ? j : [];
+  }catch(e){ ITINERARIO = []; }
+  pintarSmart();
+}
+
+function ciudadEntrega(){
+  if(envioDif) return g('env-ciu');
+  return tipo==='nat' ? g('ciu') : g('ciuj');
+}
+const naIt = s => (s||'').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+function rutaDe(ciudad){
+  const q = naIt(ciudad);
+  if(!q) return null;
+  return ITINERARIO.find(r => naIt(r.ciudad) === q) || null;
+}
+function diasTexto(dias){
+  const d = (dias||[]).filter(Boolean);
+  if(d.length === 0) return '';
+  if(d.length === 1) return 'los ' + d[0];
+  return 'los ' + d.slice(0,-1).join(', ') + ' y ' + d[d.length-1];
+}
+/* Frase corta que se repite en el resumen y en el WhatsApp */
+function itinerarioTexto(){
+  const ciu = ciudadEntrega();
+  const ruta = rutaDe(ciu);
+  if(!ciu)  return 'Falta la ciudad de entrega';
+  if(!ruta) return 'Sin ruta definida para ' + ciu + ' — confirma la fecha con Smart';
+  return 'Sale ' + diasTexto(ruta.dias) + ' hacia ' + ruta.ciudad + (ruta.nota ? ' · ' + ruta.nota : '');
+}
+
+function pintarSmart(){
+  const box = document.getElementById('smartbox');
+  if(!box) return;
+  box.classList.toggle('on', tipoTransporte === 'smart');
+  if(tipoTransporte !== 'smart') return;
+  const ciu = ciudadEntrega(), ruta = rutaDe(ciu);
+  const elD = document.getElementById('sb-dia'), elN = document.getElementById('sb-nota');
+  if(!ciu){
+    elD.className = 'sb-dia sb-warn'; elD.textContent = '🗓️ Escribe la ciudad de entrega para ver el día';
+    elN.textContent = '';
+  }else if(!ruta){
+    elD.className = 'sb-dia sb-warn'; elD.textContent = '⚠️ Sin ruta definida para ' + ciu;
+    elN.textContent = 'Esa ciudad todavía no está en el itinerario. Puedes cotizar igual, pero confirma la fecha de despacho antes de prometerla.';
+  }else{
+    elD.className = 'sb-dia'; elD.textContent = '🚐 El camión sale ' + diasTexto(ruta.dias) + ' hacia ' + ruta.ciudad;
+    elN.textContent = ruta.nota || 'Se le recuerda al cliente en la cotización.';
+  }
+}
+/* El valor lo escribe el vendedor: se limpia a numero y se repinta el total */
+function onFleteSmart(){
+  const el = document.getElementById('sb-valor');
+  const n = parseInt(String(el.value).replace(/\D/g,''), 10) || 0;
+  fleteSmart = n;
+  el.value = n ? n.toLocaleString('es-CO') : '';
+}
+
 function setTransporte(t){
   tipoTransporte = t;
-  ['incluido','cobro','propio'].forEach(x=>{
+  ['incluido','cobro','propio','smart'].forEach(x=>{
     const el = document.getElementById('tr-'+x);
     if(el) el.classList.toggle('tsel', x===t);
   });
+  if(t !== 'smart'){ fleteSmart = 0; const v=document.getElementById('sb-valor'); if(v) v.value=''; }
+  pintarSmart();
 }
 
 function getFleteDisplay(){
   if(tipoTransporte==='cobro')  return { monto:0, label:'Al cobro — transportadora cobra en entrega' };
   if(tipoTransporte==='propio') return { monto:0, label:'Transporte propio' };
+  if(tipoTransporte==='smart')  return { monto:fleteSmart, label:(fleteSmart?fmt(fleteSmart):'⚠️ Falta el valor'), smart:true };
   return null;
+}
+function nombreTransporte(){
+  return tipoTransporte==='incluido' ? 'Incluido en factura'
+       : tipoTransporte==='cobro'    ? 'Al cobro'
+       : tipoTransporte==='smart'    ? 'Transporte Smart (camión propio)'
+       : 'Transporte propio';
 }
 let inventory = {};
 
@@ -866,7 +963,7 @@ function buildResumen(){
   const iva=Math.round(subBase*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
   const fleteDisplay = getFleteDisplay();
-  const flete = fleteDisplay ? 0 : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
+  const flete = fleteDisplay ? fleteDisplay.monto : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
   const totalPacas=sel.reduce((a,s)=>a+Math.floor(s.qty/s.prod.pk),0);
   const residuoUds=sel.reduce((a,s)=>a+(s.qty%s.prod.pk),0);
   const cajasResiduo=Math.ceil(residuoUds/200);
@@ -885,7 +982,7 @@ function buildResumen(){
     `<div class="srow"><div class="srl">Dirección de entrega<small>Barrio: ${envio.barrio||'—'}</small></div><div class="srr" style="text-align:right;max-width:60%">${envio.dir}<small>${envio.ciudad}</small></div></div>`+
     (envioDif?`<div class="srow"><div class="srl" style="color:var(--green);font-size:11px">⚠ Envío a dirección diferente al titular</div><div class="srr"></div></div>`:'')+
     (g('ali')?`<div class="srow"><div class="srl">¿Qué envasa?</div><div class="srr">${g('ali')}</div></div>`:'')+
-    `<div class="srow"><div class="srl">Transporte</div><div class="srr">${tipoTransporte==='incluido'?'📦 Incluido en factura':tipoTransporte==='cobro'?'💰 Al cobro':' 🚛 Transporte propio'}</div></div>`+
+    `<div class="srow"><div class="srl">Transporte${tipoTransporte==='smart'?`<small>${itinerarioTexto()}</small>`:''}</div><div class="srr">${tipoTransporte==='incluido'?'📦 Incluido en factura':tipoTransporte==='cobro'?'💰 Al cobro':tipoTransporte==='smart'?'🚐 Transporte Smart':' 🚛 Transporte propio'}</div></div>`+
     (g('notas')?`<div class="srow"><div class="srl">Notas</div><div class="srr" style="text-align:right;max-width:60%">${g('notas')}</div></div>`:'');
   document.getElementById('acuerdo-section').style.display='block';
   document.getElementById('confirmado-box').style.display='none';
@@ -899,6 +996,7 @@ async function cotizacionAceptada(){
   const fd=tipo==='nat'?['dir','bar','ciu','dep']:['dirj','barj','ciuj','depj'];
   const falta=fd.filter(f=>!g(f));
   if(falta.length){ alert('Para pasar a PEDIDO faltan datos de envío (dirección, barrio, ciudad o departamento). Complétalos arriba.\n\nSi aún no los tienes, usa "Guardar cotización" para dejarla en cola.'); goStep(2); return; }
+  if(tipoTransporte==='smart' && !fleteSmart){ alert('Elegiste Transporte Smart pero falta el VALOR del transporte.\n\nEscríbelo en la casilla de abajo del botón, en la sección de transporte.'); goStep(2); const v=document.getElementById('sb-valor'); if(v) v.focus(); return; }
   if(!confirm('¿El cliente YA pagó? Esto la pasa a PEDIDOS.')) return;
   await procesarCot('pedido', true, 'Pasando a pedidos...', '¡Aceptada → Pedido!', 'Pasó a pedidos. Continúa el ciclo (producción, despacho, factura).');
 }
@@ -925,7 +1023,7 @@ function notificarJose(estado){
   const iva=Math.round(subBase*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
   const fleteDisp = getFleteDisplay();
-  const flete = fleteDisp ? 0 : (pedidoMuestras && sel.length===0 ? 0 : calcFlete(sel));
+  const flete = fleteDisp ? fleteDisp.monto : (pedidoMuestras && sel.length===0 ? 0 : calcFlete(sel));
   const grand=subBase+iva+flete+(pedidoMuestras?getKitPrecio():0);
   const fleteStr = fleteDisp ? fleteDisp.label : fmt(flete);
   const comision=calcComision(sel);
@@ -935,7 +1033,7 @@ function notificarJose(estado){
   msg+=`Entrega: ${envio.dir}, ${envio.barrio?'Barrio: '+envio.barrio+', ':''}${envio.ciudad}\n\n`;
   sel.forEach(s=>{ const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; msg+=`▸ ${group} ${s.prod.v} (${s.color==='blanco'?'Blanco':'Transparente'}): ${fmtN(s.qty)} uds\n`; });
   if(pedidoMuestras) msg+=`▸ Kit de muestras · ${fmt(getKitPrecio())}\n`;
-  msg+=`\nFlete: ${fleteStr}\nTOTAL: ${fmt(grand)}\nComisión estimada: ${fmt(comision)}\nTransporte: ${tipoTransporte==='incluido'?'Incluido en factura':tipoTransporte==='cobro'?'Al cobro':'Transporte propio'}\n\n✅ El cliente aceptó la cotización (queda en cola).\nEnvía las formas de pago — al pagar pasa a pedido.`;
+  msg+=`\nFlete: ${fleteStr}\nTOTAL: ${fmt(grand)}\nComisión estimada: ${fmt(comision)}\nTransporte: ${nombreTransporte()}${tipoTransporte==='smart'?'\n🚐 '+itinerarioTexto():''}\n\n✅ El cliente aceptó la cotización (queda en cola).\nEnvía las formas de pago — al pagar pasa a pedido.`;
   window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg), '_blank');
 }
 
@@ -980,7 +1078,8 @@ async function registrarEnSheets(estadoCot, irAPedidos){
   const productos=sel.map(s=>{ const precio=precioLinea(s); const subtotal=s.qty*precio; subBase+=subtotal; const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; return { ref:group+' '+s.prod.v, color:COLNOM[s.color]||'Transparente', qty:s.qty, precio, subtotal }; });
   const iva=Math.round(subBase*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
-  const fleteCalc = getFleteDisplay() ? 0 : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
+  const _fd = getFleteDisplay();
+  const fleteCalc = _fd ? _fd.monto : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
   const grand=subBase+iva+fleteCalc+(pedidoMuestras?getKitPrecio():0);
   const envio=getEnvio();
   const folio=document.getElementById('folio-display').textContent;
@@ -1006,6 +1105,9 @@ async function registrarEnSheets(estadoCot, irAPedidos){
     flete: Math.round(fleteCalc),
     tarifa_flete: esFleteLegacy()?'legacy':'2026',   // con qué política se cotizó — para auditar y para no recalcular al reabrir
     tipo_transporte: tipoTransporte,
+    transporte_nombre: nombreTransporte(),
+    flete_manual: tipoTransporte==='smart' ? String(fleteSmart) : '',
+    itinerario: tipoTransporte==='smart' ? itinerarioTexto() : '',
     total: Math.round(grand),
     comision: Math.round(calcComision(sel)),
     lista_idx: listaActiva, lista_nombre: LISTA_NAMES[listaActiva],
@@ -1138,6 +1240,9 @@ function autofillCot(){
 }
 goStep(2);   // arranca SIEMPRE en Cliente (cliente-primero), aunque no venga ?cliente
 loadClientes().then(()=>{ syncLocalClientes(); autofillCliente(); autofillCot(); });
+loadItinerario();
+/* el dia depende de la ciudad de entrega: si la cambian, se repinta la caja */
+['ciu','ciuj','env-ciu'].forEach(id=>{ const e=document.getElementById(id); if(e) e.addEventListener('input', pintarSmart); });
 function limpiarAviso(){ const av=document.getElementById('aviso-cliente'); if(av) av.style.display='none'; }
 function setListaSel(v){ listaActiva=parseInt(v)||0; promoOn=false; }   // selección manual del nivel de lista
 function buscarCliente(){
