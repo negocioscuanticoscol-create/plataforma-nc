@@ -503,9 +503,15 @@ async function entrarApp(){
     const eq=[...new Set(porBase[bid])].sort();
     SENTIDO[bid]={ puesto: Math.max(0, eq.indexOf(YO.id)), cuantos: eq.length || 1 };
   });
+  /* Cuando Lupe se abre desde una app (nido/index.html?…&app=nido) solo se
+     muestran las bases que le pertenecen a esa app. Asi la persona no ve el
+     pozo entero cuando entro a trabajar un cliente puntual. */
+  const APP=(new URLSearchParams(location.search).get('app')||'').trim().toLowerCase();
   const miNivel=NIVELES.indexOf(YO.nivel||'principiante');
   const miCed=YO.ced||'todos';
   misBases=bases.filter(b=>{
+    // si se entro desde una app, solo las bases que van a esa app
+    if(APP && String(b.destino_app||'').toLowerCase()!==APP) return false;
     /* el CED manda: si a la persona le asignaron un centro, solo ve las bases
        de ese centro. Las bases abiertas a 'todos' las ve cualquiera. */
     const bCed=b.ced||'todos';
@@ -516,16 +522,23 @@ async function entrarApp(){
     return miNivel>=req;
   });
 
+  const avisoApp = APP ? `<div class="s" style="margin-top:4px">
+      Viendo solo las bases de <b>${esc(APP)}</b> ·
+      <a href="?" style="color:inherit">ver todas</a></div>` : '';
+
   if(!misBases.length){
     $('bases').innerHTML=`<h4>Hola, ${esc(YO.nombre)}</h4>
-      <div class="s">Todavía no tienes ninguna base asignada.</div>
-      <div class="vacio">El supervisor te tiene que asignar una desde la<br>hoja de configuración de bases.</div>`;
+      ${APP ? `<div class="s">No hay bases de <b>${esc(APP)}</b> asignadas a ti.</div>
+               <div class="vacio">Puedes <a href="?" style="color:inherit">ver todas tus bases</a>
+                 o pedirle al supervisor que te asigne una.</div>`
+            : `<div class="s">Todavía no tienes ninguna base asignada.</div>
+               <div class="vacio">El supervisor te tiene que asignar una desde la<br>hoja de configuración de bases.</div>`}`;
     return;
   }
   if(misBases.length===1){ abrirBase(misBases[0]); return; }
 
   $('bases').innerHTML=`<h4>Hola, ${esc(YO.nombre)}</h4>
-    <div class="s">Escoge con cuál base vas a trabajar hoy.</div>
+    <div class="s">Escoge con cuál base vas a trabajar hoy.</div>${avisoApp}
     ${misBases.map((b,i)=>`<div class="bcard" onclick="abrirBase(misBases[${i}])">
       <div class="n">${esc(b.nombre)}</div>
       <div class="d">${esc(b.descripcion||'')}</div>

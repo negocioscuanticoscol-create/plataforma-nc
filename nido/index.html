@@ -193,7 +193,7 @@ const App={
   ORIGICO:{'Marcador':'📞','Digital':'📱','Página web':'🌐','Orgánico':'🌱','Local':'🏪'},
   /* «Lupe marca y gana»: el pozo de bases. Ahí se sube la base de
      distribuidores de Nido y ahí se marca; el CRM nace al marcar. */
-  MARCADOR:'../callprospector/lupe.html',
+  MARCADOR:'../callprospector/lupe.html?app=nido',
   _telKey(t){ const d=String(t||'').replace(/\D/g,''); return d.length>10?d.slice(-10):d; },
   /* al escribir el teléfono se busca en el directorio y se rellena lo que ya exista */
   pedTelLookup(v){ const k=this._telKey(v), e=$('p_found');
@@ -267,7 +267,12 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         id:'emb_'+e.id, nombre:e.nombre||'(sin nombre)', telefono:e.telefono||'',
         ciudad:e.ciudad||'', tipo:'Distribuidor', local_num:'',
         etapa:'contactado', interes:e.base_origen||'Lupe',
-        creado_en:e.updated_at, origen:'Marcador', _emb:true }));
+        creado_en:e.updated_at, origen:'Marcador', _emb:true,
+        /* La llave del embudo es el telefono: con ella se marcan los pasos.
+           Se traen las fechas para pintar cada circulo con la suya, igual
+           que en CED. */
+        _lk:e.lead_key, _fechas:e.fechas||{}, _etapa:e.etapa,
+        _quien:e.contactado_por||'' }));
     }catch(e){}
     this._lin=await this._fetch('nido_lineas');
     this._loc=await this._fetch('nido_locales');
@@ -1343,6 +1348,54 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   /* ---------- CRM ---------- */
   ETAPAS:['contactado','interesado','pedido','cliente'],
   EM:{contactado:'👋 Contactado',interesado:'💡 Interesado',pedido:'📋 Pedido',cliente:'🛒 Cliente'},
+  /* Los pasos del que llega de Lupe. Son los del VENDEDOR, no los del
+     telemercadeo: el lead ya llego contactado por telefono. Misma lista que
+     usa CED para el canal marcador, para que no haya dos embudos distintos. */
+  PASOS_LUPE:['👋 Contactado','🔔 Seguimiento','🎁 Muestras','🛒 Primer pedido'],
+
+  /* Marca o desmarca un paso. Cada circulo se marca SOLO y queda con su fecha;
+     al volver a tocarlo se borra, para deshacer un mal toque. No arrastra a los
+     de atras: asi no aparece "Contactado" lleno si nadie lo contacto. */
+  async lupePaso(lk,i){
+    const l=(this._leads||[]).find(x=>x._lk===lk); if(!l) return;
+    const fs=Object.assign({},l._fechas||{});
+    if(fs[i]) delete fs[i]; else fs[i]=new Date().toISOString().slice(0,10);
+    l._fechas=fs;
+    const ks=Object.keys(fs).map(Number).filter(n=>!isNaN(n));
+    l._etapa=ks.length?Math.max.apply(null,ks):-1;
+    this.vCrm();
+    try{
+      await fetch(this.SB+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',{
+        method:'POST',
+        headers:{apikey:this.KEY,Authorization:'Bearer '+this.KEY,
+                 'Content-Type':'application/json',
+                 'Prefer':'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify({empresa:'nido', lead_key:lk, nombre:l.nombre||'',
+          telefono:l.telefono||'', canal:'lupe', etapa:l._etapa, fechas:fs,
+          updated_at:new Date().toISOString()})});
+    }catch(e){ this.toast&&this.toast('No se pudo guardar el paso'); }
+  },
+
+  _embLupe(l){
+    const fs=l._fechas||{};
+    const corta=f=>{const t=String(f||'').slice(0,10).split('-');
+      return t.length===3?(t[2]+'/'+t[1]+'/'+t[0].slice(2)):'';};
+    const dot=on=>`<span style="display:inline-block;width:13px;height:13px;border-radius:50%;
+      vertical-align:middle;background:${on?'#16a34a':'#fff'};
+      border:2px solid ${on?'#0f7a33':'#b9c2cf'}"></span>`;
+    return `<div style="margin-top:8px;border-top:1px dashed var(--line,#e5e2dc);padding-top:8px;
+      display:flex;gap:14px;flex-wrap:wrap">
+      ${this.PASOS_LUPE.map((s,i)=>{const on=fs[i]!=null;
+        return `<span onclick="App.lupePaso('${l._lk}',${i})" title="${on?'Quitar':'Marcar'}: ${s}"
+          style="cursor:pointer;display:inline-flex;flex-direction:column;gap:1px;font-size:10.5px;
+                 font-weight:${on?700:500};color:${on?'#0f7a33':'#6b7686'};white-space:nowrap">
+          <span>${dot(on)} ${s}</span>
+          ${on?`<span style="font-size:9.5px;color:#8a93a6;font-weight:600;padding-left:17px">${corta(fs[i])}</span>`:''}
+        </span>`;}).join('')}
+      ${l._quien?`<span style="font-size:10px;color:#8a93a6;align-self:center">marcó ${this.esc(l._quien)}</span>`:''}
+    </div>`;
+  },
+
   vCrm(){
     const todos=this._leads||[], f=this._crmOrg||'todos';
     const porOrg={}; todos.forEach(l=>{const o=l.origen||'Sin origen'; porOrg[o]=(porOrg[o]||0)+1;});
@@ -1370,8 +1423,11 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         <div class="nm">${this.esc(l.nombre||'—')} <span class="chip tipo">${this.esc(l.tipo||'—')}</span>
           <span class="chip">${this.ORIGICO[l.origen]||'❔'} ${this.esc(l.origen||'sin origen')}</span></div>
         <div class="mt">${l.telefono?'📞 '+this.esc(l.telefono):''}${l.local_num?' · 🏬 Local '+this.esc(l.local_num):''}${l.ciudad?' · '+this.esc(l.ciudad):''}${l.interes?' · '+this.esc(l.interes):''}</div></div>
-        <a onclick="App.leadDel('${l.id}')" style="cursor:pointer;color:var(--bad)">✕</a></div>
-        <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${this.ETAPAS.map(e=>`<span class="et ${l.etapa===e?'on':''}" onclick="App.leadEtapa('${l.id}','${e}')">${this.EM[e]}</span>`).join('')}</div></div>`).join('')
+        ${l._emb?`<a href="https://wa.me/57${String(l.telefono||'').replace(/\D/g,'')}" target="_blank"
+             style="text-decoration:none;font-size:18px" title="Escribirle por WhatsApp">📱</a>`
+          :`<a onclick="App.leadDel('${l.id}')" style="cursor:pointer;color:var(--bad)">✕</a>`}</div>
+        ${l._emb ? this._embLupe(l)
+          : `<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">${this.ETAPAS.map(e=>`<span class="et ${l.etapa===e?'on':''}" onclick="App.leadEtapa('${l.id}','${e}')">${this.EM[e]}</span>`).join('')}</div>`}</div>`).join('')
         :`<div class="empty">${f==='todos'?'Todavía no hay contactos. Marca la base de Lupe y van entrando solos.'
           :'Ningún contacto llegó por '+this.esc(f)+'.'}</div>`}</div>`);
   },
