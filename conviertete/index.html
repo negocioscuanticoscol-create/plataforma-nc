@@ -3,45 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#2E6A45">
+<meta name="theme-color" content="#16191A">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Rutina">
-<title>Rutina de 5 a 9</title>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Conviértete">
+<title>Conviértete</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
 <style>
 :root{
-  --paper:#FAF7EF; --surf:#FFFFFF; --surf2:#F2EFE5;
-  --ink:#1A241E; --ink2:#3D4A42; --mut:#6E7A72;
-  --line:#DFDACD; --line2:#EDE9DE;
-  --green:#2E6A45; --green-s:#E2EDE4;
-  --mus:#B8871C; --mus-b:#D9A32C; --mus-s:#FBF0D6;
-  --clay:#C6402E; --blue:#2E6D8C;
-  --ring:#E3EFE3;
-  --shadow:0 1px 2px rgba(26,36,30,.05),0 4px 14px rgba(26,36,30,.04);
+  /* Paleta tomada del logo: pizarra, cobre, esmeralda y el dorado del texto.
+     La marca es oscura a propósito, así que la app se compromete con un solo
+     mundo visual — y a las 5 a.m. una pantalla blanca no se puede mirar. */
+  --paper:#16191A; --surf:#1F2426; --surf2:#262D2F;
+  --ink:#EDE8DF; --ink2:#C6C2B7; --mut:#8B928D;
+  --line:#313A3C; --line2:#252C2E;
+  --green:#4E9B76; --green-s:#1B2E26;
+  --mus:#E3A96E; --mus-b:#C9884F; --mus-s:#2A2118;
+  --gold:#E9C795;
+  --clay:#DC6A52; --blue:#5D9DBE;
+  --ring:#252D2F;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.28);
   --r:14px;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --paper:#141915; --surf:#1C231E; --surf2:#232B25;
-    --ink:#E9EBE4; --ink2:#C2C9BF; --mut:#8B978D;
-    --line:#2E3830; --line2:#262F28;
-    --green:#5FA97B; --green-s:#1E3327;
-    --mus:#E0B44A; --mus-b:#D9A32C; --mus-s:#332A15;
-    --clay:#E8705C; --blue:#69A9C6; --ring:#25332B;
-    --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.22);
-  }
-}
-:root[data-theme="dark"]{
-  --paper:#141915; --surf:#1C231E; --surf2:#232B25;
-  --ink:#E9EBE4; --ink2:#C2C9BF; --mut:#8B978D;
-  --line:#2E3830; --line2:#262F28;
-  --green:#5FA97B; --green-s:#1E3327;
-  --mus:#E0B44A; --mus-b:#D9A32C; --mus-s:#332A15;
-  --clay:#E8705C; --blue:#69A9C6; --ring:#25332B;
-  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.22);
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -56,6 +41,12 @@ button,input,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2.5px solid var(--green);outline-offset:2px;border-radius:8px}
 
+.marca{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.marca .mk{width:34px;height:34px;flex:none}
+.marca .wm{font-family:"IBM Plex Serif",Georgia,serif;font-weight:700;font-size:17px;
+  letter-spacing:.03em;color:var(--gold)}
+.marca .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);
+  margin-top:-2px;font-weight:600}
 .head{display:flex;align-items:center;gap:15px;margin-bottom:6px}
 .ring{position:relative;width:74px;height:74px;flex:none}
 .ring .pct{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
@@ -68,13 +59,14 @@ button{cursor:pointer}
 .dot{width:7px;height:7px;border-radius:50%;flex:none;background:var(--mut)}
 .dot.on{background:var(--green)} .dot.off{background:var(--mus-b)} .dot.err{background:var(--clay)}
 
-.ahora{background:var(--ink);color:var(--paper);border-radius:var(--r);padding:14px 16px;margin:10px 0 18px}
+.ahora{background:var(--surf2);border:1px solid var(--mus-b);border-left:4px solid var(--mus-b);
+  border-radius:var(--r);padding:14px 16px;margin:10px 0 18px}
 .ahora .lbl{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--mus-b);font-weight:600}
+  text-transform:uppercase;color:var(--mus);font-weight:600}
 .ahora .t{font-size:19px;font-weight:600;margin-top:3px;display:flex;gap:9px;align-items:baseline}
-.ahora .m{font-size:14px;opacity:.85;margin-top:5px;line-height:1.5}
+.ahora .m{font-size:14px;color:var(--ink2);margin-top:5px;line-height:1.5}
 .ahora .go{margin-top:12px;width:100%;min-height:46px;border:0;border-radius:11px;
-  background:var(--mus-b);color:#1A241E;font-weight:700;font-size:15px}
+  background:var(--mus-b);color:#16191A;font-weight:700;font-size:15px}
 
 .riel{position:relative;padding-left:60px}
 .riel::before{content:"";position:absolute;left:23px;top:14px;bottom:14px;width:2px;background:var(--line2)}
@@ -168,7 +160,9 @@ nav button.on{color:var(--green);background:var(--green-s)}
   background:transparent;color:var(--mut);font-size:13px;margin-top:8px}
 .pie{text-align:center;font-size:11px;color:var(--mut);margin-top:22px;line-height:1.7}
 .pie code{font-family:"IBM Plex Mono",monospace;background:var(--surf2);padding:1px 5px;border-radius:4px}
-.puerta{max-width:340px;margin:16vh auto 0;padding:0 18px;text-align:center}
+.puerta{max-width:340px;margin:11vh auto 0;padding:0 18px;text-align:center}
+.puerta .mk{width:120px;height:120px;margin:0 auto}
+.puerta img.logo{max-width:230px;margin:0 auto;display:block}
 .puerta input{width:100%;min-height:54px;margin-top:16px;text-align:center;letter-spacing:.5em;
   font-family:"IBM Plex Mono",monospace;font-size:22px;border-radius:12px;
   border:1.5px solid var(--line);background:var(--surf);padding:10px}
@@ -183,9 +177,9 @@ nav button.on{color:var(--green);background:var(--green-s)}
 
 <script>
 /* ==========================================================================
-   RUTINA DE 5 A 9 · registro personal de José
+   CONVIÉRTETE · Transforma tu vida · registro diario de José
    --------------------------------------------------------------------------
-   BASE DE DATOS: tablas rutina_dia y rutina_config, con prefijo propio.
+   BASE DE DATOS: tablas conviertete_dia y conviertete_config, con prefijo propio.
    NINGUNA otra app de la plataforma las lee ni las escribe, y esta app no
    toca ninguna tabla ajena: acá no hay nc_, kruh_, ced_, mkr_, ff_ ni nido_.
    Si algún día algo no cuadra, es de acá y solo de acá.
@@ -193,8 +187,8 @@ nav button.on{color:var(--green);background:var(--green-s)}
 const SB  = 'https://fnayedgvamxktxfvywwl.supabase.co';
 const K   = 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H   = {apikey:K, Authorization:'Bearer '+K, 'Content-Type':'application/json'};
-const VER = 'v1.0 · 6 sep 2026';
-const PIN = '5920';           /* cortina, no cerradura. Ver la nota del pie. */
+const VER = 'v1.1 · 6 sep 2026';
+const PIN = '1978';           /* cortina, no cerradura. Ver la nota del pie. */
 
 /* ---------- menú del ciclo de 15 días ---------- */
 const MENU = [
@@ -243,6 +237,39 @@ const RUTINA = [
  {id:"dormir",   h:"21:00",ico:"😴",t:"Dormir"}
 ];
 
+/* ---------- la marca ----------
+   El picaflor va dibujado en SVG para que la app tenga cara desde ya.
+   Si en esta misma carpeta existe logo.png (el logo bueno), se carga solo
+   y reemplaza al dibujo sin que haya que tocar nada. */
+function picaflor(tam){
+  return '<svg class="ave" viewBox="0 0 64 64" width="'+tam+'" height="'+tam+'" role="img" aria-label="Conviértete">'+
+    '<defs><linearGradient id="gp'+tam+'" x1="0" y1="1" x2="1" y2="0">'+
+    '<stop offset="0" stop-color="#3C8564"></stop><stop offset=".55" stop-color="#C9884F"></stop>'+
+    '<stop offset="1" stop-color="#E9C795"></stop></linearGradient></defs>'+
+    '<g fill="url(#gp'+tam+')">'+
+    '<path d="M30 28 Q14 12 4 18 Q16 20 22 28 Q26 34 30 28 Z"></path>'+
+    '<path d="M30 34 Q16 34 8 46 Q18 40 25 41 Q31 42 30 34 Z"></path>'+
+    '<path d="M31 22 Q42 18 46 26 Q49 34 41 41 Q34 47 30 41 Q27 33 31 22 Z"></path>'+
+    '<path d="M33 44 L27 60 L35 53 L40 60 L40 44 Z"></path></g>'+
+    '<path d="M45 22 L61 10" stroke="#E9C795" stroke-width="2.4" stroke-linecap="round" fill="none"></path>'+
+    '<circle cx="42" cy="25" r="1.4" fill="#16191A"></circle></svg>';
+}
+function marca(tam, clase){
+  return '<span class="'+clase+'" data-marca="1" style="display:inline-block">'+picaflor(tam)+
+    '<img class="logo" src="logo.png" alt="Conviértete" hidden></span>';
+}
+/* Si logo.png existe, entra y desaparece el dibujo. Si no, no pasa nada. */
+function montarLogo(){
+  document.querySelectorAll('[data-marca] img.logo').forEach(function(img){
+    if(img.dataset.listo) return;
+    img.dataset.listo = "1";
+    img.addEventListener('load', function(){
+      const svg = img.parentNode.querySelector('svg'); if(svg) svg.remove();
+      img.hidden = false;
+    });
+  });
+}
+
 /* ---------- fechas ---------- */
 const iso = d => [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
 const hoyISO = () => iso(new Date());
@@ -275,13 +302,13 @@ async function cargar(){
   try{
     const desde = addDias(St.fecha,-14);
     const [cfg, dias] = await Promise.all([
-      api('rutina_config?id=eq.app&select=inicio,pendientes'),
-      api('rutina_dia?fecha=gte.'+desde+'&select=fecha,done,vals&order=fecha')
+      api('conviertete_config?id=eq.app&select=inicio,pendientes'),
+      api('conviertete_dia?fecha=gte.'+desde+'&select=fecha,done,vals&order=fecha')
     ]);
     if(cfg.length){ St.inicio = cfg[0].inicio; St.pend = cfg[0].pendientes || []; }
     else {
       St.inicio = St.fecha; St.pend = [];
-      await api('rutina_config','POST',{id:'app',inicio:St.fecha,pendientes:[]},
+      await api('conviertete_config','POST',{id:'app',inicio:St.fecha,pendientes:[]},
                 'resolution=merge-duplicates,return=minimal');
     }
     St.dias = {};
@@ -297,7 +324,7 @@ async function cargar(){
 async function guardarDia(f, dato){
   St.dias[f] = dato; pintar();
   try{
-    await api('rutina_dia','POST',{fecha:f, done:dato.done, vals:dato.vals,
+    await api('conviertete_dia','POST',{fecha:f, done:dato.done, vals:dato.vals,
               actualizado:new Date().toISOString()},
               'resolution=merge-duplicates,return=minimal');
     St.estado="ok"; pintarSync();
@@ -307,7 +334,7 @@ async function guardarConfig(campos){
   Object.assign(St, campos.inicio?{inicio:campos.inicio}:{}, campos.pendientes?{pend:campos.pendientes}:{});
   pintar();
   try{
-    await api('rutina_config','POST',Object.assign({id:'app', inicio:St.inicio,
+    await api('conviertete_config','POST',Object.assign({id:'app', inicio:St.inicio,
               pendientes:St.pend, actualizado:new Date().toISOString()}),
               'resolution=merge-duplicates,return=minimal');
     St.estado="ok"; pintarSync();
@@ -366,6 +393,7 @@ function pintar(){
   if(!St.inicio) St.inicio = St.fecha;
   const v = {hoy:vHoy, manana:vManana, progreso:vProgreso, pend:vPend}[St.tab] || vHoy;
   app().innerHTML = cabecera() + v() + pie();
+  montarLogo();
   const tabs=[["hoy","☀️","Hoy"],["manana","🌙","Mañana"],["progreso","📈","Progreso"],["pend","📝","Pendientes"]];
   document.getElementById("nav").innerHTML = tabs.map(t=>
     '<button class="'+(St.tab===t[0]?"on":"")+'" onclick="irA(\''+t[0]+'\')">'+
@@ -375,23 +403,26 @@ function pintarSync(){ const e=document.getElementById("sync"); if(e) e.innerHTM
 
 function puerta(){
   document.getElementById("barra").style.display="none";
-  app().innerHTML = '<div class="puerta"><div style="font-size:34px">🌅</div>'+
-    '<h1 style="font-size:26px;margin-top:8px">Rutina de 5 a 9</h1>'+
-    '<div class="dim" style="margin-top:6px">Tu registro diario. Escribe la clave.</div>'+
+  app().innerHTML = '<div class="puerta">'+marca(120,"mk")+
+    '<h1 style="font-size:30px;margin-top:10px;color:var(--gold);letter-spacing:.02em">CONVIÉRTETE</h1>'+
+    '<div style="font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);'+
+    'margin-top:3px;font-weight:600">Transforma tu vida</div>'+
+    '<div class="dim" style="margin-top:14px">Tu registro diario. Escribe la clave.</div>'+
     '<input id="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" '+
     'placeholder="••••" onkeydown="if(event.key===\'Enter\')entrar()">'+
     '<button onclick="entrar()">Entrar</button></div>';
+  montarLogo();
   const el=document.getElementById("pin"); if(el) el.focus();
 }
 function entrar(){
   const el=document.getElementById("pin");
   if(!el || el.value!==PIN){ avisar("Esa no es la clave."); if(el){el.value="";el.focus();} return; }
-  try{ localStorage.setItem("rutina59_ok","1"); }catch(e){}
+  try{ localStorage.setItem("conviertete_ok","1"); }catch(e){}
   St.entro=true; pintar(); cargar();
 }
 
 function syncHTML(){
-  if(St.estado==="ok")    return '<span class="dot on"></span>Guardado · rutina_dia';
+  if(St.estado==="ok")    return '<span class="dot on"></span>Guardado · conviertete_dia';
   if(St.estado==="error") return '<span class="dot err"></span>Sin conexión · reintenta al tocar';
   return '<span class="dot"></span>Cargando…';
 }
@@ -402,7 +433,9 @@ function cabecera(){
   const hechas = R.filter(r=>d.done[r.id]).length, total = R.length;
   const pct = Math.round(hechas/total*100), C = 2*Math.PI*31;
   const col = pct===100 ? "var(--mus-b)" : "var(--green)";
-  return '<div class="head"><div class="ring">'+
+  return '<div class="marca">'+marca(34,"mk")+
+    '<div><div class="wm">CONVIÉRTETE</div><div class="tag">Transforma tu vida</div></div></div>'+
+    '<div class="head"><div class="ring">'+
     '<svg viewBox="0 0 74 74" width="74" height="74" aria-hidden="true">'+
     '<circle cx="37" cy="37" r="31" fill="none" stroke="var(--ring)" stroke-width="7"></circle>'+
     '<circle cx="37" cy="37" r="31" fill="none" stroke="'+col+'" stroke-width="7" stroke-linecap="round" '+
@@ -414,8 +447,8 @@ function cabecera(){
     '<div class="sync" id="sync">'+syncHTML()+'</div>';
 }
 function pie(){
-  return '<div class="pie">Rutina de 5 a 9 · '+VER+'<br>'+
-    'Sus datos viven solos en <code>rutina_dia</code> y <code>rutina_config</code>.<br>'+
+  return '<div class="pie">Conviértete · '+VER+'<br>'+
+    'Sus datos viven solos en <code>conviertete_dia</code> y <code>conviertete_config</code>.<br>'+
     'Ninguna otra app los lee, y esta no toca ninguna tabla ajena.</div>';
 }
 const textoComida = (r,m) => r.menu==="j" ? JUGO[m.j] : m[r.menu];
@@ -477,8 +510,8 @@ function vManana(){
     '<h2 style="font-size:21px;margin-bottom:4px">Para dejar listo esta noche</h2>'+
     filas.map(x=>'<div class="mealcard" style="border-left-color:'+x[2]+'">'+
       '<div class="k" style="color:'+x[2]+'">'+esc(x[0])+'</div><div class="v">'+esc(x[1])+'</div></div>').join("")+
-    '<div class="card" style="background:var(--ink);border-color:var(--ink);color:var(--paper)">'+
-      '<h2 style="color:var(--paper);font-size:15px">Checklist de la noche</h2>'+
+    '<div class="card" style="border:1px solid var(--mus-b);border-left:4px solid var(--mus-b)">'+
+      '<h2 style="color:var(--mus);font-size:15px">Checklist de la noche</h2>'+
       '<div style="font-size:14px;line-height:1.9">· Bolsa de carne y de pescado del congelador a la nevera<br>'+
       '· Kit del detox y del jugo de las 3 listos en la nevera<br>'+
       '· Taper del carbohidrato y de la verdura al frente</div></div>'+
@@ -600,7 +633,7 @@ function vPend(){
 }
 
 /* ---------- arranque ---------- */
-try{ if(localStorage.getItem("rutina59_ok")==="1") St.entro = true; }catch(e){}
+try{ if(localStorage.getItem("conviertete_ok")==="1") St.entro = true; }catch(e){}
 pintar();
 if(St.entro) cargar();
 
