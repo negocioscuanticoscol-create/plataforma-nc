@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Conviértete">
 <title>Conviértete</title>
+<link rel="icon" type="image/png" href="icono.png">
+<link rel="apple-touch-icon" href="icono.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600;700&display=swap">
@@ -42,7 +44,9 @@ button{cursor:pointer}
 :focus-visible{outline:2.5px solid var(--green);outline-offset:2px;border-radius:8px}
 
 .marca{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.marca .mk{width:34px;height:34px;flex:none}
+.marca .mk{width:36px;height:36px;flex:none}
+[data-marca] img.marca-img{width:100%;height:auto;display:block}
+.marca .mk img.marca-img{border-radius:8px}
 .marca .wm{font-family:"IBM Plex Serif",Georgia,serif;font-weight:700;font-size:17px;
   letter-spacing:.03em;color:var(--gold)}
 .marca .tag{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut);
@@ -161,8 +165,8 @@ nav button.on{color:var(--green);background:var(--green-s)}
 .pie{text-align:center;font-size:11px;color:var(--mut);margin-top:22px;line-height:1.7}
 .pie code{font-family:"IBM Plex Mono",monospace;background:var(--surf2);padding:1px 5px;border-radius:4px}
 .puerta{max-width:340px;margin:11vh auto 0;padding:0 18px;text-align:center}
-.puerta .mk{width:120px;height:120px;margin:0 auto}
-.puerta img.logo{max-width:230px;margin:0 auto;display:block}
+.puerta .mk{width:230px;max-width:78vw;margin:0 auto}
+.puerta .mk img.marca-img{border-radius:16px;box-shadow:0 10px 34px rgba(0,0,0,.5)}
 .puerta input{width:100%;min-height:54px;margin-top:16px;text-align:center;letter-spacing:.5em;
   font-family:"IBM Plex Mono",monospace;font-size:22px;border-radius:12px;
   border:1.5px solid var(--line);background:var(--surf);padding:10px}
@@ -238,9 +242,9 @@ const RUTINA = [
 ];
 
 /* ---------- la marca ----------
-   El picaflor va dibujado en SVG para que la app tenga cara desde ya.
-   Si en esta misma carpeta existe logo.png (el logo bueno), se carga solo
-   y reemplaza al dibujo sin que haya que tocar nada. */
+   El logo bueno vive acá al lado: icono.png (solo el arte, para la cabecera
+   y el ícono del celular) y logo.jpg (el lockup con el texto, para la
+   entrada). El picaflor en SVG queda de respaldo por si alguna no carga. */
 function picaflor(tam){
   return '<svg class="ave" viewBox="0 0 64 64" width="'+tam+'" height="'+tam+'" role="img" aria-label="Conviértete">'+
     '<defs><linearGradient id="gp'+tam+'" x1="0" y1="1" x2="1" y2="0">'+
@@ -254,13 +258,13 @@ function picaflor(tam){
     '<path d="M45 22 L61 10" stroke="#E9C795" stroke-width="2.4" stroke-linecap="round" fill="none"></path>'+
     '<circle cx="42" cy="25" r="1.4" fill="#16191A"></circle></svg>';
 }
-function marca(tam, clase){
+function marca(tam, clase, archivo){
   return '<span class="'+clase+'" data-marca="1" style="display:inline-block">'+picaflor(tam)+
-    '<img class="logo" src="logo.png" alt="Conviértete" hidden></span>';
+    '<img class="marca-img" src="'+archivo+'" alt="Conviértete" hidden></span>';
 }
-/* Si logo.png existe, entra y desaparece el dibujo. Si no, no pasa nada. */
+/* Cuando la imagen carga, entra y se va el dibujo. Si faltara, queda el picaflor. */
 function montarLogo(){
-  document.querySelectorAll('[data-marca] img.logo').forEach(function(img){
+  document.querySelectorAll('[data-marca] img.marca-img').forEach(function(img){
     if(img.dataset.listo) return;
     img.dataset.listo = "1";
     img.addEventListener('load', function(){
@@ -403,11 +407,8 @@ function pintarSync(){ const e=document.getElementById("sync"); if(e) e.innerHTM
 
 function puerta(){
   document.getElementById("barra").style.display="none";
-  app().innerHTML = '<div class="puerta">'+marca(120,"mk")+
-    '<h1 style="font-size:30px;margin-top:10px;color:var(--gold);letter-spacing:.02em">CONVIÉRTETE</h1>'+
-    '<div style="font-size:11.5px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);'+
-    'margin-top:3px;font-weight:600">Transforma tu vida</div>'+
-    '<div class="dim" style="margin-top:14px">Tu registro diario. Escribe la clave.</div>'+
+  app().innerHTML = '<div class="puerta">'+marca(230,"mk","logo.jpg")+
+    '<div class="dim" style="margin-top:18px">Tu registro diario. Escribe la clave.</div>'+
     '<input id="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" '+
     'placeholder="••••" onkeydown="if(event.key===\'Enter\')entrar()">'+
     '<button onclick="entrar()">Entrar</button></div>';
@@ -433,7 +434,7 @@ function cabecera(){
   const hechas = R.filter(r=>d.done[r.id]).length, total = R.length;
   const pct = Math.round(hechas/total*100), C = 2*Math.PI*31;
   const col = pct===100 ? "var(--mus-b)" : "var(--green)";
-  return '<div class="marca">'+marca(34,"mk")+
+  return '<div class="marca">'+marca(36,"mk","icono.png")+
     '<div><div class="wm">CONVIÉRTETE</div><div class="tag">Transforma tu vida</div></div></div>'+
     '<div class="head"><div class="ring">'+
     '<svg viewBox="0 0 74 74" width="74" height="74" aria-hidden="true">'+
