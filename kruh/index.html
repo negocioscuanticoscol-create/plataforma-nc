@@ -133,7 +133,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['fidelidad','❤️ Fidelización'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
   view:'dashboard',
   _savingPedido:false,
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
@@ -382,7 +382,7 @@ const App={
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
     this.view=v; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,fidelidad:this.vFidelidad,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ const m=$('main'); m.className=''; m.style.cssText=''; m.innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -1098,6 +1098,155 @@ const App={
     if(cats.includes(cat))cats=cats.filter(c=>c!==cat); else cats.push(cat); const val=cats.join(', ');
     await PATCH('kruh_leads?id=eq.'+id,{categorias:val}); l.categorias=val; this.vCrm(); },
   async leadDel(id){ if(!this._okBorrar())return; await DEL('kruh_leads?id=eq.'+id); this.vCrm(); },
+
+
+  /* ===================== FIDELIZACIÓN =====================
+     Una sola lista con TODO el mundo: el que nos compró y el que solo está
+     registrado. El celular es la llave — el mismo _telKey de siempre (los
+     últimos 10 dígitos), que es lo que amarra el CRM con las ventas. Si dos
+     fichas traen el mismo celular se muestran como una sola, porque son la
+     misma persona.
+     Se refresca sola cada 45 segundos: la cajera factura en otro equipo y
+     esta pantalla tiene que irlo viendo. */
+  async vFidelidad(){
+    this.loading();
+    await this._fidCargar();
+    this._fidPaint();
+    if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
+    this._aseTick=setInterval(async()=>{
+      if(this.view!=='fidelidad'){ clearInterval(this._aseTick); this._aseTick=null; return; }
+      await this._fidCargar(); this._fidPaint(true);
+    },45000);
+  },
+  async _fidCargar(){
+    /* GETALL y no GET: con más de 1000 ventas el servidor corta en silencio */
+    const [leads,ventas]=await Promise.all([
+      GETALL('kruh_leads?select=id,nombre,telefono,direccion,tipo,canal,etapa,infopromos,creado_en'),
+      GETALL('kruh_ventas?select=id,cliente,telefono,monto,producto,creado_en&order=creado_en.desc')]);
+    this._leads=leads;
+    /* 1) las compras se agrupan por celular */
+    const porTel={}; let anonN=0, anonV=0;
+    ventas.forEach(v=>{ const t=this._telKey(v.telefono);
+      if(t.length<10||t===this.TEL_ANONIMO){ anonN++; anonV+=(+v.monto||0); return; }
+      (porTel[t]=porTel[t]||[]).push(v); });
+    /* 2) una fila por persona. Primero las fichas del CRM */
+    const filas=[], porLlave={};
+    leads.forEach(l=>{ const t=this._telKey(l.telefono);
+      if(t===this.TEL_ANONIMO) return;                    // el 123 no es nadie
+      if(t.length>=10 && porLlave[t]){                    // ficha repetida: se suma a la que ya está
+        porLlave[t].dup=(porLlave[t].dup||1)+1; return; }
+      const f={id:l.id, nombre:String(l.nombre||'').trim(), tel:t,
+        dir:l.direccion||'', promo:!!l.infopromos, ficha:true,
+        compras:(t.length>=10?porTel[t]:null)||[]};
+      if(t.length>=10) porLlave[t]=f;
+      filas.push(f); });
+    /* 3) y si una venta trae un celular sin ficha, igual sale (no se pierde nadie) */
+    Object.keys(porTel).forEach(t=>{ if(porLlave[t])return;
+      const vs=porTel[t];
+      filas.push({id:'', nombre:String(vs[0].cliente||'').trim(), tel:t,
+        dir:'', promo:false, ficha:false, compras:vs}); });
+    filas.forEach(f=>{
+      f.compras.sort((a,b)=>String(b.creado_en||'').localeCompare(String(a.creado_en||'')));
+      f.n=f.compras.length;
+      f.total=f.compras.reduce((s,v)=>s+(+v.monto||0),0);
+      f.ult=f.n?String(f.compras[0].creado_en||''):''; });
+    /* el más fiel arriba; entre iguales, el que compró hace menos */
+    filas.sort((a,b)=>b.n-a.n||String(b.ult).localeCompare(String(a.ult))
+      ||(a.nombre||'~~~').localeCompare(b.nombre||'~~~'));
+    this._fid=filas;
+    this._fidAnon={n:anonN,total:anonV};
+    this._fidAbierto=this._fidAbierto||{};
+  },
+  _fidFiltra(){
+    let l=this._fid||[];
+    const f=this._fidFiltro||'todos';
+    if(f==='compraron') l=l.filter(x=>x.n>0);
+    else if(f==='fieles') l=l.filter(x=>x.n>=3);
+    else if(f==='sin') l=l.filter(x=>!x.n);
+    const q=this._norm(this._fidQ||''), qd=q.replace(/\D/g,'');
+    if(q) l=l.filter(x=>this._norm(x.nombre).includes(q)||(qd&&x.tel.includes(qd)));
+    return l;
+  },
+  /* dd/mm/aaaa, que es como se lee acá */
+  _fidFecha(s){ const d=String(s||'').slice(0,10).split('-');
+    return d.length===3?d[2]+'/'+d[1]+'/'+d[0]:String(s||'').slice(0,10); },
+  _fidDias(s){ if(!s)return null;
+    return Math.floor((Date.now()-new Date(s).getTime())/86400000); },
+  async vFidelidadRecarga(){ await this._fidCargar(); this._fidPaint(); toast('Actualizado'); },
+  fidFiltro(f){ this._fidFiltro=f; this._fidPaint(); },
+  fidBuscar(v){ this._fidQ=v; this._fidPaint(true); },
+  fidLimpiar(){ this._fidQ=''; const i=$('fid_q'); if(i)i.value=''; this._fidPaint(); },
+  /* al oprimir una persona se abren las fechas en las que nos compró */
+  fidAbrir(tel,id){ const k=tel||('id:'+id); this._fidAbierto=this._fidAbierto||{};
+    this._fidAbierto[k]=!this._fidAbierto[k]; this._fidPaint(true); },
+
+  _fidPaint(soloLista){
+    const todos=this._fid||[], lista=this._fidFiltra(), f=this._fidFiltro||'todos';
+    if(soloLista&&$('fid_lista')){ $('fid_lista').innerHTML=this._fidItems(lista);
+      if($('fid_cuenta'))$('fid_cuenta').innerHTML=this._fidCuenta(lista.length,todos.length);
+      return; }
+    const conC=todos.filter(x=>x.n>0).length, fieles=todos.filter(x=>x.n>=3).length;
+    const sinC=todos.length-conC, an=this._fidAnon||{n:0,total:0};
+    const chip=(v,t,n)=>`<span class="et ${f===v?'on':''}" onclick="App.fidFiltro('${v}')">${t} <b>${num(n)}</b></span>`;
+    this.set(`<h1>Fidelización</h1>
+      <div class="sub">Todos los clientes: los que ya compraron y los que solo están registrados · el celular es la identidad · se actualiza solo cada 45 s</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:12px">
+        ${[['👥 En la base',num(todos.length),'var(--ink)'],
+           ['🛒 Ya compraron',num(conC),'var(--ok)'],
+           ['❤️ Fieles (3+)',num(fieles),'var(--acc)'],
+           ['💤 Sin comprar',num(sinC),'var(--warn)']].map(([t,v,c])=>
+          `<div class="card" style="margin:0;padding:12px 14px"><div class="dim" style="font-size:11.5px">${t}</div>
+            <div style="font-size:24px;font-weight:800;color:${c};font-family:Fraunces,serif">${v}</div></div>`).join('')}
+      </div>
+      ${an.n?`<div class="card" style="border-left:4px solid var(--warn);background:#fff6ec;padding:11px 14px">
+        <b style="color:var(--warn)">⚠️ ${num(an.n)} ventas sin dueño</b> — ${money(an.total)} que quedaron como
+        Mostrador, sin nombre ni celular. Esas no le suman a nadie de esta lista y ya no se pueden recuperar.
+        <div class="dim" style="font-size:12px;margin-top:3px">Cada vez que se pide el celular en la caja, esa plata deja de ser anónima.</div></div>`:''}
+      <div class="row" style="gap:7px;margin:12px 0;flex-wrap:wrap;align-items:center">
+        ${chip('todos','Todos',todos.length)}${chip('compraron','Compraron',conC)}${chip('fieles','Fieles 3+',fieles)}${chip('sin','Sin comprar',sinC)}
+        <a onclick="App.vFidelidadRecarga()" class="et" style="margin-left:auto">🔄 Actualizar</a>
+      </div>
+      <div class="row" style="gap:8px;margin-bottom:10px">
+        <input id="fid_q" placeholder="🔍 Buscar por nombre o celular" value="${esc(this._fidQ||'')}" oninput="App.fidBuscar(this.value)" style="flex:1;margin:0">
+        ${this._fidQ?'<a onclick="App.fidLimpiar()" class="et">✕</a>':''}
+      </div>
+      <div class="dim" id="fid_cuenta" style="font-size:12.5px;margin-bottom:9px">${this._fidCuenta(lista.length,todos.length)}</div>
+      <div id="fid_lista">${this._fidItems(lista)}</div>`);
+  },
+  _fidCuenta(n,tot){ return this._fidQ
+    ? `<b style="color:var(--acc)">${num(n)}</b> resultado(s) para "${esc(this._fidQ)}"`
+    : `${num(n)} de ${num(tot)} personas · toca una para ver las fechas en que compró`; },
+
+  _fidItems(lista){
+    if(!lista.length) return `<div class="empty">${this._fidQ
+      ? 'Nadie con "'+esc(this._fidQ)+'" — ni por nombre ni por celular.'
+      : 'Nadie en este cajón.'}</div>`;
+    const ab=this._fidAbierto||{};
+    return lista.slice(0,600).map(x=>{
+      const k=x.tel||('id:'+x.id), abierto=!!ab[k];
+      const dias=this._fidDias(x.ult);
+      const col=x.n>=3?'var(--acc)':(x.n?'var(--ok)':'var(--mut)');
+      return `<div class="item" style="cursor:pointer" onclick="App.fidAbrir('${esc(x.tel)}','${esc(x.id)}')">
+        <div class="top"><div style="min-width:0">
+          <div class="nm">${x.nombre?esc(x.nombre):'<span style="color:var(--warn)">(sin nombre)</span>'}
+            <span style="color:${col};font-weight:800">(${x.n})</span></div>
+          <div class="mt">${x.tel
+              ? `<a href="https://wa.me/57${esc(x.tel)}" target="_blank" onclick="event.stopPropagation()" style="color:#16734a;font-weight:600">${esc(x.tel)}</a>`
+              : '<span style="color:var(--warn)">sin celular</span>'}
+            ${x.n?' · '+money(x.total)+(dias!==null?' · última hace '+(dias===0?'hoy':dias===1?'1 día':num(dias)+' días'):''):' · nunca ha comprado'}
+            ${x.ficha?'':'<span class="tag pe">sin ficha en CRM</span>'}
+            ${x.dup?'<span class="tag pe">'+x.dup+' fichas con este celular</span>':''}
+            ${x.promo?'<span class="tag">📣 promos</span>':''}</div>
+        </div><div style="flex:none;color:var(--mut);font-size:18px">${abierto?'▾':'▸'}</div></div>
+        ${abierto?`<div style="margin-top:9px;border-top:1px solid var(--line2);padding-top:8px">
+          ${x.n?x.compras.map(v=>`<div class="row" style="justify-content:space-between;padding:4px 0;font-size:13px;gap:10px">
+              <span>🛒 <b>${this._fidFecha(v.creado_en)}</b> <span class="dim" style="font-size:11.5px">${esc(String(v.producto||'').slice(0,60))}</span></span>
+              <b style="flex:none">${money(v.monto)}</b></div>`).join('')
+            :'<div class="dim" style="font-size:12.5px">Está registrado pero todavía no nos ha comprado nada. Buen candidato para la próxima promoción.</div>'}
+        </div>`:''}
+      </div>`;}).join('')
+      +(lista.length>600?`<div class="dim" style="text-align:center;padding:12px;font-size:12.5px">…y ${num(lista.length-600)} más. Usa el buscador.</div>`:'');
+  },
 
   /* ===================== INVENTARIO + índice de cobertura ===================== */
   /* ====== QUÉ DÍA SE MUEVE MÁS — el mismo informe del Dashboard, pero SIN PLATA ======
