@@ -133,7 +133,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['fidelidad','❤️ Fidelización'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
   view:'dashboard',
   _savingPedido:false,
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
@@ -382,7 +382,7 @@ const App={
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
     this.view=v; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,fidelidad:this.vFidelidad,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ const m=$('main'); m.className=''; m.style.cssText=''; m.innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -1114,7 +1114,7 @@ const App={
     this._fidPaint();
     if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
     this._aseTick=setInterval(async()=>{
-      if(this.view!=='fidelidad'){ clearInterval(this._aseTick); this._aseTick=null; return; }
+      if(this.view!=='marketing'||this._mkView!=='fidelidad'){ clearInterval(this._aseTick); this._aseTick=null; return; }
       await this._fidCargar(); this._fidPaint(true);
     },45000);
   },
@@ -1188,7 +1188,7 @@ const App={
     const conC=todos.filter(x=>x.n>0).length, fieles=todos.filter(x=>x.n>=3).length;
     const sinC=todos.length-conC, an=this._fidAnon||{n:0,total:0};
     const chip=(v,t,n)=>`<span class="et ${f===v?'on':''}" onclick="App.fidFiltro('${v}')">${t} <b>${num(n)}</b></span>`;
-    this.set(`<h1>Fidelización</h1>
+    this.set(`${this._mkVolver()}<h1 style="margin-top:8px">Fidelización</h1>
       <div class="sub">Todos los clientes: los que ya compraron y los que solo están registrados · el celular es la identidad · se actualiza solo cada 45 s</div>
       <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:12px">
         ${[['👥 En la base',num(todos.length),'var(--ink)'],
@@ -2185,6 +2185,7 @@ const App={
   async vMarketing(){
     const v=this._mkView||'';
     if(v==='marcador')      return this.vMkMarcador();
+    if(v==='fidelidad')     return this.vFidelidad();
     if(v==='institucional') return this.vMkInstitucional();
     if(v==='digital'||v==='organico') return this.vMkPorHacer(v);
     this.loading();
@@ -2198,9 +2199,11 @@ const App={
         <div><div class="nm">${tit}</div><div class="mt">${des}</div></div></div>
         <div style="text-align:right;white-space:nowrap">${der||''}<div class="dim" style="font-size:16px">›</div></div>
       </div></div>`;
-    this.set(`<h1>Marketing</h1><div class="sub">Los cuatro frentes por donde entran clientes. Cada cajón se abre y trabaja aparte.</div>
+    this.set(`<h1>Marketing</h1><div class="sub">Los frentes por donde entran clientes. Cada cajón se abre y trabaja aparte.</div>
       ${caj('marcador','📞','Marcador','Llamadas a la base de clientes que ya tenemos',
             `<b style="font-size:15px">${num(delMes.length)}</b><div class="dim" style="font-size:10px">llamadas · ${num(inte)} interesados</div>`)}
+      ${caj('fidelidad','❤️','Fidelización','Los que ya nos compraron y cuántas veces — el celular manda',
+            `<span class="tag">en vivo</span>`)}
       ${caj('institucional','🏛️','Institucional','Restaurantes y hoteles — venta al por mayor',
             `<span class="tag">2 frentes</span>`)}
       ${caj('digital','💻','Digital','Pauta, redes y todo lo que se paga',`<span class="tag">por armar</span>`)}
