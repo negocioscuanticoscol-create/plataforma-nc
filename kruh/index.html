@@ -1125,9 +1125,13 @@ const App={
       GETALL('kruh_ventas?select=id,cliente,telefono,monto,producto,creado_en&order=creado_en.desc')]);
     this._leads=leads;
     /* 1) las compras se agrupan por celular */
-    const porTel={}; let anonN=0, anonV=0;
+    const porTel={}, meses={}; let anonN=0, anonV=0;
     ventas.forEach(v=>{ const t=this._telKey(v.telefono);
-      if(t.length<10||t===this.TEL_ANONIMO){ anonN++; anonV+=(+v.monto||0); return; }
+      const mes=String(v.creado_en||'').slice(0,7);
+      const m=meses[mes]=meses[mes]||{mes:mes,n:0,total:0,anonN:0,anonV:0};
+      m.n++; m.total+=(+v.monto||0);
+      if(t.length<10||t===this.TEL_ANONIMO){ anonN++; anonV+=(+v.monto||0);
+        m.anonN++; m.anonV+=(+v.monto||0); return; }
       (porTel[t]=porTel[t]||[]).push(v); });
     /* 2) una fila por persona. Primero las fichas del CRM */
     const filas=[], porLlave={};
@@ -1154,7 +1158,11 @@ const App={
     filas.sort((a,b)=>b.n-a.n||String(b.ult).localeCompare(String(a.ult))
       ||(a.nombre||'~~~').localeCompare(b.nombre||'~~~'));
     this._fid=filas;
-    this._fidAnon={n:anonN,total:anonV};
+    /* Los desconocidos NO son una persona, pero sí son plata: van como un
+       renglón fijo arriba de la lista, con su cuenta de ventas y el desglose
+       por mes. Así se ve si la caja está pidiendo el celular o no. */
+    this._fidAnon={n:anonN, total:anonV, tot:ventas.length,
+      meses:Object.values(meses).filter(m=>m.anonN).sort((a,b)=>b.mes.localeCompare(a.mes))};
     this._fidAbierto=this._fidAbierto||{};
   },
   _fidFiltra(){
@@ -1182,7 +1190,7 @@ const App={
 
   _fidPaint(soloLista){
     const todos=this._fid||[], lista=this._fidFiltra(), f=this._fidFiltro||'todos';
-    if(soloLista&&$('fid_lista')){ $('fid_lista').innerHTML=this._fidItems(lista);
+    if(soloLista&&$('fid_lista')){ $('fid_lista').innerHTML=this._fidDesconocidos()+this._fidItems(lista);
       if($('fid_cuenta'))$('fid_cuenta').innerHTML=this._fidCuenta(lista.length,todos.length);
       return; }
     const conC=todos.filter(x=>x.n>0).length, fieles=todos.filter(x=>x.n>=3).length;
@@ -1198,10 +1206,6 @@ const App={
           `<div class="card" style="margin:0;padding:12px 14px"><div class="dim" style="font-size:11.5px">${t}</div>
             <div style="font-size:24px;font-weight:800;color:${c};font-family:Fraunces,serif">${v}</div></div>`).join('')}
       </div>
-      ${an.n?`<div class="card" style="border-left:4px solid var(--warn);background:#fff6ec;padding:11px 14px">
-        <b style="color:var(--warn)">⚠️ ${num(an.n)} ventas sin dueño</b> — ${money(an.total)} que quedaron como
-        Mostrador, sin nombre ni celular. Esas no le suman a nadie de esta lista y ya no se pueden recuperar.
-        <div class="dim" style="font-size:12px;margin-top:3px">Cada vez que se pide el celular en la caja, esa plata deja de ser anónima.</div></div>`:''}
       <div class="row" style="gap:7px;margin:12px 0;flex-wrap:wrap;align-items:center">
         ${chip('todos','Todos',todos.length)}${chip('compraron','Compraron',conC)}${chip('fieles','Fieles 3+',fieles)}${chip('sin','Sin comprar',sinC)}
         <a onclick="App.vFidelidadRecarga()" class="et" style="margin-left:auto">🔄 Actualizar</a>
@@ -1211,12 +1215,41 @@ const App={
         ${this._fidQ?'<a onclick="App.fidLimpiar()" class="et">✕</a>':''}
       </div>
       <div class="dim" id="fid_cuenta" style="font-size:12.5px;margin-bottom:9px">${this._fidCuenta(lista.length,todos.length)}</div>
-      <div id="fid_lista">${this._fidItems(lista)}</div>`);
+      <div id="fid_lista">${this._fidDesconocidos()}${this._fidItems(lista)}</div>`);
   },
   _fidCuenta(n,tot){ return this._fidQ
     ? `<b style="color:var(--acc)">${num(n)}</b> resultado(s) para "${esc(this._fidQ)}"`
     : `${num(n)} de ${num(tot)} personas · toca una para ver las fechas en que compró`; },
 
+  /* El renglón de los que no dejaron celular. Va fijo de primero porque es
+     el "cliente" más grande que tiene Kruh, y es el único que no se puede
+     llamar. Se esconde al buscar y en los cajones de personas. */
+  MESCORTO:['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'],
+  _fidDesconocidos(){
+    const a=this._fidAnon||{n:0};
+    if(!a.n) return '';
+    const f=this._fidFiltro||'todos';
+    if(this._fidQ||f==='fieles'||f==='sin') return '';
+    const pc=a.tot?Math.round(a.n/a.tot*100):0;
+    const abierto=!!(this._fidAbierto||{})['__anon'];
+    return `<div class="item" style="cursor:pointer;border-left:4px solid var(--warn);background:#fff6ec"
+        onclick="App.fidAbrir('__anon','')">
+      <div class="top"><div style="min-width:0">
+        <div class="nm">❓ Desconocidos <span class="dim" style="font-weight:600;font-size:13px">· sin teléfono</span>
+          <span style="color:var(--warn);font-weight:800">(${num(a.n)})</span></div>
+        <div class="mt">${money(a.total)} · <b>${pc}% de las ventas</b> · no le suman a nadie y no se pueden llamar</div>
+      </div><div style="flex:none;color:var(--mut);font-size:18px">${abierto?'▾':'▸'}</div></div>
+      ${abierto?`<div style="margin-top:9px;border-top:1px solid var(--line2);padding-top:8px">
+        <div class="dim" style="font-size:12px;margin-bottom:6px">Ventas que se registraron como Mostrador, sin nombre ni celular. Mes por mes:</div>
+        ${(a.meses||[]).map(m=>{ const p=m.n?Math.round(m.anonN/m.n*100):0; const y=m.mes.split('-');
+          return `<div class="row" style="justify-content:space-between;padding:4px 0;font-size:13px;gap:10px">
+            <span><b>${this.MESCORTO[+y[1]]||m.mes} ${y[0]}</b>
+              <span class="dim" style="font-size:11.5px">${num(m.anonN)} de ${num(m.n)} ventas · ${p}% anónimo</span></span>
+            <b style="flex:none">${money(m.anonV)}</b></div>`;}).join('')}
+        <div class="dim" style="font-size:12px;margin-top:7px">Cada vez que se pide el celular en la caja, esa plata deja de ser anónima y el cliente empieza a contar arriba.</div>
+      </div>`:''}
+    </div>`;
+  },
   _fidItems(lista){
     if(!lista.length) return `<div class="empty">${this._fidQ
       ? 'Nadie con "'+esc(this._fidQ)+'" — ni por nombre ni por celular.'
