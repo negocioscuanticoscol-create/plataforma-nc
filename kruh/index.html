@@ -1170,6 +1170,7 @@ const App={
     const f=this._fidFiltro||'todos';
     if(f==='compraron') l=l.filter(x=>x.n>0);
     else if(f==='fieles') l=l.filter(x=>x.n>=3);
+    else if(f==='dormidos') l=l.filter(x=>this._fidDormido(x));
     else if(f==='sin') l=l.filter(x=>!x.n);
     const q=this._norm(this._fidQ||''), qd=q.replace(/\D/g,'');
     if(q) l=l.filter(x=>this._norm(x.nombre).includes(q)||(qd&&x.tel.includes(qd)));
@@ -1178,6 +1179,11 @@ const App={
   /* dd/mm/aaaa, que es como se lee acá */
   _fidFecha(s){ const d=String(s||'').slice(0,10).split('-');
     return d.length===3?d[2]+'/'+d[1]+'/'+d[0]:String(s||'').slice(0,10); },
+  /* Dormido = nos compró alguna vez y lleva más de 90 días sin volver.
+     Es el cajón que más plata vale: ya sabemos que compran y ya tenemos el
+     celular, solo dejaron de venir. */
+  DIAS_DORMIDO:90,
+  _fidDormido(x){ return x.n>0 && (this._fidDias(x.ult)||0)>this.DIAS_DORMIDO; },
   _fidDias(s){ if(!s)return null;
     return Math.floor((Date.now()-new Date(s).getTime())/86400000); },
   async vFidelidadRecarga(){ await this._fidCargar(); this._fidPaint(); toast('Actualizado'); },
@@ -1194,6 +1200,7 @@ const App={
       if($('fid_cuenta'))$('fid_cuenta').innerHTML=this._fidCuenta(lista.length,todos.length);
       return; }
     const conC=todos.filter(x=>x.n>0).length, fieles=todos.filter(x=>x.n>=3).length;
+    const dorm=todos.filter(x=>this._fidDormido(x)).length;
     const sinC=todos.length-conC, an=this._fidAnon||{n:0,total:0};
     const chip=(v,t,n)=>`<span class="et ${f===v?'on':''}" onclick="App.fidFiltro('${v}')">${t} <b>${num(n)}</b></span>`;
     this.set(`${this._mkVolver()}<h1 style="margin-top:8px">Fidelización</h1>
@@ -1207,7 +1214,7 @@ const App={
             <div style="font-size:24px;font-weight:800;color:${c};font-family:Fraunces,serif">${v}</div></div>`).join('')}
       </div>
       <div class="row" style="gap:7px;margin:12px 0;flex-wrap:wrap;align-items:center">
-        ${chip('todos','Todos',todos.length)}${chip('compraron','Compraron',conC)}${chip('fieles','Fieles 3+',fieles)}${chip('sin','Sin comprar',sinC)}
+        ${chip('todos','Todos',todos.length)}${chip('compraron','Compraron',conC)}${chip('fieles','Fieles 3+',fieles)}${chip('dormidos','😴 +90 días',dorm)}${chip('sin','Sin comprar',sinC)}
         <a onclick="App.vFidelidadRecarga()" class="et" style="margin-left:auto">🔄 Actualizar</a>
       </div>
       <div class="row" style="gap:8px;margin-bottom:10px">
@@ -1217,9 +1224,11 @@ const App={
       <div class="dim" id="fid_cuenta" style="font-size:12.5px;margin-bottom:9px">${this._fidCuenta(lista.length,todos.length)}</div>
       <div id="fid_lista">${this._fidDesconocidos()}${this._fidItems(lista)}</div>`);
   },
-  _fidCuenta(n,tot){ return this._fidQ
-    ? `<b style="color:var(--acc)">${num(n)}</b> resultado(s) para "${esc(this._fidQ)}"`
-    : `${num(n)} de ${num(tot)} personas · toca una para ver las fechas en que compró`; },
+  _fidCuenta(n,tot){ if(this._fidQ)
+      return `<b style="color:var(--acc)">${num(n)}</b> resultado(s) para "${esc(this._fidQ)}"`;
+    if((this._fidFiltro||'todos')==='dormidos')
+      return `<b style="color:var(--warn)">${num(n)}</b> clientes que sí nos compraron y llevan más de ${this.DIAS_DORMIDO} días sin volver · ya tenemos su celular, solo hay que llamarlos`;
+    return `${num(n)} de ${num(tot)} personas · toca una para ver las fechas en que compró`; },
 
   /* El renglón de los que no dejaron celular. Va fijo de primero porque es
      el "cliente" más grande que tiene Kruh, y es el único que no se puede
@@ -1229,7 +1238,7 @@ const App={
     const a=this._fidAnon||{n:0};
     if(!a.n) return '';
     const f=this._fidFiltro||'todos';
-    if(this._fidQ||f==='fieles'||f==='sin') return '';
+    if(this._fidQ||f==='fieles'||f==='sin'||f==='dormidos') return '';
     const pc=a.tot?Math.round(a.n/a.tot*100):0;
     const abierto=!!(this._fidAbierto||{})['__anon'];
     return `<div class="item" style="cursor:pointer;border-left:4px solid var(--warn);background:#fff6ec"
