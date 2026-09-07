@@ -133,7 +133,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['crm','📇 CRM'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios']],
   view:'dashboard',
   _savingPedido:false,
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
@@ -382,7 +382,7 @@ const App={
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
     this.view=v; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,crm:this.vCrm,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios}[v]||this.vDashboard).call(this); },
   set(h){ const m=$('main'); m.className=''; m.style.cssText=''; m.innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -950,94 +950,15 @@ const App={
   ETAPAS:['contactado','interesado','pedido','cliente'],
   CATCOMPRA:['Panadería','Conservas','Repostería'],
   CANALES:[['todos','Todos'],['local','🏪 Local'],['digital','📱 Digital'],['organico','🌱 Orgánico'],['empleados','👷 Empleados']],
-  async vCrm(){
-    this.loading();
-    const [leads,ventas,peds]=await Promise.all([GET('kruh_leads?order=creado_en.desc&limit=2000'),GETALL('kruh_ventas?select=cliente,telefono,creado_en&limit=20000'),GETALL('kruh_pedidos?select=cliente,telefono,items&limit=5000')]);
-    this._leads=leads;
-    const lastTel={}, lastNom={};
-    ventas.forEach(v=>{ const t=(v.telefono||'').replace(/\D/g,''), n=(v.cliente||'').trim().toLowerCase(), d=v.creado_en||'';
-      if(t&&(!lastTel[t]||d>lastTel[t]))lastTel[t]=d; if(n&&(!lastNom[n]||d>lastNom[n]))lastNom[n]=d; });
-    this._crmUlt={tel:lastTel,nom:lastNom};
-    /* qué producto compra más cada cliente — de los items de sus pedidos, no de categorías */
-    const acum={};
-    (peds||[]).forEach(p=>{ const k=this._crmKey(p.telefono,p.cliente); if(!k)return;
-      const o=acum[k]=acum[k]||{};
-      (p.items||[]).forEach(it=>{ const n=(it.nombre||'').trim(); if(!n)return; o[n]=(o[n]||0)+(+it.qty||0); }); });
-    this._crmTop={};
-    Object.keys(acum).forEach(k=>{ this._crmTop[k]=Object.entries(acum[k]).sort((a,b)=>b[1]-a[1]).slice(0,3); });
-    this._crmPaint();
-  },
-  /* misma llave para pedidos y para leads: el telefono manda, y si no hay, el nombre */
-  _crmKey(tel,nom){ const t=String(tel||'').replace(/\D/g,'');
-    if(t.length>=10) return 't:'+t;
-    const n=this._norm(nom||''); return n?'n:'+n:''; },
-  /* Buscar ignora los cajones y los canales a proposito: si escribes un nombre
-     lo quieres encontrar este donde este, no solo dentro de la pestaña abierta. */
-  _crmFiltra(){
-    const leads=this._leads||[], q=this._norm(this._crmQ||''), qd=q.replace(/\D/g,'');
-    if(q){ return leads.filter(l=>{
-      if(this._norm(l.nombre||'').includes(q))return true;
-      if(qd && (l.telefono||'').replace(/\D/g,'').includes(qd))return true;
-      return false; }); }
-    const caj=this._crmCajon||'comunidad', can=this._crmCanal||'todos';
-    const base=caj==='comunidad'?leads:leads.filter(l=>(l.tipo||'nuevo')!=='comunidad');
-    return can==='todos'?base:base.filter(l=>(l.canal||'local')===can);
-  },
-  _crmItems(lista){
-    const U=this._crmUlt||{tel:{},nom:{}};
-    if(!lista.length) return this._crmQ
-      ? `<div class="empty">Ningún cliente con "${esc(this._crmQ)}" — ni por nombre ni por teléfono.</div>`
-      : '<div class="empty">Sin leads en este cajón.</div>';
-    return lista.map(l=>{ const tel=(l.telefono||'').replace(/\D/g,'');
-      const ult=U.tel[tel]||U.nom[(l.nombre||'').trim().toLowerCase()]||'';
-      return `<div class="item"><div class="top"><div>
-        <div class="nm">${esc(l.nombre||'—')}${tel?` · <a href="https://wa.me/57${tel}" target="_blank" style="color:#16734a;font-weight:600">${esc(l.telefono)}</a>`:''}</div>
-        <div class="mt">${l.tipo==='comunidad'?'👥 comunidad':('✨ '+esc(l.canal||'local'))}${l.ciudad?' · '+esc(l.ciudad):''} · ${ult?'🛒 última compra '+ult.slice(0,10):'sin compras aún'}
-          ${this._listaNueva(l)?'<span class="tag pe">🏷️ precios nuevos</span>':''}${l.infopromos?'<span class="tag">📣 promos</span>':''}</div></div>
-        <div class="row" style="gap:10px;flex:none"><a onclick="App.leadModal('${l.id}')" style="color:var(--acc);cursor:pointer;font-weight:700">✎</a>
-          <a onclick="App.leadDel('${l.id}')" style="color:var(--bad);cursor:pointer">✕</a></div></div>
-        ${(()=>{ const t3=(this._crmTop||{})[this._crmKey(l.telefono,l.nombre)]||[];
-          if(!t3.length) return `<div class="row" style="margin-top:7px"><span class="dim" style="font-size:11.5px">Todavía no le conocemos lo que más compra.</span></div>`;
-          const pos=['1º','2º','3º'];
-          return `<div class="row" style="margin-top:7px;gap:6px;flex-wrap:wrap;align-items:center">
-            <span class="dim" style="font-size:11px">Lo que más compra:</span>
-            ${t3.map((x,i)=>`<span class="et on" style="cursor:default"><b>${pos[i]}</b> ${esc(x[0])} <span style="opacity:.75">×${num(x[1])}</span></span>`).join('')}</div>`;})()}
-        </div>`;}).join('');
-  },
-  _crmCabeza(n){ const q=this._crmQ||'';
-    return q ? `<b style="color:var(--acc)">${n}</b> resultado(s) para "${esc(q)}" · se busca en todo el CRM, sin importar el cajón`
-             : `${n} cliente(s)`; },
-  /* solo repinta la lista, para no perder el cursor del buscador en cada tecla */
-  crmBuscar(v){ this._crmQ=v;
-    const lista=this._crmFiltra();
-    const c=$('crm_lista'); if(c)c.innerHTML=this._crmItems(lista);
-    const h=$('crm_cab'); if(h)h.innerHTML=this._crmCabeza(lista.length);
-    const x=$('crm_x'); if(x)x.style.display=v?'block':'none'; },
-  crmLimpiar(){ this._crmQ=''; const i=$('crm_q'); if(i){ i.value=''; i.focus(); } this.crmBuscar(''); },
-  _crmPaint(){
-    const leads=this._leads||[];
-    const caj=this._crmCajon||'comunidad', can=this._crmCanal||'todos';
-    const nuevos=leads.filter(l=>(l.tipo||'nuevo')!=='comunidad');
-    const base=caj==='comunidad'?leads:nuevos;
-    const lista=this._crmFiltra(), q=this._crmQ||'';
-    this.set(`<h1>CRM</h1><div class="sub">Comunidad y nuevos por canal · embudo 👋 → 💡 → 📋 → 🛒</div>
-      <div class="row" style="gap:6px;margin-bottom:12px;align-items:center">
-        <input id="crm_q" placeholder="🔍 Buscar por nombre o teléfono" value="${esc(q)}" oninput="App.crmBuscar(this.value)" style="flex:1;margin:0">
-        <button id="crm_x" class="btn gh sm" style="padding:8px 12px;${q?'':'display:none'}" onclick="App.crmLimpiar()">✕</button></div>
-      <div class="row" style="gap:10px;margin-bottom:12px">
-        <div class="cajon ${caj==='comunidad'?'on':''}" onclick="App._crmCajon='comunidad';App._crmQ='';App._crmPaint()"><b>${leads.length}</b>👥 Comunidad</div>
-        <div class="cajon ${caj==='nuevos'?'on':''}" onclick="App._crmCajon='nuevos';App._crmQ='';App._crmPaint()"><b>${nuevos.length}</b>✨ Nuevos</div></div>
-      <div class="row" style="gap:6px;margin-bottom:12px">${this.CANALES.map(([v,t])=>`<span class="et ${can===v?'on':''}" onclick="App._crmCanal='${v}';App._crmQ='';App._crmPaint()">${t}${v!=='todos'?' ('+base.filter(l=>(l.canal||'local')===v).length+')':''}</span>`).join('')}</div>
-      <button class="btn acc" onclick="App.leadModal()">＋ Registro de cliente</button>
-      <div class="hint" id="crm_cab" style="margin-top:10px">${this._crmCabeza(lista.length)}</div>
-      <div id="crm_lista" style="margin-top:6px">${this._crmItems(lista)}</div>`);
-    const i=$('crm_q'); if(i&&q){ i.focus(); i.setSelectionRange(q.length,q.length); }
-  },
+  /* La vista CRM se retiró: los clientes se registran solos al facturar y se
+     ven en Marketing → Fidelización, con sus compras. Se conservan ETAPAS,
+     ORIGEN y las funciones lead* porque el ✎ de Fidelización las usa para
+     corregir una ficha. */
   ORIGEN:[['registrado','Cliente registrado (comunidad)','comunidad','local'],['nuevo','Cliente nuevo (local)','nuevo','local'],['digital','Digital','nuevo','digital'],['organico','Orgánico','nuevo','organico'],['empleados','Empleados','comunidad','empleados']],
   leadModal(id){ const l=id?((this._leads||[]).find(x=>x.id===id)||{}):{};
-    const caj=this._crmCajon||'nuevos';
+    /* venía del cajón del CRM, que ya no existe: por defecto, cliente nuevo */
     const actual=this.ORIGEN.find(o=>o[2]===l.tipo&&o[3]===(l.canal||'local'));
-    const defO=id?((actual||[])[0]||'nuevo'):(caj==='comunidad'?'registrado':'nuevo');
+    const defO=id?((actual||[])[0]||'nuevo'):'nuevo';
     this._leadDup=null; this._leadEdit=id||'';
     modal(`<h3 style="font-family:Fraunces,serif;margin-bottom:8px">${id?'Editar cliente':'Registro de cliente'}</h3>
     <div class="g2"><div><label>Nombre</label><input id="l_nom" value="${esc(l.nombre||'')}"></div>
@@ -1081,7 +1002,7 @@ const App={
       if(!merge) return;
       const r=await PATCH('kruh_leads?id=eq.'+dup.id,{...b,telefono:b.telefono||dup.telefono||''});
       if(!r||!r.ok){ toast('⚠️ No se pudo unir al cliente existente'); return; }
-      this._leadDup=null; cerrar(); toast('Cliente unido al registro existente'); this.vCrm(); return;
+      this._leadDup=null; cerrar(); toast('Cliente unido al registro existente'); this.vFidRefrescar(); return;
     }
     let r;
     if(id){ r=await PATCH('kruh_leads?id=eq.'+id,b);
@@ -1092,12 +1013,12 @@ const App={
       if(!r){ const {infopromos,cliente_nuevo,...base}=b; r=await POST('kruh_leads',base);   // faltan las columnas nuevas
         if(r) toast('⚠️ Guardado, pero falta correr el SQL de socios'); }
       if(!r){ toast('⚠️ No se pudo registrar el cliente'); return; } }
-    this._leadDup=null; cerrar(); toast(id?'Cliente actualizado':'Cliente registrado'); this.vCrm(); },
-  async leadEtapa(id,e){ await PATCH('kruh_leads?id=eq.'+id,{etapa:e}); this.vCrm(); },
+    this._leadDup=null; cerrar(); toast(id?'Cliente actualizado':'Cliente registrado'); this.vFidRefrescar(); },
+  async leadEtapa(id,e){ await PATCH('kruh_leads?id=eq.'+id,{etapa:e}); this.vFidRefrescar(); },
   async leadCat(id,cat){ const l=(this._leads||[]).find(x=>x.id===id)||{}; let cats=(l.categorias||'').split(',').map(s=>s.trim()).filter(Boolean);
     if(cats.includes(cat))cats=cats.filter(c=>c!==cat); else cats.push(cat); const val=cats.join(', ');
-    await PATCH('kruh_leads?id=eq.'+id,{categorias:val}); l.categorias=val; this.vCrm(); },
-  async leadDel(id){ if(!this._okBorrar())return; await DEL('kruh_leads?id=eq.'+id); this.vCrm(); },
+    await PATCH('kruh_leads?id=eq.'+id,{categorias:val}); l.categorias=val; this.vFidRefrescar(); },
+  async leadDel(id){ if(!this._okBorrar())return; await DEL('kruh_leads?id=eq.'+id); this.vFidRefrescar(); },
 
 
   /* ===================== FIDELIZACIÓN =====================
@@ -1121,7 +1042,7 @@ const App={
   async _fidCargar(){
     /* GETALL y no GET: con más de 1000 ventas el servidor corta en silencio */
     const [leads,ventas]=await Promise.all([
-      GETALL('kruh_leads?select=id,nombre,telefono,direccion,tipo,canal,etapa,infopromos,creado_en'),
+      GETALL('kruh_leads?select=*'),
       GETALL('kruh_ventas?select=id,cliente,telefono,monto,producto,creado_en&order=creado_en.desc')]);
     this._leads=leads;
     /* 1) las compras se agrupan por celular */
@@ -1165,6 +1086,9 @@ const App={
       meses:Object.values(meses).filter(m=>m.anonN).sort((a,b)=>b.mes.localeCompare(a.mes))};
     this._fidAbierto=this._fidAbierto||{};
   },
+  /* Al editar o borrar un cliente ya no hay CRM que repintar: se recarga
+     Fidelización, que es la única lista que queda. */
+  async vFidRefrescar(){ await this._fidCargar(); this._fidPaint(); },
   _fidFiltra(){
     let l=this._fid||[];
     const f=this._fidFiltro||'todos';
@@ -1279,7 +1203,10 @@ const App={
             ${x.ficha?'':'<span class="tag pe">sin ficha en CRM</span>'}
             ${x.dup?'<span class="tag pe">'+x.dup+' fichas con este celular</span>':''}
             ${x.promo?'<span class="tag">📣 promos</span>':''}</div>
-        </div><div style="flex:none;color:var(--mut);font-size:18px">${abierto?'▾':'▸'}</div></div>
+        </div><div class="row" style="flex:none;gap:11px;align-items:center">
+          ${x.ficha?`<a onclick="event.stopPropagation();App.leadModal('${x.id}')" title="Editar la ficha"
+            style="color:var(--acc);cursor:pointer;font-weight:700;font-size:15px">✎</a>`:''}
+          <span style="color:var(--mut);font-size:18px">${abierto?'▾':'▸'}</span></div></div>
         ${abierto?`<div style="margin-top:9px;border-top:1px solid var(--line2);padding-top:8px">
           ${x.n?x.compras.map(v=>`<div class="row" style="justify-content:space-between;padding:4px 0;font-size:13px;gap:10px">
               <span>🛒 <b>${this._fidFecha(v.creado_en)}</b> <span class="dim" style="font-size:11.5px">${esc(String(v.producto||'').slice(0,60))}</span></span>
