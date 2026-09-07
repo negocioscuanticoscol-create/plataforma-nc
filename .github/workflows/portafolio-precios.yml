@@ -1,0 +1,34 @@
+name: portafolio-precios
+
+# Trae el precio de cierre de las acciones que José tiene en Hapi y Trii, y la
+# TRM oficial del día, y los deja en Supabase (port_precio y port_trm).
+#
+# ¿Por qué acá y no en la página? Yahoo tiene los datos pero NO manda cabecera
+# CORS, así que el navegador los bloquea. La TRM sí se puede pedir desde la
+# página (datos.gov.co responde Access-Control-Allow-Origin: *), pero igual se
+# guarda acá para tener el histórico completo aunque nadie abra la app.
+#
+# No lee una lista fija de tickers: los saca de port_operacion, así que cuando
+# José compre algo nuevo aparece solo, sin tocar este archivo.
+#
+# La llave es la publishable (pública, la misma que está en todos los HTML del
+# repo). No hay secretos que configurar.
+
+on:
+  schedule:
+    # 21:20 UTC = 4:20 p. m. Bogotá, después del cierre de NYSE/NASDAQ (4:00 p. m. ET).
+    - cron: '20 21 * * 1-5'
+    # y una segunda pasada temprano, para tener la TRM del día desde la mañana
+    - cron: '10 12 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  precios:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Bajar precios y TRM
+        run: python .github/scripts/portafolio_precios.py

@@ -147,8 +147,8 @@ const K  = 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H  = {apikey:K, Authorization:'Bearer '+K, 'Content-Type':'application/json'};
 const VER = 'v1.0 · 6 sep 2026';
 
-const St = {tab:"resumen", ops:[], precios:{}, trm:null, trmFecha:null, com:[], reps:[],
-            abierto:null, listo:false, error:""};
+const St = {tab:"resumen", ops:[], precios:{}, trm:null, trmFecha:null, trmAuto:false, trmError:"",
+            com:[], reps:[], abierto:null, listo:false, error:""};
 
 /* ---------- utilidades ---------- */
 const hoyISO = () => { const d=new Date();
@@ -169,6 +169,28 @@ async function api(ruta, metodo, cuerpo, prefer){
   const t = await r.text(); return t.trim()?JSON.parse(t):[];
 }
 
+/* La TRM oficial de la Superfinanciera, por datos.gov.co. Es de las pocas
+   fuentes que dejan que el navegador las llame directo (manda
+   Access-Control-Allow-Origin: *), así que el dólar no hay que escribirlo.
+   Si el servicio no responde, la app sigue con la última TRM guardada. */
+async function trmOficial(){
+  const url = 'https://www.datos.gov.co/resource/32sa-8pi3.json?$limit=1&$order=vigenciadesde%20DESC';
+  const r = await fetch(url, {cache:'no-store'});
+  if(!r.ok) throw new Error('datos.gov.co HTTP '+r.status);
+  const d = await r.json();
+  if(!d.length || !d[0].valor) throw new Error('sin datos');
+  return {valor:+d[0].valor, vigencia:String(d[0].vigenciadesde||'').slice(0,10)};
+}
+async function refrescarTRM(){
+  try{
+    const o = await trmOficial();
+    if(St.trmFecha===hoyISO() && Math.abs((St.trm||0)-o.valor)<0.01) return;
+    await api('port_trm','POST',{fecha:hoyISO(), valor:o.valor},
+              'resolution=merge-duplicates,return=minimal');
+    St.trm = o.valor; St.trmFecha = hoyISO(); St.trmAuto = true; pintar();
+  }catch(e){ St.trmError = String(e.message||e); }
+}
+
 async function cargar(){
   try{
     const [com, ops, pre, trm, reps] = await Promise.all([
@@ -186,6 +208,7 @@ async function cargar(){
     St.error = "";
   }catch(e){ St.error = String(e.message||e); }
   St.listo = true; pintar();
+  refrescarTRM();
 }
 
 /* ---------- el cálculo ----------
@@ -278,11 +301,15 @@ function tope(){
   return '<div class="tope"><div><div class="eyebrow">Negocios Cuánticos</div>'+
     '<h1>Portafolio</h1></div><div class="trm"><div class="eyebrow">Dólar hoy</div>'+
     '<div class="v">'+(St.trm?cop(St.trm):'—')+'</div>'+
-    '<button onclick="pedirTRM()">'+(St.trm?'del '+fecha(St.trmFecha)+' · cambiar':'ponerlo')+'</button></div></div>';
+    '<button onclick="pedirTRM()">'+
+      (St.trm ? (St.trmFecha===hoyISO() ? 'TRM oficial de hoy' : 'del '+fecha(St.trmFecha))
+              : (St.trmError?'no llegó · ponerlo':'buscando…'))+'</button></div></div>';
 }
 function pie(){
-  return '<div class="pie">Portafolio · '+VER+'<br>Sus datos viven solos en <code>port_operacion</code>, '+
-    '<code>port_precio</code> y <code>port_trm</code>.<br>Ninguna otra app los lee.</div>';
+  return '<div class="pie">Portafolio · '+VER+'<br>'+
+    'Dólar: TRM oficial de la Superfinanciera (datos.gov.co), automática.<br>'+
+    'Precios: cierre de NYSE/NASDAQ, los baja GitHub Actions a las 4:20 p. m.<br>'+
+    'Sus datos viven solos en <code>port_operacion</code>. Ninguna otra app los lee.</div>';
 }
 async function pedirTRM(){
   const v = prompt("¿A cuánto está el dólar hoy?\n\nPesos por dólar, sin puntos.\nEjemplo: 3890", St.trm||"");
@@ -481,7 +508,12 @@ async function guardarOp(){
     cantidad:cant, precio_usd:precio, comision_usd:num('op_com_usd')||0, trm:trm};
   try{
     await api('port_operacion','POST',fila,'return=minimal');
-    if(!St.precios[tk]) St.precios[tk] = {v:precio, f:fila.fecha};
+    /* Deja el precio de compra como referencia para que la posición no salga
+       "sin precio". El robot de GitHub Actions lo pisa con el cierre real. */
+    if(!St.precios[tk]){
+      try{ await api('port_precio','POST',{ticker:tk, fecha:fila.fecha, cierre_usd:precio},
+                     'resolution=merge-duplicates,return=minimal'); }catch(e){}
+    }
     await cargar(); irA('ops');
   }catch(e){ alert('No se pudo guardar: '+e.message); }
 }
