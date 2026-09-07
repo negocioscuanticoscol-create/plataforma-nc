@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101416">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Portafolio">
+<title>Portafolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600&display=swap">
+<style>
+:root{
+  /* Pizarra fría: es una mesa de trabajo con cifras, no una marca.
+     Un solo mundo visual, oscuro, para que el verde y el rojo del mercado
+     sean lo único que grite en la pantalla. */
+  --bg:#101416; --surf:#181E21; --surf2:#1F262A; --surf3:#252E32;
+  --ink:#E8EDEF; --ink2:#B6C0C4; --mut:#7E8B90;
+  --line:#2A3438; --line2:#212A2E;
+  --up:#3FB27F; --up-s:#122C22;      /* gana */
+  --down:#E06148; --down-s:#2E1A16;  /* pierde */
+  --acc:#D9A441;                     /* el dólar */
+  --acc-s:#2C2415;
+  --blue:#5B9CC4;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.26);
+  --r:13px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:560px;margin:0 auto;padding:14px 14px calc(94px + env(safe-area-inset-bottom,0px))}
+h1,h2{font-family:"IBM Plex Serif",Georgia,serif;font-weight:600;margin:0;letter-spacing:-.01em}
+h1{font-size:23px} h2{font-size:15.5px;margin-bottom:9px}
+.n{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2.5px solid var(--blue);outline-offset:2px;border-radius:8px}
+.up{color:var(--up)} .down{color:var(--down)} .dim{color:var(--mut);font-size:13px}
+.eyebrow{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut);font-weight:600}
+
+.tope{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.trm{text-align:right;flex:none}
+.trm .v{font-family:"IBM Plex Mono",monospace;font-size:15px;font-weight:600;color:var(--acc)}
+.trm button{background:none;border:0;color:var(--mut);font-size:11px;text-decoration:underline;padding:2px 0}
+
+/* el número grande: solo uno por pantalla */
+.total{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);
+  padding:17px 18px;box-shadow:var(--shadow)}
+.total .cop{font-family:"IBM Plex Mono",monospace;font-size:32px;font-weight:600;
+  font-variant-numeric:tabular-nums;line-height:1.1;margin-top:3px}
+.total .sub{font-family:"IBM Plex Mono",monospace;font-size:13.5px;color:var(--mut);margin-top:4px}
+.total .gan{display:inline-flex;align-items:center;gap:6px;margin-top:11px;padding:5px 11px;
+  border-radius:20px;font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:600}
+.gan.pos{background:var(--up-s);color:var(--up)} .gan.neg{background:var(--down-s);color:var(--down)}
+.gan.cero{background:var(--surf3);color:var(--mut)}
+
+/* los dos motores: la acción y el dólar */
+.motores{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:11px}
+.motor{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px}
+.motor .k{font-size:11px;color:var(--mut);display:flex;align-items:center;gap:5px}
+.motor .v{font-family:"IBM Plex Mono",monospace;font-size:18px;font-weight:600;margin-top:3px;
+  font-variant-numeric:tabular-nums}
+
+.card{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);
+  padding:15px;box-shadow:var(--shadow);margin-top:11px}
+.pos{display:block;width:100%;text-align:left;background:var(--surf);border:1px solid var(--line);
+  border-radius:var(--r);padding:12px 14px;margin-top:9px;box-shadow:var(--shadow)}
+.pos .l1{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.pos .tk{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:700;letter-spacing:.02em}
+.pos .nm{font-size:12px;color:var(--mut);margin-top:1px}
+.pos .val{font-family:"IBM Plex Mono",monospace;font-size:16px;font-weight:600;text-align:right}
+.pos .pc{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:600}
+.pos .det{margin-top:9px;padding-top:9px;border-top:1px dashed var(--line);display:grid;
+  grid-template-columns:1fr 1fr;gap:7px 14px}
+.kv{display:flex;justify-content:space-between;gap:8px;font-size:12.5px}
+.kv .k{color:var(--mut)} .kv .v{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 8px;border-radius:20px;background:var(--surf3);color:var(--ink2)}
+.sinprecio{background:var(--acc-s);color:var(--acc)}
+
+/* diversificación: barra apilada, que es lo que la pregunta pide */
+.apilada{display:flex;height:13px;border-radius:7px;overflow:hidden;background:var(--surf3);margin:4px 0 10px}
+.apilada span{display:block;height:100%}
+.leyenda{display:flex;flex-direction:column;gap:6px}
+.leyenda .fila{display:grid;grid-template-columns:11px 1fr auto auto;align-items:center;gap:9px;font-size:13px}
+.leyenda .pt{width:11px;height:11px;border-radius:3px}
+.leyenda .pc{font-family:"IBM Plex Mono",monospace;color:var(--mut);font-size:12.5px;min-width:44px;text-align:right}
+.leyenda .mt{font-family:"IBM Plex Mono",monospace;font-size:12.5px;min-width:92px;text-align:right}
+
+table.ops{width:100%;border-collapse:collapse;font-size:12.5px}
+table.ops th{text-align:left;font-size:10px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--mut);font-weight:600;padding:0 8px 7px 0;white-space:nowrap}
+table.ops td{padding:8px 8px 8px 0;border-top:1px solid var(--line2);
+  font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+.scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+.campos{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.campo{display:flex;flex-direction:column;gap:4px}
+.campo label{font-size:11px;color:var(--mut);font-weight:600}
+.campo input,.campo select{min-height:46px;padding:9px 12px;border-radius:10px;
+  border:1.5px solid var(--line);background:var(--surf2);font-size:16px;
+  font-family:"IBM Plex Mono",monospace}
+.campo.ancho{grid-column:1/-1}
+.btn{width:100%;min-height:48px;border:0;border-radius:11px;background:var(--up);
+  color:#08130E;font-weight:700;font-size:15px;margin-top:11px}
+.btn.gris{background:var(--surf3);color:var(--ink)}
+.vacio{text-align:center;color:var(--mut);padding:26px 14px;font-size:14px;line-height:1.6}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--surf);border-top:1px solid var(--line);
+  padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));z-index:30}
+nav .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:3px}
+nav button{border:0;background:none;border-radius:10px;padding:7px 1px 6px;display:flex;
+  flex-direction:column;align-items:center;gap:3px;color:var(--mut);min-height:52px;justify-content:center}
+nav button .i{font-size:17px;line-height:1}
+nav button .l{font-size:10px;font-weight:600}
+nav button.on{color:var(--ink);background:var(--surf3)}
+.pie{text-align:center;font-size:11px;color:var(--mut);margin-top:22px;line-height:1.7}
+.pie code{font-family:"IBM Plex Mono",monospace;background:var(--surf2);padding:1px 5px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="vacio">Cargando…</div></div>
+<nav><div class="in" id="nav"></div></nav>
+
+<script>
+/* ==========================================================================
+   PORTAFOLIO · las inversiones de José en Hapi y Trii
+   --------------------------------------------------------------------------
+   BASE: tablas port_* con prefijo propio. Ninguna otra app las lee ni las
+   escribe, y esta no toca ninguna tabla ajena.
+
+   LA IDEA QUE MANDA: usted compra en pesos algo que vale en dólares. La
+   ganancia tiene DOS motores y hay que verlos por separado, porque una acción
+   puede subir 12% y usted perder plata si el dólar bajó 15%.
+
+     valor hoy − costo  =  cantidad·(P₁−P₀)·T₁   +   cantidad·P₀·(T₁−T₀)
+                            └── la acción ──┘        └──── el dólar ────┘
+
+   P = precio en dólares, T = TRM (pesos por dólar). ₀ = al comprar, ₁ = hoy.
+   ========================================================================== */
+const SB = 'https://fnayedgvamxktxfvywwl.supabase.co';
+const K  = 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H  = {apikey:K, Authorization:'Bearer '+K, 'Content-Type':'application/json'};
+const VER = 'v1.0 · 6 sep 2026';
+
+const St = {tab:"resumen", ops:[], precios:{}, trm:null, trmFecha:null, com:[], reps:[],
+            abierto:null, listo:false, error:""};
+
+/* ---------- utilidades ---------- */
+const hoyISO = () => { const d=new Date();
+  return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-"); };
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const cop = n => '$'+Math.round(+n||0).toLocaleString('es-CO');
+const usd = n => 'US$'+(+n||0).toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct = n => (n>0?'+':'')+(+n||0).toFixed(1)+'%';
+const fecha = f => { const p=String(f).slice(0,10).split('-');
+  return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0].slice(2) : f; };
+const signo = n => n>0.5?'up':(n<-0.5?'down':'');
+
+async function api(ruta, metodo, cuerpo, prefer){
+  const h = Object.assign({}, H); if(prefer) h.Prefer = prefer;
+  const r = await fetch(SB+'/rest/v1/'+ruta, {method:metodo||'GET', headers:h,
+              body: cuerpo!=null ? JSON.stringify(cuerpo) : undefined});
+  if(!r.ok) throw new Error(r.status+' '+(await r.text()).slice(0,180));
+  const t = await r.text(); return t.trim()?JSON.parse(t):[];
+}
+
+async function cargar(){
+  try{
+    const [com, ops, pre, trm, reps] = await Promise.all([
+      api('port_comisionista?select=*&activo=is.true&order=nombre'),
+      api('port_operacion?select=*&order=fecha.desc'),
+      api('port_precio?select=ticker,fecha,cierre_usd&order=fecha.desc&limit=2000'),
+      api('port_trm?select=fecha,valor&order=fecha.desc&limit=1'),
+      api('port_reporte?select=id,ticker,titulo,fuente,veredicto,resumen,fecha&order=fecha.desc&limit=100')
+    ]);
+    St.com = com; St.ops = ops; St.reps = reps;
+    /* del histórico de precios nos quedamos con el más reciente de cada ticker */
+    St.precios = {};
+    pre.forEach(p=>{ if(!St.precios[p.ticker]) St.precios[p.ticker] = {v:+p.cierre_usd, f:p.fecha}; });
+    if(trm.length){ St.trm = +trm[0].valor; St.trmFecha = trm[0].fecha; }
+    St.error = "";
+  }catch(e){ St.error = String(e.message||e); }
+  St.listo = true; pintar();
+}
+
+/* ---------- el cálculo ----------
+   Una posición por ticker. Las ventas salen al costo promedio, que es lo que
+   pide la DIAN y además es lo honesto: no se escoge cuál lote se vendió. */
+function posiciones(filtroCom){
+  const ops = St.ops.filter(o=>!filtroCom || o.comisionista===filtroCom);
+  const por = {};
+  ops.slice().sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha))).forEach(function(o){
+    const t = String(o.ticker||'').toUpperCase().trim(); if(!t) return;
+    const p = por[t] = por[t] || {ticker:t, nombre:o.nombre||'', sector:o.sector||'Sin sector',
+      com:o.comisionista, qty:0, costoUSD:0, costoCOP:0, realCOP:0, realUSD:0, vendidas:0, ops:[]};
+    p.ops.push(o);
+    if(o.nombre) p.nombre = o.nombre;
+    if(o.sector) p.sector = o.sector;
+    const q = +o.cantidad||0, pr = +o.precio_usd||0, cm = +o.comision_usd||0, T = +o.trm||0;
+    if(o.tipo==='compra'){
+      p.qty += q; p.costoUSD += q*pr + cm; p.costoCOP += (q*pr + cm)*T;
+    } else if(o.tipo==='venta'){
+      const promUSD = p.qty ? p.costoUSD/p.qty : 0;
+      const promCOP = p.qty ? p.costoCOP/p.qty : 0;
+      const vq = Math.min(q, p.qty);
+      p.realUSD += vq*pr - cm - vq*promUSD;
+      p.realCOP += (vq*pr - cm)*T - vq*promCOP;
+      p.costoUSD -= vq*promUSD; p.costoCOP -= vq*promCOP;
+      p.qty -= vq; p.vendidas += vq;
+    } else if(o.tipo==='dividendo'){
+      p.realUSD += q*pr; p.realCOP += q*pr*T;
+    }
+  });
+  return Object.keys(por).map(function(t){
+    const p = por[t];
+    p.promUSD = p.qty ? p.costoUSD/p.qty : 0;
+    p.promCOP = p.qty ? p.costoCOP/p.qty : 0;
+    p.trm0    = p.promUSD ? p.promCOP/p.promUSD : 0;   /* TRM promedio de compra */
+    const pr = St.precios[t];
+    p.precio  = pr ? pr.v : null;
+    p.precioF = pr ? pr.f : null;
+    p.T1      = St.trm;
+    if(p.precio!=null && St.trm){
+      p.valUSD  = p.qty * p.precio;
+      p.valCOP  = p.valUSD * St.trm;
+      p.ganCOP  = p.valCOP - p.costoCOP;
+      p.ganUSD  = p.valUSD - p.costoUSD;
+      /* los dos motores, exactos y sin término cruzado suelto */
+      p.efAccion = p.qty * (p.precio - p.promUSD) * St.trm;
+      p.efDolar  = p.qty * p.promUSD * (St.trm - p.trm0);
+      p.pcCOP = p.costoCOP ? p.ganCOP/p.costoCOP*100 : 0;
+      p.pcUSD = p.costoUSD ? p.ganUSD/p.costoUSD*100 : 0;
+    }
+    return p;
+  }).sort((a,b)=>(b.valCOP||b.costoCOP||0)-(a.valCOP||a.costoCOP||0));
+}
+const abiertas = ps => ps.filter(p=>p.qty>0.0000001);
+
+function totales(ps){
+  const t = {costoCOP:0, valCOP:0, costoUSD:0, valUSD:0, efAccion:0, efDolar:0,
+             realCOP:0, faltan:0, con:0};
+  abiertas(ps).forEach(function(p){
+    t.costoCOP += p.costoCOP; t.costoUSD += p.costoUSD;
+    if(p.valCOP!=null){ t.valCOP += p.valCOP; t.valUSD += p.valUSD;
+      t.efAccion += p.efAccion; t.efDolar += p.efDolar; t.con++; }
+    else t.faltan++;
+  });
+  ps.forEach(p=>{ t.realCOP += p.realCOP; });
+  t.ganCOP = t.valCOP - t.costoCOP;
+  t.pc = t.costoCOP ? t.ganCOP/t.costoCOP*100 : 0;
+  return t;
+}
+
+/* ---------- pintar ---------- */
+const app = () => document.getElementById('app');
+const TABS = [["resumen","📊","Resumen"],["hapi","🟢","Hapi"],["trii","🟠","Trii"],
+              ["ops","📋","Operaciones"],["reportes","📄","Reportes"]];
+function irA(t){ St.tab=t; St.abierto=null; pintar(); window.scrollTo(0,0); }
+function abrir(t){ St.abierto = St.abierto===t?null:t; pintar(); }
+
+function pintar(){
+  document.getElementById('nav').innerHTML = TABS.map(t=>
+    '<button class="'+(St.tab===t[0]?'on':'')+'" onclick="irA(\''+t[0]+'\')">'+
+    '<span class="i">'+t[1]+'</span><span class="l">'+t[2]+'</span></button>').join('');
+  if(!St.listo){ app().innerHTML='<div class="vacio">Cargando…</div>'; return; }
+  if(St.error){ app().innerHTML='<div class="card" style="border-color:var(--down)">'+
+    '<h2 style="color:var(--down)">No se pudo leer la base</h2><div class="dim">'+esc(St.error)+'</div></div>'; return; }
+  const v = {resumen:vResumen, hapi:()=>vBroker('hapi'), trii:()=>vBroker('trii'),
+             ops:vOps, reportes:vReportes}[St.tab] || vResumen;
+  app().innerHTML = tope() + v() + pie();
+}
+function tope(){
+  return '<div class="tope"><div><div class="eyebrow">Negocios Cuánticos</div>'+
+    '<h1>Portafolio</h1></div><div class="trm"><div class="eyebrow">Dólar hoy</div>'+
+    '<div class="v">'+(St.trm?cop(St.trm):'—')+'</div>'+
+    '<button onclick="pedirTRM()">'+(St.trm?'del '+fecha(St.trmFecha)+' · cambiar':'ponerlo')+'</button></div></div>';
+}
+function pie(){
+  return '<div class="pie">Portafolio · '+VER+'<br>Sus datos viven solos en <code>port_operacion</code>, '+
+    '<code>port_precio</code> y <code>port_trm</code>.<br>Ninguna otra app los lee.</div>';
+}
+async function pedirTRM(){
+  const v = prompt("¿A cuánto está el dólar hoy?\n\nPesos por dólar, sin puntos.\nEjemplo: 3890", St.trm||"");
+  if(v===null) return;
+  const n = parseFloat(String(v).replace(/[^\d.]/g,''));
+  if(!n || n<500 || n>20000){ alert("Ese valor no parece una TRM. Escribe algo como 3890."); return; }
+  try{
+    await api('port_trm','POST',{fecha:hoyISO(), valor:n},'resolution=merge-duplicates,return=minimal');
+    St.trm = n; St.trmFecha = hoyISO(); pintar();
+  }catch(e){ alert("No se pudo guardar: "+e.message); }
+}
+async function pedirPrecio(tk){
+  const p = St.precios[tk];
+  const v = prompt("Precio de "+tk+" en dólares.\n\nEl cierre de hoy. Ejemplo: 47.50",
+                   p?p.v:"");
+  if(v===null) return;
+  const n = parseFloat(String(v).replace(/[^\d.]/g,''));
+  if(!n || n<=0){ alert("Escribe un número, como 47.50"); return; }
+  try{
+    await api('port_precio','POST',{ticker:tk, fecha:hoyISO(), cierre_usd:n},
+              'resolution=merge-duplicates,return=minimal');
+    St.precios[tk] = {v:n, f:hoyISO()}; pintar();
+  }catch(e){ alert("No se pudo guardar: "+e.message); }
+}
+
+/* ---------- RESUMEN ---------- */
+function vResumen(){
+  const ps = posiciones(null), ab = abiertas(ps), t = totales(ps);
+  if(!St.ops.length) return vacioInicial();
+
+  let h = '<div class="total"><div class="eyebrow">Valor hoy del portafolio</div>'+
+    '<div class="cop">'+(t.con?cop(t.valCOP):'—')+'</div>'+
+    '<div class="sub">'+(t.con?usd(t.valUSD)+' · costó '+cop(t.costoCOP):'falta el precio de las acciones')+'</div>'+
+    (t.con?'<div><span class="gan '+(t.ganCOP>0?'pos':t.ganCOP<0?'neg':'cero')+'">'+
+      (t.ganCOP>=0?'▲':'▼')+' '+cop(Math.abs(t.ganCOP))+' · '+pct(t.pc)+'</span></div>':'')+
+    (t.faltan?'<div class="dim" style="margin-top:9px">'+t.faltan+' posición(es) sin precio del día. '+
+      'Tócalas abajo y ponle el precio.</div>':'')+'</div>';
+
+  if(t.con){
+    h += '<div class="motores">'+
+      '<div class="motor"><div class="k">📈 Le ganó la acción</div>'+
+      '<div class="v '+signo(t.efAccion)+'">'+(t.efAccion>=0?'+':'−')+cop(Math.abs(t.efAccion))+'</div></div>'+
+      '<div class="motor"><div class="k">💵 Le movió el dólar</div>'+
+      '<div class="v '+signo(t.efDolar)+'">'+(t.efDolar>=0?'+':'−')+cop(Math.abs(t.efDolar))+'</div></div></div>'+
+      '<div class="dim" style="margin-top:7px;padding:0 2px">Los dos suman su ganancia en pesos. '+
+      'Si el de la derecha está en rojo, el dólar le está comiendo lo que la acción le dio.</div>';
+  }
+  if(Math.abs(t.realCOP) > 0.5){
+    h += '<div class="card"><h2>Ya liquidado</h2><div class="kv"><span class="k">Ganancia realizada</span>'+
+      '<span class="v '+signo(t.realCOP)+'">'+(t.realCOP>=0?'+':'−')+cop(Math.abs(t.realCOP))+'</span></div>'+
+      '<div class="dim" style="margin-top:5px">De lo que ya vendió, contra el dólar del día que compró.</div></div>';
+  }
+
+  h += diversificacion(ab, 'sector', 'Diversificación por sector');
+  h += diversificacion(ab, 'com', 'Repartición por comisionista');
+  h += '<div class="card"><h2>Posiciones abiertas</h2>'+
+       (ab.length?ab.map(tarjeta).join(''):'<div class="dim">Nada abierto.</div>')+'</div>';
+  return h;
+}
+
+function vacioInicial(){
+  return '<div class="card"><h2>Todavía no hay ninguna operación</h2>'+
+    '<div class="dim" style="line-height:1.65">Esta app calcula algo que ningún broker le muestra: '+
+    'cuánto ganó <b>por la acción</b> y cuánto <b>por el dólar</b>, por separado.<br><br>'+
+    'Para eso necesita tres datos de cada compra: la fecha, el precio en dólares y '+
+    '<b>la TRM de ese día</b>. Sin la TRM no se puede saber si de verdad ganó plata.</div>'+
+    '<button class="btn" onclick="irA(\'ops\')">Cargar la primera compra</button></div>';
+}
+
+function diversificacion(ab, campo, titulo){
+  if(!ab.length) return '';
+  const base = ab.filter(p=>p.valCOP!=null).length ? 'valCOP' : 'costoCOP';
+  const tot = ab.reduce((a,p)=>a+(p[base]||0),0);
+  if(!tot) return '';
+  const g = {};
+  ab.forEach(function(p){ const k = campo==='com' ? nombreCom(p.com) : (p.sector||'Sin sector');
+    g[k] = (g[k]||0) + (p[base]||0); });
+  const PAL = ['#3FB27F','#D9A441','#5B9CC4','#B07FC9','#E06148','#5FA9A0','#C98F5A','#8A96A0'];
+  const filas = Object.keys(g).map(k=>({k:k, v:g[k], pc:g[k]/tot*100})).sort((a,b)=>b.v-a.v);
+  const alerta = filas[0].pc >= 50;
+  return '<div class="card"><h2>'+titulo+'</h2>'+
+    '<div class="apilada">'+filas.map((f,i)=>'<span style="width:'+f.pc.toFixed(2)+
+      '%;background:'+PAL[i%PAL.length]+'"></span>').join('')+'</div>'+
+    '<div class="leyenda">'+filas.map((f,i)=>'<div class="fila">'+
+      '<span class="pt" style="background:'+PAL[i%PAL.length]+'"></span>'+
+      '<span>'+esc(f.k)+'</span><span class="pc">'+f.pc.toFixed(1)+'%</span>'+
+      '<span class="mt">'+cop(f.v)+'</span></div>').join('')+'</div>'+
+    (alerta?'<div class="dim" style="margin-top:10px;color:var(--acc)">⚠️ '+esc(filas[0].k)+
+      ' pesa '+filas[0].pc.toFixed(0)+'% del portafolio. Eso ya no es diversificación.</div>':'')+
+    '<div class="dim" style="margin-top:8px">Medido sobre '+
+      (base==='valCOP'?'el valor de hoy':'lo que costó, porque faltan precios')+'.</div></div>';
+}
+function nombreCom(id){ const c = St.com.filter(x=>x.id===id)[0]; return c?c.nombre:(id||'—'); }
+
+function tarjeta(p){
+  const ab = St.abierto===p.ticker;
+  const hay = p.valCOP!=null;
+  return '<button class="pos" onclick="abrir(\''+p.ticker+'\')">'+
+    '<div class="l1"><div><div class="tk">'+esc(p.ticker)+
+      ' <span class="chip">'+esc(nombreCom(p.com))+'</span>'+
+      (hay?'':' <span class="chip sinprecio">sin precio</span>')+'</div>'+
+      '<div class="nm">'+esc(p.nombre||p.sector)+' · '+(+p.qty).toLocaleString('es-CO')+' acciones</div></div>'+
+    '<div><div class="val">'+(hay?cop(p.valCOP):cop(p.costoCOP))+'</div>'+
+      (hay?'<div class="pc '+signo(p.ganCOP)+'">'+pct(p.pcCOP)+' en pesos</div>':
+           '<div class="pc" style="color:var(--acc)">tócala</div>')+'</div></div>'+
+    (ab?'<div class="det">'+
+      kv('Compró a', usd(p.promUSD)) + kv('Vale hoy', hay?usd(p.precio):'—') +
+      kv('Dólar de compra', cop(p.trm0)) + kv('Dólar hoy', St.trm?cop(St.trm):'—') +
+      kv('Costó', cop(p.costoCOP)) + kv('Vale', hay?cop(p.valCOP):'—') +
+      (hay?kv('Por la acción', (p.efAccion>=0?'+':'−')+cop(Math.abs(p.efAccion)), signo(p.efAccion)):'') +
+      (hay?kv('Por el dólar', (p.efDolar>=0?'+':'−')+cop(Math.abs(p.efDolar)), signo(p.efDolar)):'') +
+      (Math.abs(p.realCOP)>0.5?kv('Ya liquidado', (p.realCOP>=0?'+':'−')+cop(Math.abs(p.realCOP)), signo(p.realCOP)):'')+
+      '<div style="grid-column:1/-1;margin-top:4px">'+
+      '<span class="dim" style="text-decoration:underline;cursor:pointer" '+
+      'onclick="event.stopPropagation();pedirPrecio(\''+p.ticker+'\')">Actualizar el precio de '+esc(p.ticker)+
+      (p.precioF?' (hoy: '+fecha(p.precioF)+')':'')+'</span></div>'+
+    '</div>':'')+'</button>';
+}
+function kv(k,v,cls){ return '<div class="kv"><span class="k">'+esc(k)+'</span>'+
+  '<span class="v '+(cls||'')+'">'+esc(v)+'</span></div>'; }
+
+/* ---------- CAJÓN DE CADA COMISIONISTA ---------- */
+function vBroker(id){
+  const ps = posiciones(id), ab = abiertas(ps), t = totales(ps);
+  const nom = nombreCom(id);
+  if(!ab.length && !ps.length) return '<div class="card"><h2>'+esc(nom)+'</h2>'+
+    '<div class="dim">Todavía no hay operaciones en '+esc(nom)+'.</div>'+
+    '<button class="btn" onclick="irA(\'ops\')">Cargar una compra</button></div>';
+  return '<div class="total"><div class="eyebrow">'+esc(nom)+' · valor hoy</div>'+
+    '<div class="cop">'+(t.con?cop(t.valCOP):'—')+'</div>'+
+    '<div class="sub">'+ab.length+' posición(es) · costó '+cop(t.costoCOP)+'</div>'+
+    (t.con?'<div><span class="gan '+(t.ganCOP>0?'pos':t.ganCOP<0?'neg':'cero')+'">'+
+      (t.ganCOP>=0?'▲':'▼')+' '+cop(Math.abs(t.ganCOP))+' · '+pct(t.pc)+'</span></div>':'')+'</div>'+
+    (t.con?'<div class="motores">'+
+      '<div class="motor"><div class="k">📈 La acción</div><div class="v '+signo(t.efAccion)+'">'+
+        (t.efAccion>=0?'+':'−')+cop(Math.abs(t.efAccion))+'</div></div>'+
+      '<div class="motor"><div class="k">💵 El dólar</div><div class="v '+signo(t.efDolar)+'">'+
+        (t.efDolar>=0?'+':'−')+cop(Math.abs(t.efDolar))+'</div></div></div>':'')+
+    '<div class="card"><h2>Posiciones</h2>'+ab.map(tarjeta).join('')+'</div>'+
+    diversificacion(ab,'sector','Sectores en '+esc(nom));
+}
+
+/* ---------- OPERACIONES ---------- */
+function vOps(){
+  let h = '<div class="card"><h2>Anotar una operación</h2>'+
+    '<div class="dim" style="margin:-4px 0 11px">La TRM es obligatoria: es la que después le dice '+
+    'si ganó por la acción o por el dólar.</div>'+
+    '<div class="campos">'+
+    sel('op_tipo','Qué fue',[['compra','Compra'],['venta','Venta'],['dividendo','Dividendo']])+
+    sel('op_com','Comisionista',St.com.map(c=>[c.id,c.nombre]))+
+    inp('op_ticker','Nemotécnico','text','TREE')+
+    inp('op_fecha','Fecha','date',hoyISO())+
+    inp('op_cant','Cantidad','number','10')+
+    inp('op_precio','Precio en US$','number','42.00')+
+    inp('op_com_usd','Comisión US$','number','0')+
+    inp('op_trm','Dólar ese día','number',St.trm||'3890')+
+    inp('op_nombre','Nombre (opcional)','text','LendingTree',true)+
+    inp('op_sector','Sector (opcional)','text','Finanzas',true)+
+    '</div><button class="btn" onclick="guardarOp()">Guardar operación</button></div>';
+
+  if(!St.ops.length) return h;
+  h += '<div class="card"><h2>Todas las operaciones</h2><div class="scrollx"><table class="ops">'+
+    '<thead><tr><th>Fecha</th><th>Qué</th><th>Ticker</th><th>Cant.</th><th>US$</th>'+
+    '<th>Dólar</th><th>Costó (COP)</th><th>Dónde</th><th></th></tr></thead><tbody>'+
+    St.ops.map(function(o){
+      const total = ((+o.cantidad||0)*(+o.precio_usd||0) + (+o.comision_usd||0)) * (+o.trm||0);
+      const col = o.tipo==='compra'?'':(o.tipo==='venta'?'up':'acc');
+      return '<tr><td>'+fecha(o.fecha)+'</td>'+
+        '<td class="'+(o.tipo==='venta'?'up':'')+'">'+esc(o.tipo)+'</td>'+
+        '<td><b>'+esc(String(o.ticker).toUpperCase())+'</b></td>'+
+        '<td>'+(+o.cantidad).toLocaleString('es-CO')+'</td>'+
+        '<td>'+(+o.precio_usd).toFixed(2)+'</td>'+
+        '<td>'+cop(o.trm)+'</td><td>'+cop(total)+'</td>'+
+        '<td>'+esc(nombreCom(o.comisionista))+'</td>'+
+        '<td><span style="color:var(--down);cursor:pointer" onclick="borrarOp(\''+o.id+'\')">✕</span></td></tr>';
+    }).join('')+'</tbody></table></div></div>';
+  return h;
+}
+function inp(id,l,t,ph,vacio){ return '<div class="campo'+(vacio?' ancho':'')+'"><label for="'+id+'">'+esc(l)+
+  '</label><input id="'+id+'" type="'+t+'" '+(t==='number'?'inputmode="decimal" step="any" ':'')+
+  (t==='date'?'value="'+ph+'"':'placeholder="'+esc(ph)+'"')+'></div>'; }
+function sel(id,l,ops){ return '<div class="campo"><label for="'+id+'">'+esc(l)+'</label><select id="'+id+'">'+
+  ops.map(o=>'<option value="'+esc(o[0])+'">'+esc(o[1])+'</option>').join('')+'</select></div>'; }
+
+async function guardarOp(){
+  const g = id => (document.getElementById(id)||{}).value || '';
+  const num = id => parseFloat(String(g(id)).replace(/[^\d.\-]/g,''));
+  const tk = g('op_ticker').toUpperCase().trim();
+  const cant = num('op_cant'), precio = num('op_precio'), trm = num('op_trm');
+  if(!tk){ alert('Falta el nemotécnico. Por ejemplo TREE.'); return; }
+  if(!cant || cant<=0){ alert('Falta la cantidad de acciones.'); return; }
+  if(!(precio>0)){ alert('Falta el precio en dólares.'); return; }
+  if(!(trm>500)){ alert('Falta el dólar de ese día. Sin eso no se puede calcular la ganancia real.'); return; }
+  const fila = {comisionista:g('op_com'), tipo:g('op_tipo'), ticker:tk,
+    nombre:g('op_nombre')||null, sector:g('op_sector')||null, fecha:g('op_fecha')||hoyISO(),
+    cantidad:cant, precio_usd:precio, comision_usd:num('op_com_usd')||0, trm:trm};
+  try{
+    await api('port_operacion','POST',fila,'return=minimal');
+    if(!St.precios[tk]) St.precios[tk] = {v:precio, f:fila.fecha};
+    await cargar(); irA('ops');
+  }catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+async function borrarOp(id){
+  if(!confirm('¿Borrar esta operación?\n\nSe recalcula todo el portafolio.')) return;
+  try{ await api('port_operacion?id=eq.'+id,'DELETE',null,'return=minimal'); await cargar(); }
+  catch(e){ alert('No se pudo borrar: '+e.message); }
+}
+
+/* ---------- REPORTES ---------- */
+function vReportes(){
+  if(!St.reps.length){
+    const tks = Object.keys(St.precios).concat(St.ops.map(o=>String(o.ticker).toUpperCase()));
+    const unicos = tks.filter((v,i,a)=>v && a.indexOf(v)===i);
+    return '<div class="card"><h2>Reportes</h2>'+
+      '<div class="dim" style="line-height:1.65">Acá van a caer los análisis de sus acciones.<br><br>'+
+      '<b>PRISM-INSIGHT</b> es libre (AGPL-3.0) y cubre NYSE y NASDAQ, pero corre en Python y '+
+      'cada reporte llama a un modelo de pago. Tenerlo prendido escaneando todo el mercado cuesta '+
+      'unos <b>US$310 al mes</b>. Corrido solo sobre lo suyo, son unos dólares por tanda.<br><br>'+
+      'Cuando lo conectemos, va a correr por GitHub Actions —igual que el recolector de pauta— '+
+      'y va a escribir acá.</div>'+
+      (unicos.length?'<div class="dim" style="margin-top:12px">Se correría sobre: <b>'+
+        unicos.map(esc).join(', ')+'</b></div>':'')+'</div>';
+  }
+  return '<div class="card"><h2>Reportes</h2></div>' + St.reps.map(function(r){
+    const c = /comprar/i.test(r.veredicto||'')?'up':/vender/i.test(r.veredicto||'')?'down':'';
+    return '<div class="card"><div class="l1" style="display:flex;justify-content:space-between;gap:10px">'+
+      '<div><div class="tk n" style="font-weight:700">'+esc(r.ticker||'—')+'</div>'+
+      '<div class="dim">'+fecha(r.fecha)+' · '+esc(r.fuente||'')+'</div></div>'+
+      (r.veredicto?'<span class="chip '+c+'">'+esc(r.veredicto)+'</span>':'')+'</div>'+
+      '<div style="margin-top:8px;font-weight:600">'+esc(r.titulo)+'</div>'+
+      (r.resumen?'<div class="dim" style="margin-top:5px;line-height:1.6">'+esc(r.resumen)+'</div>':'')+
+      '</div>';
+  }).join('');
+}
+
+pintar(); cargar();
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') cargar(); });
+</script>
+</body>
+</html>
