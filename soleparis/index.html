@@ -127,7 +127,9 @@
 <script>
 const App = {
   // 1 admin (ve todo) + 5 claves de cliente (solo Starting Point)
-  PASS:{ 'soleadmin2026':'admin', 'solegerencia2026':'gerencia', 'soleparis1':'cliente','soleparis2':'cliente','soleparis3':'cliente','soleparis4':'cliente','soleparis5':'cliente' },
+  /* 'ncdemo2026' es la clave de PRESENTACIÓN: la misma en todas las apps de NC,
+     para mostrarle la plataforma a un cliente sin repartir las claves reales. */
+  PASS:{ 'soleadmin2026':'admin', 'solegerencia2026':'gerencia', 'ncdemo2026':'gerencia', 'soleparis1':'cliente','soleparis2':'cliente','soleparis3':'cliente','soleparis4':'cliente','soleparis5':'cliente' },
   CATS:['Facial','Capilar','Corporal','Ojos','Labios','Kit','Tarjeta'],
   rol:'', view:'inicio', _cat:'', _editId:null,
   _diag:[], _dResp:{a:{},b:{},tools:{}},
