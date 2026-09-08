@@ -1280,7 +1280,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-08-15e',
+VER:'2026-09-07a',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
@@ -1289,6 +1289,36 @@ SOCIOS:['Bancario','FES','Proveedores','JVC retiros','JVC retiros carro','JVC ca
 CLASES_CAJA:['Cobro de cliente','Pago a proveedor','UPS envíos','Giro al exterior','Retiro de efectivo',
   'Compras con tarjeta','Traslado entre cuentas','Impuesto 4x1000','Comisiones bancarias',
   'Rendimientos','Retefuente','Aporte de socio','Prestamo','Gasto operativo','Por clasificar'],
+/* ===== CAJONES DE CAJA · tres niveles =====
+   1) Entradas / Salidas
+   2) dentro de cada uno, un cajón por tipo de detalle (la clase)
+   3) dentro de la clase, el listado: fecha · valor · detalle del banco · qué fue
+   Solo mira el extracto: los movimientos a mano no son del banco y desvirtúan
+   el total. Por eso la caja cuadra únicamente con los que NO son manuales. */
+_cjSet(k,v){ this[k] = (this[k]===v ? '' : v); if(k==='_cjES') this._cjClase=''; this._cajaPaint(); },
+_cjMovs(M){ return (M||[]).filter(x=>!x.manual); },
+_cjClaseDe(x){ return (x.clase && x.clase!=='Por clasificar') ? x.clase : '(sin clasificar)'; },
+
+_cajonesHTML(M){
+  const T=this._cjMovs(M);
+  const es=this._cjES||'', cl=this._cjClase||'';
+  const ent=T.filter(x=>+x.valor>0), sal=T.filter(x=>+x.valor<0);
+  const sum=l=>l.reduce((a,x)=>a+Math.abs(+x.valor||0),0);
+  const saldo=T.reduce((a,x)=>a+(+x.valor||0),0);
+  const caja=(id,ico,tit,lista,color)=>`<div class="card" style="cursor:pointer;flex:1;min-width:210px;border-left:5px solid ${color};${es===id?'box-shadow:0 0 0 2px '+color+' inset':''}" onclick="App._cjSet('_cjES','${id}')"><div class="mini" style="font-weight:700;letter-spacing:.06em">${ico} ${tit}</div><div style="font-size:23px;font-weight:800;color:${color};line-height:1.15;margin-top:2px">${money(sum(lista))}</div><div class="mini">${lista.length} movimientos · toca para abrir</div></div>`;
+  let h=`<div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">${caja('entra','▲','ENTRADAS',ent,'#16794a')}${caja('sale','▼','SALIDAS',sal,'#b3261e')}<div class="card" style="flex:1;min-width:190px;border-left:5px solid #555"><div class="mini" style="font-weight:700;letter-spacing:.06em">= SALDO DEL BANCO</div><div style="font-size:23px;font-weight:800;line-height:1.15;margin-top:2px">${money(saldo)}</div><div class="mini">${T.length} movimientos del extracto</div></div></div>`;
+  if(!es) return h+`<div class="card mini">Toca <b>Entradas</b> o <b>Salidas</b> para ver los cajones por tipo de detalle.</div>`;
+  const L = es==='entra' ? ent : sal;
+  const g={}; L.forEach(x=>{ const k=this._cjClaseDe(x); (g[k]=g[k]||[]).push(x); });
+  const clases=Object.keys(g).map(k=>({k, n:g[k].length, v:sum(g[k])})).sort((a,b)=>b.v-a.v);
+  const tot=sum(L), col = es==='entra'?'#16794a':'#b3261e';
+  h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><b>${es==='entra'?'▲ Entradas':'▼ Salidas'} por tipo de detalle</b><span class="mini">${clases.length} tipos · ${money(tot)}</span></div><table class="tb" style="margin-top:8px"><thead><tr><th>Tipo de detalle</th><th>Movs</th><th style="text-align:right">Total</th><th style="text-align:right">%</th><th></th></tr></thead><tbody>${clases.map(c=>`<tr style="cursor:pointer;${cl===c.k?'background:#f3f6fb;font-weight:700':''}" onclick="App._cjSet('_cjClase',${JSON.stringify(c.k).replace(/"/g,'&quot;')})"><td>${esc(c.k)}</td><td>${c.n}</td><td style="text-align:right;color:${col};font-weight:700">${money(c.v)}</td><td style="text-align:right">${tot?(c.v/tot*100).toFixed(1):'0.0'}%</td><td style="text-align:right">${cl===c.k?'▾':'▸'}</td></tr>`).join('')}</tbody></table></div>`;
+  if(!cl) return h;
+  const filas=(g[cl]||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+  h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><b>${esc(cl)}</b><span class="mini">${filas.length} movimientos · ${money(sum(filas))}</span></div><table class="tb" style="margin-top:8px"><thead><tr><th>Fecha</th><th style="text-align:right">Valor</th><th>Detalle del banco</th><th>Qué fue (FES)</th><th>Responsable</th></tr></thead><tbody>${filas.map(x=>`<tr><td>${fecha(x.fecha)}</td><td style="text-align:right;color:${col};font-weight:700">${money(Math.abs(+x.valor||0))}</td><td>${esc(x.detalle||'—')}</td><td>${x.detalle_fes?esc(x.detalle_fes):'<span style="color:#b45309">por identificar</span>'}</td><td>${esc(x.socio||'—')}</td></tr>`).join('')}</tbody></table></div>`;
+  return h;
+},
+
 async cajaMovs(){ this._cmov=await GETALL('ff_banco_mov?order=fecha.desc&limit=5000'); return this._cmov; },
 
 vBancos: safe(async function(){
@@ -1380,8 +1410,10 @@ _cajaPaint(){
   this.set(`<h1>💵 Caja</h1><div class="sub2">Todo el movimiento de plata: banco, efectivo y préstamos · <span class="mini">v${this.VER}</span></div>
   <div class="tabs2">
     <button class="${sub==='caja'?'on':''}" onclick="App._cajaTab='caja';App._cajaPaint()">Caja (${M.length})</button>
+    <button class="${sub==='cajones'?'on':''}" onclick="App._cajaTab='cajones';App._cajaPaint()">🗂️ Cajones</button>
     <button class="${sub==='bancos'?'on':''}" onclick="App._cajaTab='bancos';App._cajaPaint()">Bancos · extractos (${meses.length})</button>
   </div>
+  ${sub==='cajones'?this._cajonesHTML(M):''}
   ${sub==='caja'?`
   <div class="card" style="padding:10px 12px">
     <div class="mini" style="font-weight:700;margin-bottom:6px">FILTRAR</div>
