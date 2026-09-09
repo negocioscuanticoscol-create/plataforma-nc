@@ -892,16 +892,28 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
      precio de Pillow o de Resortado según lo que pida el cliente. */
   /* Sale tal cual del catálogo de producto (nido/catalogo.html):
      cinco líneas y un servicio a la medida. */
-  /* 8 sep 2026 · Nido queda solo en colchones de tractomula. Se sacaron las
-     secciones de Colchones, Sensaflex, BabyNido y Nido Mascotas, junto con sus
-     referencias del inventario (respaldo en _PLAYBOOK/respaldo_nido_inventario_
-     sin_truck-20260908.json, por si hay que devolverlas).
+  /* 8 sep 2026 · sale Nido Mascotas. Quedan las cuatro que se venden:
+     Colchones, Sensaflex, BabyNido y Nido Truck.
 
      Los tamaños se escriben IGUAL que en nido_inventario.tamano: el precio se
      cruza con la llave 'REFERENCIA|Tamaño', así que 'Fotón Mula' con tilde o
      'Kenworth' a secas salían sin precio y encima duplicados. */
   CATALOGO_BASE:[
-    // Tres moldes de cabina. El precio lo da fábrica: sin recargo.
+    // Línea 01 · pillowtop, garantía 5 años
+    {sec:'Colchones', refs:[
+      {ref:'PILLOWTOP CASSATA',   tams:TAMS4},
+      {ref:'PILLOWTOP RESORTADO', tams:TAMS4},
+      // «Crea tu colchón»: se fabrica con la medida del cliente
+      {ref:'CREA TU COLCHÓN', tams:['Medida especial'], recargo:15,
+       tipos:['Pillowtop Cassata','Pillowtop Resortado'],
+       baseDe:{'Pillowtop Cassata':'PILLOWTOP CASSATA','Pillowtop Resortado':'PILLOWTOP RESORTADO'}}]},
+    // Línea 02 · colchoneta de 17 cm en espuma D26, en todas las medidas
+    {sec:'Sensaflex', refs:[
+      {ref:'SENSAFLEX GRIS D26', tams:TAMS4.concat(['Medida especial']), recargo:15}]},
+    // Línea 03 · cuna, espuma D23
+    {sec:'BabyNido', refs:[
+      {ref:'COLCHÓN CUNA', tams:['130×70×15','Medida especial'], recargo:15}]},
+    // Línea 04 · tres moldes de cabina. El precio lo da fábrica: sin recargo.
     {sec:'Nido Truck', refs:[
       {ref:'NIDO TRUCK', tams:['FVR Viejo','Foton Mula','Mula Kenworth'], recargo:0}]},
   ],
@@ -909,7 +921,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
      a Gloria y a Diana les seguirían saliendo las secciones viejas guardadas en
      su equipo por más que acá se cambie. Al subir la versión, el guardado se
      descarta y vuelve a salir de CATALOGO_BASE. */
-  CAT_VER:'2026-09-08-truck',
+  CAT_VER:'2026-09-08-sin-mascotas',
   get CATALOGO(){
     if(this._cat) return this._cat;
     let g=null;
