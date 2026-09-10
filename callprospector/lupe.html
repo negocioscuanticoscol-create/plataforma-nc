@@ -276,7 +276,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260907-copiar-celular';
+const VER='20260910-ciudades-cortas-2';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -598,6 +598,20 @@ async function abrirBase(b){
      En una base de 1.223 eso deja unas 600 llamadas de distancia entre cada una
      —cuatro dias de trabajo— y si alguna alcanza a otra, la sincronizacion ya
      saca lo que la otra marco. */
+  /* Primero las ciudades a las que les quedan POCOS. La idea es ACABAR
+     ciudades, no dejar cabos sueltos regados en 162. En Calzado·Distribuidores
+     quedaban 88 ciudades con un solo prospecto: con este orden se cierran 113
+     ciudades en 144 llamadas, y Bogota (374) queda de ultima.
+     Se cuenta sobre lo que QUEDA por llamar —no sobre la base entera—, asi que
+     una ciudad que se va vaciando sube sola la proxima vez que se abre.
+     El sort de JS es estable: dentro de la misma ciudad se respeta el orden que
+     ya trajo la consulta (prioridad.asc, nombre.asc), o sea los mejores primero. */
+  const cCiu={};
+  const kCiu=l=>String(l.ciudad||'').trim()||cSin;   // misma clave que usa saltarCiudad
+  TODOS.forEach(l=>{ const k=kCiu(l); cCiu[k]=(cCiu[k]||0)+1; });
+  TODOS.sort((a,b)=>{ const ka=kCiu(a), kb=kCiu(b);
+    return (cCiu[ka]-cCiu[kb]) || ka.localeCompare(kb,'es'); });
+
   const sen = SENTIDO[b.id];
   if(sen && sen.cuantos>1 && TODOS.length){
     const salto=Math.floor(sen.puesto * TODOS.length / sen.cuantos);
@@ -683,11 +697,24 @@ function trabarTarjeta(trabada){
   document.querySelectorAll('#main .res button, #main .nav button, #main .nav select')
     .forEach(b=>b.disabled=trabada);
 }
+/* Se acabo la ciudad: seguir SOLO con la siguiente mas corta, sin devolver a
+   "todas". Frenar aqui para que la persona escoja ciudad a mano es justo lo que
+   hace que queden 162 ciudades a medias: el punto es CERRAR ciudades. */
+function saltarCiudad(){
+  const c={}; TODOS.forEach(l=>{ const k=String(l.ciudad||'').trim()||cSin; c[k]=(c[k]||0)+1; });
+  const sig=Object.keys(c).sort((a,b)=>c[a]-c[b]||a.localeCompare(b,'es'))[0];
+  if(!sig) return false;
+  toast('✅ Ciudad terminada · sigue '+sig+' ('+c[sig]+(c[sig]===1?' prospecto)':' prospectos)'));
+  filtrarCiudad(sig===cSin?cSin:sig);
+  return true;
+}
 function render(){
   /* Cada vez que se repinta la tarjeta los botones nacen nuevos y prendidos:
      aqui se destraba, no en cada salida de marcar(). */
   MARCANDO=false;
   if(!leads.length){
+    // se acabo ESTA ciudad pero la base todavia tiene: seguir sin preguntar
+    if(CIUDAD && TODOS.length && saltarCiudad()) return;
     $('main').innerHTML=`<div class="card"><div class="emp">No quedan prospectos</div>
       <div class="sub" style="margin-top:8px">${CIUDAD
         ? 'Ya trabajaste todo lo de <b>'+esc(CIUDAD)+'</b>. Quedan '+num(TODOS.length)+' en las demás ciudades.'
