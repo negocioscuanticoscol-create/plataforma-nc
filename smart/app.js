@@ -618,10 +618,19 @@ const App = {
     // ── Inteligencia de recompra por cliente ──
     this._cliByDoc={}; cli.forEach(c=>{ this._cliByDoc[c.documento]=c; });
     this._celByName={}; cli.forEach(c=>{ if(!c.celular) return; const kk=norm(c.nombre); if(kk) this._celByName[kk]=c.celular; const core=norm(String(c.nombre).replace(/\(.*?\)/g,'')); if(core && !this._celByName[core]) this._celByName[core]=c.celular; });
-    /* El celular sale del documento, y si no, del nombre. Antes esto estaba
-       escrito dentro de la fila; ahora tambien hace falta para contar cuantos se
-       pueden llamar, asi que va una sola vez. */
-    const celDe=(k,o)=>(((this._cliByDoc||{})[o.doc]||{}).celular||(this._celByName||{})[k]||'')+'';
+    /* Tercera fuente del telefono: el que quedo escrito en el pedido. Habia
+       clientes con la ficha vacia cuyo celular SI estaba en su cotizacion —
+       Blanca Cecilia Quintero, por ejemplo— y salian como "sin telefono". */
+    this._celByCot={};
+    try{ const rq=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.smart&select=cliente,celular&limit=3000',{headers:H});
+      const jq=await rq.json();
+      (Array.isArray(jq)?jq:[]).forEach(x=>{ if(!String(x.celular||'').replace(/\D/g,'')) return;
+        const kk=norm(x.cliente); if(kk && !this._celByCot[kk]) this._celByCot[kk]=x.celular; });
+    }catch(e){}
+    /* El celular sale del documento, y si no, del nombre, y si no, del pedido.
+       Antes esto estaba escrito dentro de la fila; ahora tambien hace falta para
+       contar cuantos se pueden llamar, asi que va una sola vez. */
+    const celDe=(k,o)=>(((this._cliByDoc||{})[o.doc]||{}).celular||(this._celByName||{})[k]||(this._celByCot||{})[k]||'')+'';
     const mNum=m=>{const M={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};const[a,b]=String(m||'').split('-');return b?(+b)*12+(M[(a||'').toLowerCase()]||0):0;};
     const MM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; const numM=n=>n?MM[n%12]+'-'+Math.floor(n/12):'—';
     const nowM=mNum(mesActual);
