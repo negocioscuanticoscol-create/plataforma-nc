@@ -1817,6 +1817,16 @@ const App = {
   _findPed(id){ return (this._peds||[]).find(x=>x.id===id)||{}; },
   _prodResumen(d){ let p=d&&d.productos; if(typeof p==='string'){ try{p=JSON.parse(p);}catch(e){ return d&&typeof d.productos==='string'?d.productos:''; } } if(Array.isArray(p)) return p.map(x=>`${x.ref||''} ${x.color||''} ×${x.qty||0}`).join(' · '); return (d&&d.productos)||''; },
   _dirDespacho(d){ d=d||{}; return [d.envio_dir||d.dir_factura, d.envio_barrio||d.barrio_factura, d.envio_ciudad||d.ciudad_factura].map(x=>(x||'').toString().trim()).filter(Boolean).join(', '); },
+  /* La tarjeta de "por despachar" llegaba abierta y una sola ocupaba media
+     pantalla: para ver el quinto pedido tocaba bajar mucho. Ahora el nombre
+     abre y cierra lo de la guia. NO se repinta la vista a proposito: si se
+     volviera a pintar, la guia que ya escribio en otra tarjeta se le borra. */
+  pedToggle(id){
+    const el=document.getElementById('det-'+id); if(!el) return;
+    const abrir = el.style.display==='none';
+    el.style.display = abrir?'block':'none';
+    const fl=document.getElementById('fl-'+id); if(fl) fl.textContent = abrir?'▾':'▸';
+  },
   pedPicking(id){
     const p=(this._peds||[]).find(x=>x.id===id)||{}; const d=p.datos||{};
     let pr=d.productos; if(typeof pr==='string'){ try{pr=JSON.parse(pr);}catch(e){pr=[];} } if(!Array.isArray(pr)) pr=[];
@@ -1848,9 +1858,10 @@ const App = {
     this.set(`<h1>Pedidos · Validación</h1><div class="sub">Autorizados esperando despacho · pon transportadora + guía (o foto)</div>
       <div class="kpis"><div class="kpi naranja"><b>${pend.length}</b><span>Por despachar</span></div><div class="kpi"><b>${nHoy}</b><span>Autorizados hoy</span></div><div class="kpi"><b style="color:#16a34a">${cl(valorPend)}</b><span>💰 Valorización</span></div></div>
       ${pend.length?pend.map(p=>{const d=p.datos||{};const f=(p.creado_en||'').slice(0,10);return `<div class="item">
-        <div class="top"><div><div class="nom">${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 📅 ${f}${f===hoy?' · 🆕 hoy':''}${(d.celular||p.celular)?' · 📱 '+esc(d.celular||p.celular):''}</div></div><span class="badge b-cotizada">por despachar</span></div>
+        <div class="top" onclick="App.pedToggle('${p.id}')" style="cursor:pointer" title="Toca el nombre para poner guía y despachar"><div><div class="nom"><span id="fl-${p.id}" style="color:#9aa;font-size:12px">▸</span> ${esc(p.cliente||p.folio||'—')}</div><div class="meta">${p.folio?esc(p.folio)+' · ':''}${cl(p.total)} · 📅 ${f}${f===hoy?' · 🆕 hoy':''}${(d.celular||p.celular)?' · 📱 '+esc(d.celular||p.celular):''}</div></div><span class="badge b-cotizada">por despachar</span></div>
         <div style="font-size:11.5px;color:#667;margin:4px 0">${esc(this._prodResumen(d)).slice(0,90)}</div>
         ${(()=>{const dir=this._dirDespacho(d);return dir?`<div style="font-size:12px;color:#2563eb;margin:2px 0;font-weight:600">📍 ${esc(dir)}</div>`:'';})()}
+        <div id="det-${p.id}" style="display:none">
         <button class="btn-sm" type="button" style="background:#0b1f2a;color:#fff;width:100%;margin:4px 0" onclick="App.pedPicking('${p.id}')">📋 Abrir pedido — picking / packing</button>
         <div style="margin:8px 0">
           <select id="transp-${p.id}" class="field" style="padding:9px;border:1px solid var(--linea);border-radius:8px;width:100%;margin-bottom:6px">${TR.map(t=>`<option ${p.transportadora===t?'selected':''}>${t}</option>`).join('')}</select>
@@ -1865,7 +1876,7 @@ const App = {
           <button class="btn-sm" style="background:#16a34a;color:#fff;font-weight:700" onclick="App.pedDespachar('${p.id}')">📦 Despachar →</button>
           <button class="btn-sm" style="background:#3a48b3;color:#fff;font-weight:700" onclick="App.pedDespacharPropio('${p.id}')">🚚 Transporte propio</button>
           <button class="btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa" onclick="App.pedACotizacionSmart('${p.id}')">↩️ A cotización</button>
-        </div></div>`;}).join(''):'<div class="empty">No hay pedidos por despachar.</div>'}`);
+        </div></div></div>`;}).join(''):'<div class="empty">No hay pedidos por despachar.</div>'}`);
   },
   async vDespachosSmart(){
     this.loading();
