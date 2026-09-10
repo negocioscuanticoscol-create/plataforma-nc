@@ -311,6 +311,82 @@ const App = {
   rol(){ return this.perfil?.rol; },
   puede(...roles){ const r=this.rol(); if((r==='gerente'||r==='director')&&roles.some(x=>['vendedor','facturacion','bodega','planta'].includes(x))) return true; return roles.includes(r); },
 
+  /* ==================== SOFIA · chats de la pauta ====================
+     Los chats se separan por el anuncio que los origino. Meta manda el
+     source_id en el webhook y Sofia ya lo guarda en fuente_ad_id: eso es lo
+     que permite saber si el cliente llego por la pauta de cliente final o por
+     la de distribuidores, que es la pregunta que decide como se le habla.
+
+     El mapa vive aca y no en la base a proposito: son tres anuncios y cambia
+     cuando se lanza campana, no cada dia. Si sale una campana nueva, se agrega
+     una linea. Lo que no este en el mapa cae en "Otros", nunca se pierde. */
+  ADS_SOFIA: {
+    // cliente final / construccion
+    '120247983096150570': {cajon:'final', campana:'Construcción empresas · Bogotá'},
+    '120247621224870570': {cajon:'final', campana:'Feroz BOG · construcción 30km'},
+    // distribuidores y aliados
+    '120247907725810570': {cajon:'distri', campana:'Búsqueda distribuidores sept'},
+    '120247907569730570': {cajon:'distri', campana:'Aliado dotación sept'},
+    '120246379524300570': {cajon:'distri', campana:'Busco distribuidor · ciudades pequeñas'},
+  },
+  async vSofia(){
+    this.loading();
+    const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
+    let ch=[];
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000'+this.fCed(),{headers:H});
+         const j=await r.json(); ch=Array.isArray(j)?j:[]; }catch(e){}
+    const M=this.ADS_SOFIA;
+    const cajonDe=c=>(M[String(c.fuente_ad_id||'')]||{}).cajon||'otros';
+    const campDe =c=>(M[String(c.fuente_ad_id||'')]||{}).campana||(c.fuente_ad_id?('anuncio '+c.fuente_ad_id):'sin anuncio');
+    const G={final:[],distri:[],otros:[]};
+    ch.forEach(c=>G[cajonDe(c)].push(c));
+    // "hace cuanto" en palabras: una fecha suelta no dice si el chat esta vivo
+    const dias=f=>{ if(!f) return null; const d=Math.floor((Date.now()-new Date(f).getTime())/86400000); return d; };
+    const cuando=f=>{ const d=dias(f); if(d===null) return '—';
+      return d<=0?'hoy':d===1?'ayer':d<7?('hace '+d+' días'):d<31?('hace '+Math.floor(d/7)+' sem'):('hace '+Math.floor(d/30)+' meses'); };
+    const fila=c=>{
+      const tel=(c.telefono||'').replace(/\D/g,'');
+      const d=dias(c.ultima_fecha);
+      const frio=d!==null&&d>7;
+      return `<div class="item" style="display:block${frio?';opacity:.62':''}">
+        <div class="top"><div style="min-width:0">
+          <div class="nom">${esc(c.nombre||c.telefono||'—')}${c.no_leido?' <span style="background:#dc2626;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;vertical-align:2px">sin leer</span>':''}</div>
+          <div class="meta">${tel?`<a href="https://wa.me/57${esc(tel)}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">📱 ${esc(c.telefono)}</a> · `:''}${esc(campDe(c))} · ${cuando(c.ultima_fecha)}</div>
+        </div><span class="badge" style="${c.modo==='humano'?'background:#fff3e0;color:#b45309':'background:#e7f7ee;color:#16734a'}">${c.modo==='humano'?'👤 humano':'🤖 Sofía'}</span></div>
+        ${c.ultimo_mensaje?`<div style="font-size:12px;color:#667;margin-top:5px;background:#f8fafc;border-left:3px solid var(--linea);padding:6px 9px;border-radius:0 6px 6px 0">${esc(String(c.ultimo_mensaje).slice(0,180))}</div>`:''}
+        ${(c.ciudad||c.etiqueta)?`<div style="font-size:11.5px;color:#8a8f98;margin-top:5px">${c.ciudad?'📍 '+esc(c.ciudad):''}${c.ciudad&&c.etiqueta?' · ':''}${c.etiqueta?esc(c.etiqueta):''}</div>`:''}
+      </div>`;
+    };
+    const cajon=(clave,ico,tit,sub,color)=>{
+      const a=G[clave]; const abierto=this._sofiaCajon===clave;
+      const nuevos=a.filter(x=>dias(x.ultima_fecha)!==null&&dias(x.ultima_fecha)<=7).length;
+      return `<div class="card" style="border-left:4px solid ${color};padding:0;overflow:hidden;margin-bottom:10px">
+        <div onclick="App.sofiaAbrir('${clave}')" style="cursor:pointer;padding:13px 15px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div style="min-width:0">
+            <div style="font-weight:800;font-size:14.5px">${ico} ${tit}</div>
+            <div style="font-size:11.5px;color:#667;margin-top:2px">${sub}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-size:22px;font-weight:800;color:${color};line-height:1">${a.length}</div>
+            <div style="font-size:10.5px;color:#8a8f98">${nuevos} esta semana</div>
+          </div>
+          <span style="color:#9aa;font-size:13px">${abierto?'▾':'▸'}</span>
+        </div>
+        ${abierto?`<div style="padding:0 12px 12px">${a.length?a.map(fila).join(''):'<div class="empty">Sin chats en este cajón.</div>'}</div>`:''}
+      </div>`;
+    };
+    const ult=ch.length?ch[0].ultima_fecha:null;
+    const d=dias(ult);
+    this.set(`<h1>Sofía · chats de la pauta</h1>
+      <div class="sub">Cada conversación queda en el cajón del anuncio por el que llegó</div>
+      ${d!==null&&d>2?`<div class="card" style="background:#fff7ed;border-color:#fed7aa;color:#9a3412;font-size:13px">
+        ⚠️ <b>El último chat es de ${cuando(ult)}.</b> Si la pauta está corriendo y no entran mensajes nuevos, Sofía no está contestando — el cerebro vive en n8n y hay que revisar que esté ejecutando.</div>`:''}
+      ${cajon('final','🏗️','Pauta cliente final','Construcción · compran para usar. Guion: nombre, ciudad, ficha, cantidad, bodega Bogotá','#2563eb')}
+      ${cajon('distri','🏭','Oferta distribuidores','Buscan revender. Guion: escala por volumen y precio mayorista','#a16207')}
+      ${G.otros.length?cajon('otros','❔','Sin anuncio identificado','Escribieron directo, o el anuncio no está en el mapa','#64748b'):''}`);
+  },
+  sofiaAbrir(c){ this._sofiaCajon = (this._sofiaCajon===c ? null : c); this.vSofia(); },
+
   /* ---------- NAV ---------- */
   pintarNav(){
     const r=this.rol();
@@ -323,6 +399,7 @@ const App = {
       {v:'cotizaciones', ic:'📝', t:'Cotizar'},
       {v:'pedidos', ic:'📦', t:'Pedidos'},
       {v:'despachos', ic:'🚚', t:'Despachos'},
+      {v:'sofia', ic:'🤖', t:'Sofía'},
     ];
     const ROW2=[
       {v:'gastos', ic:'💸', t:'Gastos'},
@@ -344,10 +421,10 @@ const App = {
     /* 'consulta' va en TODOS los roles a proposito: la consulta de plantas es de
        toda la organizacion, no de un area. Quien solo debe ver eso y nada mas
        lleva el cargo 'consultador', que en ced_permisos tiene unicamente consulta. */
-    const TODOS=['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','datos','admin','permisos'];
-    const DEF={admin:TODOS, gerente:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes'],
-      director:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios'],
-      vendedor:['dashboard','consulta','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario','precios'],
+    const TODOS=['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','datos','admin','permisos','sofia'];
+    const DEF={admin:TODOS, gerente:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','sofia'],
+      director:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','sofia'],
+      vendedor:['dashboard','consulta','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario','precios','sofia'],
       facturacion:['panel','consulta','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','consulta','despachos','inventario'], planta:['dashboard','consulta','pedidos','planta','inventario']};
     /* De donde salen las pestañas, en orden:
        1. Si la persona entra por la red (tiene CARGO), manda ced_permisos —
@@ -428,7 +505,7 @@ const App = {
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
-      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario, precios:this.vPrecios, pendientes:this.vPendientes}[view] || this.vDashboard).call(this);
+      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario, precios:this.vPrecios, pendientes:this.vPendientes, sofia:this.vSofia}[view] || this.vDashboard).call(this);
   },
   set(html){ $('main').innerHTML = this._subnav() + html; },
   enConstruccion(view){
