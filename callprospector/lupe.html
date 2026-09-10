@@ -152,7 +152,15 @@ main{flex:1;padding:13px 15px 0}
 .b-Datonegativo{background:#78716C}
 .b-Habeasdata{background:#1E40AF}
 .b-Yaescliente{background:#0F766E}
-.b-InfoWhatsApp{background:#166534}
+.b-InfoWhatsApp{background:#166534}          /* ya no se pinta: queda por los registros viejos */
+.b-Cambiodebase{background:#166534}
+/* lista de bases del cambio de base */
+.pan .bl{display:grid;gap:6px;margin-top:2px}
+.pan .bl button{width:100%;text-align:left;background:var(--card);border:1px solid var(--line);
+  color:var(--tx);border-radius:10px;padding:12px 13px;font-size:13.5px;font-weight:700;
+  cursor:pointer;font-family:inherit}
+.pan .bl button:active{filter:brightness(.88)}
+.pan .bl button[disabled]{opacity:.5}
 .pan .cat{width:100%;margin-top:9px;border:none;border-radius:11px;padding:13px;
   background:#166534;color:#fff;font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit}
 .pan .cat:active{filter:brightness(.88)}
@@ -276,7 +284,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260910-ciudades-cortas-2';
+const VER='20260910-cambio-de-base';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -345,7 +353,11 @@ const SEG=['cliente','marca','canal','sector','subsector','departamento','ciudad
    dos agentes marcarian cosas distintas y el informe no se podria comparar.
    Antes salian de BASE.botones — una columna que no existe en mkr_bases, asi que
    aqui no aparecia NINGUN boton. */
-const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente','Info WhatsApp'];
+/* 'Info WhatsApp' salio del teclado el 10-sep: su puesto lo tomo el boton de
+   cambio de base. Sigue en ICONO y en TARIFA_DEF a proposito, porque hay
+   llamadas viejas guardadas con ese resultado y el tablero tiene que poder
+   pintarlas. */
+const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente'];
 const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50,'Info WhatsApp':350};
 const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
 
@@ -729,7 +741,10 @@ function render(){
   const t=Object.assign({},TARIFA_DEF,BASE.tarifas||{});
   const botones=RESULTADOS.map(k=>
     `<button class="b-${k.replace(/\s/g,'')}" onclick="marcar('${esc(k).replace(/'/g,'')}')">
-      ${ICONO[k]||''} ${esc(k)}<small>${cop(t[k])}</small></button>`).join('');
+      ${ICONO[k]||''} ${esc(k)}<small>${cop(t[k])}</small></button>`).join('')
+    /* Va en la grilla para que este a la mano, pero NO llama a marcar(): mover de
+       base no es un resultado de llamada, no paga y no cuenta como marcacion. */
+    + (misBases.length>1 ? `<button class="b-Cambiodebase" onclick="abrirCambioBase()">🏢 Cambio de base<small>no paga</small></button>` : '');
 
   $('main').innerHTML=`<div class="card">
     ${selectorCiudad()}
@@ -748,14 +763,9 @@ function render(){
     <!-- Volver al anterior: si uno se pasa de largo o quiere retomar al que
          acaba de dejar, sin tener que recorrer toda la lista otra vez. -->
     <div class="nav"><button onclick="mover(-1)">⏮ Anterior</button><button onclick="mover(1)">Saltar sin marcar ⏭</button></div>
-    <!-- Corregir el rubro NO es un resultado de llamada: no paga ni cuenta como
-         marcacion, y por eso NO va en el teclado de arriba (ese tiene que seguir
-         igual en toda base). Sirve para el caso de "aparece en Distribuidores
-         pero en realidad es una empresa que consume dotacion". -->
-    ${misBases.length>1?`<div class="nav"><select id="destBase" onchange="moverDeBase(this.value)">
-      <option value="">🏢 Está en la base equivocada…</option>
-      ${misBases.filter(b=>b.id!==BASE.id).map(b=>`<option value="${esc(b.id)}">Pasar a ${esc(b.nombre)}</option>`).join('')}
-    </select></div>`:''}
+    <!-- El selector "Esta en la base equivocada" se quito el 10-sep: ahora esto
+         se hace con el boton 🏢 Cambio de base del teclado. Dos caminos para lo
+         mismo solo confundian. -->
     <div class="prog">${num(idx+1)} de ${num(leads.length)} por llamar</div>
   </div>`;
 }
@@ -943,16 +953,35 @@ function selectorCiudad(){
   </select></div>`;
 }
 
+/* ---------- cambio de base: se despliegan las bases que uno tiene ---------- */
+function abrirCambioBase(){
+  const l=leads[idx]; if(!l||!BASE) return;
+  const otras=misBases.filter(b=>b.id!==BASE.id);
+  if(!otras.length){ toast('No tienes otra base a donde pasarlo',true); return; }
+  const c=$('panel'); if(!c) return;
+  c.innerHTML=`<div class="pan">
+    <h5>🏢 ¿A qué base pertenece?</h5>
+    <div class="ps"><b>${esc(l.nombre||'')}</b> sale de <b>${esc(BASE.nombre)}</b> y queda en la que escojas.
+      Esto no es un resultado de llamada: <b>no paga</b> y no cuenta como marcación.</div>
+    <div class="bl">${otras.map(b=>`<button onclick="moverDeBase('${esc(b.id)}')">${esc(b.nombre)}</button>`).join('')}</div>
+    <div class="pb" style="margin-top:8px"><button class="s" onclick="cerrarCambioBase()">Cancelar</button></div>
+  </div>`;
+  /* Igual que el panel del interesado: sale DEBAJO del teclado, y si la pantalla
+     no baja sola parece que el boton no hizo nada. */
+  setTimeout(()=>c.scrollIntoView({behavior:'smooth',block:'center'}),60);
+}
+function cerrarCambioBase(){ const c=$('panel'); if(c) c.innerHTML=''; trabarTarjeta(false); }
+
 /* Pasa el prospecto a otra base. Escribe en mkr_empresas y NO en mkr_leads,
    porque mkr_leads es una vista y no se puede actualizar.
    Lee las notas antes de escribir: si se sobreescriben, se pierde de que rubro
    venia (DOTACION, Metalmecanica...) y ya no habria como devolverlo. */
 async function moverDeBase(destino){
-  const sel=$('destBase');
   if(!destino) return;
   const l=leads[idx], dest=misBases.find(b=>b.id===destino);
-  if(!l||!dest){ if(sel) sel.value=''; return; }
-  if(sel) sel.disabled=true;
+  if(!l||!dest) return;
+  const bts=document.querySelectorAll('#panel button');
+  bts.forEach(b=>b.disabled=true);              // sin esto, dos toques = dos movidas
   try{
     let antes='';
     const p=await fetch(SB+'/rest/v1/mkr_empresas?select=notas&id=eq.'+encodeURIComponent(l.id),{headers:H});
@@ -966,7 +995,7 @@ async function moverDeBase(destino){
     toast('🏢 Pasó a '+dest.nombre);
     render(); window.scrollTo(0,0);
   }catch(e){
-    if(sel){ sel.disabled=false; sel.value=''; }
+    bts.forEach(b=>b.disabled=false);           // se puede volver a intentar
     toast('⚠️ No se pudo mover. Revisa la señal.',true);
   }
 }
