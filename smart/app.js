@@ -618,6 +618,10 @@ const App = {
     // ── Inteligencia de recompra por cliente ──
     this._cliByDoc={}; cli.forEach(c=>{ this._cliByDoc[c.documento]=c; });
     this._celByName={}; cli.forEach(c=>{ if(!c.celular) return; const kk=norm(c.nombre); if(kk) this._celByName[kk]=c.celular; const core=norm(String(c.nombre).replace(/\(.*?\)/g,'')); if(core && !this._celByName[core]) this._celByName[core]=c.celular; });
+    /* El celular sale del documento, y si no, del nombre. Antes esto estaba
+       escrito dentro de la fila; ahora tambien hace falta para contar cuantos se
+       pueden llamar, asi que va una sola vez. */
+    const celDe=(k,o)=>(((this._cliByDoc||{})[o.doc]||{}).celular||(this._celByName||{})[k]||'')+'';
     const mNum=m=>{const M={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};const[a,b]=String(m||'').split('-');return b?(+b)*12+(M[(a||'').toLowerCase()]||0):0;};
     const MM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; const numM=n=>n?MM[n%12]+'-'+Math.floor(n/12):'—';
     const nowM=mNum(mesActual);
@@ -658,9 +662,12 @@ const App = {
         <div style="height:14px;background:var(--gris);border-radius:8px;overflow:hidden;margin-top:8px"><div style="height:100%;width:${avP.toFixed(1)}%;background:var(--naranja)"></div></div>
         <div style="font-size:11.5px;color:#667;margin-top:6px">Buscamos <b>1.000 clientes</b> que en una sola compra superen <b>$300k</b> y compren <b>cada mes</b> → <b>$300.000.000/mes</b>. Vas en ${perfil}, faltan ${Math.max(0,METcli-perfil)}.</div>
       </div>
-      <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-size:15px;margin-bottom:4px">🏆 Clientes de más de $700.000 · barrido de llamadas</h2><button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="window.print()">🖨️ Imprimir</button></div>
-        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Todos los que acumulan más de <b>$700.000</b> en compras (${Object.values(porCli).filter(o=>o.v>700000).length}) · 🟢 ya pidió en ${mesActual} · ⚪ no este mes　|　🟢 bolita = <b>ya lo contacté</b> (clic) · ⚪ por contactar</div>
-        ${Object.entries(porCli).filter(([k,o])=>o.v>700000).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>{ const ref=o.doc||k; const cli2=(this._cliByDoc||{})[o.doc]||{}; const cel=((cli2.celular||(this._celByName||{})[k]||'')+''); const tel=cel.replace(/\D/g,''); return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-bottom:1px solid var(--linea);font-size:13px;border-radius:6px;${o.esteMes?'background:#e7f7ee':''}">
+      <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2 style="font-size:15px;margin-bottom:4px">🏆 Todos los clientes · de mayor a menor · barrido de llamadas</h2><button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="window.print()">🖨️ Imprimir</button></div>
+        <!-- Cortaba en $700.000 y solo dejaba ver 32. Los otros 89 tambien ya
+             compraron y son a quienes se les puede volver a llamar, asi que salen
+             todos, del que mas ha dejado al que menos. -->
+        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Los <b>${Object.keys(porCli).length}</b> clientes que ya compraron, del que más ha dejado al que menos · <b>${Object.entries(porCli).filter(([k,o])=>celDe(k,o).replace(/\D/g,'')).length} se pueden llamar</b>, ${Object.entries(porCli).filter(([k,o])=>!celDe(k,o).replace(/\D/g,'')).length} sin teléfono (toca ➕ Tel) · 🟢 ya pidió en ${mesActual} · ⚪ no este mes　|　🟢 bolita = <b>ya lo contacté</b> (clic) · ⚪ por contactar</div>
+        ${Object.entries(porCli).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>{ const ref=o.doc||k; const cel=celDe(k,o); const tel=cel.replace(/\D/g,''); return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-bottom:1px solid var(--linea);font-size:13px;border-radius:6px;${o.esteMes?'background:#e7f7ee':''}">
           <span>${o.esteMes?'🟢':'⚪'} ${esc(titt(o.best))}${cel?` · <span style="color:#445;font-weight:600">📱 ${esc(cel)}</span>`:` · <button onclick="App.cliSmartTel('${esc(o.doc||'')}')" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa;border-radius:7px;padding:2px 8px;font-size:11px;cursor:pointer">➕ Tel</button>`}</span>
           <span style="display:flex;align-items:center;gap:9px"><b>${cl(o.v)}</b> <small style="color:var(--gristxt);font-weight:700" title="compras registradas">(${o.n})</small> · <span style="color:var(--verde)">${cl(o.c)}</span>${this._bola(ref)}</span>
         </div>`;}).join('')||'<div class="empty">Sin datos</div>'}
