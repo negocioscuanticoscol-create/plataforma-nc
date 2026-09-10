@@ -1,0 +1,57 @@
+name: empleos-maria
+
+# Busca vacantes de Jefe/Gerente/Director de Compras, Abastecimiento y Comercio
+# Exterior en elempleo, computrabajo y tres bolsas de empleo remoto, y manda a
+# Telegram SOLO lo que no haya avisado antes.
+#
+# Por que acá y no en n8n: n8n en Railway lleva encolando sin ejecutar desde el
+# 19 de agosto de 2026. GitHub Actions corre en los servidores de GitHub y no
+# depende de que nadie deje un computador prendido.
+#
+# La memoria de lo ya avisado vive en Supabase, tabla nc_empleos. Sin ella el
+# agente repetiría las mismas vacantes todos los días.
+#
+# Los dos secretos se configuran una sola vez en:
+#   Settings → Secrets and variables → Actions → New repository secret
+#     TELEGRAM_TOKEN    (el bot @nc_alertas_smart_bot)
+#     TELEGRAM_CHAT_ID  (a quién le llega)
+
+on:
+  schedule:
+    - cron: '30 12 * * *'   # 12:30 UTC = 7:30 a. m. Bogotá, todos los días
+  workflow_dispatch:         # botón para correrlo a mano desde la pestaña Actions
+
+# Si por algo se solapan dos corridas, que no manden el aviso dos veces.
+concurrency:
+  group: empleos-maria
+  cancel-in-progress: false
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Buscar vacantes y avisar por Telegram
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python .github/scripts/empleos_agente.py
+
+      - name: Avisar si el agente se cayó
+        if: failure()
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        # Un agente que falla en silencio es peor que no tenerlo: uno cree que
+        # no hay vacantes nuevas cuando en realidad lleva días roto.
+        run: |
+          curl -sS -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" \
+            --data-urlencode "chat_id=$TELEGRAM_CHAT_ID" \
+            --data-urlencode "text=⚠️ El buscador de empleos falló hoy. Revisar la pestaña Actions del repo plataforma-nc." \
+            > /dev/null
