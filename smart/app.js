@@ -627,10 +627,21 @@ const App = {
       (Array.isArray(jq)?jq:[]).forEach(x=>{ if(!String(x.celular||'').replace(/\D/g,'')) return;
         const kk=norm(x.cliente); if(kk && !this._celByCot[kk]) this._celByCot[kk]=x.celular; });
     }catch(e){}
-    /* El celular sale del documento, y si no, del nombre, y si no, del pedido.
-       Antes esto estaba escrito dentro de la fila; ahora tambien hace falta para
-       contar cuantos se pueden llamar, asi que va una sola vez. */
-    const celDe=(k,o)=>(((this._cliByDoc||{})[o.doc]||{}).celular||(this._celByName||{})[k]||(this._celByCot||{})[k]||'')+'';
+    /* Un celular que se pueda MARCAR: 10 digitos empezando en 3. Si viene con
+       el 57 del pais, se le quita. Cualquier otra cosa no sirve para llamar. */
+    const okCel=t=>{ const d=String(t||'').replace(/\D/g,'');
+      if(d.length===10 && d[0]==='3') return d;
+      if(d.length===12 && d.slice(0,2)==='57' && d[2]==='3') return d.slice(2);
+      return ''; };
+    /* El celular sale del documento, del nombre o del pedido — pero se prefiere
+       el que SI se puede marcar, no el primero que aparezca. Lacteos Tulua, el
+       cliente mas grande, salia con "300252252" (nueve digitos) teniendo el bueno
+       guardado en otra parte. */
+    const celDe=(k,o)=>{
+      const cand=[(((this._cliByDoc||{})[o.doc]||{}).celular), (this._celByName||{})[k], (this._celByCot||{})[k]];
+      for(const c of cand){ const d=okCel(c); if(d) return d; }
+      return (cand.find(x=>String(x||'').replace(/\D/g,''))||'')+'';   // no sirve para llamar, pero se muestra
+    };
     const mNum=m=>{const M={ene:0,feb:1,mar:2,abr:3,may:4,jun:5,jul:6,ago:7,sep:8,oct:9,nov:10,dic:11};const[a,b]=String(m||'').split('-');return b?(+b)*12+(M[(a||'').toLowerCase()]||0):0;};
     const MM=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; const numM=n=>n?MM[n%12]+'-'+Math.floor(n/12):'—';
     const nowM=mNum(mesActual);
@@ -675,7 +686,7 @@ const App = {
         <!-- Cortaba en $700.000 y solo dejaba ver 32. Los otros 89 tambien ya
              compraron y son a quienes se les puede volver a llamar, asi que salen
              todos, del que mas ha dejado al que menos. -->
-        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Los <b>${Object.keys(porCli).length}</b> clientes que ya compraron, del que más ha dejado al que menos · <b>${Object.entries(porCli).filter(([k,o])=>celDe(k,o).replace(/\D/g,'')).length} se pueden llamar</b>, ${Object.entries(porCli).filter(([k,o])=>!celDe(k,o).replace(/\D/g,'')).length} sin teléfono (toca ➕ Tel) · 🟢 ya pidió en ${mesActual} · ⚪ no este mes　|　🟢 bolita = <b>ya lo contacté</b> (clic) · ⚪ por contactar</div>
+        <div style="font-size:11.5px;color:#667;margin-bottom:8px">Los <b>${Object.keys(porCli).length}</b> clientes que ya compraron, del que más ha dejado al que menos · <b>${Object.entries(porCli).filter(([k,o])=>okCel(celDe(k,o))).length} se pueden llamar</b>, ${Object.entries(porCli).filter(([k,o])=>!okCel(celDe(k,o))).length} sin número marcable (toca ➕ Tel) · 🟢 ya pidió en ${mesActual} · ⚪ no este mes　|　🟢 bolita = <b>ya lo contacté</b> (clic) · ⚪ por contactar</div>
         ${Object.entries(porCli).sort((a,b)=>b[1].v-a[1].v).map(([k,o])=>{ const ref=o.doc||k; const cel=celDe(k,o); const tel=cel.replace(/\D/g,''); return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 9px;border-bottom:1px solid var(--linea);font-size:13px;border-radius:6px;${o.esteMes?'background:#e7f7ee':''}">
           <span>${o.esteMes?'🟢':'⚪'} ${esc(titt(o.best))}${cel?` · <span style="color:#445;font-weight:600">📱 ${esc(cel)}</span>`:` · <button onclick="App.cliSmartTel('${esc(o.doc||'')}')" style="background:#fff3e0;color:#b45309;border:1px solid #fed7aa;border-radius:7px;padding:2px 8px;font-size:11px;cursor:pointer">➕ Tel</button>`}</span>
           <span style="display:flex;align-items:center;gap:9px"><b>${cl(o.v)}</b> <small style="color:var(--gristxt);font-weight:700" title="compras registradas">(${o.n})</small> · <span style="color:var(--verde)">${cl(o.c)}</span>${this._bola(ref)}</span>
