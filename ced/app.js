@@ -354,7 +354,11 @@ const App = {
           <div class="meta">${tel?`<a href="https://wa.me/57${esc(tel)}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">📱 ${esc(c.telefono)}</a> · `:''}${esc(campDe(c))} · ${cuando(c.ultima_fecha)}</div>
         </div><span class="badge" style="${c.modo==='humano'?'background:#fff3e0;color:#b45309':'background:#e7f7ee;color:#16734a'}">${c.modo==='humano'?'👤 humano':'🤖 Sofía'}</span></div>
         ${c.ultimo_mensaje?`<div style="font-size:12px;color:#667;margin-top:5px;background:#f8fafc;border-left:3px solid var(--linea);padding:6px 9px;border-radius:0 6px 6px 0">${esc(String(c.ultimo_mensaje).slice(0,180))}</div>`:''}
-        ${(c.ciudad||c.etiqueta)?`<div style="font-size:11.5px;color:#8a8f98;margin-top:5px">${c.ciudad?'📍 '+esc(c.ciudad):''}${c.ciudad&&c.etiqueta?' · ':''}${c.etiqueta?esc(c.etiqueta):''}</div>`:''}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:7px">
+          <div style="font-size:11.5px;color:#8a8f98;min-width:0">${c.ciudad?'📍 '+esc(c.ciudad):''}${c.ciudad&&c.etiqueta?' · ':''}${c.etiqueta?esc(c.etiqueta):''}</div>
+          <button class="btn-sm" style="background:#fff7ed;color:#b45309;border:1px solid #fed7aa;flex:none"
+            onclick="App.sofiaReiniciar('${esc(c.telefono||'')}','${esc((c.nombre||'').replace(/'/g,''))}')">🔄 Reiniciar</button>
+        </div>
       </div>`;
     };
     const cajon=(clave,ico,tit,sub,color)=>{
@@ -381,9 +385,38 @@ const App = {
       <div class="sub">Cada conversación queda en el cajón del anuncio por el que llegó</div>
       ${d!==null&&d>2?`<div class="card" style="background:#fff7ed;border-color:#fed7aa;color:#9a3412;font-size:13px">
         ⚠️ <b>El último chat es de ${cuando(ult)}.</b> Si la pauta está corriendo y no entran mensajes nuevos, Sofía no está contestando — el cerebro vive en n8n y hay que revisar que esté ejecutando.</div>`:''}
+      <div class="card" style="background:#f8fafc;font-size:12px;color:#667;padding:11px 14px">
+        🔄 <b>Para entrenarla:</b> el botón <b>Reiniciar</b> de cada chat le borra a Sofía lo que
+        recuerda de ese número, así puedes probar el guion desde el saludo las veces que quieras.
+        </div>
       ${cajon('final','🏗️','Pauta cliente final','Construcción · compran para usar. Guion: nombre, ciudad, ficha, cantidad, bodega Bogotá','#2563eb')}
       ${cajon('distri','🏭','Oferta distribuidores','Buscan revender. Guion: escala por volumen y precio mayorista','#a16207')}
       ${G.otros.length?cajon('otros','❔','Sin anuncio identificado','Escribieron directo, o el anuncio no está en el mapa','#64748b'):''}`);
+  },
+  /* Reiniciar = borrarle a Sofia lo que recuerda de ESTE numero. El proximo
+     mensaje que llegue de ahi lo trata como si fuera la primera vez, y por eso
+     sirve para probar el guion de arriba a abajo sin cambiar de celular.
+     NO borra el chat de WhatsApp de la persona ni la deja sin historial en el
+     tablero: solo se va la memoria de la conversacion (nc_agente_mem). */
+  async sofiaReiniciar(tel, nombre){
+    const t=(tel||'').replace(/\D/g,'');
+    if(!t){ this._toast('Ese chat no tiene teléfono'); return; }
+    if(!confirm('¿Reiniciar la conversación con '+(nombre||t)+'?\n\nSofía olvida lo hablado y el próximo mensaje lo atiende desde el saludo. Sirve para probar el guion desde cero.')) return;
+    const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json'};
+    try{
+      /* Se prueban las dos formas del numero: la memoria vieja quedo con 57
+         adelante y la nueva sin el, y si se borra solo una el agente sigue
+         acordandose por la otra. */
+      for(const v of [t, t.replace(/^57/,''), '57'+t.replace(/^57/,'')]){
+        await fetch(this._SBU()+'/rest/v1/nc_agente_mem?empresa=eq.feroz&telefono=eq.'+encodeURIComponent(v),
+          {method:'DELETE',headers:{...H,'Prefer':'return=minimal'}});
+      }
+      await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?empresa=eq.feroz&telefono=eq.'+encodeURIComponent(tel),
+        {method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+         body:JSON.stringify({modo:'agente', reeng_step:0, reeng_done:false, no_leido:false})});
+      this._toast('🔄 Listo. Sofía arranca de cero con este número.');
+      this.vSofia();
+    }catch(e){ this._toast('No se pudo reiniciar: '+e.message); }
   },
   sofiaAbrir(c){ this._sofiaCajon = (this._sofiaCajon===c ? null : c); this.vSofia(); },
 
