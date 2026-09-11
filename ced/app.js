@@ -336,9 +336,13 @@ const App = {
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000'+this.fCed(),{headers:H});
          const j=await r.json(); ch=Array.isArray(j)?j:[]; }catch(e){}
     const M=this.ADS_SOFIA;
-    const cajonDe=c=>(M[String(c.fuente_ad_id||'')]||{}).cajon||'otros';
+    /* Quien escribe sin venir de un anuncio se atiende con el guion de CLIENTE
+       FINAL —asi quedo Sofia el 10-sep— y por eso va en ese cajon: el cajon
+       refleja COMO se le hablo, no solo de donde llego. El origen real no se
+       pierde: cada fila dice si vino de un anuncio o escribio directo. */
+    const cajonDe=c=>(M[String(c.fuente_ad_id||'')]||{}).cajon||'final';
     const campDe =c=>(M[String(c.fuente_ad_id||'')]||{}).campana||(c.fuente_ad_id?('anuncio '+c.fuente_ad_id):'sin anuncio');
-    const G={final:[],distri:[],otros:[]};
+    const G={final:[],distri:[]};
     ch.forEach(c=>G[cajonDe(c)].push(c));
     // "hace cuanto" en palabras: una fecha suelta no dice si el chat esta vivo
     const dias=f=>{ if(!f) return null; const d=Math.floor((Date.now()-new Date(f).getTime())/86400000); return d; };
@@ -389,9 +393,9 @@ const App = {
         🔄 <b>Para entrenarla:</b> el botón <b>Reiniciar</b> de cada chat le borra a Sofía lo que
         recuerda de ese número, así puedes probar el guion desde el saludo las veces que quieras.
         </div>
-      ${cajon('final','🏗️','Pauta cliente final','Construcción · compran para usar. Guion: nombre, ciudad, ficha, cantidad, bodega Bogotá','#2563eb')}
+      ${cajon('final','🏗️','Cliente final','Compran para usar. Guion: nombre, ciudad, ficha Fortia, cantidad, $49.900 y bodega Bogotá. Incluye a los que escriben directo.','#2563eb')}
       ${cajon('distri','🏭','Oferta distribuidores','Buscan revender. Guion: escala por volumen y precio mayorista','#a16207')}
-      ${G.otros.length?cajon('otros','❔','Sin anuncio identificado','Escribieron directo, o el anuncio no está en el mapa','#64748b'):''}`);
+`);
   },
   /* Reiniciar = borrarle a Sofia lo que recuerda de ESTE numero. El proximo
      mensaje que llegue de ahi lo trata como si fuera la primera vez, y por eso
