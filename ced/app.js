@@ -352,9 +352,20 @@ const App = {
       const tel=(c.telefono||'').replace(/\D/g,'');
       const d=dias(c.ultima_fecha);
       const frio=d!==null&&d>7;
+      const abierto = this._sofiaVerTel===tel;
+      const hilo = abierto ? (this._sofiaHilo||[]) : [];
+      const burbujas = !abierto ? '' : (hilo.length
+        ? `<div style="margin-top:9px;border-top:1px solid var(--linea);padding-top:9px;display:grid;gap:6px">
+            ${hilo.map(m=>{
+              if(m.rol==='material') return `<div style="justify-self:center;font-size:11px;color:#667">📎 <a href="${esc(m.contenido)}" target="_blank" style="color:#3a48b3">material enviado</a></div>`;
+              const mio = m.rol!=='user';
+              return `<div style="justify-self:${mio?'end':'start'};max-width:82%;background:${mio?'#e7f7ee':'#f1f3f6'};border-radius:${mio?'10px 10px 2px 10px':'10px 10px 10px 2px'};padding:7px 10px;font-size:12.5px;line-height:1.45;white-space:pre-wrap">${esc(String(m.contenido||'').slice(0,900))}<div style="font-size:9.5px;color:#8a8f98;margin-top:3px">${esc(String(m.creado_en||'').slice(5,16).replace('T',' '))}</div></div>`;
+            }).join('')}
+          </div>`
+        : '<div style="margin-top:9px;font-size:12px;color:#8a8f98">Sin mensajes guardados de este chat.</div>');
       return `<div class="item" style="display:block${frio?';opacity:.62':''}">
         <div class="top"><div style="min-width:0">
-          <div class="nom">${esc(c.nombre||c.telefono||'—')}${c.no_leido?' <span style="background:#dc2626;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;vertical-align:2px">sin leer</span>':''}</div>
+          <div class="nom" onclick="App.sofiaVer('${esc(c.telefono||'')}')" style="cursor:pointer" title="Toca para ver toda la conversación">${abierto?'▾':'▸'} ${esc(c.nombre||c.telefono||'—')}${c.no_leido?' <span style="background:#dc2626;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;vertical-align:2px">sin leer</span>':''}</div>
           <div class="meta">${tel?`<a href="https://wa.me/57${esc(tel)}" target="_blank" style="color:#16734a;font-weight:700;text-decoration:none">📱 ${esc(c.telefono)}</a> · `:''}${esc(campDe(c))} · ${cuando(c.ultima_fecha)}</div>
         </div><span class="badge" style="${c.modo==='humano'?'background:#fff3e0;color:#b45309':'background:#e7f7ee;color:#16734a'}">${c.modo==='humano'?'👤 humano':'🤖 Sofía'}</span></div>
         ${c.ultimo_mensaje?`<div style="font-size:12px;color:#667;margin-top:5px;background:#f8fafc;border-left:3px solid var(--linea);padding:6px 9px;border-radius:0 6px 6px 0">${esc(String(c.ultimo_mensaje).slice(0,180))}</div>`:''}
@@ -363,6 +374,7 @@ const App = {
           <button class="btn-sm" style="background:#fff7ed;color:#b45309;border:1px solid #fed7aa;flex:none"
             onclick="App.sofiaReiniciar('${esc(c.telefono||'')}','${esc((c.nombre||'').replace(/'/g,''))}')">🔄 Reiniciar</button>
         </div>
+        ${burbujas}
       </div>`;
     };
     const cajon=(clave,ico,tit,sub,color)=>{
@@ -421,6 +433,25 @@ const App = {
       this._toast('🔄 Listo. Sofía arranca de cero con este número.');
       this.vSofia();
     }catch(e){ this._toast('No se pudo reiniciar: '+e.message); }
+  },
+  /* La conversacion completa vive en nc_agente_mem, no en el lead: el lead solo
+     guarda el ULTIMO mensaje. Se trae al abrir y no antes, para no bajar miles
+     de filas cada vez que se entra a la pestana. */
+  async sofiaVer(tel){
+    if(this._sofiaVerTel===tel){ this._sofiaVerTel=null; this._sofiaHilo=[]; return this.vSofia(); }
+    this._sofiaVerTel=tel; this._sofiaHilo=[];
+    const t=(tel||'').replace(/\D/g,'');
+    const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
+    /* El numero quedo guardado de varias formas —con 57 y sin 57— segun la epoca:
+       se piden las dos o media conversacion no aparece. */
+    const v=[...new Set([t, t.replace(/^57/,''), '57'+t.replace(/^57/,'')])].filter(Boolean);
+    const q='telefono=in.('+v.map(x=>'"'+x+'"').join(',')+')';
+    try{
+      const r=await fetch(this._SBU()+'/rest/v1/nc_agente_mem?select=rol,contenido,creado_en&empresa=eq.feroz&'
+        +encodeURI(q)+'&order=creado_en.asc&limit=200',{headers:H});
+      const j=await r.json(); this._sofiaHilo=Array.isArray(j)?j:[];
+    }catch(e){ this._sofiaHilo=[]; }
+    this.vSofia();
   },
   sofiaAbrir(c){ this._sofiaCajon = (this._sofiaCajon===c ? null : c); this.vSofia(); },
 
