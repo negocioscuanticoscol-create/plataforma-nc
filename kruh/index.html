@@ -133,7 +133,7 @@ function cerrar(){ $('modal-host').innerHTML=''; }
 
 const App={
   cerrar,
-  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios'],['sandra','💬 Sandra']],
+  TABS:[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['pedidos','📋 Pedidos'],['marketing','📣 Marketing'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['usuarios','👤 Usuarios'],['precios','💲 Precios'],['asistente','💬 Milena']],
   view:'dashboard',
   _savingPedido:false,
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
@@ -382,10 +382,11 @@ const App={
   go(v){ const perm=this._tabsRol(); if(!perm.includes(v))v=this._primeraTab();
     if(this._aseTick){ clearInterval(this._aseTick); this._aseTick=null; }
     this.view=v; document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios,sandra:this.vSandra}[v]||this.vDashboard).call(this); },
-  /* Sandra: los chats de WhatsApp de la pauta. La pantalla es compartida (assets/asistente.js)
-     y solo toca las tablas kruh_wa_*. El guion lo editan admin y gerencia. */
-  vSandra(){ Asistente.vista($('main'),{prefijo:'kruh',nombre:'Sandra',marca:'Kruh',guion:this.puedeGestionar}); },
+    ({dashboard:this.vDashboard,recetas:this.vRecetas,pedidos:this.vPedidos,proveedores:this.vProveedores,materiaprima:this.vMateriaPrima,inventario:this.vInventario,precios:this.vPrecios,marketing:this.vMarketing,presupuestos:this.vPresupuestos,ventas:this.vVentas,gastos:this.vGastos,usuarios:this.vUsuarios,asistente:this.vAsistente}[v]||this.vDashboard).call(this); },
+  /* Milena: los chats de WhatsApp de la pauta. La pantalla es compartida (assets/asistente.js)
+     y solo toca las tablas kruh_wa_*. El guion lo editan admin y gerencia.
+     La pestana se llama 'asistente' y no por el nombre: si la asistente cambia de nombre, solo se toca nombre:'…'. */
+  vAsistente(){ Asistente.vista($('main'),{prefijo:'kruh',nombre:'Milena',marca:'Kruh',guion:this.puedeGestionar}); },
   set(h){ const m=$('main'); m.className=''; m.style.cssText=''; m.innerHTML=h; },
   loading(){ $('main').className='spin'; $('main').innerHTML='<div style="text-align:center;padding:40px;color:var(--mut)">Cargando…</div>'; },
 
@@ -3289,7 +3290,7 @@ const App={
     const [us,pm]=await Promise.all([GET('kruh_usuarios?order=creado_en&limit=200'),GET('kruh_permisos?limit=50')]);
     this._us=us; this._ase=ase||[]; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]);
     const abierta=(ase||[]).find(a=>a.inicio&&!a.fin);
-    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['marketing','📣 Marketing'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['sandra','💬 Sandra']];
+    const MODS=[['dashboard','📊 Dashboard'],['recetas','🥖 Recetas'],['pedidos','📋 Pedidos'],['crm','📇 CRM'],['marketing','📣 Marketing'],['proveedores','🚚 Proveedores'],['materiaprima','🛒 Compras'],['inventario','📦 Inventario'],['presupuestos','🎯 Presupuestos'],['ventas','💰 Ventas'],['gastos','🧾 Gastos'],['asistente','💬 Milena']];
     const RMAT=['cajera','panadero','bodeguero','chef'];
     this.set(`<h1>Usuarios y permisos</h1><div class="sub">Cada persona con su clave y rol · y qué pestaña ve cada rol</div>
       ${this._aseBloque(ase,abierta)}
@@ -3439,7 +3440,7 @@ window.addEventListener('DOMContentLoaded',()=>App.init());
 
 <!-- Horas: el tiempo que NC le trabaja a este negocio. Va a nc_hora, la misma tabla
      de todas las apps, y el Centro de Mando lo suma sin registrar dos veces. -->
-<!-- Sandra: la pantalla de chats de WhatsApp. Compartida: otro negocio la monta con su prefijo. -->
+<!-- Milena: la pantalla de chats de WhatsApp. Compartida: otro negocio la monta con su prefijo. -->
 <script src="../assets/asistente.js?v=20260912"></script>
 
 <script src="../assets/horas.js"></script>
