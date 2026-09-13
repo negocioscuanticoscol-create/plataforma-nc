@@ -308,11 +308,12 @@ vComandos(){
    +this.COMANDOS.map(g=>'<div class="card" style="margin-bottom:12px">'
      +'<div style="font-weight:800;font-size:15px;margin-bottom:4px">'+g[0]+'</div>'
      +(g[1]?'<div style="color:var(--sub);font-size:12.5px;margin-bottom:6px">'+g[1]+'</div>':'')
-     +g[2].map(c=>'<div style="border-top:1px solid #e5e7eb;padding:9px 0">'
+     /* El Centro de Mando es oscuro: el comando va claro sobre fondo casi negro, o no se lee */
+     +g[2].map(c=>'<div style="border-top:1px solid rgba(255,255,255,.12);padding:9px 0">'
         +'<div style="font-weight:700;font-size:13.5px">'+c[0]+'</div>'
         +(c[1]?'<div style="display:flex;gap:6px;align-items:center;margin:5px 0">'
-          +'<code style="flex:1;min-width:0;overflow-x:auto;white-space:nowrap;background:#f3f4f6;border-radius:7px;padding:7px 9px;font-size:12.5px">'+e(c[1])+'</code>'
-          +'<button onclick="App.copiarComando(this)" data-c="'+e(c[1])+'" title="Copiar" style="flex:none;border:1px solid #e5e7eb;background:#fff;border-radius:7px;padding:6px 9px;cursor:pointer">📋</button></div>':'')
+          +'<code style="flex:1;min-width:0;overflow-x:auto;white-space:nowrap;background:#070b14;color:#e2e8f0;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:7px 9px;font-size:12.5px;font-family:Consolas,Menlo,monospace">'+e(c[1])+'</code>'
+          +'<button onclick="App.copiarComando(this)" data-c="'+e(c[1])+'" title="Copiar" style="flex:none;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;border-radius:7px;padding:6px 9px;cursor:pointer">📋</button></div>':'')
         +'<div style="color:var(--sub);font-size:12.5px;line-height:1.45">'+c[2]+'</div></div>').join('')
      +'</div>').join('');
 },
