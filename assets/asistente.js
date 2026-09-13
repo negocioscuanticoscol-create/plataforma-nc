@@ -170,16 +170,27 @@
     }, 900);
   }
 
-  /* El bot late cada 10 min: más de 25 sin latir es que el chip o el PC se apagó. */
+  /* Tres estados, porque "prendida" no es lo mismo que "contestando":
+       rojo    → más de 25 min sin latido, o desvinculada: el bot o el PC están apagados
+       naranja → el bot late, pero en la última hora NO pudo contestar (sin saldo en
+                 Anthropic, Claude caído, sin internet…). El bot manda estado 'error'
+                 con el motivo y no deja que el latido normal lo tape.
+       verde   → late y contesta. */
   function htmlSalud() {
     if (!latidos.length) return '<div class="as-salud mal">⚠️ <b>El chip de ' + esc(o.nombre) + ' nunca se ha conectado.</b> Mientras no se escanee el QR, nadie contesta la pauta.</div>';
     return latidos.map(function (l) {
       var min = (Date.now() - new Date(l.visto_en).getTime()) / 60000;
-      var ok = min <= 25 && l.estado !== 'caido';
-      return ok
-        ? '<div class="as-salud ok">🟢 <b>' + esc(o.nombre) + ' está conectada</b> · ' + esc(l.etiqueta || '') + ' · último latido ' + cuando(l.visto_en) + '</div>'
-        : '<div class="as-salud mal">🔴 <b>' + esc(o.nombre) + ' NO está contestando</b> · último latido ' + cuando(l.visto_en) +
-          (l.nota ? ' · ' + esc(l.nota) : '') + '. Revisar que el PC esté prendido y el bot corriendo.</div>';
+      if (min > 25 || l.estado === 'caido') {
+        return '<div class="as-salud mal">🔴 <b>' + esc(o.nombre) + ' NO está contestando</b> · último latido ' + cuando(l.visto_en) +
+          (l.nota ? ' · ' + esc(l.nota) : '') + '. Revisar que el computador esté prendido y el bot corriendo (estado.ps1).</div>';
+      }
+      if (l.estado === 'error') {
+        var reconecta = /^reconectando/i.test(l.nota || '');
+        return '<div class="as-salud" style="background:#fff1dc;border-color:#f0a45c;color:#7c2d12">🟠 <b>' +
+          (reconecta ? esc(o.nombre) + ' se está reconectando' : esc(o.nombre) + ' no pudo contestar: ' + esc(l.nota || 'motivo desconocido')) + '</b>' +
+          (reconecta ? '' : '<div style="font-size:12px;margin-top:3px">Los clientes afectados quedan marcados "no se pudo contestar": escríbeles tú. Se quita sola cuando vuelva a contestar bien.</div>') + '</div>';
+      }
+      return '<div class="as-salud ok">🟢 <b>' + esc(o.nombre) + ' está conectada y contestando</b> · ' + esc(l.etiqueta || '') + ' · último latido ' + cuando(l.visto_en) + '</div>';
     }).join('');
   }
 
