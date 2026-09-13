@@ -208,10 +208,18 @@ const App = {
     this.set('<h1>Chats</h1><div class="sub">Cargando conversaciones…</div>');
     const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK()};
     let msgs=[], leads=[];
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_agente_mem?order=creado_en.desc&limit=4000',{headers:H});
-      const j=await r.json(); msgs=Array.isArray(j)?j:[]; }catch(e){}
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads?select=telefono,nombre,ciudad,etiqueta,interes&limit=3000',{headers:H});
-      const j=await r.json(); leads=Array.isArray(j)?j:[]; }catch(e){}
+    /* SOLO Smart. Antes pedía la tabla entera y aquí salían los chats de Sofía (Feroz),
+       que ahora viven en la pestaña Sofía de CED. Y Supabase entrega máximo 1.000 filas
+       por pedido: con "limit=4000" en una sola llamada llegaban 1.000, mezcladas. Por
+       eso se pide por páginas. */
+    const paginas=async(ruta,tope)=>{ let out=[];
+      for(let off=0; off<tope; off+=1000){
+        const r=await fetch(this._SBU()+'/rest/v1/'+ruta+'&limit=1000&offset='+off,{headers:H});
+        const j=await r.json(); if(!Array.isArray(j)) break;
+        out=out.concat(j); if(j.length<1000) break; }
+      return out; };
+    try{ msgs=await paginas('nc_agente_mem?empresa=eq.smart&order=creado_en.desc',4000); }catch(e){}
+    try{ leads=await paginas('nc_bot_leads?empresa=eq.smart&select=telefono,nombre,ciudad,etiqueta,interes&order=id',3000); }catch(e){}
     if(!msgs.length){ this.set('<h1>Chats</h1><div class="card">No se pudieron leer las conversaciones.</div>'); return; }
     const byTel={}; leads.forEach(l=>{ const k=String(l.telefono||'').replace(/\D/g,'').slice(-10); if(k) byTel[k]=l; });
     this._chatLeads=byTel; this._chatMsgs=msgs;
@@ -254,10 +262,6 @@ const App = {
     this.set(`<h1>Chats</h1>
       <div class="sub">Lo que el agente habla con la gente. Toca una conversación para leerla completa.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-        <select onchange="App._chatEmp=this.value;App._chatsPaint()" style="width:auto;padding:9px;border:1.5px solid var(--linea);border-radius:9px">
-          <option value="" ${emp?'':'selected'}>Todas</option>
-          <option value="smart" ${emp==='smart'?'selected':''}>Smart</option>
-          <option value="feroz" ${emp==='feroz'?'selected':''}>Feroz</option></select>
         <input placeholder="Buscar nombre o celular…" value="${esc(this._chatQ||'')}"
           oninput="App._chatQ=this.value;clearTimeout(App._chatT);App._chatT=setTimeout(()=>App._chatsPaint(),300)"
           style="flex:1;min-width:150px;padding:10px;border:1.5px solid var(--linea);border-radius:9px">
