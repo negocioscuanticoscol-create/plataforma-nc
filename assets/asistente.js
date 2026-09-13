@@ -1,16 +1,18 @@
 /* ============================================================================
    ASISTENTE · los chats de WhatsApp que atiende la asistente de cada negocio
 
-   La asistente (Sandra en Kruh) contesta sola desde un chip con OpenWA
-   (_PLAYBOOK/openwa/bot.js). Esta pantalla es donde el negocio la supervisa:
+   La asistente (Milena en Kruh) contesta sola desde un chip con Baileys
+   (_PLAYBOOK/openwa/bot-baileys.mjs). Esta pantalla es donde el negocio la supervisa:
      - ve qué escribe la gente y qué le contestó la asistente
+     - ve arriba, en naranja, a los clientes que QUIEREN COMPRAR (con pitido si
+       la pestaña está abierta)
      - toma un chat (la asistente se calla) o se lo devuelve
      - contesta como persona: queda "pendiente" y el bot lo manda por el chip
      - edita el guion (solo quien la app deje)
 
    Se monta en la app de cada negocio con una línea en su go():
        <script src="../assets/asistente.js"></script>
-       sandra: function(){ Asistente.vista($('main'), {prefijo:'kruh', nombre:'Sandra', guion:true}) }
+       asistente: function(){ Asistente.vista($('main'), {prefijo:'kruh', nombre:'Milena', marca:'Kruh', guion:true}) }
 
    Cada cliente vive aparte: SOLO lee y escribe en las tablas de su prefijo
    (<prefijo>_wa_chats, _wa_mensajes, _wa_guion). De NC solo lee nc_wa_latido,
@@ -21,6 +23,10 @@
   var SB = 'https://fnayedgvamxktxfvywwl.supabase.co';
   var KEY = 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
   var H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
+
+  /* La pone el bot cuando la asistente detecta intención de compra. Si se cambia
+     aquí, cambiarla también en bot-baileys.mjs (ETIQUETA_COMPRA). */
+  var ETQ_COMPRA = 'quiere comprar';
 
   function api(path, opt) {
     opt = opt || {};
@@ -62,16 +68,22 @@
     '#as-root .as-salud{border-radius:11px;padding:10px 13px;font-size:13px;margin-bottom:12px;border:1px solid}',
     '#as-root .as-salud.ok{background:#e6f1e2;border-color:#c9dfc2;color:#2f5a2b}',
     '#as-root .as-salud.mal{background:#f7e2dd;border-color:#ecc2b8;color:#8a2c20}',
+    '#as-root .as-alerta{background:#fff1dc;border:2px solid #f0a45c;color:#7c2d12;border-radius:12px;padding:12px 14px;margin-bottom:12px}',
+    '#as-root .as-alerta b{font-size:15px}',
+    '#as-root .as-alerta .as-quien{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}',
+    '#as-root .as-alerta button{padding:7px 11px;border-radius:9px;border:1px solid #f0a45c;background:#fff;color:#7c2d12;font-weight:700;font-size:12.5px;cursor:pointer;font-family:inherit}',
     '#as-root .as-filtros{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}',
     '#as-root .as-f{padding:7px 12px;border-radius:20px;border:1px solid var(--line,#e7ddc9);background:#fff;font-size:12.5px;cursor:pointer;font-family:inherit}',
     '#as-root .as-f.on{background:var(--ink,#2a1f16);color:#fff;border-color:var(--ink,#2a1f16)}',
     '#as-root .as-chat{background:var(--card,#fff);border:1px solid var(--line,#e7ddc9);border-radius:12px;margin-bottom:8px;overflow:hidden}',
     '#as-root .as-chat.on{border-color:var(--acc,#b5651d);box-shadow:0 0 0 2px rgba(181,101,29,.12)}',
+    '#as-root .as-chat.compra{border-left:4px solid #f0a45c}',
     '#as-root .as-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:11px 13px;cursor:pointer}',
     '#as-root .as-nom{font-weight:700;font-size:14px}',
     '#as-root .as-meta{font-size:11.5px;color:var(--mut,#9a8b78);margin-top:2px}',
     '#as-root .as-ult{font-size:12.5px;color:var(--ink2,#5b4d3f);padding:0 13px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
     '#as-root .as-nl{background:#dc2626;color:#fff;border-radius:6px;padding:1px 6px;font-size:10px;vertical-align:2px;margin-left:4px}',
+    '#as-root .as-compra{background:#fde7d2;color:#9a3412;border-radius:6px;padding:1px 6px;font-size:10.5px;font-weight:700;vertical-align:1px;margin-left:4px}',
     '#as-root .as-badge{flex:none;font-size:11px;font-weight:700;border-radius:8px;padding:3px 8px}',
     '#as-root .as-badge.agente{background:#e6f1e2;color:#2f5a2b}',
     '#as-root .as-badge.humano{background:#fff1dc;color:#9a4f12}',
@@ -94,11 +106,15 @@
   ].join('\n');
 
   var el = null, o = {}, chats = [], latidos = [], abierto = null, hilo = [], filtro = 'todos',
-      guion = null, verGuion = false, tick = null, borrador = {}, enviando = false;
+      guion = null, verGuion = false, tick = null, borrador = {}, enviando = false,
+      vistosCompra = null, tituloOriginal = null, parpadeo = null;
   var T = function (t) { return o.prefijo + '_wa_' + t; };
 
   function vivo() { return !!$('as-root'); }
   function parar() { if (tick) { clearInterval(tick); tick = null; } }
+  function quierenComprar() {
+    return (chats || []).filter(function (c) { return c.etiqueta === ETQ_COMPRA && c.no_leido; });
+  }
 
   function cargar() {
     return Promise.all([
@@ -116,6 +132,44 @@
       .catch(function () { hilo = []; });
   }
 
+  /* ---------- alarma de compra ---------- */
+  /* Solo suena cuando aparece un cliente NUEVO que quiere comprar mientras la
+     pestaña está abierta; al entrar no suena por los que ya estaban. */
+  function revisarAlarma() {
+    if (chats === null) return;
+    var ahora = quierenComprar().map(function (c) { return dig(c.telefono); });
+    if (vistosCompra !== null) {
+      var nuevos = ahora.filter(function (t) { return vistosCompra.indexOf(t) < 0; });
+      if (nuevos.length) { sonar(); parpadear(); }
+    }
+    vistosCompra = ahora;
+  }
+  function sonar() {
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.28].forEach(function (t, i) {
+        var osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.frequency.value = i ? 1046 : 784;
+        g.gain.setValueAtTime(0.0001, ctx.currentTime + t);
+        g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.25);
+        osc.connect(g); g.connect(ctx.destination);
+        osc.start(ctx.currentTime + t); osc.stop(ctx.currentTime + t + 0.26);
+      });
+    } catch (e) {}
+  }
+  function parpadear() {
+    if (parpadeo) return;
+    tituloOriginal = document.title;
+    var n = 0;
+    parpadeo = setInterval(function () {
+      document.title = (n++ % 2) ? tituloOriginal : '🛒 Quieren comprar';
+      if (n > 20 || document.hasFocus()) {
+        clearInterval(parpadeo); parpadeo = null; document.title = tituloOriginal;
+      }
+    }, 900);
+  }
+
   /* El bot late cada 10 min: más de 25 sin latir es que el chip o el PC se apagó. */
   function htmlSalud() {
     if (!latidos.length) return '<div class="as-salud mal">⚠️ <b>El chip de ' + esc(o.nombre) + ' nunca se ha conectado.</b> Mientras no se escanee el QR, nadie contesta la pauta.</div>';
@@ -127,6 +181,17 @@
         : '<div class="as-salud mal">🔴 <b>' + esc(o.nombre) + ' NO está contestando</b> · último latido ' + cuando(l.visto_en) +
           (l.nota ? ' · ' + esc(l.nota) : '') + '. Revisar que el PC esté prendido y el bot corriendo.</div>';
     }).join('');
+  }
+
+  function htmlAlerta() {
+    var q = quierenComprar();
+    if (!q.length) return '';
+    return '<div class="as-alerta">🛒 <b>' + q.length + (q.length === 1 ? ' cliente quiere comprar' : ' clientes quieren comprar') + '</b>' +
+      '<div style="font-size:12.5px;margin-top:2px">' + esc(o.nombre) + ' ya le avisó por WhatsApp a la línea de domicilios. Toca el nombre para ver qué pidió; al abrirlo, la alerta se quita.</div>' +
+      '<div class="as-quien">' + q.map(function (c) {
+        var tel = dig(c.telefono);
+        return '<button onclick="Asistente.abrir(\'' + tel + '\')">' + esc(c.nombre || ('+' + tel)) + ' · ' + cuando(c.ultima_fecha) + '</button>';
+      }).join('') + '</div></div>';
   }
 
   function htmlHilo(c) {
@@ -172,22 +237,29 @@
     }
     var nH = chats.filter(function (c) { return c.modo === 'humano'; }).length;
     var nN = chats.filter(function (c) { return c.no_leido; }).length;
+    var nC = chats.filter(function (c) { return c.etiqueta === ETQ_COMPRA; }).length;
     var lista = chats.filter(function (c) {
-      return filtro === 'humano' ? c.modo === 'humano' : filtro === 'nuevos' ? c.no_leido : true;
+      return filtro === 'humano' ? c.modo === 'humano'
+        : filtro === 'nuevos' ? c.no_leido
+        : filtro === 'compra' ? c.etiqueta === ETQ_COMPRA
+        : true;
     });
     var f = function (k, t) { return '<button class="as-f' + (filtro === k ? ' on' : '') + '" onclick="Asistente.filtro(\'' + k + '\')">' + t + '</button>'; };
     el.innerHTML = '<div id="as-root">' +
       '<h1>💬 ' + esc(o.nombre) + ' · WhatsApp de la pauta</h1>' +
       '<div class="sub">Lo que escribe la gente y lo que ' + esc(o.nombre) + ' le contesta. Toca un chat para leerlo completo o contestar tú.</div>' +
-      htmlSalud() + htmlGuion() +
-      '<div class="as-filtros">' + f('todos', 'Todos · ' + chats.length) + f('nuevos', '🔴 Sin leer · ' + nN) + f('humano', '👤 Con persona · ' + nH) +
+      htmlSalud() + htmlAlerta() + htmlGuion() +
+      '<div class="as-filtros">' + f('todos', 'Todos · ' + chats.length) + f('compra', '🛒 Quieren comprar · ' + nC) +
+        f('nuevos', '🔴 Sin leer · ' + nN) + f('humano', '👤 Con persona · ' + nH) +
         (o.guion && !verGuion ? '<button class="as-f" style="margin-left:auto" onclick="Asistente.guion()">✏️ Guion</button>' : '') + '</div>' +
       (lista.length ? lista.map(function (c) {
-        var tel = dig(c.telefono), on = abierto === tel;
-        return '<div class="as-chat' + (on ? ' on' : '') + '">' +
+        var tel = dig(c.telefono), on = abierto === tel, compra = c.etiqueta === ETQ_COMPRA;
+        return '<div class="as-chat' + (on ? ' on' : '') + (compra ? ' compra' : '') + '">' +
           '<div class="as-top" onclick="Asistente.abrir(\'' + tel + '\')"><div style="min-width:0">' +
-            '<div class="as-nom">' + (on ? '▾ ' : '▸ ') + esc(c.nombre || ('+' + tel)) + (c.no_leido ? '<span class="as-nl">nuevo</span>' : '') + '</div>' +
-            '<div class="as-meta">📱 +' + esc(tel) + ' · ' + cuando(c.ultima_fecha) + (c.etiqueta ? ' · ' + esc(c.etiqueta) : '') + '</div></div>' +
+            '<div class="as-nom">' + (on ? '▾ ' : '▸ ') + esc(c.nombre || ('+' + tel)) +
+              (compra ? '<span class="as-compra">🛒 quiere comprar</span>' : '') +
+              (c.no_leido ? '<span class="as-nl">nuevo</span>' : '') + '</div>' +
+            '<div class="as-meta">📱 +' + esc(tel) + ' · ' + cuando(c.ultima_fecha) + (c.etiqueta && !compra ? ' · ' + esc(c.etiqueta) : '') + '</div></div>' +
             '<span class="as-badge ' + (c.modo === 'humano' ? 'humano">👤 Persona' : 'agente">🤖 ' + esc(o.nombre)) + '</span></div>' +
           (on ? htmlHilo(c) : (c.ultimo_mensaje ? '<div class="as-ult">' + esc(c.ultimo_mensaje) + '</div>' : '')) +
         '</div>';
@@ -196,12 +268,16 @@
     var hl = $('as-hilo'); if (hl) hl.scrollTop = hl.scrollHeight;
   }
 
-  /* Refresca solo si nadie está escribiendo: repintar borraría el cursor. */
+  /* Los datos y la alarma se revisan siempre; repintar se salta mientras alguien
+     escribe, porque borraría el cursor. */
   function refrescar() {
     if (!vivo()) { parar(); return; }
-    var foco = document.activeElement;
-    if (foco && (foco.id === 'as-txt' || foco.id === 'as-guion-txt')) return;
-    cargar().then(function () { if (vivo()) pinta(); });
+    cargar().then(function () {
+      revisarAlarma();
+      var foco = document.activeElement;
+      var escribiendo = foco && (foco.id === 'as-txt' || foco.id === 'as-guion-txt');
+      if (vivo() && !escribiendo) pinta();
+    });
   }
 
   var Asistente = {
@@ -213,7 +289,8 @@
       el.className = ''; el.style.cssText = '';
       el.innerHTML = '<div id="as-root"><div class="as-vacio">Cargando chats…</div></div>';
       parar();
-      cargar().then(pinta);
+      vistosCompra = null;
+      cargar().then(function () { revisarAlarma(); pinta(); });
       tick = setInterval(refrescar, 8000);
     },
     filtro: function (k) { filtro = k; pinta(); },
