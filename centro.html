@@ -257,13 +257,77 @@ const RED={Instagram:{c:'var(--ig)',ic:'📸'},Facebook:{c:'var(--fb)',ic:'📘'
 
 const App={
 vista:'resumen',
-TABS:[['resumen','📊 Resumen'],['pauta','📣 Pauta'],['horas','⏱️ Horas'],['cuentas','🪪 Cuentas'],['agentes','🤖 Agentes'],['herram','🧰 Herramientas'],['redes','📱 Redes'],['financiero','💰 Financiero']],
+TABS:[['resumen','📊 Resumen'],['pauta','📣 Pauta'],['horas','⏱️ Horas'],['cuentas','🪪 Cuentas'],['agentes','🤖 Agentes'],['herram','🧰 Herramientas'],['redes','📱 Redes'],['financiero','💰 Financiero'],['comandos','⌨️ Comandos']],
+/* ---------- COMANDOS ----------
+   Lo que se corre a mano en el computador de José, con su explicación, porque ya son
+   muchos y se olvidan. Solo nombres y rutas: NUNCA llaves ni contraseñas, este HTML
+   se publica. Cuando se cree un script nuevo que se corra a mano, agregarlo aquí.
+   Formato: [grupo, nota del grupo, [[qué hace, comando, explicación], …]] */
+COMANDOS:[
+ ['🤖 Milena · WhatsApp de la pauta de Kruh','Corre en este computador. El guion se cambia en la app de Kruh → 💬 Milena → ✏️ Guion y NO necesita reinicio.',[
+   ['Ver cómo está','powershell -ExecutionPolicy Bypass -File _PLAYBOOK\\openwa\\estado.ps1','Dice si el proceso corre, el semáforo (verde / naranja / rojo) y las últimas líneas del registro. <b>Empezar siempre por aquí.</b>'],
+   ['Prender','powershell -ExecutionPolicy Bypass -File _PLAYBOOK\\openwa\\prender.ps1','La prende escondida y sigue viva aunque se cierre la terminal o VS Code. Si ya estaba prendida no abre otra.'],
+   ['Apagar (mantenimiento)','powershell -ExecutionPolicy Bypass -File _PLAYBOOK\\openwa\\apagar.ps1','Mientras esté apagada nadie contesta el chip. No se pierde la vinculación: al prender no hay que escanear el QR.'],
+   ['Reiniciar','powershell -ExecutionPolicy Bypass -File _PLAYBOOK\\openwa\\reiniciar.ps1','Apaga y prende. Solo hace falta después de cambiar el código del bot o config.json.']]],
+ ['🖥️ Abrir las apps','En Claude Code también sirve escribir <b>/apps</b>.',[
+   ['Abrir todas','powershell -ExecutionPolicy Bypass -File _PLAYBOOK\\abrir_apps.ps1','Abre todas las apps publicadas en Chrome, en la pantalla 2, en una sola ventana.'],
+   ['Abrir solo algunas','powershell -ExecutionPolicy Bypass -File _PLAYBOOK\\abrir_apps.ps1 ced smart nido','Pon los nombres de las que quieras (ced, smart, nido, kruh, fes, lupe, centro…).'],
+   ['Ver la lista sin abrir','powershell -ExecutionPolicy Bypass -File _PLAYBOOK\\abrir_apps.ps1 -Lista','Muestra qué apps hay y sus nombres cortos.'],
+   ['Abrir en otra pantalla','powershell -ExecutionPolicy Bypass -File _PLAYBOOK\\abrir_apps.ps1 -Pantalla 3','Igual que abrir todas, pero en la pantalla 3.']]],
+ ['🗄️ Base de datos','',[
+   ['Correr una consulta','python _PLAYBOOK\\_sql.py "select count(*) from kruh_pedidos"','Corre SQL en la base única con el token de administrador. También recibe la ruta de un archivo .sql. <b>OJO: no hay respaldos automáticos; un DELETE o UPDATE no tiene vuelta atrás.</b>'],
+   ['Tablas sin protección (RLS)','python _PLAYBOOK\\_rls_revisar.py','Lista las tablas que están sin RLS (lo que Supabase alerta por correo).'],
+   ['Qué negocios pesan en la base','python _PLAYBOOK\\_mapa_negocios.py','Cuántas tablas y filas tiene cada negocio en la base única.']]],
+ ['📣 Pauta','',[
+   ['Recolectar la pauta a mano','python _PLAYBOOK\\_pauta_recolector.py','Lee los anuncios de Meta y actualiza el tablero de Pauta. Normalmente corre solo en GitHub Actions; esto es para cuando se necesita ya.'],
+   ['Lista de contactos de Smart para Meta','python _PLAYBOOK\\_smart_audiencia.py','Arma el público personalizado de Smart para subir a Meta y la lista corta de clientes calientes para WhatsApp.']]],
+ ['✈️ FES','Todo guarda los archivos en C:\\1 . Personal\\FES, nunca en el repo.',[
+   ['Bajar adjuntos del correo','python _PLAYBOOK\\fes_bajar_correo.py','Baja los adjuntos de los últimos 90 días a las carpetas locales. Con una fecha (2026-01-01) baja desde ahí; con <b>todo</b>, el histórico.'],
+   ['Revisar qué no se bajó','python _PLAYBOOK\\fes_revisar_correo.py','Diagnóstico: correos que quedaron fuera del índice, para no perder facturas.'],
+   ['Mover adjuntos a su cajón','python _PLAYBOOK\\fes_mover_correos.py','Muestra qué movería. Para hacerlo de verdad: agregar <b>aplicar</b> al final.'],
+   ['Validar contra el banco','python _PLAYBOOK\\fes_validar_banco.py','Compara los movimientos con los extractos del banco.'],
+   ['Subir lo escrito en el Excel de socios','python _PLAYBOOK\\fes_cargar_socios.py','Muestra qué cambiaría en la base según las columnas amarillas. Para subirlo: agregar <b>aplicar</b> al final.'],
+   ['Regenerar el Excel de socios','python _PLAYBOOK\\fes_excel_socios.py','Vuelve a armar el archivo con todos los movimientos. <b>OJO: lo sobrescribe. Si estás llenando columnas, primero súbelas con el comando de arriba + aplicar.</b>'],
+   ['Excel para la contadora','python _PLAYBOOK\\fes_excel_contadora.py','Facturas de compra (del XML de la DIAN) y demás pestañas para la contadora.'],
+   ['Partir el informe contable','python _PLAYBOOK\\fes_separar_contabilidad.py','Deja un Excel por tema para mandarle a la contadora solo lo que pida.']]],
+ ['🛏️ Colchones Nido','',[
+   ['Regenerar el informe de ventas','python _PLAYBOOK\\nido_informe\\generar_datos.py','Lee los Excel de los 3 almacenes y rehace nido/datos.js del informe. Hay que publicar después (commit + push).']]],
+ ['⏱️ Horas','',[
+   ['Horas desde el historial de git','python _PLAYBOOK\\horas_desde_git.py','Muestra las horas por negocio reconstruidas del git (no escribe nada). <b>OJO: marzo–agosto 2026 ya están cargadas; no volver a correrlo con "escribir".</b>']]],
+ ['⚙️ Corren solos (no hay que hacer nada)','Si alguno deja de verse, revisar GitHub → Actions.',[
+   ['Recolector de pauta','','Todos los días a las 6 a. m., en GitHub Actions (repo privado Smart_packing).'],
+   ['Respaldo + vigilante','','Todos los días, en GitHub Actions (repo privado Smart_packing).'],
+   ['Agente de vacantes (María)','','Todos los días a las 7:30 a. m.; avisa por Telegram lo nuevo.'],
+   ['Mantener viva la base','','Todos los días a las 2:37 a. m., para que Supabase no pause el proyecto.'],
+   ['Precios del portafolio','','Lunes a viernes a las 7:10 a. m. y 4:20 p. m.']]]
+],
+vComandos(){
+  const e=s=>String(s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+  $('main').innerHTML='<h1>⌨️ Comandos</h1>'
+   +'<div class="sub">Lo que se corre a mano en el computador de José. Abre PowerShell en <b>C:\\NC\\plataforma-nc</b>, copia el comando con 📋 y pégalo.</div>'
+   +this.COMANDOS.map(g=>'<div class="card" style="margin-bottom:12px">'
+     +'<div style="font-weight:800;font-size:15px;margin-bottom:4px">'+g[0]+'</div>'
+     +(g[1]?'<div style="color:var(--sub);font-size:12.5px;margin-bottom:6px">'+g[1]+'</div>':'')
+     +g[2].map(c=>'<div style="border-top:1px solid #e5e7eb;padding:9px 0">'
+        +'<div style="font-weight:700;font-size:13.5px">'+c[0]+'</div>'
+        +(c[1]?'<div style="display:flex;gap:6px;align-items:center;margin:5px 0">'
+          +'<code style="flex:1;min-width:0;overflow-x:auto;white-space:nowrap;background:#f3f4f6;border-radius:7px;padding:7px 9px;font-size:12.5px">'+e(c[1])+'</code>'
+          +'<button onclick="App.copiarComando(this)" data-c="'+e(c[1])+'" title="Copiar" style="flex:none;border:1px solid #e5e7eb;background:#fff;border-radius:7px;padding:6px 9px;cursor:pointer">📋</button></div>':'')
+        +'<div style="color:var(--sub);font-size:12.5px;line-height:1.45">'+c[2]+'</div></div>').join('')
+     +'</div>').join('');
+},
+copiarComando(b){
+  const t=b.getAttribute('data-c');
+  const listo=()=>{ b.textContent='✓'; setTimeout(()=>{ b.textContent='📋'; },1200); };
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(listo).catch(()=>prompt('Copia el comando:',t));
+  else prompt('Copia el comando:',t);
+},
 /* las apps del ecosistema · las periféricas leen nc_clientes para saber a quién sirven */
 APPS:{app:'📱 App propia',callprospector:'📞 CallProspector',marcador:'☎️ Marcador',
       reservas:'📅 Reservas',bot:'🤖 Bot WhatsApp',pauta:'📣 Pauta'},
 nav(){ $('nav').innerHTML=this.TABS.map(([v,n])=>`<button class="${v===this.vista?'on':''}" onclick="App.go('${v}')">${n}</button>`).join(''); },
 go(v){ this.vista=v; this.nav(); $('main').innerHTML='<div class="empty">Cargando…</div>';
-  ({resumen:this.vResumen,pauta:this.vPauta,horas:this.vHoras,cuentas:this.vCuentas,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero}[v]||this.vResumen).call(this); },
+  ({resumen:this.vResumen,pauta:this.vPauta,horas:this.vHoras,cuentas:this.vCuentas,agentes:this.vAgentes,herram:this.vHerram,redes:this.vRedes,financiero:this.vFinanciero,comandos:this.vComandos}[v]||this.vResumen).call(this); },
 
 /* ---------- FINANCIERO ----------
    Esto no es contabilidad: es el tablero con el que se decide qué negocio sigue.
