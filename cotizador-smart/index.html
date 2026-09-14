@@ -274,6 +274,7 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
   </div>
   <div class="slabel">// Productos disponibles — de menor a mayor tamaño</div>
   <div class="pgrid" id="grid-fp"></div>
+  <div class="field" style="margin:14px 16px 6px"><label>📝 Notas de la cotización <span style="color:#d63031;font-weight:600">(ej: muestras · salen en rojo debajo de las referencias)</span></label><textarea id="notas-prod" placeholder="Ej: enviar muestras de 520 ml y 1000 ml" oninput="setNotasCot(this.value)"></textarea></div>
   <div id="errbanner">Selecciona al menos un producto con mínimo 100 unidades, o el kit de muestras.</div>
   <div class="bwrap" style="padding-top:4px">
     <button class="btn btn-p" onclick="goStep2()">Ver mi cotización →</button>
@@ -957,7 +958,11 @@ function pintarNotas(){
   box.textContent=t?('📝 '+t):'';
   box.style.display=t?'block':'none';
 }
-function setNotasCot(v){ const n=document.getElementById('notas'); if(n) n.value=v; pintarNotas(); }
+/* Hay tres casillas (Datos, Productos, Cotizacion) para el mismo dato: escribir en una llena las otras */
+function setNotasCot(v){
+  ['notas','notas-prod','notas-cot'].forEach(id=>{ const e=document.getElementById(id); if(e && e!==document.activeElement) e.value=v; });
+  pintarNotas();
+}
 
 function buildResumen(){
   const sel=getSel(); const folio=genFolio();
@@ -1182,7 +1187,7 @@ function resetAll(){
     const card=document.getElementById('card-'+p.id); if(card) card.classList.remove('sel');
     const qtot=document.getElementById('qtot-'+p.id); if(qtot) qtot.textContent='';
   }));
-  ['nom','tel','ced','neg','dir','bar','ciu','dep','eml','rut','rsoc','rec','telj','dirj','barj','ciuj','depj','emlj','ali','notas','notas-cot','env-nom','env-tel','env-dir','env-bar','env-ciu','env-dep'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  ['nom','tel','ced','neg','dir','bar','ciu','dep','eml','rut','rsoc','rec','telj','dirj','barj','ciuj','depj','emlj','ali','notas','notas-prod','notas-cot','env-nom','env-tel','env-dir','env-bar','env-ciu','env-dep'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
   document.querySelectorAll('.ali-btn.on').forEach(b=>{ b.classList.remove('on'); if(b.dataset.val==='Otro') document.getElementById('ali-otro').style.display='none'; });
   document.getElementById('errbanner').style.display='none';
   if(envioDif) toggleEnvioDif();
@@ -1246,7 +1251,7 @@ function autofillCot(){
     const sv=(id,val)=>{const el=document.getElementById(id); if(el&&val) el.value=val;};
     if(esJur){ sv('rut',d.cedula_nit); sv('rsoc',d.empresa); sv('rec',d.contacto||d.empresa); sv('telj',d.celular); sv('emlj',d.correo); sv('dirj',d.dir_factura); sv('barj',d.barrio_factura); sv('ciuj',d.ciudad_factura); sv('depj',d.dep_factura); }
     else { sv('ced',d.cedula_nit); sv('nom',d.empresa||d.contacto); sv('neg',d.empresa); sv('tel',d.celular); sv('eml',d.correo); sv('dir',d.dir_factura); sv('bar',d.barrio_factura); sv('ciu',d.ciudad_factura); sv('dep',d.dep_factura); }
-    sv('notas',d.notas);   // antes las notas se perdian al reabrir la cotizacion
+    if(d.notas) setNotasCot(d.notas);   // antes las notas se perdian al reabrir la cotizacion
     // restaura la LISTA DE PRECIOS que tenía la cotización (antes se perdía y tocaba re-elegirla)
     if(d.lista_idx!=null && d.lista_idx!==''){ const li=parseInt(d.lista_idx); if(!isNaN(li)){ listaActiva=li; const ls=document.getElementById('lista-sel'); if(ls) ls.value=String(li); } }
     let prods=d.productos; if(typeof prods==='string'){ try{prods=JSON.parse(prods);}catch(e){prods=null;} }
