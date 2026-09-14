@@ -394,7 +394,7 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
       <input type="text" id="ali-otro" placeholder="¿Qué producto?" style="display:none;margin-top:4px" oninput="updateAli()">
       <input type="hidden" id="ali">
     </div>
-    <div class="field"><label>Notas adicionales</label><textarea id="notas" placeholder="Preguntas, referencias especiales, fechas..."></textarea></div>
+    <div class="field"><label>Notas adicionales</label><textarea id="notas" placeholder="Ej: enviar muestras de 520 ml · salen en rojo en la cotización"></textarea></div>
   </div>
   <div class="bwrap">
     <div id="errbanner2" style="display:none;background:#fff0f0;border:1px solid #d63031;border-radius:12px;padding:10px 14px;font-size:13px;color:#d63031;margin-bottom:10px"></div>
@@ -414,6 +414,7 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
     <div class="scard">
       <div class="shdr"><span>Cotización Smart Packaging Colombia</span><span class="shdr-folio" id="folio-display"></span></div>
       <div id="sum-items"></div>
+      <div id="sum-notas" style="display:none;padding:9px 15px;border-bottom:1px solid var(--bd);color:#d63031;font-size:13px;font-weight:700;line-height:1.45;white-space:pre-wrap"></div>
       <div style="padding:10px 15px;background:var(--bg)">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">Subtotal sin IVA</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-sub">-</span></div>
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">IVA 19%</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-iva">-</span></div>
@@ -429,6 +430,7 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
         <div style="font-size:10.5px;color:#9aa7b5;margin-top:4px">📲 Envía el comprobante por WhatsApp y despachamos</div>
       </div>
     </div>
+    <div class="field" style="margin:0 0 12px"><label>📝 Notas de la cotización <span style="color:#d63031;font-weight:600">(salen en rojo debajo de las referencias)</span></label><textarea id="notas-cot" placeholder="Ej: enviar muestras de 520 ml y 1000 ml · despachar el lunes" oninput="setNotasCot(this.value)"></textarea></div>
     <div class="scard">
       <div class="shdr"><span>Datos de entrega</span></div>
       <div id="sum-cliente"></div>
@@ -947,6 +949,16 @@ function getContacto(){ return tipo==='nat'?g('nom'):g('rec'); }
 function getEmpresa(){ return tipo==='nat'?(g('neg')||g('nom')):g('rsoc'); }
 function getTel(){ return tipo==='nat'?g('tel'):g('telj'); }
 
+/* Notas de la cotizacion (ej: muestras que pidio el cliente). Se escriben en Datos o en la
+   cotizacion — es el mismo campo #notas — y salen en rojo debajo de la ultima referencia. */
+function pintarNotas(){
+  const box=document.getElementById('sum-notas'); if(!box) return;
+  const t=g('notas');
+  box.textContent=t?('📝 '+t):'';
+  box.style.display=t?'block':'none';
+}
+function setNotasCot(v){ const n=document.getElementById('notas'); if(n) n.value=v; pintarNotas(); }
+
 function buildResumen(){
   const sel=getSel(); const folio=genFolio();
   document.getElementById('folio-display').textContent=folio;
@@ -983,7 +995,9 @@ function buildResumen(){
     (envioDif?`<div class="srow"><div class="srl" style="color:var(--green);font-size:11px">⚠ Envío a dirección diferente al titular</div><div class="srr"></div></div>`:'')+
     (g('ali')?`<div class="srow"><div class="srl">¿Qué envasa?</div><div class="srr">${g('ali')}</div></div>`:'')+
     `<div class="srow"><div class="srl">Transporte${tipoTransporte==='smart'?`<small>${itinerarioTexto()}</small>`:''}</div><div class="srr">${tipoTransporte==='incluido'?'📦 Incluido en factura':tipoTransporte==='cobro'?'💰 Al cobro':tipoTransporte==='smart'?'🚐 Transporte Smart':' 🚛 Transporte propio'}</div></div>`+
-    (g('notas')?`<div class="srow"><div class="srl">Notas</div><div class="srr" style="text-align:right;max-width:60%">${g('notas')}</div></div>`:'');
+    '';
+  const nc=document.getElementById('notas-cot'); if(nc) nc.value=g('notas');
+  pintarNotas();   // las notas ya no van en Datos de entrega: salen en rojo debajo de las referencias
   document.getElementById('acuerdo-section').style.display='block';
   document.getElementById('confirmado-box').style.display='none';
   ['btn-guardar','btn-aceptar'].forEach(id=>{ const b=document.getElementById(id); if(b){ b.disabled=false; b.style.opacity='1'; } });
@@ -1168,7 +1182,7 @@ function resetAll(){
     const card=document.getElementById('card-'+p.id); if(card) card.classList.remove('sel');
     const qtot=document.getElementById('qtot-'+p.id); if(qtot) qtot.textContent='';
   }));
-  ['nom','tel','ced','neg','dir','bar','ciu','dep','eml','rut','rsoc','rec','telj','dirj','barj','ciuj','depj','emlj','ali','notas','env-nom','env-tel','env-dir','env-bar','env-ciu','env-dep'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  ['nom','tel','ced','neg','dir','bar','ciu','dep','eml','rut','rsoc','rec','telj','dirj','barj','ciuj','depj','emlj','ali','notas','notas-cot','env-nom','env-tel','env-dir','env-bar','env-ciu','env-dep'].forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
   document.querySelectorAll('.ali-btn.on').forEach(b=>{ b.classList.remove('on'); if(b.dataset.val==='Otro') document.getElementById('ali-otro').style.display='none'; });
   document.getElementById('errbanner').style.display='none';
   if(envioDif) toggleEnvioDif();
@@ -1232,6 +1246,7 @@ function autofillCot(){
     const sv=(id,val)=>{const el=document.getElementById(id); if(el&&val) el.value=val;};
     if(esJur){ sv('rut',d.cedula_nit); sv('rsoc',d.empresa); sv('rec',d.contacto||d.empresa); sv('telj',d.celular); sv('emlj',d.correo); sv('dirj',d.dir_factura); sv('barj',d.barrio_factura); sv('ciuj',d.ciudad_factura); sv('depj',d.dep_factura); }
     else { sv('ced',d.cedula_nit); sv('nom',d.empresa||d.contacto); sv('neg',d.empresa); sv('tel',d.celular); sv('eml',d.correo); sv('dir',d.dir_factura); sv('bar',d.barrio_factura); sv('ciu',d.ciudad_factura); sv('dep',d.dep_factura); }
+    sv('notas',d.notas);   // antes las notas se perdian al reabrir la cotizacion
     // restaura la LISTA DE PRECIOS que tenía la cotización (antes se perdía y tocaba re-elegirla)
     if(d.lista_idx!=null && d.lista_idx!==''){ const li=parseInt(d.lista_idx); if(!isNaN(li)){ listaActiva=li; const ls=document.getElementById('lista-sel'); if(ls) ls.value=String(li); } }
     let prods=d.productos; if(typeof prods==='string'){ try{prods=JSON.parse(prods);}catch(e){prods=null;} }
