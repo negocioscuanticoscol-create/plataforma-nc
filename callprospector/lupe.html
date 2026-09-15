@@ -288,7 +288,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-reparto-por-ciudad';
+const VER='20260915-nunca-esconder-por-error';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -593,10 +593,12 @@ async function entrarApp(){
      que la lista salia ordenada por nombre y con "contando..." en todas: se
      escogia a ciegas y era facil caer en una vacia. mkr_mapa_bases trae la
      cuenta buena, y el cliente, en una sola consulta. */
-  const mapa=await GET('mkr_mapa_bases?select=base_id,por_llamar,cajon&limit=400');
+  const mapa=await GET('mkr_mapa_bases?select=base_id,por_llamar,cajon&limit=400&t='+Date.now());
   const info={};
   (Array.isArray(mapa)?mapa:[]).forEach(x=>{ info[x.base_id]={n:+x.por_llamar||0, cajon:x.cajon}; });
-  misBases.forEach(b=>{ const i=info[b.id]||{}; b._quedan=i.n; b._cajon=i.cajon; });
+  /* null = NO SE SABE cuanto queda. Distinto de cero. */
+  misBases.forEach(b=>{ const i=info[b.id];
+    b._quedan = i ? i.n : null; b._cajon = i ? i.cajon : null; });
 
   /* Una base sin nadie a quien llamar NO se le muestra. Diana perdio una
      mañana adentro de "Distribuidores Camas y Colchones": 974 registros y ni
@@ -605,10 +607,17 @@ async function entrarApp(){
      trabajar. Quien reparte las ve marcadas en Lupe Control; la que marca, no.
      Si se le quedan todas por fuera se le dice, que es distinto de una lista
      vacia sin razon. */
-  const sinNada=misBases.filter(b=>!((b._quedan||0)>0));
-  misBases=misBases.filter(b=>(b._quedan||0)>0);
+  /* Solo se esconde la que SE SABE que esta en cero. Si el conteo no llego
+     —la consulta fallo, o la base todavia no esta en el mapa— la base se
+     muestra igual: el dia que mkr_mapa_bases no contesto, esto dejo a Diana y
+     a Jose sin una sola base que abrir y con un mensaje que decia que no habia
+     prospectos, que era falso. Mas vale mostrarla sin numero que dejar a
+     alguien sin poder trabajar. */
+  const sinNada=misBases.filter(b=>b._quedan===0);
+  misBases=misBases.filter(b=>b._quedan!==0);
   // las que mas trabajo tienen, primero
-  misBases.sort((a,b)=>(b._quedan||0)-(a._quedan||0) || String(a.nombre).localeCompare(String(b.nombre),'es'));
+  misBases.sort((a,b)=>((b._quedan==null?-1:b._quedan))-((a._quedan==null?-1:a._quedan))
+                       || String(a.nombre).localeCompare(String(b.nombre),'es'));
 
   if(!misBases.length){
     $('bases').innerHTML=`<h4>Hola, ${esc(YO.nombre)}</h4>
@@ -627,7 +636,7 @@ async function entrarApp(){
         ${b._cajon?`<div class="cli">${esc(b._cajon)}</div>`:''}
         <div class="n">${esc(b.nombre)}</div>
         <div class="d">${esc(b.descripcion||'')}</div>
-        <div class="q"><span>${num(b._quedan)} por llamar</span><b>Entrar ›</b></div>
+        <div class="q"><span>${b._quedan==null?'entra y mira':num(b._quedan)+' por llamar'}</span><b>Entrar ›</b></div>
       </div>`).join('')}
     ${sinNada.length?`<div class="s" style="margin-top:14px;opacity:.7">
       ${sinNada.length===1?'Otra base tuya está':`Otras ${sinNada.length} bases tuyas están`}
