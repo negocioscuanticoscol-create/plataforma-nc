@@ -158,6 +158,12 @@ main{flex:1;padding:13px 15px 0}
   font-weight:700;color:var(--naranja2);margin-bottom:3px}
 #bases .bcard.vacia{opacity:.45;cursor:default}
 #bases .bcard.vacia .q span{color:var(--bad)}
+/* el numero que dieron en la llamada, en verde: es al que se manda la info */
+.inum.nuevo{background:rgba(37,211,102,.16);border-color:rgba(37,211,102,.55);
+  color:#7BEFA8;font-weight:800}
+.iq{font-size:12.5px;color:var(--tx);margin-top:2px;font-weight:600}
+.iq.falta{color:var(--warn);font-weight:500}
+.iaviso{margin-top:6px;font-size:11px;color:#7BEFA8;opacity:.9}
 /* interesados agrupados por persona, para el administrador */
 .qgrupo{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;background:var(--card2)}
 .qgrupo.ab{border-color:var(--naranja)}
@@ -296,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-interesados-por-persona';
+const VER='20260915-guardar-y-numero-nuevo';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -976,30 +982,45 @@ async function copiarNum(el){
 
 function filaInteresado(x, equipo){
   const lindo=t=>String(t||'').replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3');
-  /* Los dos numeros, no uno: el marcado es por donde se llamo y el otro es el
-     que dieron para mandar la informacion. Con uno solo toca adivinar. */
-  const nums=[...new Set([soloNum(x.whatsapp||x.lead_cel||''), soloNum(x.whatsapp2||'')])].filter(n=>n.length>=10);
+  /* Los dos numeros, separados a proposito:
+     - el MARCADO es por donde se llamo;
+     - el NUEVO es el que dieron en la llamada, y es al que hay que mandar la
+       informacion. Pintados iguales tocaba adivinar cual era cual, y la info
+       se iba al numero de la empresa en vez de al celular de la persona. */
+  const marcado=soloNum(x.whatsapp||x.lead_cel||'');
+  const nuevo=soloNum(x.whatsapp2||'');
   const ya=!!x.trabajado;
-  /* Se dice lo que FALTA, no se deja el hueco en blanco: si no se ve que falta
-     el nombre, nadie lo pregunta cuando escribe. */
+  const chip=(n,esNuevo)=>`<span class="inum${esNuevo?' nuevo':''}" role="button" tabindex="0"
+      title="${esNuevo?'Este es el que dieron: mandar aquí':'Número por donde se llamó'} · clic para copiar"
+      data-num="${esc(n)}" onclick="copiarNum(this)"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();copiarNum(this);}"
+      >${esNuevo?'📲 ':''}${esc(lindo(n))}</span>`;
+  const chips=[];
+  if(nuevo && nuevo.length>=10) chips.push(chip(nuevo,true));
+  if(marcado && marcado.length>=10 && marcado!==nuevo) chips.push(chip(marcado,false));
+
+  /* El nombre de quien contesto va arriba y grande: es con quien se habla al
+     escribir, y estaba perdido entre la ciudad y el correo. */
+  const quien = x.contacto ? `<div class="iq">👤 ${esc(x.contacto)}</div>`
+                           : `<div class="iq falta">👤 sin nombre de contacto</div>`;
   const det=[x.lead_ciudad||'',
              (equipo && x.agente) ? '📞 '+esc(x.agente) : '',
-             x.contacto ? '👤 '+esc(x.contacto) : '<span class="falta">sin nombre de contacto</span>',
              x.correo ? '✉️ '+esc(x.correo) : '',
              x.validado ? '' : '<span class="falta">sin datos · no ha pagado</span>',
              ya ? '<b style="color:#25D366">enviado</b>' : ''
             ].filter(Boolean).join(' · ');
   return `<div class="iw${ya?' hecho':''}">
     <div class="ie">${esc(x.lead_nombre||'(sin nombre)')}</div>
-    <div class="id">${det}</div>
+    ${quien}
+    ${det?`<div class="id">${det}</div>`:''}
     <div class="ib">
-      ${nums.length ? nums.map(n=>`<span class="inum" role="button" tabindex="0"
-            title="Clic o Enter para copiar" data-num="${esc(n)}"
-            onclick="copiarNum(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();copiarNum(this);}">${esc(lindo(n))}</span>`).join('')
+      ${chips.length ? chips.join('')
         : '<span class="falta" style="font-size:12px">sin teléfono · hay que buscarlo</span>'}
       ${ya ? '' : `<label class="ick"><input type="checkbox"
           onchange="trabajado('${esc(x.id)}')"> enviado</label>`}
     </div>
+    ${nuevo && marcado && nuevo!==marcado
+      ? '<div class="iaviso">📲 Manda la info al verde: es el que dieron en la llamada</div>' : ''}
   </div>`;
 }
 async function trabajado(id){
@@ -1210,15 +1231,18 @@ function abrirPanel(fila,l,tarifa){
     <input id="pW" inputmode="tel" placeholder="WhatsApp" value="${esc(soloNum(l.cel))}">
     <input id="pW2" inputmode="tel" placeholder="Otro celular (si dan uno distinto)">
     <input id="pM" inputmode="email" placeholder="Correo">
-    <div class="pb">
-      <button class="g" onclick="guardarPanel('${fila.id}',${tarifa})">📤 Enviar info</button>
-      <button class="s" onclick="cerrarPanel()">⏳ Pendiente</button>
-    </div>
-    <!-- Guarda igual que arriba, pero ademas deja anotado que ya se le mando el
-         catalogo. Asi el seguimiento sabe que a este ya se le enviO material y
-         no se le vuelve a mandar lo mismo. -->
-    <button class="cat" onclick="guardarPanel('${fila.id}',${tarifa},true)">📄 Catálogo enviado
-      <small style="display:block;font-weight:500;opacity:.8;font-size:11px">se guarda al ${esc(soloNum(l.cel))} y pasa al siguiente</small></button>
+    <!-- UN solo boton. Antes eran tres —Enviar info, Pendiente y Catalogo
+         enviado— y en mitad de una llamada hay que decidir cual, sin que la
+         diferencia entre ellos se vea en pantalla. Aqui solo se guarda lo que
+         dieron; mandar la informacion es el paso siguiente y lo hace quien
+         corresponda desde la lista de Interesados. -->
+    <button class="cat" onclick="guardarPanel('${fila.id}',${tarifa})">💾 Guardar
+      <small style="display:block;font-weight:500;opacity:.85;font-size:11px">se abonan ${cop(tarifa)} y pasa al siguiente</small></button>
+    <!-- Salida para cuando no dieron nada: sin esto la tarjeta queda trabada y
+         no se puede seguir llamando. -->
+    <button class="s" style="width:100%;margin-top:7px;background:transparent;border:1px solid var(--line);
+      color:var(--dim);border-radius:10px;padding:10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit"
+      onclick="cerrarPanel()">No dieron datos · seguir</button>
     </div>`;
   /* El panel sale DEBAJO de los botones: si la pantalla no baja sola, parece
      que el boton no hizo nada. */
