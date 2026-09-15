@@ -284,7 +284,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260910-cambio-de-base';
+const VER='20260915-ciudad-y-conectados';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -964,8 +964,8 @@ function pintarTag(){
   if(!BASE) return;
   $('baseTag').textContent='📁 '+BASE.nombre+(CIUDAD?' · '+CIUDAD:'')+' · '
     +leads.length.toLocaleString('es-CO')
-    +((SENTIDO[BASE.id]&&SENTIDO[BASE.id].cuantos>1)
-        ? ' · punto '+(SENTIDO[BASE.id].puesto+1)+' de '+SENTIDO[BASE.id].cuantos : '')
+    +((REPARTO&&REPARTO.cuantos>1)
+        ? ' · '+(REPARTO.puesto+1)+' de '+REPARTO.cuantos+' en línea' : '')
     +(misBases.length>1?' · cambiar':'');
 }
 /* Las ciudades salen de la base en memoria, no de otra consulta: asi el numero
