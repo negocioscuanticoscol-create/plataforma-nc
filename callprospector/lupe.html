@@ -288,7 +288,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-decir-por-que';
+const VER='20260915-arreglo-filtro-cliente';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -352,7 +352,14 @@ const NIVELES=['principiante','intermedio','avanzado','asesor'];
    filtro, la consulta pedia ced=eq.nido contra 313 filas con ced nulo y devolvia
    CERO — la base de colchones se veia como "ya la trabajaste toda".
    El permiso por CED ya se resuelve arriba, al escoger que bases se muestran. */
-const SEG=['cliente','marca','canal','sector','subsector','departamento','ciudad','barrio'];
+/* Los campos por los que una base recorta su segmento. 'cliente' NO va aqui:
+   es de QUIEN es la base (el cajon), no un filtro sobre el prospecto. Mientras
+   la columna no existio en mkr_bases esto no hacia daño; el dia que se creo
+   para armar los cajones, Lupe empezo a mandar &cliente=eq.nido contra
+   mkr_leads.cliente —que esta en nulo en los 31.913 prospectos— y todas las
+   bases empezaron a abrir en CERO. Diana y Jose perdieron media mañana con
+   "no quedan prospectos" y la base llena. */
+const SEG=['marca','canal','sector','subsector','departamento','ciudad','barrio'];
 /* Los botones son los MISMOS en toda base, a proposito: si cambiaran por base,
    dos agentes marcarian cosas distintas y el informe no se podria comparar.
    Antes salian de BASE.botones — una columna que no existe en mkr_bases, asi que
