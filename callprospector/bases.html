@@ -143,6 +143,10 @@ h2{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--fa
 .cd .quien2{padding:0 14px 12px 35px;display:flex;flex-wrap:wrap;gap:5px}
 .cd .quien2 span{font-size:11px;background:rgba(37,192,138,.15);border:1px solid rgba(37,192,138,.42);
   color:#7FE3BE;padding:3px 10px;border-radius:20px;font-weight:600}
+/* quien tiene la base completa llama esta ciudad tambien, pero no es suya en
+   exclusiva: se distingue del que si la tiene asignada por nombre. */
+.cd .quien2 span.todabase{background:rgba(74,155,232,.14);border-color:rgba(74,155,232,.42);color:#8FC4F5}
+.cd .quien2 span.libre{background:transparent;border-color:rgba(240,167,60,.4);color:var(--warn);font-weight:500}
 .cd .pers{border-top:1px solid var(--line);background:rgba(0,0,0,.2);padding:11px 14px}
 .pa{display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--card2);
   border:1px solid var(--line);border-radius:10px;margin-bottom:6px}
@@ -254,7 +258,7 @@ footer b{color:var(--dim)}
 /* Esta pantalla no avisaba cuando se publicaba una version nueva: tocaba
    acordarse de recargar a mano, y se miraban numeros viejos creyendo que eran
    los de ahora. El marcador ya tenia este aviso; ahora Control tambien. */
-const VER='20260915-control-nombres-visibles';
+const VER='20260915-quien-llama-cada-ciudad';
 let ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-ultimoChequeo < 300000) return;
@@ -499,15 +503,27 @@ const M={
     const filas=cs.map(c=>{
       const ab=this.cdAbierta===c.ciudad;
       const mun=c.ciudad==='(sin ciudad)'?'':c.ciudad;
-      const asigCd=this.asign.filter(a=>a.base_id===b.base_id&&(a.municipio||'')===mun);
-      const nom=asigCd.map(a=>(this.agentes.find(g=>g.id===a.agente_id)||{}).nombre).filter(Boolean);
+      /* Quien llama ESTA ciudad. Son dos grupos y hay que verlos juntos:
+         - quien la tiene asignada por nombre;
+         - y quien tiene la base entera, que tambien la llama aunque no figure
+           ciudad por ciudad. Antes el nombre de quien tenia la base completa
+           solo aparecia pegado a "(sin ciudad)" —porque ahi coincidian los dos
+           con municipio vacio— y en las demas ciudades no salia nadie, como si
+           estuvieran libres. */
+      const asigCd=mun
+        ? this.asign.filter(a=>a.base_id===b.base_id && a.municipio===mun)
+        : [];
+      const nom=asigCd.map(a=>(this.agentes.find(g=>g.id===a.agente_id)||{}).nombre).filter(Boolean)
+        .concat(duenos.map(n=>n+' \u00b7 toda la base'));
       return `<div class="cd ${ab?'ab':''} ${nom.length?'tomada':''}">
         <div class="cab" onclick="M.toggleCiudad('${js(c.ciudad)}')">
           <div class="fl">&#9654;</div>
           <div class="cn">${esc(c.ciudad)}<small>${esc(c.departamento||'\u2014')}</small></div>
           <div class="cq"><b class="mono">${num(c.por_llamar)}</b><span>por llamar</span></div>
         </div>
-        ${nom.length&&!ab?`<div class="quien2">${nom.map(n=>`<span>${esc(n)}</span>`).join('')}</div>`:''}
+        ${nom.length
+          ? `<div class="quien2">${nom.map(n=>`<span${n.indexOf('\u00b7 toda la base')>0?' class="todabase"':''}>\ud83d\udc64 ${esc(n)}</span>`).join('')}</div>`
+          : `<div class="quien2"><span class="libre">sin asignar</span></div>`}
         ${ab?`<div class="pers">${this.personas(mun)}</div>`:''}
       </div>`;
     }).join('')||'<div class="vacio">Ninguna ciudad coincide.</div>';
