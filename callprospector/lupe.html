@@ -1262,6 +1262,10 @@ async function sincronizar(){
       const antes=leads.length, actual=leads[idx] && leads[idx].id;
       TODOS=TODOS.filter(l=>!hechos.has(l.id));
       leads=leads.filter(l=>!hechos.has(l.id));
+      /* ORDEN tambien: es de donde se rehace la lista cada vez que entra o sale
+         alguien. Si no se limpia aqui, lo que la otra ya marco REAPARECE en el
+         siguiente reparto y se llama dos veces a la misma empresa. */
+      ORDEN=ORDEN.filter(l=>!hechos.has(l.id));
       if(leads.length!==antes){
         const i=leads.findIndex(l=>l.id===actual);      // quedarse en el mismo si sigue
         idx = i>=0 ? i : Math.min(idx, Math.max(0, leads.length-1));
