@@ -288,7 +288,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-solo-bases-con-telefono';
+const VER='20260915-supervisor-ve-todo';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -547,6 +547,7 @@ async function entrarApp(){
   const APP=(new URLSearchParams(location.search).get('app')||'').trim().toLowerCase();
   const miNivel=NIVELES.indexOf(YO.nivel||'principiante');
   const miCed=YO.ced||'todos';
+  const esSupervisor = (YO.nivel==='asesor');
   misBases=bases.filter(b=>{
     // si se entro desde una app, solo las bases que van a esa app
     if(APP && String(b.destino_app||'').toLowerCase()!==APP) return false;
@@ -554,6 +555,11 @@ async function entrarApp(){
        de ese centro. Las bases abiertas a 'todos' las ve cualquiera. */
     const bCed=b.ced||'todos';
     if(miCed!=='todos' && bCed!=='todos' && bCed!==miCed) return false;
+    /* El supervisor (nivel asesor) entra a TODAS, tenga o no asignaciones.
+       Antes la regla era "si tienes asignaciones, solo ves esas", asi que
+       asignarle una base al dueño lo ENCERRABA en ella: pasaba de ver el pozo
+       entero a ver solo lo que se le habia asignado. */
+    if(esSupervisor) return true;
     // después: si te la asignaron, es tuya. Si nadie asignó nada, se abre por nivel.
     if(mias.size) return mias.has(b.id);
     const req=(!b.nivel||b.nivel==='todos')?-1:NIVELES.indexOf(b.nivel);
@@ -1216,6 +1222,12 @@ async function releerMisCiudades(){
    no, cada una ya trabaja lo suyo y partírsela le quitaría la mitad de su
    propio territorio a cada una. */
 function miTerritorio(){
+  /* El supervisor entra a mirar, no a trabajar la lista. Si compartiera
+     territorio con quien esta marcando, el reparto lo contaria como una mas y
+     le partiria la lista por la mitad — a Sara le quedaban 1.400 de 2.802 solo
+     porque Jose tenia la misma base abierta. Con una firma propia no coincide
+     con nadie: ni reparte ni le reparten. */
+  if(YO && YO.nivel==='asesor') return 'sup:'+YO.id;
   const mias=(BASE&&MIS_CIUDADES[BASE.id])||[];
   return mias.length ? mias.slice().sort().join('|') : '';
 }
