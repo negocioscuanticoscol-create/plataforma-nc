@@ -288,7 +288,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-reparto-desde-la-base';
+const VER='20260915-decir-por-que';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -377,7 +377,7 @@ let ORDEN=[], REPARTO={puesto:0,cuantos:1};
 /* Las bases donde tengo asignacion. El supervisor puede ABRIR cualquier base
    sin tenerla asignada; en esas entra a mirar y no debe quitarle lista a quien
    si la tiene repartida. */
-let MIS_BASES=new Set(), VIVOS=[];
+let MIS_BASES=new Set(), VIVOS=[], PORQUE=null;
 /* Tarjeta trabada: mientras se guarda una marcacion —y mientras el panel del
    interesado esta abierto— no se puede volver a marcar. Sin esto la tarjeta se
    quedaba en pantalla con los diez botones vivos y cada toque de mas guardaba
@@ -675,6 +675,13 @@ async function abrirBase(b){
   // los ya marcados NO vuelven a salir, aunque se recargue la página
   const hechos=new Set((ya||[]).map(x=>x.lead_id).filter(Boolean));
   TODOS=ls.filter(l=>l.cel && !hechos.has(l.id));
+  /* De donde salio cada recorte. Sin esto, "no quedan prospectos" no dice si
+     la base venia vacia, si ya se llamo todo, si el territorio dejo cero o si
+     el reparto se lo llevo: son cuatro causas distintas con el mismo mensaje, y
+     se pierden horas adivinando cual es. */
+  PORQUE={trajo:ls.length, sinCel:ls.filter(l=>!l.cel).length,
+          yaMarcados:ls.filter(l=>l.cel && hechos.has(l.id)).length,
+          trasCel:TODOS.length, trasCiudad:null, trasReparto:null, ciudades:0};
 
   /* MI CIUDAD manda. Si en Lupe Control me dieron una o varias ciudades de esta
      base, el resto no es mio y no se me muestra. Asi se puede arrancar por una
@@ -683,7 +690,9 @@ async function abrirBase(b){
   if(misCiu && misCiu.length){
     const set=new Set(misCiu.map(c=>c.toLowerCase()));
     TODOS=TODOS.filter(l=>set.has(String(l.ciudad||'').trim().toLowerCase()));
+    PORQUE.ciudades=misCiu.length;
   }
+  PORQUE.trasCiudad=TODOS.length;
   /* De que punta arranca cada quien. Con TRES en la misma base hacen falta tres
      puntos de partida, no dos: 'medio' corre la lista para empezar por la mitad.
      En una base de 1.223 eso deja unas 600 llamadas de distancia entre cada una
@@ -807,7 +816,14 @@ function render(){
   if(!leads.length){
     // se acabo ESTA ciudad pero la base todavia tiene: seguir sin preguntar
     if(CIUDAD && TODOS.length && saltarCiudad()) return;
+    const P=PORQUE||{};
+    const razon = !P.trajo ? 'Esta base no tiene prospectos cargados.'
+      : P.trasCel===0 ? `Los ${num(P.trajo)} de esta base ya se llamaron.`
+      : (P.ciudades && P.trasCiudad===0) ? `Tus ${P.ciudades} ciudades ya están llamadas. Quedan ${num(P.trasCel)} en el resto de la base.`
+      : (P.trasReparto===0 && P.trasCiudad>0) ? `Los ${num(P.trasCiudad)} que quedan se los repartió otra persona conectada.`
+      : '';
     $('main').innerHTML=`<div class="card"><div class="emp">No quedan prospectos</div>
+      ${razon?`<div class="sub" style="margin:8px 0 2px;color:var(--naranja2)">${esc(razon)}</div>`:''}
       <div class="sub" style="margin-top:8px">${CIUDAD
         ? 'Ya trabajaste todo lo de <b>'+esc(CIUDAD)+'</b>. Quedan '+num(TODOS.length)+' en las demás ciudades.'
         : 'Ya trabajaste toda esta base.'}</div>
@@ -1340,6 +1356,7 @@ function aplicarReparto(){
     });
   }
   TODOS=l; leads=TODOS.slice();
+  if(typeof PORQUE==='object'&&PORQUE) PORQUE.trasReparto=leads.length;
   /* No se reinicia en cero: si estaba hablando con alguien, ese sigue enfrente. */
   const i=actual?leads.findIndex(x=>x.id===actual):-1;
   idx=i>=0?i:0;
