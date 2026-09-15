@@ -251,6 +251,32 @@ footer b{color:var(--dim)}
 <div id="toast"></div>
 
 <script>
+/* Esta pantalla no avisaba cuando se publicaba una version nueva: tocaba
+   acordarse de recargar a mano, y se miraban numeros viejos creyendo que eran
+   los de ahora. El marcador ya tenia este aviso; ahora Control tambien. */
+const VER='20260915-control-nombres-visibles';
+let ultimoChequeo=0;
+async function mirarVersion(){
+  if(Date.now()-ultimoChequeo < 300000) return;
+  ultimoChequeo=Date.now();
+  try{
+    const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return;
+    const t=await r.text();
+    const m=t.match(/const VER='([^']+)'/);
+    if(m && m[1]!==VER && !document.getElementById('nuevaVer')){
+      const d=document.createElement('div');
+      d.id='nuevaVer';
+      d.textContent='✨ Hay una versión nueva · toca aquí para actualizar';
+      d.onclick=()=>location.reload();
+      d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99999;padding:14px;'
+        +'background:#16a34a;color:#fff;text-align:center;font-weight:600;cursor:pointer;'
+        +'box-shadow:0 -4px 18px rgba(0,0,0,.3)';
+      document.body.appendChild(d);
+    }
+  }catch(e){}
+}
+
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -298,7 +324,7 @@ const M={
   vista:'cajones', base:'', filas:[], agentes:[], bases:[], pagos:[],
   /* --- lo que era la pantalla de Bases: cajon -> base -> ciudad --- */
   cajones:[], mapa:[], asign:[], vivos:[],
-  cjAbierto:'', baseAb:null, ciudades:[], cdAbierta:'', filtroCd:'', ed:null,
+  cjAbierto:'', baseAb:null, ciudades:[], cdAbierta:'', filtroCd:'', ed:null, verVacias:false,
 
   async cargar(){
     const [f,a,b,pg,cj,mp,asg,vv]=await Promise.all([
@@ -405,14 +431,20 @@ const M={
       const tot=bs.reduce((s,m)=>s+(+m.por_llamar||0),0);
       const ab=this.cjAbierto===(c.slug||'');
       const lista=bs.map(m=>{
-        const nAs=this.asign.filter(a=>a.base_id===m.base_id).length;
+        const asigB=this.asign.filter(a=>a.base_id===m.base_id);
+        /* Los nombres, no el numero: "3 asignaciones" no dice a quien
+           reclamarle ni quien esta cubriendo esa base. */
+        const quienB=[...new Set(asigB.map(a=>(this.agentes.find(g=>g.id===a.agente_id)||{}).nombre))]
+                     .filter(Boolean);
+        const nAs=asigB.length;
         const enLinea=this.vivos.filter(v=>v.base_id===m.base_id).length;
         const muerta=!m.por_llamar;
         return `<div class="bi ${muerta?'muerta':''}" onclick="M.abrirBase('${js(m.base_id)}')">
           ${enLinea?'<div class="enlinea" title="alguien marcando ahora"></div>':''}
           <div class="bn">${esc(m.base)}${m.activa?'':' &middot; <span style="color:var(--bad)">apagada</span>'}
             <small>${muerta?'\u26a0\ufe0f sin nadie a qui\u00e9n llamar'
-                   :(nAs?nAs+(nAs===1?' asignaci\u00f3n':' asignaciones'):'sin asignar')}${
+                   :(quienB.length?'\ud83d\udc64 '+esc(quienB.join(', '))
+                                  :'<span style="color:var(--warn)">sin asignar</span>')}${
                    enLinea?' \u00b7 '+enLinea+' en l\u00ednea':''}</small></div>
           <div class="bq"><b class="mono">${num(m.por_llamar)}</b><span>por llamar</span></div>
         </div>`;
@@ -458,6 +490,12 @@ const M={
     const duenos=this.asign.filter(a=>a.base_id===b.base_id&&!a.municipio)
       .map(a=>(this.agentes.find(g=>g.id===a.agente_id)||{}).nombre).filter(Boolean);
 
+    /* Las ciudades en cero se esconden. No es un error: 'por llamar' ahora
+       descuenta lo ya marcado, asi que una ciudad chica se vacia apenas se
+       trabaja — en Calzado hay 481 llamadas hechas y 101 ciudades acabadas.
+       Mezcladas con las que si tienen, no se ve donde queda trabajo. */
+    const vacias=cs.filter(c=>!c.por_llamar);
+    if(!this.verVacias) cs=cs.filter(c=>c.por_llamar>0);
     const filas=cs.map(c=>{
       const ab=this.cdAbierta===c.ciudad;
       const mun=c.ciudad==='(sin ciudad)'?'':c.ciudad;
@@ -483,19 +521,29 @@ const M={
           cursor:pointer;font-family:inherit;flex:none">&#9881; Editar base</button>
       </div>
       ${this.ed ? this.formEditar() : ''}
-      ${duenos.length?`<div class="nf ambar"><div class="ico">\u26a0\ufe0f</div><div style="flex:1;min-width:0">
-        <h3>Alguien tiene la base entera</h3>
-        <p><b>${esc(duenos.join(', '))}</b> ${duenos.length===1?'la ve':'la ven'} completa, sin ciudad.
-        Eso pisa el reparto por ciudad.</p>
-        <div class="quien" style="cursor:pointer" onclick="M.toggleCiudad('__toda__')">
-          <span>Ver y quitar \u203a</span></div></div></div>`:''}
-      ${this.cdAbierta==='__toda__'?`<div class="cd ab"><div class="pers">
-        <h2 style="margin:0 0 9px">Toda la base, sin ciudad</h2>${this.personas('')}</div></div>`:''}
+      ${duenos.length?`<div class="cd" style="border-color:rgba(37,192,138,.45)">
+        <div class="cab" onclick="M.toggleCiudad('__toda__')">
+          <div class="fl">&#9654;</div>
+          <div class="cn">\ud83d\udc64 ${esc(duenos.join(', '))}
+            <small>trabaja la base completa, sin repartir por ciudad</small></div>
+          <div class="cq"><b class="mono">${num(b.por_llamar)}</b><span>por llamar</span></div>
+        </div>
+        ${this.cdAbierta==='__toda__'?`<div class="pers">${this.personas('')}</div>`:''}
+      </div>`:`<div class="cd" style="border-color:rgba(240,167,60,.45)">
+        <div class="cab" onclick="M.toggleCiudad('__toda__')">
+          <div class="fl">&#9654;</div>
+          <div class="cn" style="color:var(--warn)">Nadie tiene la base completa
+            <small>o se asigna entera aqu\u00ed, o por ciudades abajo</small></div>
+        </div>
+        ${this.cdAbierta==='__toda__'?`<div class="pers">${this.personas('')}</div>`:''}
+      </div>`}
 
       <h2>Ciudades &middot; de m\u00e1s a menos</h2>
       <input class="busca" placeholder="Buscar ciudad o departamento\u2026"
         value="${esc(this.filtroCd)}" oninput="M.filtroCd=this.value;M.vCiudades()">
       ${filas}
+      ${vacias.length?`<div class="nota" style="margin-top:10px;cursor:pointer" onclick="M.verVacias=!M.verVacias;M.pintar()">
+        ${this.verVacias?'\u2212 esconder' : '+ ver'} las ${vacias.length} ciudades ya llamadas</div>`:''}
       <div class="nota" style="margin-top:12px">Se arranca por una ciudad peque\u00f1a para probar,
         y cuando funciona se le abre la siguiente. Si dos personas quedan en la misma
         ciudad, Lupe les parte la lista seg\u00fan qui\u00e9n est\u00e9 conectado.</div></section>`;
@@ -830,6 +878,7 @@ const M={
   }
 };
 M.cargar(); setInterval(()=>M.cargar(),8000);
+mirarVersion(); setInterval(mirarVersion, 60000);
 </script>
 </body>
 </html>
