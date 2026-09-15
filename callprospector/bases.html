@@ -298,7 +298,7 @@ const M={
   vista:'cajones', base:'', filas:[], agentes:[], bases:[], pagos:[],
   /* --- lo que era la pantalla de Bases: cajon -> base -> ciudad --- */
   cajones:[], mapa:[], asign:[], vivos:[],
-  cjAbierto:'', baseAb:null, ciudades:[], cdAbierta:'', filtroCd:'',
+  cjAbierto:'', baseAb:null, ciudades:[], cdAbierta:'', filtroCd:'', ed:null,
 
   async cargar(){
     const [f,a,b,pg,cj,mp,asg,vv]=await Promise.all([
@@ -444,7 +444,7 @@ const M={
     this.ciudades=Array.isArray(cs)?cs:[];
     this.pintar();
   },
-  cerrarBase(){ this.baseAb=null; this.ciudades=[]; this.cdAbierta=''; this.filtroCd=''; this.pintar(); window.scrollTo(0,0); },
+  cerrarBase(){ this.baseAb=null; this.ciudades=[]; this.cdAbierta=''; this.filtroCd=''; this.ed=null; this.pintar(); window.scrollTo(0,0); },
 
   vCiudades(){
     const b=this.baseAb;
@@ -476,7 +476,13 @@ const M={
 
     $('main').innerHTML=`<section>
       <button class="btn gh" style="margin:0 0 12px" onclick="M.cerrarBase()">&lsaquo; Todos los cajones</button>
-      <h2>${esc(b.base)} &middot; ${esc(b.cajon||'sin caj\u00f3n')}</h2>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <h2 style="margin:0;flex:1">${esc(b.base)} &middot; ${esc(b.cajon||'sin caj\u00f3n')}</h2>
+        <button onclick="M.editar()" style="background:var(--card2);border:1px solid var(--line);
+          color:var(--dim);border-radius:9px;padding:7px 11px;font-size:11.5px;font-weight:700;
+          cursor:pointer;font-family:inherit;flex:none">&#9881; Editar base</button>
+      </div>
+      ${this.ed ? this.formEditar() : ''}
       ${duenos.length?`<div class="nf ambar"><div class="ico">\u26a0\ufe0f</div><div style="flex:1;min-width:0">
         <h3>Alguien tiene la base entera</h3>
         <p><b>${esc(duenos.join(', '))}</b> ${duenos.length===1?'la ve':'la ven'} completa, sin ciudad.
@@ -495,6 +501,57 @@ const M={
         ciudad, Lupe les parte la lista seg\u00fan qui\u00e9n est\u00e9 conectado.</div></section>`;
   },
   toggleCiudad(c){ this.cdAbierta=(this.cdAbierta===c)?'':c; this.pintar(); },
+
+  /* Editar la base: nombre, de quien es, descripcion y si se ve o no.
+     Se perdio al unir esta pantalla con el Centro de Mando y sin ella tocaba
+     entrar a Supabase para cambiarle el nombre a una base o moverla de cajon. */
+  editar(){ this.ed = this.ed ? null : {...this.baseAb}; this.pintar(); window.scrollTo(0,0); },
+  setEd(k,v){ this.ed[k]=v; },
+  formEditar(){
+    const f=this.ed;
+    const ops=this.cajones.map(c=>`<option value="${esc(c.slug)}"${
+      f.cajon_slug===c.slug?' selected':''}>${esc(c.nombre)}</option>`).join('');
+    return `<div class="cd ab" style="margin-bottom:12px"><div class="pers">
+      <label style="display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+        color:var(--faint);font-weight:700;margin-bottom:5px">Nombre de la base</label>
+      <input class="busca" style="margin-bottom:10px" value="${esc(f.base||'')}"
+        oninput="M.setEd('base',this.value)">
+      <label style="display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+        color:var(--faint);font-weight:700;margin-bottom:5px">Caj&oacute;n &middot; de qui&eacute;n es</label>
+      <select class="busca" style="margin-bottom:10px" onchange="M.setEd('cajon_slug',this.value)">${ops}</select>
+      <label style="display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+        color:var(--faint);font-weight:700;margin-bottom:5px">Descripci&oacute;n &middot; lo que ve quien marca</label>
+      <input class="busca" style="margin-bottom:10px" value="${esc(f.descripcion||'')}"
+        oninput="M.setEd('descripcion',this.value)">
+      <label style="display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;
+        color:var(--faint);font-weight:700;margin-bottom:5px">Estado</label>
+      <select class="busca" onchange="M.setEd('activa',this.value==='1')">
+        <option value="1"${f.activa?' selected':''}>Encendida &middot; se ve en Lupe</option>
+        <option value="0"${f.activa?'':' selected'}>Apagada &middot; no se le muestra a nadie</option>
+      </select>
+      <button class="btn" onclick="M.guardarBase()">Guardar</button>
+      <button class="btn gh" onclick="M.editar()">Cancelar</button>
+      <div class="nota" style="margin-top:8px">Los cajones se crean en Supabase,
+        en la tabla <b>mkr_clientes</b>.</div>
+    </div></div>`;
+  },
+  async guardarBase(){
+    const f=this.ed;
+    if(!String(f.base||'').trim()){ toast('Ponle nombre a la base'); return; }
+    const ok=await PATCH('mkr_bases?id=eq.'+encodeURIComponent(f.base_id),{
+      nombre:String(f.base).trim(),
+      cliente:f.cajon_slug||null,
+      descripcion:String(f.descripcion||'').trim()||null,
+      activa:f.activa!==false});
+    if(!ok){ toast('No se pudo guardar'); return; }
+    toast('Base guardada');
+    const id=f.base_id;
+    this.ed=null;
+    await this.cargar();                       // se vuelven a leer los cajones
+    const m=this.mapa.find(x=>x.base_id===id);
+    if(m){ this.baseAb=m; }
+    this.pintar();
+  },
 
   /* ---------- 3. quien llama esa ciudad ---------- */
   personas(mun){
