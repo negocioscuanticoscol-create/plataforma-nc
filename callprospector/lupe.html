@@ -366,6 +366,10 @@ const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No 
    marcar un prospecto tiene que salir de las DOS listas o reaparece al quitar el
    filtro. */
 let YO=null, BASE=null, misBases=[], leads=[], TODOS=[], CIUDAD='', SENTIDO={}, MIS_CIUDADES={}, idx=0, miPlata=0, pendientes=0, misLlamadas=0;
+/* ORDEN es la lista ya ordenada pero SIN repartir. Se guarda aparte porque el
+   reparto se rehace cada vez que entra o sale alguien: si se rotara encima de
+   lo ya rotado, a la tercera vuelta nadie sabria por donde va. */
+let ORDEN=[], REPARTO={puesto:0,cuantos:1};
 /* Tarjeta trabada: mientras se guarda una marcacion —y mientras el panel del
    interesado esta abierto— no se puede volver a marcar. Sin esto la tarjeta se
    quedaba en pantalla con los diez botones vivos y cada toque de mas guardaba
@@ -646,12 +650,13 @@ async function abrirBase(b){
   TODOS.sort((a,b)=>{ const ka=kCiu(a), kb=kCiu(b);
     return (cCiu[ka]-cCiu[kb]) || ka.localeCompare(kb,'es'); });
 
-  const sen = SENTIDO[b.id];
-  if(sen && sen.cuantos>1 && TODOS.length){
-    const salto=Math.floor(sen.puesto * TODOS.length / sen.cuantos);
-    if(salto>0) TODOS=TODOS.slice(salto).concat(TODOS.slice(0,salto));
-  }
-  CIUDAD=''; leads=TODOS.slice(); idx=0;
+  /* Hasta aqui TODOS esta ordenado pero sin repartir. Se guarda asi para poder
+     rehacer el reparto cuando entre o salga alguien. */
+  ORDEN=TODOS.slice();
+  await latir();
+  REPARTO=await calcularReparto();
+  aplicarReparto();
+  CIUDAD=''; idx=0;
 
   $('bases').style.display='none';
   ['hd','main','rank','inter','tarifas','ft'].forEach(id=>$(id).style.display='');
@@ -1145,8 +1150,70 @@ function pintarPlata(bump){
 }
 
 /* ==================== TABLERO REAL ==================== */
+/* ---------- presencia: quien esta marcando AHORA ---------- */
+
+/* El latido dice "sigo aca, en esta base, en esta ciudad". Sin esto el reparto
+   se hacia sobre los ASIGNADOS estuvieran o no: con tres asignadas y una sola
+   conectada, esa una trabajaba su tercio y los otros dos tercios no los
+   llamaba nadie. */
+async function latir(){
+  if(!YO||!YO.id) return;
+  const mias=(BASE&&MIS_CIUDADES[BASE.id])||[];
+  try{
+    await fetch(SB+'/rest/v1/mkr_presencia',{method:'POST',
+      headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify([{agente_id:YO.id, base_id:BASE?BASE.id:null,
+        municipio:mias.length===1?mias[0]:null, visto_en:new Date().toISOString()}])});
+  }catch(e){}
+}
+
+/* Mi puesto entre los que estan conectados en MI MISMO territorio.
+   Territorio = la misma base y la misma ciudad. Quien esta en otra ciudad de
+   la misma base no me pisa, asi que no cuenta para repartir la mia. */
+async function calcularReparto(){
+  if(!BASE||!YO||!YO.id) return {puesto:0,cuantos:1};
+  const mias=MIS_CIUDADES[BASE.id]||[];
+  const miMun=mias.length===1?mias[0]:null;
+  const vivos=await GET('mkr_conectados?select=agente_id,municipio&base_id=eq.'+encodeURIComponent(BASE.id));
+  if(!Array.isArray(vivos)||!vivos.length) return {puesto:0,cuantos:1};
+  const mismo=vivos.filter(v=>String(v.municipio||'')===String(miMun||''));
+  const eq=[...new Set(mismo.map(v=>v.agente_id))].sort();
+  const p=eq.indexOf(YO.id);
+  /* Si todavia no aparezco (el latido acaba de salir), me cuento igual: mejor
+     repartir de mas que darle la lista entera a dos personas a la vez. */
+  return p<0 ? {puesto:eq.length, cuantos:eq.length+1} : {puesto:p, cuantos:eq.length};
+}
+
+/* Reparte ORDEN entre los conectados y conserva en que prospecto iba. */
+function aplicarReparto(){
+  const {puesto,cuantos}=REPARTO;
+  const actual=leads[idx]?leads[idx].id:null;
+  let l=ORDEN.slice();
+  if(cuantos>1 && l.length){
+    const salto=Math.floor(puesto*l.length/cuantos);
+    if(salto>0) l=l.slice(salto).concat(l.slice(0,salto));
+  }
+  TODOS=l; leads=TODOS.slice();
+  /* No se reinicia en cero: si estaba hablando con alguien, ese sigue enfrente. */
+  const i=actual?leads.findIndex(x=>x.id===actual):-1;
+  idx=i>=0?i:0;
+}
+
 async function sincronizar(){
   const hoy=new Date(); hoy.setHours(0,0,0,0);
+  /* El latido y el reparto van en el mismo ciclo que ya estaba corriendo. */
+  if(BASE){
+    if(!sincronizar.ultLat||Date.now()-sincronizar.ultLat>55000){
+      sincronizar.ultLat=Date.now(); await latir();
+    }
+    const r=await calcularReparto();
+    if(r.cuantos!==REPARTO.cuantos||r.puesto!==REPARTO.puesto){
+      const antes=REPARTO.cuantos; REPARTO=r; aplicarReparto(); render();
+      toast(r.cuantos>antes
+        ? '👥 Entró alguien más: ahora son '+r.cuantos+' en esta lista'
+        : '👤 Quedaron '+r.cuantos+' · te tocó más lista');
+    }
+  }
   /* Sin filtro de base a proposito: el tablero es de TODA la red. Da igual que
      una este en Ibague y otra en calzado — compiten entre si, y eso es lo que
      empuja a marcar. */
