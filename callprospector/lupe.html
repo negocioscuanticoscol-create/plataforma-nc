@@ -158,6 +158,14 @@ main{flex:1;padding:13px 15px 0}
   font-weight:700;color:var(--naranja2);margin-bottom:3px}
 #bases .bcard.vacia{opacity:.45;cursor:default}
 #bases .bcard.vacia .q span{color:var(--bad)}
+/* interesados agrupados por persona, para el administrador */
+.qgrupo{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden;background:var(--card2)}
+.qgrupo.ab{border-color:var(--naranja)}
+.qcab{display:flex;align-items:center;gap:9px;padding:11px 13px;cursor:pointer;font-size:13.5px}
+.qcab .fl{color:var(--faint);font-size:11px;width:10px;flex:none}
+.qcab b{font-weight:700}
+.qcab .qn{margin-left:auto;font-size:11.5px;color:var(--faint);white-space:nowrap}
+.qgrupo.ab .qcab{border-bottom:1px solid var(--line)}
 /* lista de bases del cambio de base */
 .pan .bl{display:grid;gap:6px;margin-top:2px}
 .pan .bl button{width:100%;text-align:left;background:var(--card);border:1px solid var(--line);
@@ -288,7 +296,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-arreglo-filtro-cliente';
+const VER='20260915-interesados-por-persona';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -298,6 +306,9 @@ const $=s=>document.getElementById(s);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const cop=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
 const num=n=>(+n||0).toLocaleString('es-CO');
+/* Para meter un texto dentro de un onclick="...('aqui')" sin que una comilla
+   parta el HTML. Los nombres traen apostrofes y tildes. */
+const js=t=>esc(String(t==null?'':t)).split("'").join('&#39;');
 const soloNum=s=>String(s||'').replace(/\D/g,'');
 const SINTILDE=new RegExp('[\\u0300-\\u036f]','g');
 const norm=s=>String(s||'').trim().toLowerCase().normalize('NFD').replace(SINTILDE,'').replace(/\s+/g,' ');
@@ -384,7 +395,7 @@ let ORDEN=[], REPARTO={puesto:0,cuantos:1};
 /* Las bases donde tengo asignacion. El supervisor puede ABRIR cualquier base
    sin tenerla asignada; en esas entra a mirar y no debe quitarle lista a quien
    si la tiene repartida. */
-let MIS_BASES=new Set(), VIVOS=[], PORQUE=null;
+let MIS_BASES=new Set(), VIVOS=[], PORQUE=null, INTER_ABIERTO='';
 /* Tarjeta trabada: mientras se guarda una marcacion —y mientras el panel del
    interesado esta abierto— no se puede volver a marcar. Sin esto la tarjeta se
    quedaba en pantalla con los diez botones vivos y cada toque de mas guardaba
@@ -893,21 +904,50 @@ function filtrarCiudad(v){
 let INTER=[];
 async function cargarInteresados(){
   if(!YO) return;
-  const d=await GETALL('mkr_llamadas?select=id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
-    +'whatsapp2,correo,creado_en,validado,estado_venta&resultado=eq.Interesado&trabajado=is.false&base_id=not.is.null'
-    +'&agente_id=eq.'+YO.id+'&order=creado_en.desc');
+  /* 'trabajado=is.false' dejaba por fuera a los que quedaron en NULL —los que
+     entraron por el marcador viejo, que no mandaba esa columna—: 19 interesados
+     invisibles, nadie les mando nada. 'not.is.true' es lo que se queria decir:
+     todo lo que todavia no esta trabajado, sea false o este vacio. */
+  const base='mkr_llamadas?select=id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
+    +'whatsapp2,correo,creado_en,validado,estado_venta,agente,agente_id'
+    +'&resultado=eq.Interesado&trabajado=not.is.true&base_id=not.is.null&order=creado_en.desc';
+  /* El administrador ve los de TODA la red: el segundo paso —mandar la info por
+     WhatsApp— no siempre lo hace quien marco. Los demas ven los suyos. */
+  const d=await GETALL(base + (esAdmin() ? '' : '&agente_id=eq.'+YO.id));
   INTER=Array.isArray(d)?d:[];
   pintarInteresados();
 }
+function esAdmin(){ return !!(YO && YO.nivel==='asesor'); }
+
 function pintarInteresados(){
   const b=$('inBody'), i=$('inInfo'); if(!b) return;
-  i.textContent = INTER.length ? INTER.length+(INTER.length===1?' por trabajar':' por trabajar') : 'ninguno pendiente';
+  i.textContent = INTER.length ? INTER.length+' por trabajar' : 'ninguno pendiente';
   if(!INTER.length){
     b.innerHTML='<div class="vacio" style="padding:18px">Todo al día. Cuando marques un interesado aparece acá para mandarle la información.</div>';
     return;
   }
-  b.innerHTML=INTER.map(filaInteresado).join('');
+  if(!esAdmin()){ b.innerHTML=INTER.map(filaInteresado).join(''); return; }
+
+  /* Administrador: primero POR QUIEN, y al tocar un nombre se abren los suyos.
+     Con la lista de toda la red de corrido no se sabe a quien reclamarle ni
+     por donde va cada una. */
+  const por={};
+  INTER.forEach(x=>{ const k=x.agente||'(sin nombre)'; (por[k]=por[k]||[]).push(x); });
+  const nombres=Object.keys(por).sort((a,c)=>por[c].length-por[a].length);
+  b.innerHTML=nombres.map(n=>{
+    const l=por[n], ab=(INTER_ABIERTO===n);
+    const sinCel=l.filter(x=>!(x.whatsapp||x.lead_cel)).length;
+    return `<div class="qgrupo${ab?' ab':''}">
+      <div class="qcab" onclick="abrirInteresados('${js(n)}')">
+        <span class="fl">${ab?'▾':'▸'}</span>
+        <b>${esc(n)}</b>
+        <span class="qn">${l.length} por mandar${sinCel?' · '+sinCel+' sin celular':''}</span>
+      </div>
+      ${ab?l.map(filaInteresado).join(''):''}
+    </div>`;
+  }).join('');
 }
+function abrirInteresados(n){ INTER_ABIERTO=(INTER_ABIERTO===n)?'':n; pintarInteresados(); }
 
 /* Una sola forma de pintar el interesado, usada por la lista de arriba Y por la
    categoria desplegada: si se pintaran distinto, en un lado faltaria el segundo
