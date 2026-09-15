@@ -138,17 +138,26 @@ const App={
   _savingPedido:false,
   MESNOM:['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'],
   PASS:{admin:'kruhadmin2026', gerencia:'kruhgerencia2026'},
+  /* Los roles fijos son solo los que tienen clave en el codigo. Los demas salen
+     de kruh_permisos: asi crear un rol nuevo es agregar una fila en la base y
+     nada mas. Antes esta lista estaba escrita a mano y init() borraba el rol de
+     quien no estuviera en ella — se le reconocia la clave, se le guardaba el
+     rol y acto seguido se le devolvia al login, sin decirle por que. */
   ROLES:['admin','gerencia','cajera','panadero','bodeguero','chef'],
+  get _rolesOK(){ return this.ROLES.concat(Object.keys(this._permisos||{})); },
   get esAdmin(){ return this.rol==='admin'; },
   get puedeGestionar(){ return this.rol==='admin'||this.rol==='gerencia'; },
   _tabsRol(){ if(this.rol==='admin') return this.TABS.map(t=>t[0]);
     if(this.rol==='gerencia') return this.TABS.map(t=>t[0]).filter(v=>v!=='usuarios');   // gerencia ve todo menos Usuarios
-    return ((this._permisos||{})[this.rol]||['recetas']).filter(v=>v!=='usuarios'&&v!=='dashboard'); },
+    /* Manda lo que diga kruh_permisos. Antes se le quitaba 'dashboard' a todo
+       el mundo aunque el rol lo tuviera asignado: el chef lo tiene desde que se
+       creo y nunca lo vio. 'usuarios' si queda reservado para admin. */
+    return ((this._permisos||{})[this.rol]||['recetas']).filter(v=>v!=='usuarios'); },
   _primeraTab(){ const t=this._tabsRol(); return t.includes('dashboard')?'dashboard':(t[0]||'recetas'); },
   async init(){ /* localStorage y no sessionStorage: así no vuelve a pedir la clave en cada pestaña nueva */
     this.rol=localStorage.getItem('kruh_rol')||sessionStorage.getItem('kruh_rol')||'';
     try{ const [us,pm]=await Promise.all([GET('kruh_usuarios?select=nombre,rol,clave,activo&limit=200'),GET('kruh_permisos?limit=50')]); this._usuarios=us; this._permisos={}; pm.forEach(p=>this._permisos[p.rol]=p.tabs||[]); }catch(e){ this._usuarios=[]; this._permisos={}; }
-    if(!this.ROLES.includes(this.rol)){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go(this._primeraTab()); },
+    if(!this._rolesOK.includes(this.rol)){this.rol='';} if(!this.rol) return this.vLogin(); this.paintHeader(); this.nav(); this.go(this._primeraTab()); },
   vLogin(){ $('nav').innerHTML=''; if($('nav2'))$('nav2').innerHTML=''; $('main').className='';
     $('main').innerHTML=`<div style="max-width:340px;margin:44px auto 0"><div class="card" style="text-align:center">
       <div style="font-family:Fraunces,serif;font-size:38px;color:var(--ink)">kruh<b style="color:var(--acc)">.</b></div>
