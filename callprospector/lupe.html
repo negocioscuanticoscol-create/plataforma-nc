@@ -1156,6 +1156,14 @@ function pintarPlata(bump){
    se hacia sobre los ASIGNADOS estuvieran o no: con tres asignadas y una sola
    conectada, esa una trabajaba su tercio y los otros dos tercios no los
    llamaba nadie. */
+/* Mi territorio no es UNA ciudad: es el conjunto que me dieron. Sara tiene 132.
+   Dos personas solo se reparten la misma lista si su conjunto es idéntico; si
+   no, cada una ya trabaja lo suyo y partírsela le quitaría la mitad de su
+   propio territorio a cada una. */
+function miTerritorio(){
+  const mias=(BASE&&MIS_CIUDADES[BASE.id])||[];
+  return mias.length ? mias.slice().sort().join('|') : '';
+}
 async function latir(){
   if(!YO||!YO.id) return;
   const mias=(BASE&&MIS_CIUDADES[BASE.id])||[];
@@ -1163,7 +1171,8 @@ async function latir(){
     await fetch(SB+'/rest/v1/mkr_presencia',{method:'POST',
       headers:{...H,Prefer:'resolution=merge-duplicates,return=minimal'},
       body:JSON.stringify([{agente_id:YO.id, base_id:BASE?BASE.id:null,
-        municipio:mias.length===1?mias[0]:null, visto_en:new Date().toISOString()}])});
+        municipio:mias.length===1?mias[0]:null, territorio:miTerritorio(),
+        visto_en:new Date().toISOString()}])});
   }catch(e){}
 }
 
@@ -1172,11 +1181,10 @@ async function latir(){
    la misma base no me pisa, asi que no cuenta para repartir la mia. */
 async function calcularReparto(){
   if(!BASE||!YO||!YO.id) return {puesto:0,cuantos:1};
-  const mias=MIS_CIUDADES[BASE.id]||[];
-  const miMun=mias.length===1?mias[0]:null;
-  const vivos=await GET('mkr_conectados?select=agente_id,municipio&base_id=eq.'+encodeURIComponent(BASE.id));
+  const miTer=miTerritorio();
+  const vivos=await GET('mkr_conectados?select=agente_id,territorio&base_id=eq.'+encodeURIComponent(BASE.id));
   if(!Array.isArray(vivos)||!vivos.length) return {puesto:0,cuantos:1};
-  const mismo=vivos.filter(v=>String(v.municipio||'')===String(miMun||''));
+  const mismo=vivos.filter(v=>String(v.territorio||'')===miTer);
   const eq=[...new Set(mismo.map(v=>v.agente_id))].sort();
   const p=eq.indexOf(YO.id);
   /* Si todavia no aparezco (el latido acaba de salir), me cuento igual: mejor
