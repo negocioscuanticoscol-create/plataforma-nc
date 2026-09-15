@@ -288,7 +288,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-nunca-esconder-por-error';
+const VER='20260915-reparto-desde-la-base';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1264,14 +1264,31 @@ async function latir(){
    la misma base no me pisa, asi que no cuenta para repartir la mia. */
 async function calcularReparto(){
   if(!BASE||!YO||!YO.id){ VIVOS=[]; return {puesto:0,cuantos:1}; }
-  const v=await GET('mkr_conectados?select=agente_id,territorio&base_id=eq.'+encodeURIComponent(BASE.id));
-  VIVOS=Array.isArray(v)?v.filter(x=>!String(x.territorio||'').startsWith('mirando:')):[];
-  /* Se guarda quien esta y con que territorio; el reparto de verdad se hace
-     ciudad por ciudad en aplicarReparto. Aca solo queda cuantos somos, que es
-     lo que se le muestra en el chip. */
+  /* El territorio de los demas se saca de las ASIGNACIONES, no de lo que
+     reporte su navegador. Si se confia en el latido, basta con que alguien
+     tenga abierta una version vieja de esta pagina para que diga "base entera"
+     y le parta la lista al que si esta trabajando: a Sara le quedaban 1.400 de
+     2.799 porque Jose tenia Lupe abierto con la version de antes, cuando aun
+     figuraba asignado. La base es la que manda, y esta igual para todos. */
+  const [v,asig]=await Promise.all([
+    GET('mkr_conectados?select=agente_id&base_id=eq.'+encodeURIComponent(BASE.id)),
+    GET('mkr_asignaciones?select=agente_id,municipio&base_id=eq.'+encodeURIComponent(BASE.id)+'&limit=3000')
+  ]);
+  const ciudadesDe={};
+  (Array.isArray(asig)?asig:[]).forEach(a=>{
+    (ciudadesDe[a.agente_id]=ciudadesDe[a.agente_id]||[]).push(a.municipio||null);
+  });
+  /* Solo entran al reparto los que estan conectados Y tienen esta base
+     asignada. Quien la abrio sin tenerla asignada entro a mirar. */
+  VIVOS=(Array.isArray(v)?v:[])
+    .filter(x=>ciudadesDe[x.agente_id])
+    .map(x=>({agente_id:x.agente_id,
+              territorio:(ciudadesDe[x.agente_id].some(c=>!c)
+                          ? ''                                   // base entera
+                          : ciudadesDe[x.agente_id].slice().sort().join('|'))}));
   const conmigo=VIVOS.filter(x=>compartimos(x.territorio)).map(x=>x.agente_id);
-  const eq=[...new Set(conmigo.concat([YO.id]))].sort();
-  return {puesto:Math.max(0,eq.indexOf(YO.id)), cuantos:eq.length};
+  const eq=[...new Set(conmigo.concat(MIS_BASES.has(BASE.id)?[YO.id]:[]))].sort();
+  return {puesto:Math.max(0,eq.indexOf(YO.id)), cuantos:Math.max(1,eq.length)};
 }
 
 /* Dos territorios se cruzan si comparten al menos una ciudad. Base entera
