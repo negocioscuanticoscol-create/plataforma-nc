@@ -365,7 +365,7 @@ const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No 
    al filtrar por ciudad hay que poder volver a "todas" sin recargar, y porque al
    marcar un prospecto tiene que salir de las DOS listas o reaparece al quitar el
    filtro. */
-let YO=null, BASE=null, misBases=[], leads=[], TODOS=[], CIUDAD='', SENTIDO={}, idx=0, miPlata=0, pendientes=0, misLlamadas=0;
+let YO=null, BASE=null, misBases=[], leads=[], TODOS=[], CIUDAD='', SENTIDO={}, MIS_CIUDADES={}, idx=0, miPlata=0, pendientes=0, misLlamadas=0;
 /* Tarjeta trabada: mientras se guarda una marcacion —y mientras el panel del
    interesado esta abierto— no se puede volver a marcar. Sin esto la tarjeta se
    quedaba en pantalla con los diez botones vivos y cada toque de mas guardaba
@@ -498,7 +498,7 @@ async function entrarApp(){
 
   const [bases,asign]=await Promise.all([
     GET('mkr_bases?select=*&activa=eq.true&order=nombre&limit=200'),
-    GET('mkr_asignaciones?select=base_id,agente_id,sentido&limit=2000')
+    GET('mkr_asignaciones?select=base_id,agente_id,sentido,municipio&limit=2000')
   ]);
   if(!Array.isArray(bases)){ $('bases').innerHTML='<div class="vacio">'+esc(porQueFallo())+'</div>'; return; }
 
@@ -507,15 +507,28 @@ async function entrarApp(){
   const todasAsig = Array.isArray(asign)?asign:[];
   const mias=new Set(todasAsig.filter(a=>a.agente_id===YO.id).map(a=>a.base_id));
 
+  /* MI CIUDAD dentro de la base. Se asigna desde Lupe Control.
+     Si me dieron ciudades, solo veo esas: es mi territorio y no se lo pisa
+     nadie. Si no me dieron ninguna (municipio nulo), la base es entera, como
+     funcionaba antes. */
+  MIS_CIUDADES={};
+  todasAsig.filter(a=>a.agente_id===YO.id && a.municipio).forEach(a=>{
+    (MIS_CIUDADES[a.base_id]=MIS_CIUDADES[a.base_id]||[]).push(String(a.municipio).trim());
+  });
+
   /* PUNTO DE ARRANQUE, repartido parejo.
      Antes eran tres nombres fijos -inicio, medio, fin- y con una cuarta persona
      se acababan. Ahora la base se parte en tantos puntos como gente asignada
      haya: con 4 personas y 1.200 empresas, cada una arranca 300 mas adelante que
      la anterior. Sirve para cualquier numero y se reacomoda solo al agregar a
      alguien. El orden es por agente_id, que no cambia. */
+  /* Quien tiene ciudad propia NO entra en el reparto por puntos: ya tiene su
+     territorio aparte. Si se contara, correria el arranque de los demas por
+     una persona que ni siquiera esta en su misma lista. */
   SENTIDO={};
   const porBase={};
-  todasAsig.forEach(a=>{ (porBase[a.base_id]=porBase[a.base_id]||[]).push(a.agente_id); });
+  todasAsig.filter(a=>!a.municipio)
+    .forEach(a=>{ (porBase[a.base_id]=porBase[a.base_id]||[]).push(a.agente_id); });
   Object.keys(porBase).forEach(bid=>{
     const eq=[...new Set(porBase[bid])].sort();
     SENTIDO[bid]={ puesto: Math.max(0, eq.indexOf(YO.id)), cuantos: eq.length || 1 };
@@ -605,6 +618,15 @@ async function abrirBase(b){
   // los ya marcados NO vuelven a salir, aunque se recargue la página
   const hechos=new Set((ya||[]).map(x=>x.lead_id).filter(Boolean));
   TODOS=ls.filter(l=>l.cel && !hechos.has(l.id));
+
+  /* MI CIUDAD manda. Si en Lupe Control me dieron una o varias ciudades de esta
+     base, el resto no es mio y no se me muestra. Asi se puede arrancar por una
+     ciudad chica para probar y abrir la siguiente cuando funcione. */
+  const misCiu=MIS_CIUDADES[b.id];
+  if(misCiu && misCiu.length){
+    const set=new Set(misCiu.map(c=>c.toLowerCase()));
+    TODOS=TODOS.filter(l=>set.has(String(l.ciudad||'').trim().toLowerCase()));
+  }
   /* De que punta arranca cada quien. Con TRES en la misma base hacen falta tres
      puntos de partida, no dos: 'medio' corre la lista para empezar por la mitad.
      En una base de 1.223 eso deja unas 600 llamadas de distancia entre cada una
