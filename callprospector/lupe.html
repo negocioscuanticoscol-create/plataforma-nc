@@ -288,7 +288,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-bases-con-trabajo';
+const VER='20260915-solo-bases-con-telefono';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -586,10 +586,20 @@ async function entrarApp(){
   const info={};
   (Array.isArray(mapa)?mapa:[]).forEach(x=>{ info[x.base_id]={n:+x.por_llamar||0, cajon:x.cajon}; });
   misBases.forEach(b=>{ const i=info[b.id]||{}; b._quedan=i.n; b._cajon=i.cajon; });
-  // las que tienen con que trabajar primero, de mas a menos; las vacias al final
+
+  /* Una base sin nadie a quien llamar NO se le muestra. Diana perdio una
+     mañana adentro de "Distribuidores Camas y Colchones": 974 registros y ni
+     un telefono. La pantalla se la ofrecia igual que a las demas y, al entrar,
+     solo decia "no quedan prospectos" — sin explicar que ahi no habia con que
+     trabajar. Quien reparte las ve marcadas en Lupe Control; la que marca, no.
+     Si se le quedan todas por fuera se le dice, que es distinto de una lista
+     vacia sin razon. */
+  const sinNada=misBases.filter(b=>!((b._quedan||0)>0));
+  misBases=misBases.filter(b=>(b._quedan||0)>0);
+  // las que mas trabajo tienen, primero
   misBases.sort((a,b)=>(b._quedan||0)-(a._quedan||0) || String(a.nombre).localeCompare(String(b.nombre),'es'));
 
-  if(!misBases.some(b=>(b._quedan||0)>0)){
+  if(!misBases.length){
     $('bases').innerHTML=`<h4>Hola, ${esc(YO.nombre)}</h4>
       <div class="s">Tus bases están sin prospectos por llamar.</div>
       <div class="vacio">Ya se llamó todo lo que tenían, o todavía no les han
@@ -602,15 +612,15 @@ async function entrarApp(){
      tarjeta dice de quien es la base y no solo como se llama. */
   $('bases').innerHTML=`<h4>Hola, ${esc(YO.nombre)}</h4>
     <div class="s">Escoge con cuál base vas a trabajar hoy.</div>${avisoApp}
-    ${misBases.map((b,i)=>{
-      const n=b._quedan, vacia=!(n>0);
-      return `<div class="bcard${vacia?' vacia':''}"${vacia?'':` onclick="abrirBase(misBases[${i}])"`}>
+    ${misBases.map((b,i)=>`<div class="bcard" onclick="abrirBase(misBases[${i}])">
         ${b._cajon?`<div class="cli">${esc(b._cajon)}</div>`:''}
         <div class="n">${esc(b.nombre)}</div>
         <div class="d">${esc(b.descripcion||'')}</div>
-        <div class="q"><span>${n==null?'—':(vacia?'sin prospectos por llamar'
-            :num(n)+' por llamar')}</span>${vacia?'':'<b>Entrar ›</b>'}</div>
-      </div>`;}).join('')}`;
+        <div class="q"><span>${num(b._quedan)} por llamar</span><b>Entrar ›</b></div>
+      </div>`).join('')}
+    ${sinNada.length?`<div class="s" style="margin-top:14px;opacity:.7">
+      ${sinNada.length===1?'Otra base tuya está':`Otras ${sinNada.length} bases tuyas están`}
+      sin prospectos por llamar. El supervisor ya lo ve.</div>`:''}`;
 }
 function volverBases(){ if(misBases.length>1){ $('bases').style.display='block'; window.scrollTo(0,0); } }
 
