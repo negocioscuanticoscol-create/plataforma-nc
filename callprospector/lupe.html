@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-guardar-y-numero-nuevo';
+const VER='20260915-base-de-pruebas';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1457,8 +1457,11 @@ async function sincronizar(){
   /* Sin filtro de base a proposito: el tablero es de TODA la red. Da igual que
      una este en Ibague y otra en calzado — compiten entre si, y eso es lo que
      empuja a marcar. */
+  /* sala=neq.pruebas: lo que se marca en la base de pruebas no entra al
+     tablero ni a la plata del dia. La llamada guarda en 'sala' el cajon de su
+     base, asi que la de pruebas viene marcada de fabrica. */
   const filas=await GETALL('mkr_llamadas?select=agente,agente_id,valor,validado,creado_en'+
-    '&creado_en=gte.'+hoy.toISOString()+'&order=creado_en.desc&limit=5000');
+    '&creado_en=gte.'+hoy.toISOString()+'&sala=neq.pruebas&order=creado_en.desc&limit=5000');
   if(!Array.isArray(filas)){ $('live').classList.add('off'); $('liveTx').textContent='sin señal'; return; }
   $('live').classList.remove('off'); $('liveTx').textContent='en vivo';
 

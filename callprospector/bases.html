@@ -302,7 +302,9 @@ const M={
 
   async cargar(){
     const [f,a,b,pg,cj,mp,asg,vv]=await Promise.all([
-      GETALL('mkr_llamadas?select=id,agente,resultado,valor,datos,validado,estado_venta,base_id,lead_nombre,contacto,whatsapp,whatsapp2,correo,creado_en,lead_cel,lead_ciudad&order=creado_en.asc&limit=8000'),
+      /* sala=neq.pruebas: la base de pruebas no entra en calidad, personas ni
+         liquidacion. Sin esto, probar la app le mueve los numeros a la gente. */
+      GETALL('mkr_llamadas?select=id,agente,resultado,valor,datos,validado,estado_venta,base_id,lead_nombre,contacto,whatsapp,whatsapp2,correo,creado_en,lead_cel,lead_ciudad&sala=neq.pruebas&order=creado_en.asc&limit=8000'),
       GET('mkr_agentes?select=*&order=nombre&limit=300'),
       GET('mkr_bases?select=id,nombre,cliente&order=nombre&limit=200'),
       /* Lo que ya se le pago a cada quien. Va aparte de las llamadas: lo
