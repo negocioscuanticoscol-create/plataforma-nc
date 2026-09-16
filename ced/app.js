@@ -3054,6 +3054,7 @@ const App = {
           <option value="">Cotizar — curva normal</option>
           <option value="pedido">Generar pedido — curva normal</option>
           <option value="par">Muestra PAR — ${money(C.MUESTRA_PAR)}/par + IVA + transporte ${money(C.MUESTRA_FLETE||22000)}</option>
+          <option value="par25">Muestra PAR — ${money(C.MUESTRA_PAR_ESPECIAL||25000)}/par (precio especial) + IVA + transporte ${money(C.MUESTRA_FLETE||22000)}</option>
           <option value="parsv">Muestra PAR — SIN valor comercial (regalo, no se cobra)</option>
           <option value="pie">Muestra DE PIE — sin valor comercial · envío gratis</option>
           <option value="svc">Muestras SIN valor comercial (varias tallas) — sin precio</option>
@@ -3178,7 +3179,10 @@ const App = {
         if(cd&&so&&so.dataset) cd.value=so.dataset.nit||'';
         const cc=$('co_contacto');     if(cc) cc.value=ec.contacto||'';
         const ct=$('co_contacto_tel'); if(ct) ct.value=ec.contacto_tel||'';
-        const mt=$('co_muestra_tipo'); if(mt) mt.value=ec.es_muestra?(ec.muestra_tipo==='pie'?'pie':(ec.muestra_tipo==='nono'?'svc':'par')):'';
+        /* Una muestra a precio especial se guarda como muestra_tipo 'par' -para que
+           el flete, el PDF y el CRM la traten igual-, asi que al reabrirla se
+           distingue por el precio que quedo escrito, no por el tipo. */
+        const mt=$('co_muestra_tipo'); if(mt) mt.value=ec.es_muestra?(ec.muestra_tipo==='pie'?'pie':(ec.muestra_tipo==='nono'?'svc':(ec.muestra_tipo==='parsv'?'parsv':((+ec.precio_par===(C.MUESTRA_PAR_ESPECIAL||25000))?'par25':'par')))):'';
         const ci=$('co_iva'); if(ci) ci.checked=(+ec.iva>0);
         const cv=ec.curva||{}; document.querySelectorAll('#co_grid input').forEach(i=>{ const t=i.dataset.talla; if(cv[t]!=null) i.value=cv[t]; });
         if(ec.muestra_tipo==='pie'){ const ks=Object.keys(cv); const pc=$('co_pie_cant'); if(pc) pc.value=ec.pares||1; const pt=$('co_pie_talla'); if(pt&&ks[0]) pt.value=ks[0]; }
@@ -3425,7 +3429,7 @@ const App = {
     if(grid) grid.style.display = esPie ? 'none' : 'block';   // DE PIE no usa grilla
     if(pie)  pie.style.display  = esPie ? 'block' : 'none';
     const aw=$('co_asesor_wrap'); if(aw) aw.style.display=(v==='vendedor')?'block':'none';
-    const fw=$('co_mflete_wrap'); if(fw) fw.style.display=(v==='par')?'block':'none';
+    const fw=$('co_mflete_wrap'); if(fw) fw.style.display=(v==='par'||v==='par25')?'block':'none';
     const lbl=document.querySelector('#co_curva_card label'); if(lbl) lbl.textContent = v ? 'Tallas de la muestra — pares por talla' : 'Arma la curva — pares por talla';
     const h=$('co_muestra_hint'); if(h){ h.style.display = (v && !esPie) ? 'block' : 'none'; } },
   /* Al escoger la empresa se trae su contacto, pero solo si el campo está vacío:
@@ -3566,6 +3570,10 @@ const App = {
     const tipoM=this._cotTipoM();
     if(tipoM){
       const esPie=(tipoM==='pie'), esSVC=(tipoM==='svc'), esVend=(tipoM==='vendedor'), esParSV=(tipoM==='parsv'), sinValor=(esPie||esSVC||esVend||esParSV);
+      /* El precio de la muestra ya no es uno solo. Se guarda EN la cotizacion
+         (precio_par), que es lo que lee el PDF: asi una cotizacion vieja
+         conserva su precio aunque despues se cambie la tarifa. */
+      const precioM = (tipoM==='par25') ? (C.MUESTRA_PAR_ESPECIAL||25000) : C.MUESTRA_PAR;
       let cu;
       if(esPie){   // muestra de pie (nono): no grilla; talla opcional + cantidad de nonos
         const talla=$('co_pie_talla')?$('co_pie_talla').value:''; const cant=Math.max(1,Math.floor(+(($('co_pie_cant')||{}).value)||1));
@@ -3575,14 +3583,14 @@ const App = {
         if(cu.pares<1){ alert('Pon las tallas/pares de la muestra en la grilla.'); return; }
       }
       const conIvaM=(($('co_iva')||{checked:true}).checked);
-      const sub=sinValor?0:C.MUESTRA_PAR*cu.pares, iva=(sinValor?0:(conIvaM?Math.round(sub*C.IVA):0));
+      const sub=sinValor?0:precioM*cu.pares, iva=(sinValor?0:(conIvaM?Math.round(sub*C.IVA):0));
       const _ft=(($('co_muestra_flete')||{}).value)||'nacional';
       const flete=sinValor?0:(_ft==='bogota'?9500:(_ft==='sin'?0:Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000)));
       const total=sub+iva+flete;
       const partes=Object.keys(cu.tallas).length ? Object.keys(cu.tallas).sort((a,b)=>a-b).map(t=>`T${t}×${cu.tallas[t]}`).join(', ') : `${cu.pares} nono(s)`;
       const reg={numero:num,cliente_id:cid||null,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':(esParSV?'parsv':((esSVC||esVend)?'nono':'par')),flete,
-        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esParSV?`Muestra PAR · SIN valor comercial (regalo) · ${cu.pares} par(es) · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} + IVA ${money(iva)} + 🚚 ${flete?('transporte '+money(flete)+(_ft==='bogota'?' (Bogotá)':'')+' (aparte)'):'SIN transporte'} · ${partes}`))),
-        pares:cu.pares,cajas:0,resto:0,curva:cu.tallas,precio_par:sinValor?0:C.MUESTRA_PAR,subtotal:sub,iva,total,flete_al_cobro:false,estado:'cotizada',
+        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esParSV?`Muestra PAR · SIN valor comercial (regalo) · ${cu.pares} par(es) · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(precioM)} = ${money(sub)} + IVA ${money(iva)} + 🚚 ${flete?('transporte '+money(flete)+(_ft==='bogota'?' (Bogotá)':'')+' (aparte)'):'SIN transporte'} · ${partes}`))),
+        pares:cu.pares,cajas:0,resto:0,curva:cu.tallas,precio_par:sinValor?0:precioM,subtotal:sub,iva,total,flete_al_cobro:false,estado:'cotizada',
         interno:esVend,asesor:esVend?asesorV:null,
         vendedor_id:this.user.id,referencia:(cl&&cl.referencia)||'701',recomendado:!!(cl&&cl.recomendado),comision_nc:0,comision_gpjr:0};
       const error=await this._saveCot(reg);
@@ -3852,8 +3860,12 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       const ftxt = cajas>=C.MIN_CAJAS_SIN_FLETE ? '🚚 flete incluido (gratis)' : `🚚 flete al cobro${p.transporte?' · '+esc(p.transporte):' (transportadora que elija)'}`;
       liq = `💵 ${pares} × ${money(C.PRECIO_PAR)} = ${money(sub)} &nbsp;+ IVA ${money(iva)} &nbsp;· ${ftxt} &nbsp;= <b>${money(tot||sub+iva)}</b>`;
     } else if(p.muestra_tipo==='par'){
-      const sub=C.MUESTRA_PAR*pares, iva=Math.round(sub*C.IVA), fl=(p.flete==null||p.flete==='')?Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000):(+p.flete||0);
-      liq = `💵 ${pares} × ${money(C.MUESTRA_PAR)} = ${money(sub)} &nbsp;+ IVA ${money(iva)} &nbsp;+ 🚚 transporte ${money(fl)} (aparte) &nbsp;= <b>${money(tot||sub+iva+fl)}</b>`;
+      /* El precio sale de la cotizacion, no de la tarifa de hoy: hay muestras a
+         40.900 y a 25.000, y recalcular con la tarifa le cambiaba el valor a la
+         que no era. Si es una vieja que no lo guardo, se cae a la tarifa. */
+      const pp=(+p.precio_par)||C.MUESTRA_PAR;
+      const sub=pp*pares, iva=Math.round(sub*C.IVA), fl=(p.flete==null||p.flete==='')?Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000):(+p.flete||0);
+      liq = `💵 ${pares} × ${money(pp)} = ${money(sub)} &nbsp;+ IVA ${money(iva)} &nbsp;+ 🚚 transporte ${money(fl)} (aparte) &nbsp;= <b>${money(tot||sub+iva+fl)}</b>`;
     } else {
       liq = '💵 Sin valor comercial · 🚚 envío gratis';
     }

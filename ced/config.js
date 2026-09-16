@@ -5,6 +5,11 @@ window.FEROZ_CONFIG = {
   SUPABASE_KEY: 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',
   PRECIO_PAR: 40900,
   MUESTRA_PAR: 40900,
+  /* Segundo precio de muestra, para cuando hay que entrar con algo mas barato
+     que los 40.900. Se escoge en el cotizador; el de arriba sigue siendo el
+     normal. La cotizacion guarda el precio que se uso, asi que cambiar este
+     numero no toca ninguna cotizacion ya hecha. */
+  MUESTRA_PAR_ESPECIAL: 25000,
   MUESTRA_FLETE: 22000,        // transporte de muestra par
   MUESTRA_FLETE_PARES: 3,      // ... por cada cuántos pares
   PARES_CAJA: 16,
