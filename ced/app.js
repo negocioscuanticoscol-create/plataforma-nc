@@ -3063,11 +3063,18 @@ const App = {
         <div class="hint" style="margin-top:6px" id="co_muestra_hint">La muestra usa las tallas de abajo (sin la regla de 16 pares por caja).</div>
         <div id="co_asesor_wrap" style="display:none;margin-top:8px"><label style="font-size:12px;color:#667">Nombre del vendedor/asesor *</label><input class="field" id="co_asesor" placeholder="Ej: Juan Pérez — equipo comercial"></div>
         <div id="co_mflete_wrap" style="display:none;margin-top:8px"><label style="font-size:12px;color:#667">🚚 Transporte de la muestra</label>
-          <select class="field" id="co_muestra_flete">
+          <select class="field" id="co_muestra_flete" onchange="App.toggleFleteOtro()">
             <option value="nacional">Nacional — ${money(C.MUESTRA_FLETE||22000)} por cada ${C.MUESTRA_FLETE_PARES||3} pares</option>
             <option value="bogota">Bogotá — $9.500</option>
             <option value="sin">Sin transporte — $0 (recoge / al cobro)</option>
-          </select></div>
+            <option value="otro">Otro valor — lo escribo yo</option>
+          </select>
+          <div id="co_mflete_otro_wrap" style="display:none;margin-top:6px">
+            <label style="font-size:12px;color:#667">Valor del transporte</label>
+            <input class="field" id="co_mflete_otro" type="number" min="0" step="500" placeholder="Ej: 35000"
+                   oninput="App.cotFletePreview()">
+            <div class="hint" id="co_mflete_prev" style="margin-top:4px">Lo que cotice la transportadora. Va aparte, no entra al IVA.</div>
+          </div></div>
       </div>
       <div class="card" style="border-left:4px solid var(--azul)">
         <label style="margin:0"><b>🧾 ¿Quién factura? *</b></label>
@@ -3186,6 +3193,19 @@ const App = {
         const ci=$('co_iva'); if(ci) ci.checked=(+ec.iva>0);
         const cv=ec.curva||{}; document.querySelectorAll('#co_grid input').forEach(i=>{ const t=i.dataset.talla; if(cv[t]!=null) i.value=cv[t]; });
         if(ec.muestra_tipo==='pie'){ const ks=Object.keys(cv); const pc=$('co_pie_cant'); if(pc) pc.value=ec.pares||1; const pt=$('co_pie_talla'); if(pt&&ks[0]) pt.value=ks[0]; }
+        /* El transporte tampoco se restauraba: al reabrir una cotizacion el
+           selector volvia a "Nacional" y al guardar el valor cambiaba solo. No
+           se guarda CUAL opcion se escogio sino el monto, asi que se deduce:
+           0 es sin transporte, 9.500 Bogota, lo que da la regla por pares es
+           nacional, y cualquier otra cosa es un valor escrito a mano. */
+        if(ec.es_muestra && ec.muestra_tipo==='par'){
+          const fl=+ec.flete||0;
+          const nac=Math.ceil((ec.pares||1)/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000);
+          const op = fl===0 ? 'sin' : (fl===9500 ? 'bogota' : (fl===nac ? 'nacional' : 'otro'));
+          const sf=$('co_muestra_flete'); if(sf) sf.value=op;
+          const io_=$('co_mflete_otro'); if(io_ && op==='otro') io_.value=fl;
+          this.toggleFleteOtro();
+        }
         /* Se vuelve a la MISMA referencia y a la MISMA lista con que se cotizó.
            Sin esto el formulario arrancaba en la primera referencia de la lista
            y al guardar el cambio la cotización salía con otro producto y otro
@@ -3269,6 +3289,18 @@ const App = {
   /* 'pedido' es la MISMA cotización normal, solo con otro nombre en pantalla.
      Se normaliza a vacío en todos lados para que ninguna lógica de muestras lo
      confunda con una muestra (cualquier valor distinto de vacío lo es). */
+  /* Abre la casilla del valor solo cuando se escoge "Otro", y la deja lista
+     para escribir: si hay que buscar el mouse para el campo que uno acaba de
+     pedir, se pierde el hilo. */
+  toggleFleteOtro(){ const v=(($('co_muestra_flete')||{}).value)||'';
+    const w=$('co_mflete_otro_wrap'); if(!w) return;
+    w.style.display=(v==='otro')?'block':'none';
+    if(v==='otro'){ const i=$('co_mflete_otro'); if(i) setTimeout(()=>i.focus(),40); }
+    this.cotFletePreview(); },
+  cotFletePreview(){ const h=$('co_mflete_prev'); if(!h) return;
+    const v=Math.max(0,Math.round(+(($('co_mflete_otro')||{}).value)||0));
+    h.textContent = v ? ('Transporte: '+money(v)+' · va aparte, no entra al IVA')
+                      : 'Lo que cotice la transportadora. Va aparte, no entra al IVA.'; },
   _cotTipoM(){ const v=($('co_muestra_tipo')||{}).value||''; return v==='pedido'?'':v; },
 
   /* Referencias cotizables = las que existen en inventario, con el precio por
@@ -3585,11 +3617,17 @@ const App = {
       const conIvaM=(($('co_iva')||{checked:true}).checked);
       const sub=sinValor?0:precioM*cu.pares, iva=(sinValor?0:(conIvaM?Math.round(sub*C.IVA):0));
       const _ft=(($('co_muestra_flete')||{}).value)||'nacional';
-      const flete=sinValor?0:(_ft==='bogota'?9500:(_ft==='sin'?0:Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000)));
+      /* 'otro' es para cuando la transportadora cotiza un valor que no es ninguno
+         de los tres de la lista -un destino lejano, una guia especial-. Se escribe
+         y se guarda tal cual en la cotizacion. */
+      const _fo=Math.max(0,Math.round(+(($('co_mflete_otro')||{}).value)||0));
+      const flete=sinValor?0:(_ft==='otro'?_fo:(_ft==='bogota'?9500:(_ft==='sin'?0
+                 :Math.ceil(cu.pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000))));
+      if(_ft==='otro' && !_fo){ alert('Escribe el valor del transporte, o cambia a "Sin transporte".'); return; }
       const total=sub+iva+flete;
       const partes=Object.keys(cu.tallas).length ? Object.keys(cu.tallas).sort((a,b)=>a-b).map(t=>`T${t}×${cu.tallas[t]}`).join(', ') : `${cu.pares} nono(s)`;
       const reg={numero:num,cliente_id:cid||null,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':(esParSV?'parsv':((esSVC||esVend)?'nono':'par')),flete,
-        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esParSV?`Muestra PAR · SIN valor comercial (regalo) · ${cu.pares} par(es) · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(precioM)} = ${money(sub)} + IVA ${money(iva)} + 🚚 ${flete?('transporte '+money(flete)+(_ft==='bogota'?' (Bogotá)':'')+' (aparte)'):'SIN transporte'} · ${partes}`))),
+        detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esParSV?`Muestra PAR · SIN valor comercial (regalo) · ${cu.pares} par(es) · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(precioM)} = ${money(sub)} + IVA ${money(iva)} + 🚚 ${flete?('transporte '+money(flete)+(_ft==='bogota'?' (Bogotá)':(_ft==='otro'?' (cotizado)':''))+' (aparte)'):'SIN transporte'} · ${partes}`))),
         pares:cu.pares,cajas:0,resto:0,curva:cu.tallas,precio_par:sinValor?0:precioM,subtotal:sub,iva,total,flete_al_cobro:false,estado:'cotizada',
         interno:esVend,asesor:esVend?asesorV:null,
         vendedor_id:this.user.id,referencia:(cl&&cl.referencia)||'701',recomendado:!!(cl&&cl.recomendado),comision_nc:0,comision_gpjr:0};
