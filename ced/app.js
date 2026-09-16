@@ -4239,7 +4239,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   crmEditarProsp(id){ const c=(this._crmFCli||[]).find(x=>x.id===id); if(c) this.modalCliente(()=>this.vCrm(), c); },
   async crmNota(id){ const c=(this._crmFCli||[]).find(x=>x.id===id)||{}; const v=prompt('📝 Nota para '+(c.nombre||'el cliente')+':', c.notas||''); if(v===null) return; await this.sb.from('clientes').update({notas:v}).eq('id',id); this._toast('Nota guardada'); this.vCrm(); },
   crmFCajon(s){ this._crmFCajon=s; this._crmMarcCat=null; this.vCrm(); },
-  crmMarcCat(c){ this._crmMarcCat=(this._crmMarcCat===c?null:c); this.vCrm(); },   // toggle: muestra los contactos de esa categoría; re-toca para ocultar
+  crmMarcCat(c){ this._crmMarcCat=(this._crmMarcCat===c?null:c); this._crmMarcQuien=null; this.vCrm(); },
+  crmMarcQuien(n){ this._crmMarcQuien=n||null; this.vCrm(); },   // cajon por persona dentro de la categoria   // toggle: muestra los contactos de esa categoría; re-toca para ocultar
   crmInforme(cajon){
     const cli=this._crmFCli||[];
     const arr=cli.filter(c=> cajon==='esp'?!!c.especial : cajon==='gpjr'?(!!c.recomendado&&!c.especial) : (!c.recomendado&&!c.especial));
@@ -4348,18 +4349,32 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       /* Por defecto Interesado. Si esa base no tiene ninguno, el primero que haya. */
       let cat=this._crmMarcCat; if(!cat||!byCal[cat]) cat = byCal['Interesado'] ? 'Interesado' : (cats[0]?cats[0][0]:null);
       const nInt=byCal['Interesado']||0;
-      const quien=[...new Set(res.map(r=>r.agente).filter(Boolean))].join(', ');
+
+      /* UN CAJON POR PERSONA. Antes los nombres iban juntos en una linea del
+         encabezado y en letra chica al lado de la fecha de cada fila: con 103
+         interesados de uno y 15 de otra, los 15 quedaban enterrados y parecia
+         que no habian subido. Ahora se filtra por quien llamo, y el conteo es
+         DE LA CATEGORIA que se este viendo, no del total de la base. */
+      const deCat=res.filter(r=>(r.resultado||'—')===cat);
+      const porQuien={}; deCat.forEach(r=>{ const k=r.agente||'(sin nombre)'; porQuien[k]=(porQuien[k]||0)+1; });
+      const gente=Object.entries(porQuien).sort((a,b)=>b[1]-a[1]);
+      let mq=this._crmMarcQuien; if(mq && !porQuien[mq]) mq=null; this._crmMarcQuien=mq;
+      const btnGente = gente.length>1 ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">`
+        + `<button class="btn-sm" style="font-weight:700;background:${!mq?'var(--naranja);color:#fff':'#f3f4f6;color:#444'}" onclick="App.crmMarcQuien('')">Todas (${deCat.length})</button>`
+        + gente.map(([k,v])=>`<button class="btn-sm" style="font-weight:700;background:${k===mq?'var(--naranja);color:#fff':'#f3f4f6;color:#444'}" onclick="App.crmMarcQuien('${String(k).replace(/'/g,"")}')">👤 ${esc(k)} <b>(${v})</b></button>`).join('')
+        + `</div>` : '';
+      const quien=gente.map(([k,v])=>k+' '+v).join(' · ');
       const botones=cats.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${cats.map(([k,v])=>`<button class="btn-sm" style="font-weight:800;padding:9px 13px;background:${k===cat?'#0b1f2a':'#eef2ff'};color:${k===cat?'#fff':'#3a48b3'}" onclick="App.crmMarcCat('${(k||'').replace(/'/g,'')}')">${ICO[k]||''} ${esc(k)} <b>(${v})</b></button>`).join('')}</div>`:'';
       const resumen=`<div class="card" style="border-left:4px solid var(--naranja)">
         <div style="font-size:12px;color:#667;margin-bottom:8px">🐭 <b>${esc(bs.nombre)}</b>${bs.destino_ced?' · CED '+esc(bs.destino_ced):''}${quien?' · 👤 '+esc(quien):''}</div>
         <div class="kpis"><div class="kpi"><b>${res.length.toLocaleString('es-CO')}</b><span>Gestionados</span></div>
           <div class="kpi verde"><b>${nInt.toLocaleString('es-CO')}</b><span>🔥 Interesados</span></div>
           <div class="kpi naranja"><b>${res.filter(r=>r.datos).length.toLocaleString('es-CO')}</b><span>Con datos</span></div></div>
-        ${botones}
+        ${botones}${btnGente}
         ${bs.descripcion?`<div style="font-size:11px;color:#9aa3b0;margin-top:8px">${esc(bs.descripcion)}</div>`:''}
       </div>`;
       if(!cats.length) return resumen+'<div class="empty">Esta base todavía no tiene gestión. Aparece apenas marquen en Lupe.</div>';
-      const sel=res.filter(r=>(r.resultado||'—')===cat);
+      const sel=mq ? deCat.filter(r=>(r.agente||'(sin nombre)')===mq) : deCat;
       const lista=sel.map(r=>{
         const tel=String(r.whatsapp||r.lead_cel||'').replace(/[^0-9]/g,'');
         /* La llave es el telefono pelado, la MISMA que estampa Lupe en
@@ -4371,7 +4386,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         return `<div class="item" style="display:block"><div class="top">
           <div><div class="nom">${esc(r.lead_nombre||'—')}</div>
             <div class="meta">${tel?'📱 '+esc(tel):'<span style="color:#b91c1c">sin teléfono</span>'}${w2&&w2!==tel?' / '+esc(w2):''}${r.lead_ciudad?' · 📍 '+esc(r.lead_ciudad):''}${r.contacto?' · 👤 '+esc(r.contacto):''}${r.correo?' · ✉️ '+esc(r.correo):''}</div>
-            <div class="meta">${r.creado_en?'📅 '+esc(String(r.creado_en).slice(0,10)):''}${r.agente?' · '+esc(r.agente):''} ${falta}</div></div>
+            <div class="meta">${r.creado_en?'📅 '+esc(String(r.creado_en).slice(0,10)):''}${r.agente?` <span style="background:#eef2ff;color:#3a48b3;font-weight:700;font-size:10.5px;padding:1px 7px;border-radius:9px">👤 ${esc(r.agente)}</span>`:''} ${falta}</div></div>
           <span class="badge ${cat==='Interesado'?'b-aceptada':'b-entregado'}">${ICO[cat]||''} ${esc(cat)}</span></div>
           ${this._emb(key,-1,'marcador',r.lead_nombre,tel)}</div>`; }).join('');
       return resumen+(lista||'<div class="empty">Sin contactos en esta categoría.</div>');

@@ -1051,7 +1051,7 @@ async function trabajado(id){
     const r=await fetch(SB+'/rest/v1/mkr_llamadas?id=eq.'+encodeURIComponent(id),
       {method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify({trabajado:true})});
     if(!r.ok) throw new Error(r.status);
-    const d=await alEmbudo(x);
+    const d=await alEmbudo(x, 2);   // marcarlo trabajado ES haberle mandado la info
     /* El aviso dice lo que de verdad paso. Antes decia "pasa al CRM" siempre,
        incluso cuando la base no tenia a donde mandarlo y no se mandaba nada. */
     toast(d ? '✅ Enviado · pasa al CRM'+(d.ced?' de '+d.ced:'')
@@ -1066,7 +1066,7 @@ async function trabajado(id){
    Va el sello de la base (base_origen): el prospecto vive UNA sola vez, pero el
    CRM tiene que poder decir de donde salio para que otro CED no se lo trabaje
    encima al que si es dueño. */
-async function alEmbudo(x){
+async function alEmbudo(x, etapa){
   /* La base es la DEL INTERESADO, no la que este abierta. El administrador ve
      los de toda la red: si marcaba uno de Diana en tractomulas mientras el
      tenia abierto Calzado, el prospecto entraba al CRM de Feroz en vez del de
@@ -1095,7 +1095,9 @@ async function alEmbudo(x){
            contacto. Se estampa con la fecha de hoy para que el CRM no lo
            pida otra vez ni lo muestre vacio. */
         fechas:  {0: new Date().toISOString().slice(0,10)},
-        etapa:   2,                                          // ya se le mando la informacion
+        /* 1 = se hablo con el, 2 = ya se le mando la informacion. Entra en 1
+           apenas se guarda el interesado y sube a 2 cuando se marca trabajado. */
+        etapa:   etapa || 1,
         contactado_por: YO.nombre || null,
         base_origen: b.nombre,
         base_id: b.id,
@@ -1300,6 +1302,21 @@ async function guardarPanel(id,tarifa,catalogo){
         datos:true, validado:true, valor:tarifa, actualizado:new Date().toISOString(),
         estado_venta: catalogo?'catalogo_enviado':'nuevo'})});
     if(!r.ok){ toast('No se pudo guardar. Intenta otra vez.',true); return; }
+
+    /* Y sube al CRM AQUI MISMO. Antes solo subia cuando alguien abria la
+       lista de interesados y oprimia "ya lo trabaje"; como ese paso no tiene
+       dueno, quedaron 80 prospectos represados en Lupe y el CRM de CED y el
+       de Nido no recibian nada desde el 11 de septiembre. El que dijo que si
+       tiene que estar visible para el equipo el mismo dia, no cuando alguien
+       se acuerde. Entra en etapa 1 -contactado-; al marcarlo trabajado sube
+       a 2. No se espera la respuesta: si el CRM falla, la llamada ya quedo
+       guardada y no se le pierde el trabajo a nadie.
+       El telefono clave es el VERDE si lo dieron, que es al que se le manda. */
+    const l=leads[idx]||{};
+    alEmbudo({ base_id: (BASE&&BASE.id)||null,
+              whatsapp: soloNum(w2)||soloNum(w)||null, lead_cel: l.cel||null,
+              lead_nombre: l.nombre||null, lead_ciudad: l.ciudad||null },
+             catalogo ? 2 : 1);
   }catch(e){ toast('Sin señal. Intenta otra vez.',true); return; }
   pendientes=Math.max(0,pendientes-1);
   miPlata+=tarifa; pintarPlata(true);

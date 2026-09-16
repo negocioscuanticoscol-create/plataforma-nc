@@ -1536,8 +1536,22 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   vCrm(){
     const todos=this._leads||[], f=this._crmOrg||'todos';
     const porOrg={}; todos.forEach(l=>{const o=l.origen||'Sin origen'; porOrg[o]=(porOrg[o]||0)+1;});
-    const arr=f==='todos'?todos:todos.filter(l=>(l.origen||'Sin origen')===f);
+    let arr=f==='todos'?todos:todos.filter(l=>(l.origen||'Sin origen')===f);
     const cajones=['todos'].concat(this.ORIGEN).concat(porOrg['Sin origen']?['Sin origen']:[]);
+
+    /* UN CAJON POR PERSONA dentro del origen que se este viendo. Lo de Lupe
+       llega de varias telemercaderistas a la vez -59 de Diana y 20 de Sara- y
+       el nombre solo salia en gris al pie de cada ficha: con la lista revuelta
+       parecia que los de una no habian llegado. */
+    const porQ={}; arr.forEach(l=>{ if(l._quien) porQ[l._quien]=(porQ[l._quien]||0)+1; });
+    const gente=Object.entries(porQ).sort((a,b)=>b[1]-a[1]);
+    let q=this._crmQuien; if(q && !porQ[q]) q=null; this._crmQuien=q;
+    if(q) arr=arr.filter(l=>l._quien===q);
+    const barraGente = gente.length>1
+      ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin:0 0 10px">`
+        + `<span class="et ${!q?'on':''}" onclick="App._crmQuien=null;App.vCrm()">Todas</span>`
+        + gente.map(([k,v])=>`<span class="et ${q===k?'on':''}" onclick="App._crmQuien='${String(k).replace(/'/g,'')}';App.vCrm()">👤 ${this.esc(k)} (${v})</span>`).join('')
+        + `</div>` : '';
     this.set(`<h1>CRM</h1><div class="sub">Embudo 👋 → 💡 → 📋 → 🛒 · de dónde llega cada contacto</div>
 
       <div class="card" style="border-left:4px solid var(--gold)">
@@ -1555,10 +1569,11 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         return `<span class="et ${f===o?'on':''}" onclick="App._crmOrg='${o}';App.vCrm()">${
           o==='todos'?'Todos':((this.ORIGICO[o]||'❔')+' '+o)} (${n})</span>`;}).join('')}</div>
 
+      ${barraGente}
       <button class="btn gold" onclick="App.leadModal()">＋ Registro</button>
       <div style="margin-top:12px">${arr.length?arr.map(l=>`<div class="item"><div class="top"><div>
         <div class="nm">${this.esc(l.nombre||'—')} <span class="chip tipo">${this.esc(l.tipo||'—')}</span>
-          <span class="chip">${this.ORIGICO[l.origen]||'❔'} ${this.esc(l.origen||'sin origen')}</span></div>
+          <span class="chip">${this.ORIGICO[l.origen]||'❔'} ${this.esc(l.origen||'sin origen')}</span>${l._quien?`<span class="chip" style="background:#eef2ff;color:#3a48b3;font-weight:700">👤 ${this.esc(l._quien)}</span>`:''}</div>
         <div class="mt">${l.telefono?'📞 '+this.esc(l.telefono):''}${l.local_num?' · 🏬 Local '+this.esc(l.local_num):''}${l.ciudad?' · '+this.esc(l.ciudad):''}${l.interes?' · '+this.esc(l.interes):''}</div></div>
         ${l._emb?'':`<a onclick="App.leadDel('${l.id}')" style="cursor:pointer;color:var(--bad)">✕</a>`}</div>
         ${l._emb ? this._embLupe(l)
