@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260916-el-interesado-sube-al-guardarlo';
+const VER='20260916-el-turno-arranca-distinto-por-ciudad';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1463,6 +1463,18 @@ function aplicarReparto(){
       }).map(v=>v.agente_id);
       return equipoDe[k]=[...new Set(ids.concat([YO.id]))].sort();
     };
+    /* EL TURNO ARRANCA DISTINTO EN CADA CIUDAD.
+       Antes empezaba siempre por el primero del orden, y el orden es el
+       agente_id, que nunca cambia. En una ciudad con UNA sola empresa, el
+       primero se la llevaba siempre: a Sara le tocaron cero en nueve ciudades
+       seguidas -Dosquebradas, Madrid, Pitalito, Mosquera, Duitama...- porque en
+       todas habia una sola y Jose iba de primero. Le dijo a la plataforma que
+       no habia prospectos y era verdad: no le habian dejado ninguno.
+       Ahora el arranque sale del nombre de la ciudad. Es el mismo numero en
+       las dos pantallas -no se hablan, lo calculan igual-, asi que sigue sin
+       haber choques, pero las ciudades de una sola empresa se reparten.
+       Suma simple de letras: no necesita ser criptografico, necesita ser IGUAL. */
+    const arranque=(k,n)=>{ let h=0; for(let i=0;i<k.length;i++) h=(h*31+k.charCodeAt(i))%100003; return h%n; };
     const cuenta={};
     l=ORDEN.filter(x=>{
       const c=String(x.ciudad||'').trim();
@@ -1470,7 +1482,7 @@ function aplicarReparto(){
       if(eq.length<2) return true;                     // solo yo: toda la ciudad
       const k=c.toLowerCase();
       const i=(cuenta[k]=(cuenta[k]||0)+1)-1;
-      return (i % eq.length)===eq.indexOf(YO.id);      // uno para cada una, en orden
+      return ((i+arranque(k,eq.length)) % eq.length)===eq.indexOf(YO.id);
     });
   }
   TODOS=l; leads=TODOS.slice();
