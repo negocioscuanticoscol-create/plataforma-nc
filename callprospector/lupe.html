@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260915-base-de-pruebas';
+const VER='20260916-un-solo-nombre-por-persona';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -802,7 +802,7 @@ async function verCategoria(k, mantener){
     : filas.map(x=>`<div style="display:flex;gap:8px;padding:5px 0;border-top:1px solid var(--line);font-size:12px">
         <div style="flex:1;min-width:0">${esc(x.lead_nombre||'(sin nombre)')}
           <span style="color:var(--faint)">${esc(x.lead_ciudad||'')}</span>
-          ${equipo&&x.agente?'<span style="color:var(--faint)"> · '+esc(x.agente)+'</span>':''}</div>
+          ${equipo&&x.agente?'<span style="color:var(--faint)"> · '+esc(nombreDeHoy(x))+'</span>':''}</div>
         <div style="color:var(--faint);white-space:nowrap">${esc(String(x.creado_en||'').slice(0,10))}</div>
       </div>`).join(''));
 }
@@ -925,6 +925,20 @@ async function cargarInteresados(){
 }
 function esAdmin(){ return !!(YO && YO.nivel==='asesor'); }
 
+/* El nombre que quedo escrito en la llamada es el que la persona tenia ESE dia:
+   el trigger copia mkr_agentes.nombre al guardar y nunca vuelve atras. Diana
+   empezo como 'Diana' y hoy es 'Diana Salinas', asi que sus llamadas viejas y
+   las de hoy salian como dos personas. Se busca por agente_id, que no cambia.
+   Si todavia no llego la lista de agentes, se queda con lo que diga la fila. */
+function nombreDeHoy(f){
+  const gs = sincronizar.agentes;
+  if(Array.isArray(gs) && f && f.agente_id){
+    const g = gs.find(x=>String(x.id)===String(f.agente_id));
+    if(g) return g.nombre;
+  }
+  return f ? f.agente : null;
+}
+
 function pintarInteresados(){
   const b=$('inBody'), i=$('inInfo'); if(!b) return;
   i.textContent = INTER.length ? INTER.length+' por trabajar' : 'ninguno pendiente';
@@ -938,7 +952,7 @@ function pintarInteresados(){
      Con la lista de toda la red de corrido no se sabe a quien reclamarle ni
      por donde va cada una. */
   const por={};
-  INTER.forEach(x=>{ const k=x.agente||'(sin nombre)'; (por[k]=por[k]||[]).push(x); });
+  INTER.forEach(x=>{ const k=nombreDeHoy(x)||'(sin nombre)'; (por[k]=por[k]||[]).push(x); });
   const nombres=Object.keys(por).sort((a,c)=>por[c].length-por[a].length);
   b.innerHTML=nombres.map(n=>{
     const l=por[n], ab=(INTER_ABIERTO===n);
@@ -1004,7 +1018,7 @@ function filaInteresado(x, equipo){
   const quien = x.contacto ? `<div class="iq">👤 ${esc(x.contacto)}</div>`
                            : `<div class="iq falta">👤 sin nombre de contacto</div>`;
   const det=[x.lead_ciudad||'',
-             (equipo && x.agente) ? '📞 '+esc(x.agente) : '',
+             (equipo && x.agente) ? '📞 '+esc(nombreDeHoy(x)) : '',
              x.correo ? '✉️ '+esc(x.correo) : '',
              x.validado ? '' : '<span class="falta">sin datos · no ha pagado</span>',
              ya ? '<b style="color:#25D366">enviado</b>' : ''
@@ -1470,7 +1484,7 @@ async function sincronizar(){
   const real={};
   filas.forEach(f=>{
     const k=f.agente_id||('n:'+f.agente);
-    const a=real[k]=real[k]||{id:f.agente_id||null,agente:f.agente,llamadas:0,plata:0};
+    const a=real[k]=real[k]||{id:f.agente_id||null,agente:nombreDeHoy(f),llamadas:0,plata:0};
     a.llamadas++; if(f.validado) a.plata+=(+f.valor||0);
   });
   /* Y entran TODAS las habilitadas, aunque todavia no hayan marcado. Si solo

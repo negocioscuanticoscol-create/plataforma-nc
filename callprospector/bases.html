@@ -258,7 +258,7 @@ footer b{color:var(--dim)}
 /* Esta pantalla no avisaba cuando se publicaba una version nueva: tocaba
    acordarse de recargar a mano, y se miraban numeros viejos creyendo que eran
    los de ahora. El marcador ya tenia este aviso; ahora Control tambien. */
-const VER='20260915-quien-llama-cada-ciudad';
+const VER='20260916-un-solo-nombre-por-persona';
 let ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-ultimoChequeo < 300000) return;
@@ -356,6 +356,16 @@ const M={
       $('main').innerHTML='<div class="aviso"><b>Faltan las tablas.</b><br>Todavía no se ha corrido el SQL. Esta pantalla funciona apenas exista <b>mkr_llamadas</b> con sus columnas nuevas.</div>'; return; }
     $('live').classList.remove('off'); $('liveTx').textContent='en vivo';
     this.filas=f; this.agentes=Array.isArray(a)?a:[]; this.bases=Array.isArray(b)?b:[];
+
+    /* El nombre que quedo escrito en la llamada es el que la persona tenia ESE
+       dia: el trigger copia mkr_agentes.nombre al guardar, y nunca vuelve atras.
+       Diana empezo como 'Diana' y hoy es 'Diana Salinas', asi que sus 275
+       llamadas viejas y las 67 de hoy salian como dos personas distintas y la
+       liquidacion se partia en dos. Acá se reemplaza por el nombre de HOY,
+       buscando por agente_id, que ese si no cambia. */
+    const nombreDeHoy={}; this.agentes.forEach(g=>{ nombreDeHoy[String(g.id)]=g.nombre; });
+    this.filas.forEach(x=>{ const n=nombreDeHoy[String(x.agente_id)]; if(n) x.agente=n; });
+
     const s=$('fBase');
     if(s.options.length<=1) this.bases.forEach(x=>s.insertAdjacentHTML('beforeend',
       `<option value="${x.id}">${esc(x.nombre)}</option>`));
