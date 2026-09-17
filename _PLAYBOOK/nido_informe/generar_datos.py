@@ -58,9 +58,16 @@ def nm(v):
 # ============================ 1. LEER LOS EXCEL ==============================
 V, sin_valor = [], 0
 for almacen, arch in ARCH:
-    ruta = os.path.join(D, arch)
-    if not os.path.exists(ruta):
-        raise SystemExit('No encuentro el archivo: ' + ruta)
+    # Se busca por nombre en TODA la carpeta de Descargas, no solo en la raiz:
+    # desde el 17-sep-2026 esta ordenada por negocio y los archivos que se bajen
+    # pueden quedar en Descargas\Nido o donde el navegador los deje.
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+    from _descargas import buscar as _buscar, refrescar as _refrescar
+    _refrescar()                       # el archivo se puede acabar de descargar
+    ruta = _buscar(arch)
+    if not ruta:
+        raise SystemExit('No encuentro "%s" en %s ni en sus subcarpetas.' % (arch, D))
     wb = openpyxl.load_workbook(ruta, read_only=True, data_only=True)
     if 'MOVIMIENTOS' not in wb.sheetnames:
         raise SystemExit(arch + ' no tiene hoja MOVIMIENTOS')
