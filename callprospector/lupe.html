@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260917-el-panel-no-se-cierra-solo';
+const VER='20260917-el-dato-negativo-sale-de-la-base';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1249,6 +1249,23 @@ async function marcar(resultado){
           nombre:l.nombre||null, base_id:BASE.id, agente:YO.nombre})});
       toast('🛡️ Queda bloqueado en todas las bases');
     }catch(e){ toast('⚠️ Se guardó la llamada, pero no el bloqueo. Avisa.',true); }
+  }
+
+  /* DATO NEGATIVO: no es que el telefono no sirva, es que ESE REGISTRO no
+     corresponde al trabajo que se esta haciendo y no suma al objetivo -una
+     ferreteria en una base de distribuidores de calzado, una optica, un
+     estudio de tatuajes-. Hasta hoy quedaba solo anotado en la llamada, asi
+     que la empresa seguia contando como viva en Lupe Control y en los totales
+     de la base: 139 registros marcados y ninguno escondido.
+     Se marca 'descartado', que es lo que la vista mkr_leads usa para poner
+     aplica=false. NO se bloquea el telefono como en habeas data: la misma
+     empresa puede servir perfectamente para otra base con otro objetivo. */
+  if(resultado==='Dato negativo' && l.id){
+    try{
+      await fetch(SB+'/rest/v1/mkr_empresas?id=eq.'+encodeURIComponent(l.id),
+        {method:'PATCH',headers:{...H,Prefer:'return=minimal'},
+         body:JSON.stringify({estado:'descartado'})});
+    }catch(e){}                      // si falla, la llamada ya quedo guardada
   }
 
   /* Interesado: la tarjeta QUEDA trabada. La unica salida es el panel de abajo
