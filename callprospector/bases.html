@@ -258,7 +258,7 @@ footer b{color:var(--dim)}
 /* Esta pantalla no avisaba cuando se publicaba una version nueva: tocaba
    acordarse de recargar a mano, y se miraban numeros viejos creyendo que eran
    los de ahora. El marcador ya tenia este aviso; ahora Control tambien. */
-const VER='20260916-un-solo-nombre-por-persona';
+const VER='20260917-categorias-de-pago';
 let ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-ultimoChequeo < 300000) return;
@@ -319,6 +319,9 @@ let tt; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add(
 const MIN_SEG=25, META_INT=8;
 const VENTA=[['nuevo','Nuevo'],['contactado','Contactado'],['cotizo','Cotizó'],['compro','Compró'],['perdido','Perdido']];
 const NIVELES=['principiante','intermedio','avanzado','asesor'];
+/* Las cuatro formas de pagar. El orden es el de la tabla que definio Jose:
+   de la que menos cobra -la interna, que tiene sueldo aparte- a la que mas. */
+const CATEGORIAS=['interna','principiante','telemercaderista','asesora'];
 
 /* A quien se le tiene abierto el detalle de llamadas. Hay que recordarlo
    porque la pantalla se repinta sola cada 8 segundos: sin esto, el cajon
@@ -727,6 +730,10 @@ const M={
               <button class="r" onclick="M.estado(${id},'anulado')">Anular</button>`
             :`<button class="g" onclick="M.estado(${id},'activo')">Habilitar</button>`}
           <button onclick="M.subir(${id})">Subir nivel</button>
+          <label style="font-size:12px;color:var(--faint);display:flex;align-items:center;gap:5px">Paga como
+            <select onchange="M.categoria('${id}',this.value)" style="font:inherit;padding:3px 6px">
+              ${CATEGORIAS.map(c=>`<option value="${c}"${(f.categoria||'telemercaderista')===c?' selected':''}>${c}</option>`).join('')}
+            </select></label>
         </div>`:'<div class="flags"><i>Sin ficha en mkr_agentes</i></div>'}
       </div>`;}).join('')+'</section>';
   },
@@ -901,6 +908,19 @@ const M={
     if(!confirm('¿Subir a '+a.nombre+' a nivel '+n+'?'))return;
     if(!await PATCH('mkr_agentes?id=eq.'+id,{nivel:n})){ toast('No se pudo'); return; }
     a.nivel=n; toast(a.nombre+' ahora es '+n); this.pintar();
+  },
+  /* La CATEGORIA decide cuanto le paga cada boton a esa persona. No es lo
+     mismo que 'nivel': nivel manda los PERMISOS -nivel='asesor' es quien
+     administra la red- y la categoria manda la PLATA. Si fueran el mismo
+     campo, poner a alguien a cobrar como asesora la volveria administradora.
+     Lo ya marcado NO se recalcula: cada llamada guarda el valor con el que
+     se hizo, asi que cambiar esto solo afecta de aqui en adelante. */
+  async categoria(id,c){
+    const a=this.agentes.find(x=>String(x.id)===String(id)); if(!a)return;
+    if(!confirm(a.nombre+' va a cobrar como '+c.toUpperCase()+'.'+String.fromCharCode(10)
+      +'Lo que ya marco se queda como esta. ¿Seguro?')){ this.pintar(); return; }
+    if(!await PATCH('mkr_agentes?id=eq.'+id,{categoria:c})){ toast('No se pudo'); this.pintar(); return; }
+    a.categoria=c; toast(a.nombre+' paga como '+c); this.pintar();
   }
 };
 M.cargar(); setInterval(()=>M.cargar(),8000);

@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260917-el-dato-negativo-sale-de-la-base';
+const VER='20260917-tarifa-por-categoria';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -387,6 +387,22 @@ const SEG=['marca','canal','sector','subsector','departamento','ciudad','barrio'
    pintarlas. */
 const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente'];
 const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50,'Info WhatsApp':350};
+/* LO QUE PAGA CADA QUIEN depende de su CATEGORIA, no de la base. Hay cuatro
+   -interna, principiante, telemercaderista, asesora- porque no es lo mismo
+   una empleada de la empresa, que tiene sueldo aparte, que una asesora que
+   vive de la marcacion. La tabla vive en mkr_tarifas: cambiar lo que paga un
+   boton es editar una fila, no publicar el sitio.
+   TARIFA_DEF queda como red de seguridad: si la consulta falla, se paga lo de
+   telemercaderista -que es lo que se venia pagando- y nadie deja de cobrar. */
+let MI_TARIFA=null;
+function tarifas(){ return MI_TARIFA || TARIFA_DEF; }
+async function cargarMiTarifa(){
+  const cat=(YO&&YO.categoria)||'telemercaderista';
+  const f=await GET('mkr_tarifas?select=resultado,valor&categoria=eq.'+encodeURIComponent(cat));
+  if(Array.isArray(f)&&f.length){
+    const t={}; f.forEach(x=>t[x.resultado]=+x.valor||0); MI_TARIFA=t;
+  }
+}
 const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
 
 /* TODOS es la base completa; leads es lo que se esta viendo. Se separan porque
@@ -531,6 +547,12 @@ async function entrarApp(){
   $('gate').style.display='none';
   $('bases').style.display='block';
   $('bases').innerHTML='<div class="vacio">Buscando tus bases…</div>';
+  /* Lo primero: cuanto le paga a ESTA persona cada boton. Va antes de pintar
+     nada, porque la pantalla de tarifas y el valor de cada marcacion salen
+     de ahi. Si la sesion se restauro de localStorage y no trae categoria
+     -porque quedo guardada antes de que existiera- se cae en la de
+     telemercaderista, que es lo que se venia pagando. */
+  await cargarMiTarifa();
 
   const [bases,asign]=await Promise.all([
     GET('mkr_bases?select=*&activa=eq.true&order=nombre&limit=200'),
@@ -766,7 +788,7 @@ async function abrirBase(b){
    unicos a los que hay que volver. */
 let CAT_ABIERTA='';
 function pintarTarifas(){
-  const t=Object.assign({},TARIFA_DEF,BASE.tarifas||{});
+  const t=tarifas();
   $('tarBody').innerHTML=RESULTADOS.map(k=>
     `<div class="t" style="cursor:pointer;align-items:center" onclick="verCategoria('${esc(k).replace(/'/g,'')}')">
        <span>${CAT_ABIERTA===k?'▾':'▸'} ${ICONO[k]||''} ${esc(k)}</span>
@@ -874,7 +896,7 @@ function render(){
   if(idx>=leads.length) idx=0;
   if(idx<0) idx=leads.length-1;
   const l=leads[idx], cel=soloNum(l.cel);
-  const t=Object.assign({},TARIFA_DEF,BASE.tarifas||{});
+  const t=tarifas();
   const botones=RESULTADOS.map(k=>
     `<button class="b-${k.replace(/\s/g,'')}" onclick="marcar('${esc(k).replace(/'/g,'')}')">
       ${ICONO[k]||''} ${esc(k)}<small>${cop(t[k])}</small></button>`).join('')
@@ -1210,7 +1232,7 @@ async function marcar(resultado){
   if(MARCANDO) return;                       // doble toque = una sola llamada
   const l=leads[idx]; if(!l||!BASE) return;
   trabarTarjeta(true);
-  const tarifa=+Object.assign({},TARIFA_DEF,BASE.tarifas||{})[resultado]||0;
+  const tarifa=+tarifas()[resultado]||0;
   const esInteresado = resultado==='Interesado';
 
   // El interesado NO paga hasta que tenga contacto. Lo demás paga de una.
