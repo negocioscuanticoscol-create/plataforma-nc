@@ -737,7 +737,58 @@ const App = {
     const tel=(o.telefono||'').replace(/\D/g,'');
     const acc=(!o.noWa&&tel)?`${o.call?`<a class="btn-sm" href="tel:${esc(o.telefono)}" style="background:#2f6fed;color:#fff">📞</a>`:''}<a class="btn-sm" href="https://wa.me/57${tel}" target="_blank" style="background:#25d366;color:#fff">📱</a>`:'';
     const desc=o.descartar?`<button class="btn-sm" style="background:#fde8e8;color:#b3261e;padding:5px 9px" title="Descartar prospecto" onclick="App.crmDescartar('${o.key}')">✕ Descartar</button>`:'';
-    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(o.nombre||'—')}${o.telefono?` <span style="font-weight:600;color:var(--azul);font-size:13px">📱 ${esc(o.telefono)}</span>`:''}</div><div class="meta">${o.ciudad?esc(o.ciudad):''}${o.sub?(o.ciudad?'<br>':'')+esc(o.sub):''}</div></div><div style="display:flex;gap:5px;align-items:center">${o.badge||''}${acc}${desc}</div></div>${this._emb(o.key,o.base,o.canal,o.nombre,o.telefono,o.dots)}</div>`;
+    /* En los leads del bot el nombre abre la conversación con Sofía. Antes la
+       tarjeta solo mostraba el último mensaje recortado a 46 caracteres, que no
+       alcanza para saber si el cliente quedó con una duda o pidió precio. */
+    const nom=esc(o.nombre||'—');
+    const nomHTML=o.chat
+      ? `<a href="javascript:void(0)" onclick="App.crmChat('${esc(o.telefono||'')}','${esc(String(o.nombre||'').replace(/'/g,''))}')" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;cursor:pointer" title="Ver la conversación">${nom} 💬</a>`
+      : nom;
+    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${nomHTML}${o.telefono?` <span style="font-weight:600;color:var(--azul);font-size:13px">📱 ${esc(o.telefono)}</span>`:''}</div><div class="meta">${o.ciudad?esc(o.ciudad):''}${o.sub?(o.ciudad?'<br>':'')+esc(o.sub):''}</div></div><div style="display:flex;gap:5px;align-items:center">${o.badge||''}${acc}${desc}</div></div>${this._emb(o.key,o.base,o.canal,o.nombre,o.telefono,o.dots)}</div>`;
+  },
+
+  /* La conversación completa con Sofía, tal cual quedó guardada.
+     Vive en nc_agente_mem, que hasta hoy no se veía desde ninguna pantalla:
+     el lead se veía, pero lo que se habló con él no. */
+  async crmChat(tel, nombre){
+    const t=String(tel||'').replace(/\D/g,'');
+    if(!t){ this._toast('Ese lead no tiene teléfono'); return; }
+    this.modal(`<h3>💬 ${esc(nombre||t)}</h3><div class="hint">Cargando la conversación…</div>`);
+    /* Se busca por las tres formas en que puede estar guardado el número
+       (con 57, sin 57, y como llegó), porque el bot no siempre normaliza. */
+    const v=[...new Set([t, t.replace(/^57/,''), '57'+t.replace(/^57/,'')])];
+    const q=v.map(x=>`"${x}"`).join(',');
+    let msgs=[];
+    try{
+      const r=await fetch(this._SBU()+'/rest/v1/nc_agente_mem?select=rol,contenido,creado_en'
+        +'&telefono=in.('+encodeURIComponent(q)+')&order=creado_en.asc&limit=400',
+        {headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}});
+      const j=await r.json(); msgs=Array.isArray(j)?j:[];
+    }catch(e){}
+    if(!msgs.length){
+      this.modal(`<h3>💬 ${esc(nombre||t)}</h3>
+        <div class="empty">No hay conversación guardada para este número.</div>
+        <button class="btn" style="width:100%;margin-top:10px" onclick="App.cerrarModal()">Cerrar</button>`);
+      return;
+    }
+    const hora=s=>{ try{ return new Date(s).toLocaleString('es-CO',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } };
+    const burbujas=msgs.map(m=>{
+      const mio=(m.rol==='assistant'||m.rol==='bot');
+      const txt=esc(m.contenido||'').replace(/\n/g,'<br>')
+        .replace(/(https?:\/\/\S+)/g,'<a href="$1" target="_blank">$1</a>');
+      return `<div style="display:flex;justify-content:${mio?'flex-end':'flex-start'};margin:6px 0">
+        <div style="max-width:78%;padding:8px 10px;border-radius:12px;font-size:13px;line-height:1.45;
+          background:${mio?'#dcf8c6':'#fff'};border:1px solid ${mio?'#c5ecaa':'var(--linea)'}">
+          ${txt}<div style="font-size:10px;color:#888;margin-top:4px;text-align:right">${mio?'Sofía':'Cliente'} · ${hora(m.creado_en)}</div>
+        </div></div>`;
+    }).join('');
+    this.modal(`<h3>💬 ${esc(nombre||t)} <span style="font-weight:600;color:var(--azul);font-size:13px">📱 ${esc(tel)}</span></h3>
+      <div class="hint" style="margin-bottom:6px">${msgs.length} mensajes con Sofía</div>
+      <div style="max-height:56vh;overflow:auto;background:#ece5dd;padding:10px;border-radius:10px">${burbujas}</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <a class="btn btn-main" style="flex:1;text-align:center;text-decoration:none" href="https://wa.me/57${t.replace(/^57/,'')}" target="_blank">📱 Escribirle</a>
+        <button class="btn" style="flex:1;background:#eef2ff;color:#3a48b3" onclick="App.cerrarModal()">Cerrar</button>
+      </div>`);
   },
   async crmDescartar(key){
     if(!confirm('¿Descartar este prospecto? Sale de la lista (no se borra de las bases).')) return;
@@ -792,7 +843,7 @@ const App = {
     const bot=(this._crmBot||[]).filter(l=>{ const c=cd(l); return cajon==='todos'?!!c:(c===cajon); });
     if(!bot.length) return '<div class="empty">Sin leads en este cajón.</div>';
     const dots=cajon==='interesado'?'seg':'none';   // interesado: círculo de seguimiento · resto: liviano
-    return bot.map(l=>this._crmCard({key:'d'+((l.telefono||l.id)+'').replace(/\D/g,'').slice(0,18),nombre:l.nombre||l.telefono,telefono:l.telefono,ciudad:l.ciudad,sub:(l.ultimo_mensaje||'').slice(0,46),canal:'digital',base:this._baseEtapa('digital',l.etiqueta),noWa:true,dots})).join('');
+    return bot.map(l=>this._crmCard({key:'d'+((l.telefono||l.id)+'').replace(/\D/g,'').slice(0,18),nombre:l.nombre||l.telefono,telefono:l.telefono,ciudad:l.ciudad,sub:(l.ultimo_mensaje||'').slice(0,46),canal:'digital',base:this._baseEtapa('digital',l.etiqueta),noWa:true,chat:true,dots})).join('');
   },
   _crmCampCard(l){
     const tel=(l.telefono||'').replace(/\D/g,'');
