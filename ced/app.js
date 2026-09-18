@@ -661,7 +661,24 @@ const App = {
   /* Quién hizo el contacto. Es un dato de marketing, no del embudo: sirve para
      saber a quién preguntarle por ese cliente y para repartir el trabajo. Va en
      la misma tabla del embudo porque comparte la llave del lead. */
-  CONTACTAN:['Sandra','José','Boso'],
+  /* Sandra, José y Boso son de la PANADERÍA, no de la red de dotaciones. Estaban
+     quemados acá y salían en el CRM de Av 68, que no tiene nada que ver con
+     Kruh. Ahora la lista sale de la gente de la propia sede (ced_usuarios); la
+     vieja queda solo como último recurso para no dejar la fila sin botones. */
+  CONTACTAN_FALLBACK:['Sandra','José','Boso'],
+  _contactan(){
+    const mia=this.miSede();
+    const us=(this._us||[]).filter(u=>u.activo!==false && (!mia || u.ced===mia));
+    const nom=[...new Set(us.map(u=>String(u.nombre||'').trim()).filter(Boolean))];
+    return nom.length?nom:this.CONTACTAN_FALLBACK;
+  },
+  /* Los usuarios de la sede se cargan una sola vez, cuando el CRM los necesita.
+     Antes solo existían dentro de la pantalla de administración. */
+  async _cargarUsSede(){
+    if(this._us) return;
+    try{ const { data } = await this.sb.from('ced_usuarios').select('nombre,ced,activo');
+         this._us=data||[]; }catch(e){ this._us=[]; }
+  },
   _quienBtns(key){
     const act=(this._crmQuien||{})[key]||'';
     /* Cuando alguien ya lo logró, lo primero que se ve es SU NOMBRE en verde.
@@ -673,7 +690,7 @@ const App = {
         ✅ Lo contactó ${esc(act)}</div><br>`:''}
       <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">
         <span style="font-size:10.5px;color:#8a93a6;font-weight:700">${act?'CAMBIAR':'¿QUIÉN LO CONTACTÓ?'}</span>
-        ${this.CONTACTAN.map(n=>`<button class="btn-sm" style="padding:4px 10px;font-size:11px;
+        ${this._contactan().map(n=>`<button class="btn-sm" style="padding:4px 10px;font-size:11px;
           background:${act===n?'var(--naranja)':'#eef1f5'};color:${act===n?'#fff':'#54636b'}"
           onclick="App.crmQuien('${key}','${n}')">${n}</button>`).join('')}
       </div>
@@ -4279,6 +4296,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     let res=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/feroz_marcador_resultados?select=fila,nombre,cel,ciudad,resultado,mundo,fecha&order=fecha.desc&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); res=Array.isArray(j)?j:[]; }catch(e){}
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?empresa=eq.feroz&limit=5000'+this.fCed(),{headers:H}); const j=await r.json(); this._crmEmbRows=Array.isArray(j)?j:[]; this._crmEmb={}; this._crmQuien={}; this._crmFechas={}; this._crmEmbRows.forEach(x=>{this._crmEmb[x.lead_key]=x.etapa; this._crmFechas[x.lead_key]=x.fechas||{}; if(x.contactado_por) this._crmQuien[x.lead_key]=x.contactado_por;}); }catch(e){ this._crmEmbRows=[]; this._crmEmb={}; this._crmQuien={}; this._crmFechas={}; }
     this._crmFRes=res; const inter=res.filter(r=>/interes/i.test(r.resultado||''));
+    await this._cargarUsSede();   // para que "¿quién lo contactó?" muestre a la gente de ESTA sede
     let bot=[]; try{ const r=await fetch(this._SBU()+'/rest/v1/nc_bot_leads_feroz?select=*&order=ultima_fecha.desc&limit=1000'+this.fCed(),{headers:H}); const j=await r.json(); bot=Array.isArray(j)?j:[]; }catch(e){}
     let cots=[]; try{ const r=await this.sb.from('cotizaciones').select('id,cliente_id,numero,total,estado,es_muestra,creado_en').order('creado_en',{ascending:false}); cots=r.data||[]; }catch(e){}
     const cotByCli={}; cots.forEach(q=>{ if(q.cliente_id && !cotByCli[q.cliente_id]) cotByCli[q.cliente_id]=q; }); this._crmFCots=cotByCli;
@@ -4522,7 +4540,14 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const ciu=String(b.ciudad||'').trim();
     const ciuHTML = ciu ? `<span style="font-weight:700;color:#0b6b4f">📍 ${esc(ciu)}</span>`
                         : `<span style="color:#b45309">📍 sin ciudad</span>`;
-    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${esc(b.nombre||b.telefono||'—')}${b.telefono?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(b.telefono)}</span>`:''}</div><div class="meta">${ciuHTML}${b.producto?' · '+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono,mode)}${anular}</div>`;
+    /* El nombre abre la conversación con el bot. Sin esto la tarjeta solo dice
+       la etiqueta, y para saber si el cliente pidió precio o quedó con una duda
+       había que salir a buscar el chat en el teléfono. */
+    const nomTxt=esc(b.nombre||b.telefono||'—');
+    const nomHTML=(canal==='digital'&&b.telefono)
+      ? `<a href="javascript:void(0)" onclick="App.crmChat('${String(b.telefono).replace(/\D/g,'')}','${esc(String(b.nombre||'').replace(/['\\]/g,''))}')" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;cursor:pointer" title="Ver la conversación">${nomTxt} 💬</a>`
+      : nomTxt;
+    return `<div class="item" style="display:block"><div class="top"><div><div class="nom">${nomHTML}${b.telefono?` <span style="font-weight:600;color:var(--naranja);font-size:13px">📱 ${esc(b.telefono)}</span>`:''}</div><div class="meta">${ciuHTML}${b.producto?' · '+esc(b.producto):''}</div></div><span class="badge ${c}">${esc(b.etiqueta||'lead')}</span></div>${this._emb(key,base,canal,b.nombre,b.telefono,mode)}${anular}</div>`;
   },
   /* 📍 DE DÓNDE NOS ESCRIBEN — ciudades del cajón (curiosos / interesados / distribuidores) */
   _ciudBar(cajon){
