@@ -489,9 +489,9 @@ const App = {
     /* 'consulta' va en TODOS los roles a proposito: la consulta de plantas es de
        toda la organizacion, no de un area. Quien solo debe ver eso y nada mas
        lleva el cargo 'consultador', que en ced_permisos tiene unicamente consulta. */
-    const TODOS=['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','datos','admin','permisos','sofia'];
-    const DEF={admin:TODOS, gerente:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','sofia'],
-      director:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','sofia'],
+    const TODOS=['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','territorio','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','datos','admin','permisos','sofia'];
+    const DEF={admin:TODOS, gerente:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','territorio','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','sofia'],
+      director:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','territorio','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','sofia'],
       vendedor:['dashboard','consulta','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario','precios','sofia'],
       facturacion:['panel','consulta','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','consulta','despachos','inventario'], planta:['dashboard','consulta','pedidos','planta','inventario']};
     /* De donde salen las pestañas, en orden:
@@ -531,7 +531,9 @@ const App = {
   // sub-barra (pastillas) de la pestaña actual → integra los secundarios DENTRO de su pestaña
   _subnav(){
     const g=this._grupoDe(this.view); if(!g) return '';
-    const items=(this._GRUPOS[g]||[]).filter(i=>(this._permitidos||[]).includes(i[0]));
+    let items=(this._GRUPOS[g]||[]).filter(i=>(this._permitidos||[]).includes(i[0]));
+    /* El territorio es nacional: lo decide la principal, no una sede. */
+    if(this.miSede() && !this._esPrincipal) items=items.filter(i=>i[0]!=='territorio');
     if(items.length<2) return '';
     return `<div style="display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;-webkit-overflow-scrolling:touch">${items.map(([v,ic,t])=>`<button onclick="App.go('${v}')" style="flex:0 0 auto;padding:7px 13px;border-radius:18px;border:none;font-weight:700;font-size:12.5px;cursor:pointer;background:${v===this.view?'var(--naranja);color:#fff':'#eef1f5;color:#555'}">${ic} ${t}</button>`).join('')}</div>`;
   },
@@ -541,7 +543,7 @@ const App = {
      sacan de acá y se suben a ROW1/2/3. */
   _GRUPOS:{
     panel:[['panel','📈','Panel'],['dashboard','📊','Resultados']],
-    crm:[['crm','📇','CRM'],['clientes','👥','Clientes'],['cobertura','🗺️','Cobertura'],['ventas','💰','Ventas'],['autopedido','🛒','Autopedido']],
+    crm:[['crm','📇','CRM'],['clientes','👥','Clientes'],['cobertura','🗺️','Cobertura'],['territorio','🧭','Territorio'],['ventas','💰','Ventas'],['autopedido','🛒','Autopedido']],
   },
   _grupoDe(view){ for(const g in this._GRUPOS){ if(this._GRUPOS[g].some(i=>i[0]===view)) return g; } return null; },
 
@@ -570,10 +572,10 @@ const App = {
     if(view==='comisiones') return this.vComisiones();
     if(view==='gastos') return this.vGastos();
     if(view==='proveedores') return this.vProveedores();
-    const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
+    const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','territorio','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
     ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
-      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario, precios:this.vPrecios, pendientes:this.vPendientes, sofia:this.vSofia}[view] || this.vDashboard).call(this);
+      pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, territorio:this.vTerritorio, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario, precios:this.vPrecios, pendientes:this.vPendientes, sofia:this.vSofia}[view] || this.vDashboard).call(this);
   },
   set(html){ $('main').innerHTML = this._subnav() + html; },
   enConstruccion(view){
@@ -4585,6 +4587,122 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   },
 
   /* ---------- COBERTURA: drill-down geográfico ---------- */
+  /* ---------- TERRITORIO: el mapa nacional de adquisicion de distribuidores ----------
+
+     Jose: "no quiero que se quede como un informe que me hayas dado, quiero
+     guardarlo... que solo lo vea CED Feroz y que lo vayas modificando".
+
+     No calcula nada: LEE nc_territorio, que reescribe entera el barrido de los
+     sabados. Si un numero se ve raro, el problema esta en el barrido, no aca.
+
+     POR QUE FILTRA POR window.NC_EMPRESA. La tabla es una sola para Feroz, Smart
+     y Sole -el mapa de Colombia es el mismo para los tres, lo que cambia es a
+     quien le vendio cada uno-. Ese filtro es lo unico que impide que se crucen,
+     que fue el encargo explicito. Si se quita, Smart empieza a ver los
+     distribuidores de Feroz como si fueran suyos. */
+  _TERR:{
+    vendiendo:  ['#1B7A4F','Ya despacha',      'hay distribuidor y ya pidio pares'],
+    caliente:   ['#C96A0C','Cerrar ya',        '3 o mas interesados sin cerrar'],
+    abierto:    ['#2E8B57','Falta el pedido',  'firmo pero no ha pedido nada'],
+    tibio:      ['#C99A14','Seguir el centro', '1 o 2 interesados'],
+    sinllamar:  ['#B23A2A','Empezar aqui',     'hay base cargada y nadie ha llamado'],
+    vacio:      ['#8A5A52','Barrer el centro', 'ni una empresa cargada'],
+    sintraccion:['#6B6257','Revisar el guion', 'se llamo y no pego'],
+  },
+  _TERRORD:['vendiendo','caliente','abierto','tibio','sinllamar','vacio','sintraccion'],
+
+  async vTerritorio(){
+    /* La pastilla ya no le sale a una sede, pero go('territorio') se puede
+       escribir a mano: la puerta se cierra aca tambien, no solo en el menu. */
+    if(this.miSede() && !this._esPrincipal){
+      this.set('<h1>Territorio</h1><div class="empty">El mapa del territorio es nacional '
+        +'y se trabaja desde la principal.</div>'); return; }
+    this.loading();
+    const EMP = window.NC_EMPRESA || 'feroz';
+    const { data:filas=[], error } = await this.sb.from('nc_territorio')
+      .select('*').eq('empresa', EMP).order('poblacion',{ascending:false});
+    if(error){ this.set('<div class="empty">No pude leer el territorio: '+esc(error.message)+'</div>'); return; }
+    if(!filas.length){
+      this.set('<h1>🧭 Territorio</h1><div class="empty">Todavía no hay barrido para '
+        +esc(EMP)+'.<br>Lo escribe el barrido de los sábados.</div>'); return; }
+
+    const mil=n=>(n||0).toLocaleString('es-CO');
+    const T=this._TERR, t=this.terr=this.terr||{};
+    const centros=filas.filter(f=>f.nivel==='centro');
+    const sum=c=>filas.reduce((a,f)=>a+(f[c]||0),0);
+    const corte=filas[0].corte?new Date(filas[0].corte).toLocaleDateString('es-CO',
+      {day:'numeric',month:'long',year:'numeric'}):'—';
+    const anillo=c=>filas.filter(f=>f.centro===c && f.nivel==='anillo');
+
+    if(t.ciudad){
+      const c=filas.find(f=>f.ciudad===t.ciudad); if(!c){ this.terr={}; return this.vTerritorio(); }
+      const h=anillo(c.ciudad), e0=T[c.estado]||T.vacio;
+      const fila=f=>{
+        const e=T[f.estado]||T.vacio;
+        return `<div class="item"><div class="top"><div>
+          <div class="nom">${esc(f.ciudad)} <span style="font-size:11px;color:${e[0]};font-weight:700">● ${esc(e[1])}</span></div>
+          <div class="meta">${f.km} km · ${mil(f.poblacion)} hab · 📋 ${mil(f.cargados)} cargadas · ☎ ${mil(f.marcables)} marcables${f.interesados?` · 👍 <b>${mil(f.interesados)}</b> interesados`:''}${f.registrados?` · 🏪 <b>${mil(f.registrados)}</b> registrados`:''}${f.pares?` · ${mil(f.pares)} pares`:''}</div>
+        </div></div></div>`;};
+      /* Solo las ciudades que geo-co.js tiene partidas en localidades pueden
+         bajar un nivel mas; las demas no tienen a donde ir. */
+      const G=window.GEO_CO; let loc=null;
+      if(G) for(const z of G.zonas) for(const d of z.deptos) for(const x of (d.ciudades||[]))
+        if(x.nombre===c.ciudad && x.localidades) loc={zona:z.nombre, depto:d.nombre};
+      const q=s=>esc(s).replace(/'/g,'');
+      this.set(`<h1>🧭 ${esc(c.ciudad)}</h1>
+        <div class="sub" style="color:${e0[0]};font-weight:700">${esc(e0[1])} — ${esc(e0[2])}</div>
+        <button class="btn-sm btn-ghost" style="border:1px solid var(--linea);margin-bottom:10px" onclick="App.terrIr(null)">← Volver al mapa</button>
+        ${loc?`<button class="btn-sm btn-ghost" style="border:1px solid var(--linea);margin:0 0 10px 6px" onclick="App.terrLocalidades('${q(loc.zona)}','${q(loc.depto)}','${q(c.ciudad)}')">Ver localidades ›</button>`:''}
+        ${this._terrCifras(c, mil)}
+        <div class="sub" style="margin-top:14px">Su anillo — ${h.length} municipios, del más cerca al más lejos</div>
+        ${h.length?h.map(fila).join(''):'<div class="empty">No tiene municipios alrededor.</div>'}`);
+      return;
+    }
+
+    const tarjeta=f=>{
+      const e=T[f.estado]||T.vacio, h=anillo(f.ciudad);
+      const vac=h.filter(x=>!x.cargados).length;
+      return `<div class="item" style="cursor:pointer;border-left:4px solid ${e[0]}" onclick="App.terrIr('${esc(f.ciudad).replace(/'/g,'')}')"><div class="top"><div>
+        <div class="nom">${esc(f.ciudad)} <span style="font-size:12px;color:var(--suave)">›</span></div>
+        <div class="meta"><b style="color:${e[0]}">${esc(e[1])}</b> · ☎ ${mil(f.marcables)} marcables · ${f.interesados?`👍 <b>${mil(f.interesados)}</b> interesados · `:''}${f.registrados?`🏪 <b>${mil(f.registrados)}</b> registrados · `:''}${f.pares?`${mil(f.pares)} pares · `:''}${h.length} alrededor${vac?`, <b style="color:#B23A2A">${vac} en cero</b>`:''}</div>
+      </div></div></div>`;};
+
+    /* El orden es el orden en que conviene trabajar, no el alfabetico ni el de
+       tamaño: primero donde ya se vende, de ultimo lo que hay que empezar de cero. */
+    const grupos=this._TERRORD.map(k=>{
+      const g=centros.filter(c=>c.estado===k); if(!g.length) return '';
+      g.sort((a,b)=>(b.registrados-a.registrados)||(b.interesados-a.interesados)||(b.marcables-a.marcables));
+      return `<div class="sub" style="margin:14px 0 6px;color:${T[k][0]};font-weight:700">${esc(T[k][1].toUpperCase())} · ${g.length} ${g.length===1?'centro':'centros'} — ${esc(T[k][2])}</div>`
+        + g.map(tarjeta).join('');
+    }).join('');
+
+    this.set(`<h1>🧭 Territorio</h1>
+      <div class="sub">${centros.length} centros y ${filas.length-centros.length} municipios alrededor · corte del ${esc(corte)}</div>
+      <div class="hint" style="margin:8px 0 12px">Primero el centro, después el anillo: si en Montería
+      no hay distribuidor, no tiene sentido buscar en Cereté.</div>
+      ${this._terrCifras({cargados:sum('cargados'),marcables:sum('marcables'),llamadas:sum('llamadas'),
+        interesados:sum('interesados'),registrados:sum('registrados'),pedidos:sum('pedidos'),
+        pares:sum('pares'),plata:sum('plata')}, mil)}
+      ${grupos}`);
+  },
+  _terrCifras(d, mil){
+    const caja=(q,n,c)=>`<div style="flex:1 1 92px;padding:9px 11px;background:#fff;border:1px solid var(--linea);border-radius:8px">
+      <div style="font-size:19px;font-weight:800;color:${c||'inherit'}">${n}</div>
+      <div style="font-size:10.5px;color:var(--suave);text-transform:uppercase;letter-spacing:.06em;margin-top:2px">${q}</div></div>`;
+    return `<div style="display:flex;gap:7px;flex-wrap:wrap;margin:10px 0">
+      ${caja('Cargadas',mil(d.cargados))}${caja('Marcables',mil(d.marcables))}
+      ${caja('Llamadas',mil(d.llamadas))}${caja('Interesados',mil(d.interesados),'#C96A0C')}
+      ${caja('Registrados',mil(d.registrados),'#1B7A4F')}${caja('Pares',mil(d.pares),'#1B7A4F')}
+      ${d.plata?caja('Facturado','$'+mil(d.plata),'#1B7A4F'):''}</div>`;
+  },
+  terrIr(ciudad){ this.terr={ciudad}; this.vTerritorio(); },
+  /* Entrega la ciudad al drill que Cobertura ya tenia: ahi se prenden y apagan
+     las localidades que aplican. Esa pantalla no se duplica. */
+  terrLocalidades(zona,depto,ciudad){
+    this.cob={nivel:'localidades', zona, depto, ciudad};
+    this.go('cobertura');
+  },
+
   async vCobertura(){
     if(!window.GEO_CO){ this.set('<div class="empty">No cargó la data geográfica.</div>'); return; }
     this.cob = this.cob || {nivel:'zonas'};

@@ -1,0 +1,62 @@
+name: territorio
+
+# Recalcula el mapa del territorio todos los sábados: cuántas empresas hay
+# cargadas en cada ciudad, cuántas se pueden marcar, cuántas dijeron que sí, y
+# cuántas terminaron firmando como distribuidor. Lo lee CED en la pestaña
+# Territorio (🧭), dentro de CRM.
+#
+# José: "no quiero que se quede como un informe que me hayas dado... hacer
+# barridos como el que acabas de hacer cada semana... me gustaría que lo
+# programaras para hacerlo todos los sábados".
+#
+# NO calcula nada acá: llama a la función nc_territorio_refrescar(), que hace
+# todo el trabajo DENTRO de la base. Eso es a propósito. Este repo es público:
+# si el cálculo viviera acá, habría que dejarle una llave con permiso de
+# escritura, y la única que existe es el token de administración, que abre la
+# base entera. Así la única llave que viaja es la publishable, que YA está en
+# los 39 HTML del repo, y el permiso de escritura nunca sale de la base.
+#
+# La geografía —qué ciudad cuelga de cuál, los kilómetros, la población— no se
+# toca acá: la siembra _PLAYBOOK/barridos/plan-territorio.py y no cambia de una
+# semana a otra. Si se agregan municipios, se corre ese script a mano.
+
+on:
+  schedule:
+    # 11:00 UTC del sábado = 6:00 a. m. en Bogotá. Queda listo antes de que
+    # alguien abra CED el lunes.
+    - cron: '0 11 * * 6'
+  workflow_dispatch:        # botón para correrlo a mano desde la pestaña Actions
+
+jobs:
+  refrescar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recalcular el territorio de Feroz
+        run: |
+          SB="https://fnayedgvamxktxfvywwl.supabase.co"
+          KEY="sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv"
+          # Cuando Smart o Sole tengan su propio mapa, se agregan a esta lista y
+          # nada más: cada negocio vive en la misma tabla pero en sus propias
+          # filas, y la función solo toca las del negocio que se le pide.
+          for EMP in feroz; do
+            echo "── $EMP ──────────────────────────────"
+            RESP=$(curl -sS -X POST "$SB/rest/v1/rpc/nc_territorio_refrescar" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"p_empresa\":\"$EMP\"}" -w "\n%{http_code}")
+            CODE=$(echo "$RESP" | tail -1)
+            BODY=$(echo "$RESP" | sed '$d')
+            echo "$BODY"
+            if [ "$CODE" != "200" ]; then
+              echo "::error::$EMP no se pudo refrescar (HTTP $CODE)"
+              exit 1
+            fi
+            # Si el barrido devuelve cero ciudades es que alguien borró las
+            # filas de geografía: el mapa quedaría en blanco y nadie se
+            # enteraría hasta abrirlo el lunes.
+            if echo "$BODY" | grep -q '"ciudades":0'; then
+              echo "::error::$EMP quedó sin ciudades — correr plan-territorio.py para volver a sembrar la geografía"
+              exit 1
+            fi
+          done
+          echo "Territorio al día ✅"
