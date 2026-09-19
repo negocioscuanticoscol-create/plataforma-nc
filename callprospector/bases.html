@@ -258,7 +258,7 @@ footer b{color:var(--dim)}
 /* Esta pantalla no avisaba cuando se publicaba una version nueva: tocaba
    acordarse de recargar a mano, y se miraban numeros viejos creyendo que eran
    los de ahora. El marcador ya tenia este aviso; ahora Control tambien. */
-const VER='20260919-efectividad-por-cliente';
+const VER='20260919-cruces-entre-bases';
 let ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-ultimoChequeo < 300000) return;
@@ -432,13 +432,14 @@ const M={
     const tVal=ag.reduce((s,a)=>s+a.validado,0), tCru=ag.reduce((s,a)=>s+a.cruda,0);
     $('tVal').textContent=cop(tVal); $('tDud').textContent=cop(tCru-tVal);
 
-    $('nav').innerHTML=[['cajones','🗂️ Cajones'],['efectividad','📈 Efectividad'],['calidad','⚡ Calidad'],['personas','👥 Personas'],['interesados','🔥 Interesados']]
+    $('nav').innerHTML=[['cajones','🗂️ Cajones'],['efectividad','📈 Efectividad'],['calidad','⚡ Calidad'],['cruces','🔁 Cruces'],['personas','👥 Personas'],['interesados','🔥 Interesados']]
       .map(([v,t])=>`<button class="${v===this.vista?'on':''}" onclick="M.irA('${v}')">${t}</button>`).join('');
 
     /* Los cajones se pintan aunque nadie haya marcado: son para repartir el
        trabajo que todavia NO se ha hecho. El corte de abajo es solo para las
        pestañas que miden llamadas. */
     if(this.vista==='cajones') return this.vCajones();
+    if(this.vista==='cruces')  return this.vCruces();
     if(!d.length){ $('main').innerHTML='<div class="vacio">Todavía nadie ha marcado en esta base.</div>'; return; }
     if(this.vista==='calidad')    return this.vCalidad(ag);
     if(this.vista==='personas'){ this.vPersonas(ag); this.pintarLlamadas(); return; }
@@ -701,6 +702,65 @@ const M={
     $('main').innerHTML='<section><h2>Notificaciones</h2>'+N.map(n=>`<div class="nf ${n.c}">
       <div class="ico">${n.i}</div><div style="flex:1;min-width:0"><h3>${n.h}</h3><p>${n.p}</p>
       ${n.q.length?`<div class="quien">${n.q.map(x=>`<span>${esc(x)}</span>`).join('')}</div>`:''}</div></div>`).join('')+'</section>';
+  },
+
+  /* ---------- CRUCES: el mismo telefono vivo en dos bases ----------
+     Jose: "necesito poder confirmar esto" — que los Distribuidores potenciales
+     NO esten tambien en Calzado. No basta con arreglarlo: tiene que poder
+     mirarlo el dia que quiera, sin pedirselo a nadie.
+
+     Lee las vistas mkr_cruce_bases y mkr_cruce_detalle; aca no se calcula nada.
+     Lo unico que importa es VIVOS: un repetido ya descartado no molesta porque
+     nadie lo va a llamar. */
+  async vCruces(){
+    $('main').innerHTML='<section><h2>Cruces entre bases</h2><div class="vacio">Revisando…</div></section>';
+    const [pares, det] = await Promise.all([
+      GET('mkr_cruce_bases?select=*&ambas_activas=is.true&order=vivos_ambos.desc,repetidos.desc'),
+      GET('mkr_cruce_detalle?select=*&limit=400')
+    ]);
+    if(!Array.isArray(pares)){
+      $('main').innerHTML='<section><h2>Cruces entre bases</h2><div class="vacio">No pude leer el cruce. '
+        +'Puede que falten las vistas mkr_cruce_bases y mkr_cruce_detalle.</div></section>'; return; }
+
+    const malos = pares.filter(p=>p.vivos_ambos>0);
+    const pot   = malos.filter(p=>/reservada|potenciales/i.test(p.base_a+' '+p.base_b));
+    const N=[];
+
+    if(!pot.length) N.push({c:'limpio',i:'✅',h:'Los potenciales están aparte',
+      p:'Ningún teléfono de <b>Distribuidores potenciales</b> está vivo en otra base del mismo negocio. '
+       +'Nadie los puede llamar en frío. El candado de la base los descarta solos si un barrido nuevo los vuelve a traer.',q:[]});
+    else N.push({c:'rojo',i:'🔁',h:'Hay potenciales vivos en otra base',
+      p:'Estas cuentas las negocia el gerente y alguien más las puede llamar con el guion equivocado.',
+      q:pot.map(p=>`${p.base_a} ↔ ${p.base_b} · ${p.vivos_ambos} vivos`)});
+
+    const otros = malos.filter(p=>!/reservada|potenciales/i.test(p.base_a+' '+p.base_b));
+    if(otros.length) N.push({c:'ambar',i:'👯',h:'Otras bases comparten teléfonos',
+      p:'No es grave —no son cuentas reservadas— pero se está llamando dos veces al mismo número.',
+      q:otros.map(p=>`${p.base_a} ↔ ${p.base_b} · ${p.vivos_ambos} vivos`)});
+
+    const limpios = pares.filter(p=>p.repetidos>0 && p.vivos_ambos===0);
+    if(limpios.length) N.push({c:'limpio',i:'🧹',h:'Repetidos ya resueltos',
+      p:'Estos pares comparten teléfonos, pero en uno de los dos lados ya están descartados: nadie los llama.',
+      q:limpios.map(p=>`${p.base_a} ↔ ${p.base_b} · ${p.repetidos} repetidos, 0 vivos`)});
+
+    let tabla='';
+    if(Array.isArray(det) && det.length){
+      tabla='<section><h2>Uno por uno — los que siguen vivos en las dos</h2>'
+        +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px">'
+        +'<thead><tr style="text-align:left;color:var(--sv);font-size:10.5px;text-transform:uppercase">'
+        +'<th style="padding:6px 8px">Teléfono</th><th style="padding:6px 8px">En una base</th>'
+        +'<th style="padding:6px 8px">Y también en</th></tr></thead><tbody>'
+        +det.map(x=>`<tr style="border-top:1px solid var(--line)">
+            <td style="padding:6px 8px;white-space:nowrap"><b>${esc(x.telefono)}</b><div style="color:var(--sv);font-size:11px">${esc(x.municipio||'')}</div></td>
+            <td style="padding:6px 8px">${esc(x.nombre_a||'')}<div style="color:var(--sv);font-size:11px">${esc(x.base_a)}</div></td>
+            <td style="padding:6px 8px">${esc(x.nombre_b||'')}<div style="color:var(--sv);font-size:11px">${esc(x.base_b)}</div></td>
+          </tr>`).join('')+'</tbody></table></div></section>';
+    }
+
+    $('main').innerHTML='<section><h2>Cruces entre bases</h2>'+N.map(n=>`<div class="nf ${n.c}">
+      <div class="ico">${n.i}</div><div style="flex:1;min-width:0"><h3>${n.h}</h3><p>${n.p}</p>
+      ${n.q.length?`<div class="quien">${n.q.map(x=>`<span>${esc(x)}</span>`).join('')}</div>`:''}</div></div>`).join('')
+      +'</section>'+tabla;
   },
 
   vPersonas(ag){
