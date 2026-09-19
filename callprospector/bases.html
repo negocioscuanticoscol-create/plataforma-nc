@@ -258,7 +258,7 @@ footer b{color:var(--dim)}
 /* Esta pantalla no avisaba cuando se publicaba una version nueva: tocaba
    acordarse de recargar a mano, y se miraban numeros viejos creyendo que eran
    los de ahora. El marcador ya tenia este aviso; ahora Control tambien. */
-const VER='20260917-categorias-de-pago';
+const VER='20260919-efectividad-llamada-a-pedido';
 let ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-ultimoChequeo < 300000) return;
@@ -334,12 +334,12 @@ const M={
   cjAbierto:'', baseAb:null, ciudades:[], cdAbierta:'', filtroCd:'', ed:null, verVacias:false,
 
   async cargar(){
-    const [f,a,b,pg,cj,mp,asg,vv]=await Promise.all([
+    const [f,a,b,pg,cj,mp,asg,vv,emb,cot]=await Promise.all([
       /* sala=neq.pruebas: la base de pruebas no entra en calidad, personas ni
          liquidacion. Sin esto, probar la app le mueve los numeros a la gente. */
       GETALL('mkr_llamadas?select=id,agente,resultado,valor,datos,validado,estado_venta,base_id,lead_nombre,contacto,whatsapp,whatsapp2,correo,creado_en,lead_cel,lead_ciudad&sala=neq.pruebas&order=creado_en.asc&limit=8000'),
       GET('mkr_agentes?select=*&order=nombre&limit=300'),
-      GET('mkr_bases?select=id,nombre,cliente&order=nombre&limit=200'),
+      GET('mkr_bases?select=id,nombre,cliente,destino_app&order=nombre&limit=200'),
       /* Lo que ya se le pago a cada quien. Va aparte de las llamadas: lo
          producido es historia y no se reescribe, el pago se suma encima. */
       GETALL('mkr_pagos?select=agente_id,valor,semana,fecha_pago&limit=3000'),
@@ -348,12 +348,18 @@ const M={
       GET('mkr_clientes?select=*&order=orden&limit=100'),
       GET('mkr_mapa_bases?select=*&order=cajon_orden,por_llamar.desc&limit=400'),
       GETALL('mkr_asignaciones?select=*&limit=5000'),
-      GET('mkr_conectados?select=agente_id,nombre,base_id,municipio&limit=300')
+      GET('mkr_conectados?select=agente_id,nombre,base_id,municipio&limit=300'),
+      /* El embudo: lo que paso DESPUES de la llamada. Sin esto Lupe solo sabe
+         cuanto se marco, no cuanto se vendio. Se cruza por telefono. */
+      GETALL('nc_crm_embudo?select=empresa,lead_key,telefono,canal,etapa,base_origen,ced,updated_at&limit=5000'),
+      GETALL('nc_cotizaciones?select=celular,total,estado,creado_en&limit=2000')
     ]);
     this.cajones=Array.isArray(cj)?cj:[];
     this.mapa=Array.isArray(mp)?mp:[];
     this.asign=Array.isArray(asg)?asg:[];
     this.vivos=Array.isArray(vv)?vv:[];
+    this.embudo=Array.isArray(emb)?emb:[];
+    this.cotiz=Array.isArray(cot)?cot:[];
     this.pagos=Array.isArray(pg)?pg:[];
     if(!Array.isArray(f)){ $('live').classList.add('off'); $('liveTx').textContent='sin señal';
       $('main').innerHTML='<div class="aviso"><b>Faltan las tablas.</b><br>Todavía no se ha corrido el SQL. Esta pantalla funciona apenas exista <b>mkr_llamadas</b> con sus columnas nuevas.</div>'; return; }
@@ -422,7 +428,7 @@ const M={
     const tVal=ag.reduce((s,a)=>s+a.validado,0), tCru=ag.reduce((s,a)=>s+a.cruda,0);
     $('tVal').textContent=cop(tVal); $('tDud').textContent=cop(tCru-tVal);
 
-    $('nav').innerHTML=[['cajones','🗂️ Cajones'],['calidad','⚡ Calidad'],['personas','👥 Personas'],['interesados','🔥 Interesados']]
+    $('nav').innerHTML=[['cajones','🗂️ Cajones'],['efectividad','📈 Efectividad'],['calidad','⚡ Calidad'],['personas','👥 Personas'],['interesados','🔥 Interesados']]
       .map(([v,t])=>`<button class="${v===this.vista?'on':''}" onclick="M.irA('${v}')">${t}</button>`).join('');
 
     /* Los cajones se pintan aunque nadie haya marcado: son para repartir el
@@ -432,6 +438,7 @@ const M={
     if(!d.length){ $('main').innerHTML='<div class="vacio">Todavía nadie ha marcado en esta base.</div>'; return; }
     if(this.vista==='calidad')    return this.vCalidad(ag);
     if(this.vista==='personas'){ this.vPersonas(ag); this.pintarLlamadas(); return; }
+    if(this.vista==='efectividad') return this.vEfectividad();
     if(this.vista==='interesados')return this.vInteresados();
   },
 
@@ -852,6 +859,114 @@ const M={
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
     toast('Bajando '+f.length+' llamadas de '+n);
+  },
+
+  /* ---------- 5. efectividad: de la llamada al pedido ---------- */
+  /* El hilo que une una llamada con un pedido es el TELEFONO: la llamada vive en
+     mkr_llamadas y lo que paso despues en nc_crm_embudo, con sus propias etapas
+     -0 contactado, 1 segunda llamada, 2 cotizacion, 3 primer pedido-. El cruce
+     por telefono alcanza al 92% de los interesados, asi que sirve.
+     Y cada base dice a que negocio alimenta (mkr_bases.destino_app), asi que se
+     mide ced, nido y smart por separado, que es como se trabaja.
+     Lo que NO se inventa: el valor solo existe en Smart, que es el unico que
+     guarda cotizaciones con total. En los otros dice "no se registra" y no un
+     cero, porque un cero afirmaria que no vendieron y eso no lo sabemos. */
+  vEfectividad(){
+    const d=this.datos();
+    const sol=t=>{ const x=String(t||'').replace(/\D/g,''); return x.length>=10?x.slice(-10):''; };
+    const emb=this.embudo||[], cot=this.cotiz||[];
+
+    const etapaDe={};
+    emb.forEach(e=>{ [sol(e.telefono),sol(e.lead_key)].filter(Boolean).forEach(t=>{
+      const n=+e.etapa; if(!isNaN(n)) etapaDe[t]=Math.max(etapaDe[t]===undefined?-9:etapaDe[t], n); }); });
+    const valorDe={};
+    cot.forEach(c=>{ const t=sol(c.celular); if(!t) return;
+      if(c.estado==='anulado'||c.estado==='anulada') return;
+      valorDe[t]=(valorDe[t]||0)+(+c.total||0); });
+
+    const destDe={}; (this.bases||[]).forEach(b=>{ destDe[String(b.id)]=b.destino_app||'—'; });
+
+    /* Se cuenta por PERSONA y no por llamada: marcar tres veces al mismo numero
+       no son tres oportunidades de venta. */
+    const neg={};
+    const G=k=>(neg[k]=neg[k]||{ll:0,cont:0,int:0,crm:new Set(),cot:new Set(),ped:new Set(),val:0,pagado:0});
+    d.forEach(f=>{
+      const g=G(destDe[String(f.base_id)]||'—');
+      g.ll++; g.pagado+=(+f.valor||0);
+      if(f.resultado && f.resultado!=='No contesta' && f.resultado!=='Equivocado') g.cont++;
+      const t=sol(f.lead_cel)||sol(f.whatsapp); if(!t) return;
+      if(f.resultado==='Interesado'){
+        g.int++;
+        const e=etapaDe[t];
+        if(e!==undefined && e>=0) g.crm.add(t);
+        if(e>=2) g.cot.add(t);
+        if(e>=3) g.ped.add(t);
+        if(valorDe[t]) g.val+=valorDe[t];
+      }
+    });
+
+    const NOM={ced:'CED · Feroz',nido:'Colchones Nido',smart:'Smart Envases','—':'Sin destino'};
+    const filas=Object.entries(neg).sort((a,b)=>b[1].ll-a[1].ll);
+    const T=filas.reduce((s,[,g])=>({ll:s.ll+g.ll,cont:s.cont+g.cont,int:s.int+g.int,
+      crm:s.crm+g.crm.size,cot:s.cot+g.cot.size,ped:s.ped+g.ped.size,val:s.val+g.val,
+      pagado:s.pagado+g.pagado}),{ll:0,cont:0,int:0,crm:0,cot:0,ped:0,val:0,pagado:0});
+    const pc=(a,b)=>b?((100*a/b).toFixed(1)+'%'):'—';
+
+    const paso=(t,n,de,col)=>`<div style="flex:1 1 120px;background:var(--card2);border:1px solid var(--line);
+      border-radius:11px;padding:11px 12px">
+      <span style="font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700">${t}</span>
+      <b style="display:block;font-size:22px;font-weight:800;letter-spacing:-.03em;color:${col||'var(--tx)'};line-height:1.3">${num(n)}</b>
+      <span style="font-size:10.5px;color:var(--dim)">${de}</span></div>`;
+
+    const TH='padding:8px 7px;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:700;text-align:right;border-bottom:1px solid var(--line)';
+    const TD='padding:9px 7px;font-size:13px;text-align:right;border-bottom:1px solid var(--line)';
+
+    $('main').innerHTML=`<section>
+      <h2>De la llamada al pedido</h2>
+      <div style="font-size:12px;color:var(--dim);line-height:1.55;margin:-4px 0 13px">
+        Se cuenta por <b>persona</b>, no por llamada: marcar tres veces el mismo número no son tres
+        oportunidades. El puente entre la llamada y el pedido es el teléfono.</div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:17px">
+        ${paso('Llamadas',T.ll,'marcaciones hechas')}
+        ${paso('Contestaron',T.cont,pc(T.cont,T.ll)+' de las llamadas')}
+        ${paso('Interesados',T.int,pc(T.int,T.cont)+' de los que contestaron','var(--naranja)')}
+        ${paso('En el CRM',T.crm,pc(T.crm,T.int)+' de los interesados')}
+        ${paso('Cotización',T.cot,pc(T.cot,T.int)+' de los interesados')}
+        ${paso('Pedido',T.ped,pc(T.ped,T.int)+' de los interesados','var(--ok)')}
+      </div>
+
+      <h2>Por negocio</h2>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;min-width:600px">
+        <thead><tr>
+          <th style="${TH};text-align:left">Negocio</th><th style="${TH}">Llamadas</th>
+          <th style="${TH}">Contestaron</th><th style="${TH}">Interesados</th>
+          <th style="${TH}">Cotización</th><th style="${TH}">Pedido</th>
+          <th style="${TH}">Valor cotizado</th><th style="${TH}">Costo Lupe</th></tr></thead>
+        <tbody>${filas.map(([k,g])=>`<tr>
+          <td style="${TD};text-align:left"><b>${esc(NOM[k]||k)}</b></td>
+          <td style="${TD}">${num(g.ll)}</td>
+          <td style="${TD}">${num(g.cont)} <span style="color:var(--faint);font-size:11px">${pc(g.cont,g.ll)}</span></td>
+          <td style="${TD}"><b style="color:var(--naranja)">${num(g.int)}</b> <span style="color:var(--faint);font-size:11px">${pc(g.int,g.cont)}</span></td>
+          <td style="${TD}">${num(g.cot.size)}</td>
+          <td style="${TD}">${g.ped.size?('<b style="color:var(--ok)">'+num(g.ped.size)+'</b>'):'<span style="color:var(--faint)">0</span>'}</td>
+          <td style="${TD}">${g.val?cop(g.val):'<span style="color:var(--faint);font-size:11px">no se registra</span>'}</td>
+          <td style="${TD}">${cop(g.pagado)}</td></tr>`).join('')}</tbody>
+      </table></div>
+
+      ${T.ped===0?`<div class="aviso" style="margin-top:15px">
+        <b>Ningún negocio ha marcado un “Primer pedido”.</b><br>
+        Eso no dice que no se haya vendido: dice que <b>nadie lo está anotando</b>. La etapa
+        🛒 Primer pedido del CRM está en cero para los ${num(T.int)} interesados. Mientras no se llene,
+        esta pantalla mide hasta la cotización y no más.</div>`:''}
+
+      <div style="font-size:11.5px;color:var(--dim);line-height:1.6;margin-top:13px">
+        <b>El valor</b> solo aparece en Smart, que es el único que guarda cotizaciones con total.
+        Feroz y Nido no registran el valor en ninguna tabla: por eso dice “no se registra” y no un cero —
+        un cero afirmaría que no vendieron, y eso no lo sabemos.<br>
+        <b>Costo Lupe</b> es lo que se le pagó a las telemercaderistas por esas llamadas.
+      </div>
+    </section>`;
   },
 
   vInteresados(){
