@@ -4676,15 +4676,89 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         + g.map(tarjeta).join('');
     }).join('');
 
-    this.set(`<h1>🧭 Territorio</h1>
-      <div class="sub">${centros.length} centros y ${filas.length-centros.length} municipios alrededor · corte del ${esc(corte)}</div>
+    const tot={cargados:sum('cargados'),marcables:sum('marcables'),llamadas:sum('llamadas'),
+      interesados:sum('interesados'),registrados:sum('registrados'),pedidos:sum('pedidos'),
+      pares:sum('pares'),plata:sum('plata')};
+    /* Dos maneras de ver lo mismo. El mapa es para trabajar en pantalla -se toca
+       una ciudad y se entra-; el informe es para imprimir y llevarlo a una
+       reunion, por eso ahi salen las 145 filas de una vez y sin nada que tocar. */
+    const t0=t.modo||'mapa';
+    const pas=(m,ic,tx)=>`<button onclick="App.terrModo('${m}')" style="flex:0 0 auto;padding:7px 13px;border-radius:18px;border:none;font-weight:700;font-size:12.5px;cursor:pointer;background:${(t0===m)?'var(--naranja);color:#fff':'#eef1f5;color:#555'}">${ic} ${tx}</button>`;
+    const barra=`<div class="noimp" style="display:flex;gap:6px;margin:0 0 12px">${pas('mapa','🗺️','Mapa')}${pas('informe','📋','Informe')}</div>`;
+    const cab=`<h1>🧭 Territorio</h1>
+      <div class="sub">${centros.length} centros y ${filas.length-centros.length} municipios alrededor · corte del ${esc(corte)}</div>`;
+
+    if(t0==='informe'){ this.set(cab + barra + this._terrInforme(filas, centros, tot, corte, mil)); return; }
+
+    this.set(cab + barra + `
       <div class="hint" style="margin:8px 0 12px">Primero el centro, después el anillo: si en Montería
       no hay distribuidor, no tiene sentido buscar en Cereté.</div>
-      ${this._terrCifras({cargados:sum('cargados'),marcables:sum('marcables'),llamadas:sum('llamadas'),
-        interesados:sum('interesados'),registrados:sum('registrados'),pedidos:sum('pedidos'),
-        pares:sum('pares'),plata:sum('plata')}, mil)}
+      ${this._terrCifras(tot, mil)}
       ${grupos}`);
   },
+
+  /* El informe: las 145 filas agrupadas por centro, para imprimir. No tiene nada
+     que tocar a proposito — lo que se imprime tiene que verse igual en papel. */
+  _terrInforme(filas, centros, tot, corte, mil){
+    const T=this._TERR;
+    const num=(v,col)=>`<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;font-variant-numeric:tabular-nums${col&&v?';color:'+col+';font-weight:700':''}">${v?mil(v):'<span style="color:#bbc">—</span>'}</td>`;
+    const th=t=>`<th style="text-align:right;padding:6px 8px;font-size:10px;color:#8a93a6;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #333;white-space:nowrap">${t}</th>`;
+
+    const orden=[];
+    this._TERRORD.forEach(k=>centros.filter(c=>c.estado===k)
+      .sort((a,b)=>(b.registrados-a.registrados)||(b.interesados-a.interesados)||(b.marcables-a.marcables))
+      .forEach(c=>orden.push(c)));
+
+    const cuerpo=orden.map(c=>{
+      const e=T[c.estado]||T.vacio;
+      const h=filas.filter(f=>f.centro===c.ciudad && f.nivel==='anillo').sort((a,b)=>a.km-b.km);
+      const fila=(f,es)=>`<tr${es?' style="background:#fdf6ec"':''}>
+        <td style="padding:5px 8px;border-bottom:1px solid #eceef2${es?';font-weight:700':''}">${esc(f.ciudad)}${es?` <span style="font-weight:400;font-size:10.5px;color:${e[0]}">● ${esc(e[1])}</span>`:''}</td>
+        <td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;color:#8a93a6;font-size:12px">${es?'centro':f.km+' km'}</td>
+        ${num(f.poblacion)}${num(f.cargados)}${num(f.marcables)}${num(f.interesados,'#C96A0C')}${num(f.registrados,'#1B7A4F')}${num(f.pares,'#1B7A4F')}</tr>`;
+      return fila(c,1)+h.map(x=>fila(x,0)).join('');
+    }).join('');
+
+    const sueltos=filas.filter(f=>f.nivel==='suelto').sort((a,b)=>a.km-b.km);
+    const filaS=f=>`<tr><td style="padding:5px 8px;border-bottom:1px solid #eceef2">${esc(f.ciudad)}</td>
+      <td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;color:#8a93a6;font-size:12px">${f.km} km</td>
+      ${num(f.poblacion)}${num(f.cargados)}${num(f.marcables)}${num(f.interesados,'#C96A0C')}${num(f.registrados,'#1B7A4F')}${num(f.pares,'#1B7A4F')}</tr>`;
+
+    const conDist=filas.filter(f=>f.registrados||f.pedidos)
+      .sort((a,b)=>(b.pares-a.pares)||(b.registrados-a.registrados));
+
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <h2 style="font-size:15px">📋 El territorio, ciudad por ciudad</h2>
+        <button class="btn-sm noimp" style="background:#eef2ff;color:#3a48b3" onclick="window.print()">🖨️ Imprimir</button>
+      </div>
+      <div style="font-size:11.5px;color:#8a93a6;margin:2px 0 10px">Corte del ${esc(corte)} · ${filas.length} municipios de más de 50.000 habitantes</div>
+      ${this._terrCifras(tot, mil)}
+    </div>
+
+    <div class="card" style="overflow-x:auto">
+      <h2 style="font-size:14px;margin-bottom:8px">Dónde ya hay distribuidor</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:460px">
+        <thead><tr><th style="text-align:left;padding:6px 8px;font-size:10px;color:#8a93a6;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #333">Ciudad</th>${th('Registrados')}${th('Pedidos')}${th('Pares')}${th('Facturado')}</tr></thead>
+        <tbody>${conDist.map(f=>`<tr>
+          <td style="padding:5px 8px;border-bottom:1px solid #eceef2">${esc(f.ciudad)}${f.nivel==='centro'?' <span style="font-size:10px;color:#8a93a6">centro</span>':''}</td>
+          ${num(f.registrados,'#1B7A4F')}${num(f.pedidos)}${num(f.pares,'#1B7A4F')}
+          <td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;font-variant-numeric:tabular-nums${f.plata?';color:#1B7A4F;font-weight:700':''}">${f.plata?'$'+mil(f.plata):'<span style="color:#bbc">—</span>'}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>
+
+    <div class="card" style="overflow-x:auto">
+      <h2 style="font-size:14px;margin-bottom:2px">Cada centro con su anillo</h2>
+      <div style="font-size:11.5px;color:#8a93a6;margin-bottom:8px">En el orden en que conviene trabajarlos. Las distancias son en línea recta: por carretera siempre es más.</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:640px">
+        <thead><tr><th style="text-align:left;padding:6px 8px;font-size:10px;color:#8a93a6;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #333">Municipio</th>${th('Distancia')}${th('Habitantes')}${th('Cargadas')}${th('Marcables')}${th('Interesados')}${th('Registrados')}${th('Pares')}</tr></thead>
+        <tbody>${cuerpo}
+          ${sueltos.length?`<tr style="background:#f3f4f6"><td colspan="8" style="padding:5px 8px;font-weight:700;border-bottom:1px solid #eceef2">Sueltos · a más de 300 km de cualquier centro</td></tr>`+sueltos.map(filaS).join(''):''}
+        </tbody>
+      </table>
+    </div>`;
+  },
+  terrModo(m){ this.terr=Object.assign({}, this.terr, {modo:m, ciudad:null}); this.vTerritorio(); },
   _terrCifras(d, mil){
     const caja=(q,n,c)=>`<div style="flex:1 1 92px;padding:9px 11px;background:#fff;border:1px solid var(--linea);border-radius:8px">
       <div style="font-size:19px;font-weight:800;color:${c||'inherit'}">${n}</div>
