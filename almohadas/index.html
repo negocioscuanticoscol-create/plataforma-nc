@@ -153,7 +153,7 @@ nav button.on{color:var(--ambar);font-weight:700}
    pestaña Costos. Cambiar el precio del poliuretano no debe obligar a publicar
    una versión nueva.
    =========================================================================== */
-const VER='20260920-4';
+const VER='20260920-5';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/';
 const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
@@ -416,6 +416,7 @@ async function editarAlm(id,numero,pesoActual,estado){
   const op=prompt('Almohada ' + numero + '  ·  ' + pesoActual + ' g\n\n'
     + '1 = corregir el peso\n'
     + (estado === 'empacada' ? '2 = devolverla a reposo (desempacar)\n' : '')
+    + (estado === 'descartada' ? '2 = revivirla — no estaba mala\n' : '')
     + '3 = ANULAR — salió mala, se daña o se rompe\n'
     + '4 = borrar — el registro estuvo mal hecho\n\nEscribe el número:', '1');
   if(op===null) return;
@@ -426,7 +427,7 @@ async function editarAlm(id,numero,pesoActual,estado){
     const n=+v;
     if(!n){ toast('Peso inválido',1); return; }
     if(await PATCH('alm_almohada?id=eq.'+id,{peso:n})) toast(numero+' corregida');
-  } else if(o==='2' && estado==='empacada'){
+  } else if(o==='2' && (estado==='empacada'||estado==='descartada')){
     if(await PATCH('alm_almohada?id=eq.'+id,{estado:'inyectada',empacada_en:null}))
       toast(numero+' volvió a reposo');
   } else if(o==='3'){
@@ -447,7 +448,7 @@ async function editarAlm(id,numero,pesoActual,estado){
     const r=await fetch(SB+'alm_almohada?id=eq.'+id,{method:'DELETE',headers:H});
     toast(r.ok?numero+' borrada':'No se pudo borrar',!r.ok);
   } else { return; }
-  (VISTA==='empacar'?vEmpacar:vTurnoAbierto)();
+  ({empacar:vEmpacar,inv:vInv}[VISTA]||vTurnoAbierto)();
 }
 
 async function guardarAlmohada(numero,refId,pp){
@@ -630,7 +631,8 @@ async function registrarVenta(){
    puede vender, así que contarla como inventario sería mentirse. */
 async function vInv(){
   cargando();
-  const alm=await GET('alm_almohada?select=referencia_id,estado,creado_en,empacada_en,venta_id');
+  const alm=await GET('alm_almohada?select=*&order=id.desc');
+  window._todas=alm;
   const ventas=await GET('alm_venta?select=id,fecha');
   const fVenta={}; ventas.forEach(v=>fVenta[v.id]=v.fecha);
   const dia=x=>String(x||'').slice(0,10);
@@ -690,9 +692,44 @@ async function vInv(){
       <div class="f"><span>Salieron malas o se dañaron</span><b class="mal">${tot.anu}</b></div>
       <div class="res">Siguen contando como poliuretano gastado —se hicieron— pero no
         se pueden vender.</div></div>`:''}
+    <div class="tit">Todas las almohadas</div>
+    <div class="campo"><div class="l">Buscar por número o referencia</div>
+      <input id="busca" placeholder="B1-24, corazón…" oninput="pintarTodas()"></div>
+    <div class="caja" id="todas"></div>
     <div class="res" style="border-radius:11px;border:1px solid var(--linea)">
       Entra al inventario cuando se empaca, no cuando se inyecta: en reposo
       todavía no se puede vender.</div>`);
+  pintarTodas();
+}
+
+/* La lista completa, con su lápiz. Hacía falta porque con el turno CERRADO no
+   había forma de llegar a una almohada: en Turno solo salen las del turno
+   abierto, y en Empacar solo las que ya cumplieron el reposo. Una almohada mal
+   pesada quedaba encerrada, arrastrando su error por el balance para siempre. */
+function pintarTodas(){
+  const q=(($('busca')||{}).value||'').trim().toLowerCase();
+  const ETQ={inyectada:'en reposo',empacada:'lista',vendida:'vendida',descartada:'anulada'};
+  const COL={inyectada:'esp',empacada:'ok',vendida:'',descartada:'mal'};
+  let l=(window._todas||[]);
+  if(q) l=l.filter(x=>{ const r=REFS.find(y=>y.id==x.referencia_id)||{};
+    return String(x.numero||'').toLowerCase().includes(q)
+        || String(r.nombre||'').toLowerCase().includes(q); });
+  const top=l.slice(0,40);
+  $('todas').innerHTML = top.length ? top.map(x=>{
+    const r=REFS.find(y=>y.id==x.referencia_id)||{};
+    const pp=x.peso_pensado||r.peso_previsto||0;
+    const d=x.peso-pp;
+    const bien=pp?Math.abs(d/pp*100)<=(r.tolerancia||8):true;
+    return `<div class="f"><span><b>${esc(x.numero)}</b>
+        <span style="color:var(--tenue);font-size:12px"> ${esc(r.nombre||'')}</span>
+        <div style="font-size:12px;color:var(--tenue)">${num(x.peso)} g
+          ${pp?`<span class="${bien?'ok':'mal'}">${d>0?'+':''}${num(d)}</span>`:''}</div></span>
+      <span style="display:flex;align-items:center;gap:7px">
+        <span class="chip ${COL[x.estado]||''}">${ETQ[x.estado]||x.estado}</span>
+        <button class="lap" onclick="editarAlm(${x.id},'${esc(x.numero)}',${x.peso},'${x.estado}')">✏️</button>
+      </span></div>`; }).join('')
+    + (l.length>40?`<div class="res">Se ven 40 de ${l.length}. Usa el buscador.</div>`:'')
+    : '<div class="vacio">Ninguna coincide.</div>';
 }
 
 /* ===================== CIERRE DEL DÍA ===================== */
