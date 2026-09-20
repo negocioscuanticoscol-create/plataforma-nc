@@ -153,7 +153,7 @@ nav button.on{color:var(--ambar);font-weight:700}
    pestaña Costos. Cambiar el precio del poliuretano no debe obligar a publicar
    una versión nueva.
    =========================================================================== */
-const VER='20260920-2';
+const VER='20260920-3';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/';
 const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
@@ -405,22 +405,35 @@ function cmpPeso(pp,tol){
 }
 /* Corregir o borrar una almohada mal registrada. Se pregunta el peso nuevo; si
    se deja vacío, se borra el registro y ese número queda libre otra vez. */
-async function editar(id,numero,pesoActual){
-  const v=prompt('Almohada ' + numero + ' — peso correcto en gramos.\n'
-    + 'Deja el campo vacío para BORRAR este registro.', pesoActual);
-  if(v===null) return;
-  const t=v.trim();
-  if(t===''){
+async function editar(id,numero,pesoActual){ return editarAlm(id,numero,pesoActual,'inyectada'); }
+
+/* El lápiz, que funciona igual en Turno y en Empacar. Tres salidas: corregir el
+   peso, devolver la almohada al paso anterior, o borrarla del todo.
+   Un peso mal tecleado arrastra el balance del turno y el costo del día, y una
+   casilla marcada por error saca del inventario una almohada que sí está. Las
+   dos cosas tienen que poder deshacerse sin salir de la pantalla. */
+async function editarAlm(id,numero,pesoActual,estado){
+  const op=prompt('Almohada ' + numero + '  ·  ' + pesoActual + ' g\n\n'
+    + '1 = corregir el peso\n'
+    + (estado === 'empacada' ? '2 = devolverla a reposo (desempacar)\n' : '')
+    + '3 = borrar el registro\n\nEscribe el número:', '1');
+  if(op===null) return;
+  const o=op.trim();
+  if(o==='1'){
+    const v=prompt('Peso correcto en gramos', pesoActual);
+    if(v===null) return;
+    const n=+v;
+    if(!n){ toast('Peso inválido',1); return; }
+    if(await PATCH('alm_almohada?id=eq.'+id,{peso:n})) toast(numero+' corregida');
+  } else if(o==='2' && estado==='empacada'){
+    if(await PATCH('alm_almohada?id=eq.'+id,{estado:'inyectada',empacada_en:null}))
+      toast(numero+' volvió a reposo');
+  } else if(o==='3'){
     if(!confirm('¿Borrar '+numero+'? El número queda libre para usarse otra vez.')) return;
     const r=await fetch(SB+'alm_almohada?id=eq.'+id,{method:'DELETE',headers:H});
     toast(r.ok?numero+' borrada':'No se pudo borrar',!r.ok);
-  } else {
-    const n=+t;
-    if(!n){ toast('Peso inválido',1); return; }
-    const ok=await PATCH('alm_almohada?id=eq.'+id,{peso:n});
-    if(ok) toast(numero+' corregida');
-  }
-  vTurnoAbierto();
+  } else { return; }
+  (VISTA==='empacar'?vEmpacar:vTurnoAbierto)();
 }
 
 async function guardarAlmohada(numero,refId,pp){
@@ -484,20 +497,31 @@ async function vEmpacar(){
   const fila=x=>{ const r=REFS.find(y=>y.id==x.referencia_id)||{};
     return `<div class="chk"><div class="bx" onclick="empacar(${x.id})"></div>
       <span class="id">${esc(x.numero)}</span>
-      <span class="g">${Math.floor(x.h)} h · ${num(x.peso)} g</span></div>`; };
+      <span class="g">${Math.floor(x.h)} h · ${num(x.peso)} g</span>
+      <button class="lap" onclick="editarAlm(${x.id},'${esc(x.numero)}',${x.peso},'inyectada')">✏️</button>
+      </div>`; };
   /* Se muestran las horas que LLEVA, no solo las que faltan: así se ve de una
      cuánto tiempo lleva esa almohada en la estantería. */
   const filaEsp=x=>`<div class="chk"><div class="bx" style="border-style:dashed"></div>
       <span class="id" style="color:var(--tenue)">${esc(x.numero)}</span>
       <span class="g">lleva ${Math.floor(x.h)} h
         <span class="chip esp">faltan ${Math.ceil(hrs-x.h)} h</span></span></div>`;
-  const inv=await GET('alm_almohada?select=referencia_id&estado=eq.empacada');
+  const inv=await GET('alm_almohada?select=*&estado=eq.empacada&order=empacada_en.desc');
   const porRef={}; inv.forEach(x=>porRef[x.referencia_id]=(porRef[x.referencia_id]||0)+1);
+  /* Las últimas empacadas quedan a la mano: marcar la casilla equivocada es el
+     error más fácil de cometer en esta pantalla. */
+  const ultEmp=inv.slice(0,5).map(x=>`<div class="chk">
+      <div class="bx si">✓</div><span class="id">${esc(x.numero)}</span>
+      <span class="g">empacada</span>
+      <button class="lap" onclick="editarAlm(${x.id},'${esc(x.numero)}',${x.peso},'empacada')">✏️</button>
+    </div>`).join('');
   set('Empacar','Reposo de<br>'+hrs+' horas',`
     ${listas.length?`<div class="tit">Listas · reposo cumplido (${listas.length})</div>
       <div class="caja">${listas.map(fila).join('')}</div>`:'<div class="vacio">Ninguna cumplió el reposo todavía.</div>'}
     ${esperando.length?`<div class="tit">Todavía en reposo (${esperando.length})</div>
       <div class="caja">${esperando.map(filaEsp).join('')}</div>`:''}
+    ${ultEmp?`<div class="tit">Últimas empacadas · por si hay que deshacer</div>
+      <div class="caja">${ultEmp}</div>`:''}
     <div class="tit">En inventario</div>
     <div class="caja">${REFS.map(r=>`<div class="f"><span>${esc(r.nombre)}</span>
       <b>${porRef[r.id]||0}</b></div>`).join('')}</div>`);
