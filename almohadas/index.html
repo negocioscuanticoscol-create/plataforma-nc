@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Almohadas Crudas">
+<meta name="theme-color" content="#1A1917">
+<title>Almohadas Crudas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --espuma:#F2EFE9; --papel:#FBFAF7; --tinta:#1A1917;
+  --ambar:#C2620A; --ambar-cl:#FDF0E1;
+  --verde:#15713D; --verde-cl:#E6F4EA;
+  --rojo:#AD2E24; --rojo-cl:#FBEAE8;
+  --linea:#DBD5CA; --tenue:#78736A;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--espuma);color:var(--tinta);
+  font:400 15px/1.5 Barlow,system-ui,-apple-system,sans-serif;
+  padding-top:env(safe-area-inset-top)}
+h1,h2,.cond{font-family:"Barlow Condensed",Barlow,sans-serif}
+input,select,button,textarea{font-family:inherit;font-size:16px}
+
+/* ---- login ---- */
+#login{min-height:100dvh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:24px;gap:14px}
+#login h1{font-size:40px;font-weight:700;text-transform:uppercase;margin:0;text-align:center;
+  line-height:.95;letter-spacing:.01em}
+#login .sub{color:var(--tenue);font-size:13px;letter-spacing:.16em;text-transform:uppercase;
+  margin-bottom:10px}
+#login input{width:100%;max-width:280px;padding:15px;border:1.5px solid var(--linea);
+  border-radius:12px;text-align:center;background:var(--papel)}
+#login button{width:100%;max-width:280px}
+
+/* ---- armazón ---- */
+#app{max-width:520px;margin:0 auto;padding:0 0 100px;display:none}
+.top{background:var(--tinta);color:var(--espuma);padding:12px 15px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;
+  position:sticky;top:0;z-index:20}
+.top .t{font:700 19px "Barlow Condensed",sans-serif;text-transform:uppercase;letter-spacing:.04em}
+.top .s{font-size:11px;opacity:.72;text-align:right;line-height:1.3}
+main{padding:14px;display:flex;flex-direction:column;gap:11px}
+nav{position:fixed;bottom:0;left:0;right:0;max-width:520px;margin:0 auto;background:var(--papel);
+  border-top:1px solid var(--linea);display:flex;z-index:20;
+  padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:none;padding:9px 2px;font-size:10px;color:var(--tenue);
+  display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+nav button .i{font-size:19px}
+nav button.on{color:var(--ambar);font-weight:700}
+
+/* ---- piezas ---- */
+.tit{font:600 10px Barlow,sans-serif;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--tenue);margin:4px 0 -3px}
+.caja{border:1px solid var(--linea);border-radius:12px;overflow:hidden;background:var(--papel)}
+.f{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;
+  border-bottom:1px solid var(--linea);font-size:14px}
+.f:last-child{border-bottom:none}
+.f b{font-variant-numeric:tabular-nums}
+.par{display:grid;grid-template-columns:1fr 104px;gap:8px;align-items:center;padding:9px 11px;
+  border-bottom:1px solid var(--linea)}
+.par:last-child{border-bottom:none}
+.par .pn{font-size:14px;font-weight:600}
+.par .pn small{display:block;font-weight:400;color:var(--tenue);font-size:11.5px;margin-top:1px}
+.par input{width:100%;border:1px solid var(--ambar);background:var(--ambar-cl);border-radius:8px;
+  padding:8px 5px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums;color:var(--tinta)}
+.res{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;
+  background:var(--espuma);font-size:12.5px;color:var(--tenue)}
+.res b{color:var(--tinta);font-size:15px;font-variant-numeric:tabular-nums}
+.btn{border:none;border-radius:12px;padding:15px;font-weight:700;background:var(--ambar);
+  color:#fff;width:100%;cursor:pointer}
+.btn.sec{background:transparent;color:var(--tinta);border:1.5px solid var(--linea)}
+.btn.verde{background:var(--verde)}
+.btn:disabled{opacity:.4}
+.campo{border:1px solid var(--linea);border-radius:12px;padding:9px 12px;background:var(--papel)}
+.campo .l{font:600 10px Barlow,sans-serif;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--tenue);margin-bottom:3px}
+.campo input,.campo select{width:100%;border:none;background:none;padding:0;font-size:16px;
+  font-weight:600;color:var(--tinta)}
+.campo.sel{border-color:var(--ambar);background:var(--ambar-cl)}
+.tira{display:flex;gap:7px}
+.tira>div{flex:1;background:var(--papel);border:1px solid var(--linea);border-radius:11px;padding:10px}
+.tira .n{font:700 23px/1 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums}
+.tira .l{font-size:9.5px;color:var(--tenue);text-transform:uppercase;letter-spacing:.06em;margin-top:3px}
+.grande{background:var(--tinta);color:var(--espuma);border-radius:13px;padding:16px;text-align:center}
+.grande .n{font:700 38px/1 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums}
+.grande .l{font-size:10.5px;opacity:.75;text-transform:uppercase;letter-spacing:.09em;margin-top:5px}
+.etiq{border:2px dashed var(--tinta);border-radius:11px;padding:13px;text-align:center;background:var(--papel)}
+.etiq .r{font:600 10px Barlow,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--tenue)}
+.etiq .c{font:700 34px/1 "Barlow Condensed",sans-serif;letter-spacing:.05em;margin-top:3px}
+.peso{border:2.5px solid var(--ambar);border-radius:15px;padding:14px;text-align:center;
+  background:var(--ambar-cl)}
+.peso .l{font:600 10.5px Barlow,sans-serif;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ambar);margin-bottom:5px}
+.peso input{width:100%;border:none;background:none;text-align:center;
+  font:700 46px/1 "Barlow Condensed",sans-serif;font-variant-numeric:tabular-nums;color:var(--tinta)}
+.peso .cmp{margin-top:6px;font-size:12.5px;font-weight:600;min-height:18px}
+.chip{font:600 10.5px Barlow,sans-serif;padding:3px 8px;border-radius:9px;white-space:nowrap}
+.chip.ok{background:var(--verde-cl);color:var(--verde)}
+.chip.mal{background:var(--rojo-cl);color:var(--rojo)}
+.chip.esp{background:var(--ambar-cl);color:var(--ambar)}
+.ok{color:var(--verde)} .mal{color:var(--rojo)} .amb{color:var(--ambar)}
+.f.tot{background:var(--espuma);font-weight:700;border-bottom:none}
+.f.perd{background:var(--rojo-cl);border-bottom:none}
+.f.perd b{color:var(--rojo)}
+.vacio{text-align:center;color:var(--tenue);padding:26px 12px;font-size:14px}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;padding:10px 4px;border:1px solid var(--linea);border-radius:10px;
+  background:var(--papel);color:var(--tenue);font-weight:600;font-size:13px;cursor:pointer}
+.seg button.on{background:var(--tinta);color:var(--espuma);border-color:var(--tinta)}
+.chk{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--linea)}
+.chk:last-child{border-bottom:none}
+.chk .bx{width:24px;height:24px;border-radius:7px;border:2px solid var(--linea);flex:none;
+  display:flex;align-items:center;justify-content:center;font-weight:700;cursor:pointer}
+.chk .bx.si{background:var(--verde);border-color:var(--verde);color:#fff}
+.chk .id{font-weight:700;font-variant-numeric:tabular-nums}
+.chk .g{margin-left:auto;color:var(--tenue);font-size:12.5px}
+#toast{position:fixed;left:12px;right:12px;bottom:calc(76px + env(safe-area-inset-bottom));
+  background:var(--tinta);color:var(--espuma);padding:13px;border-radius:12px;text-align:center;
+  font-weight:600;z-index:60;display:none;font-size:14px}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1>Almohadas<br>Crudas</h1>
+  <div class="sub">Poliuretano viscoelástico</div>
+  <input id="clave" type="password" placeholder="Clave" autocomplete="current-password">
+  <button class="btn" onclick="entrar()">Entrar</button>
+  <div id="loginMsg" style="color:var(--rojo);font-size:13.5px;min-height:20px"></div>
+</div>
+
+<div id="app">
+  <div class="top"><div class="t" id="topT">—</div><div class="s" id="topS"></div></div>
+  <main id="main"></main>
+  <nav id="nav"></nav>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ===========================================================================
+   ALMOHADAS CRUDAS — control de producción de almohadas de poliuretano.
+
+   Todo gira alrededor del BALANCE DE MASA:
+       kg que entran = peso de las almohadas + purgas + pérdida sin explicar
+   Esa última línea es el número que hoy nadie mide, y es el que la app saca
+   solo al cerrar cada turno.
+
+   Los costos NO están en este código: viven en alm_param y se editan desde la
+   pestaña Costos. Cambiar el precio del poliuretano no debe obligar a publicar
+   una versión nueva.
+   =========================================================================== */
+const VER='20260920-1';
+const SB='https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/';
+const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+
+const $=s=>document.getElementById(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const cop=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+const num=(n,d)=>(+n||0).toLocaleString('es-CO',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});
+const hoy=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'America/Bogota'});
+
+function toast(t,malo){
+  const d=$('toast'); d.textContent=t;
+  d.style.background=malo?'var(--rojo)':'var(--tinta)';
+  d.style.display='block'; clearTimeout(d._t);
+  d._t=setTimeout(()=>d.style.display='none',2600);
+}
+
+/* PostgREST corta en 1.000 filas sin avisar. Todo lo que pueda crecer se pide
+   paginado: las almohadas pasan de mil en pocas semanas. */
+async function GET(p){
+  let out=[],off=0;
+  for(;;){
+    const r=await fetch(SB+p+(p.includes('?')?'&':'?')+'limit=1000&offset='+off,{headers:H});
+    if(!r.ok) return out;
+    const b=await r.json(); out=out.concat(b);
+    if(b.length<1000) return out;
+    off+=1000;
+  }
+}
+async function POST(t,b,pref){
+  const r=await fetch(SB+t,{method:'POST',
+    headers:{...H,Prefer:pref||'return=representation'},body:JSON.stringify(b)});
+  if(!r.ok){ toast('No se pudo guardar',1); return null; }
+  return pref==='return=minimal'?true:await r.json();
+}
+async function PATCH(t,b){
+  const r=await fetch(SB+t,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},
+    body:JSON.stringify(b)});
+  if(!r.ok) toast('No se pudo guardar',1);
+  return r.ok;
+}
+
+/* ---- estado ---- */
+let PARAM={}, REFS=[], TURNO=null, VISTA='turno', REPARTO=[];
+let vSel=null, vItems=[], vIva=true, vTipo='empresa';
+
+const P=k=>+(PARAM[k]||0);
+const diaEspacio=()=>P('espacio_dias')?P('espacio_periodo')/P('espacio_dias'):0;
+
+async function cargar(){
+  const [pa,re,rp]=await Promise.all([
+    GET('alm_param?select=*'), GET('alm_referencia?select=*&order=orden'),
+    GET('alm_reparto?select=*&order=desde')]);
+  PARAM={}; pa.forEach(x=>PARAM[x.clave]=x.valor!=null?x.valor:x.texto);
+  window._paramFilas=pa; REFS=re; REPARTO=rp;
+  const t=await GET('alm_turno?select=*&cerrado_en=is.null&order=id.desc');
+  TURNO=t[0]||null;
+}
+
+/* ===================== LOGIN ===================== */
+async function entrar(){
+  const c=$('clave').value.trim();
+  $('loginMsg').textContent='Entrando…';
+  const r=await GET("alm_param?select=texto&clave=eq.clave_app");
+  if(!r.length){ $('loginMsg').textContent='No pude leer la configuración.'; return; }
+  if(c!==r[0].texto){ $('loginMsg').textContent='Clave incorrecta.'; return; }
+  try{ localStorage.setItem('alm:ok','1'); }catch(e){}
+  $('login').style.display='none'; $('app').style.display='block';
+  await cargar(); pintarNav(); ir('turno');
+}
+try{ if(localStorage.getItem('alm:ok')==='1'){
+  $('login').style.display='none'; $('app').style.display='block';
+  cargar().then(()=>{ pintarNav(); ir('turno'); });
+} }catch(e){}
+
+/* ===================== NAVEGACIÓN ===================== */
+const VISTAS=[['turno','🏭','Turno'],['empacar','📦','Empacar'],['vender','🏷️','Vender'],
+              ['dia','📅','Día'],['resumen','📊','Resumen'],['costos','⚙️','Costos']];
+function pintarNav(){
+  $('nav').innerHTML=VISTAS.map(([v,i,t])=>
+    `<button class="${v===VISTA?'on':''}" onclick="ir('${v}')"><span class="i">${i}</span>${t}</button>`).join('');
+}
+function ir(v){ VISTA=v; pintarNav(); window.scrollTo(0,0);
+  ({turno:vTurno,empacar:vEmpacar,vender:vVender,dia:vDia,resumen:vResumen,costos:vCostos}[v])(); }
+function set(t,s,html){ $('topT').textContent=t; $('topS').innerHTML=s||''; $('main').innerHTML=html; }
+const cargando=()=>set('…','', '<div class="vacio">Cargando…</div>');
+
+/* ===================== COSTOS ===================== */
+/* Cada bloque muestra la división y el resultado, no solo el dato suelto: si el
+   número quedó mal tecleado se nota ahí mismo sin sacar calculadora. */
+function vCostos(){
+  const g={}; (window._paramFilas||[]).forEach(x=>{
+    if(x.clave==='clave_app'||x.clave==='bolsas_stock') return;
+    (g[x.grupo||'Otros']=g[x.grupo||'Otros']||[]).push(x); });
+  const campo=x=>`<div class="par"><div class="pn">${esc(nombreParam(x.clave))}
+      ${x.formula?`<small>${esc(x.formula)}</small>`:''}</div>
+      <input id="p_${x.clave}" type="number" inputmode="decimal" value="${x.valor!=null?x.valor:''}"></div>`;
+  const orden=['Fijos','Mano de obra','Materiales','Insumos','Proporciones','Producción','Venta'];
+  let html='';
+  orden.forEach(k=>{ if(!g[k]) return;
+    html+=`<div class="tit">${k}</div><div class="caja">${g[k].sort((a,b)=>a.orden-b.orden).map(campo).join('')}
+      ${resumenGrupo(k)}</div>`; });
+  html+=`<div class="tit">Referencias</div><div class="caja">`+REFS.map(r=>
+    `<div class="par"><div class="pn">${esc(r.nombre)}<small>marca ${esc(r.prefijo)} · peso previsto en gramos</small></div>
+      <input id="r_${r.id}" type="number" inputmode="decimal" value="${r.peso_previsto||''}"></div>`).join('')
+    +`</div>
+    <div class="tit">Precios de venta</div><div class="caja">`+REFS.map(r=>
+    `<div class="par" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:5px">
+      <div class="pn" style="font-size:12.5px">${esc(r.nombre)}</div>
+      <input id="p1_${r.id}" type="number" inputmode="numeric" placeholder="1" value="${r.precio_1||''}">
+      <input id="p3_${r.id}" type="number" inputmode="numeric" placeholder="3+" value="${r.precio_3||''}">
+      <input id="p5_${r.id}" type="number" inputmode="numeric" placeholder="5+" value="${r.precio_5||''}">
+    </div>`).join('')+`</div>
+    <button class="btn" onclick="guardarCostos()">Guardar costos</button>`;
+  set('Costos','Se configura<br>una vez',html);
+}
+function nombreParam(k){
+  return {espacio_periodo:'Arriendo del espacio',espacio_dias:'Se divide en (días)',
+    mano_obra_unidad:'Mano de obra por almohada',precio_poliuretano:'Poliuretano',
+    precio_cloruro:'Cloruro',precio_desmoldante:'Desmoldante',precio_pasta:'Pasta · pigmento',
+    costo_bolsa:'Bolsa',pct_desmoldante:'Desmoldante %',pct_pigmento:'Pasta %',
+    horas_reposo:'Reposo antes de embolsar',iva:'IVA'}[k]||k;
+}
+function resumenGrupo(k){
+  if(k==='Fijos') return `<div class="res"><span>Cada día que se abre turno cuesta</span><b>${cop(diaEspacio())}</b></div>`;
+  if(k==='Mano de obra') return `<div class="res"><span>Un día de 100 almohadas</span><b>${cop(P('mano_obra_unidad')*100)}</b></div>`;
+  if(k==='Materiales') return `<div class="res"><span>10 kg de poliuretano</span><b>${cop(P('precio_poliuretano')*10)}</b></div>`;
+  return '';
+}
+async function guardarCostos(){
+  for(const x of (window._paramFilas||[])){
+    const e=$('p_'+x.clave); if(!e) continue;
+    const v=e.value===''?null:+e.value;
+    if(v!==x.valor){ await PATCH('alm_param?clave=eq.'+encodeURIComponent(x.clave),{valor:v}); }
+  }
+  for(const r of REFS){
+    const b={peso_previsto:+$('r_'+r.id).value||r.peso_previsto,
+      precio_1:$('p1_'+r.id).value===''?null:+$('p1_'+r.id).value,
+      precio_3:$('p3_'+r.id).value===''?null:+$('p3_'+r.id).value,
+      precio_5:$('p5_'+r.id).value===''?null:+$('p5_'+r.id).value};
+    await PATCH('alm_referencia?id=eq.'+r.id,b);
+  }
+  await cargar(); toast('Costos guardados'); vCostos();
+}
+
+/* ===================== TURNO ===================== */
+function vTurno(){ TURNO?vTurnoAbierto():vAbrirTurno(); }
+
+/* Abrir turno es usar un día de bodega: desde ese toque se cobra. */
+function vAbrirTurno(){
+  const filas=REFS.map(r=>`<div class="par" style="grid-template-columns:1fr 62px 72px;gap:6px">
+      <div class="pn" style="font-size:13px">${esc(r.nombre)}<small>marca ${esc(r.prefijo)}</small></div>
+      <input id="c_${r.id}" type="number" inputmode="numeric" placeholder="0">
+      <input id="w_${r.id}" type="number" inputmode="numeric" value="${r.peso_previsto||''}"></div>`).join('');
+  set('Abrir turno',hoy(),`
+    <div class="tit">Poliuretano que se carga</div>
+    <div class="campo sel"><div class="l">Kilos para este turno</div>
+      <input id="kg" type="number" inputmode="decimal" placeholder="0,0"></div>
+    <div class="tit">Corridas que se piensan hacer</div>
+    <div class="caja">
+      <div class="res"><span>Referencia</span><span>Cant. · Peso g</span></div>${filas}</div>
+    <div class="caja"><div class="res"><span>Abrir turno cobra el día de bodega</span>
+      <b>${cop(diaEspacio())}</b></div></div>
+    <button class="btn" onclick="abrirTurno()">Abrir turno · usar el día</button>`);
+}
+async function abrirTurno(){
+  const kg=+$('kg').value;
+  if(!kg){ toast('Falta el poliuretano que se carga',1); return; }
+  const t=await POST('alm_turno',[{fecha:hoy(),kg_cargados:kg}]);
+  if(!t) return;
+  const id=t[0].id, plan=[];
+  REFS.forEach(r=>{ const c=+$('c_'+r.id).value||0;
+    if(c) plan.push({turno_id:id,referencia_id:r.id,cantidad:c,peso_pensado:+$('w_'+r.id).value||r.peso_previsto}); });
+  if(plan.length) await POST('alm_turno_plan',plan,'return=minimal');
+  /* El día de bodega se carga AQUÍ y no al cerrar: el dueño de la bodega cobra
+     por día usado, y el día se usó desde que se abrió. */
+  await POST('alm_gasto',[{fecha:hoy(),concepto:'espacio',valor:diaEspacio(),
+    detalle:'Día de bodega · turno '+id}],'return=minimal');
+  await cargar(); toast('Turno abierto'); vTurno();
+}
+
+async function vTurnoAbierto(){
+  cargando();
+  const [alm,plan]=await Promise.all([
+    GET('alm_almohada?select=*&turno_id=eq.'+TURNO.id+'&order=id.desc'),
+    GET('alm_turno_plan?select=*&turno_id=eq.'+TURNO.id)]);
+  window._alm=alm;
+  const kgUsados=alm.reduce((a,x)=>a+(+x.peso||0),0)/1000;
+  const porRef={}; alm.forEach(x=>porRef[x.referencia_id]=(porRef[x.referencia_id]||0)+1);
+  const sel=vSel||(plan[0]&&plan[0].referencia_id)||(REFS[0]&&REFS[0].id);
+  vSel=sel;
+  const ref=REFS.find(r=>r.id==sel)||REFS[0];
+  const pp=(plan.find(p=>p.referencia_id==sel)||{}).peso_pensado||(ref&&ref.peso_previsto)||0;
+  const sig=(ref?ref.prefijo:'')+'-'+(await consecutivo(ref));
+
+  const listaPlan=plan.map(p=>{ const r=REFS.find(x=>x.id==p.referencia_id)||{};
+    const h=porRef[p.referencia_id]||0;
+    return `<div class="f"><span>${esc(r.nombre)}</span>
+      <b class="${h>=p.cantidad?'ok':''}">${h} de ${p.cantidad}</b></div>`; }).join('');
+  const ultimas=alm.slice(0,4).map(x=>{ const r=REFS.find(y=>y.id==x.referencia_id)||{};
+    const d=x.peso-(x.peso_pensado||0), pc=x.peso_pensado?Math.round(d/x.peso_pensado*100):0;
+    const bien=Math.abs(pc)<=(r.tolerancia||8);
+    return `<div class="f"><span><b>${esc(x.numero)}</b> · ${num(x.peso)} g</span>
+      <span class="chip ${bien?'ok':'mal'}">${d>0?'+':''}${num(d)} g</span></div>`;}).join('');
+
+  set('Turno abierto',TURNO.fecha+'<br>'+alm.length+' hechas',`
+    <div class="tira">
+      <div><div class="n">${alm.length}</div><div class="l">hechas</div></div>
+      <div><div class="n">${num(kgUsados,1)}</div><div class="l">kg usados</div></div>
+      <div><div class="n">${num((TURNO.kg_cargados||0)-kgUsados,1)}</div><div class="l">kg quedan</div></div>
+    </div>
+    <div class="campo sel"><div class="l">Referencia que está registrando</div>
+      <select id="selRef" onchange="vSel=this.value;vTurnoAbierto()">
+        ${REFS.map(r=>`<option value="${r.id}" ${r.id==sel?'selected':''}>${esc(r.nombre)}</option>`).join('')}
+      </select></div>
+    <div class="etiq"><div class="r">Marque esta almohada</div><div class="c">${esc(sig)}</div></div>
+    <div class="peso"><div class="l">Peso real · debía pesar ${num(pp)} g</div>
+      <input id="peso" type="number" inputmode="decimal" placeholder="0" oninput="cmpPeso(${pp},${ref?ref.tolerancia||8:8})">
+      <div class="cmp" id="cmp"></div></div>
+    <button class="btn" onclick="guardarAlmohada('${esc(sig)}',${sel},${pp})">Guardar y dar el siguiente</button>
+    ${listaPlan?`<div class="tit">Contra el plan</div><div class="caja">${listaPlan}</div>`:''}
+    ${ultimas?`<div class="tit">Últimas registradas</div><div class="caja">${ultimas}</div>`:''}
+    <button class="btn sec" onclick="ir('cerrar')">Cerrar turno</button>`);
+  $('peso').focus();
+}
+/* El consecutivo corre por referencia y sigue de un turno a otro: B1-241 es la
+   Básica 1 número 241 desde que arrancó el negocio. */
+async function consecutivo(ref){
+  if(!ref) return 1;
+  const r=await GET('alm_almohada?select=numero&referencia_id=eq.'+ref.id);
+  let max=0;
+  r.forEach(x=>{ const n=+String(x.numero).split('-').pop(); if(n>max) max=n; });
+  return max+1;
+}
+function cmpPeso(pp,tol){
+  const v=+$('peso').value, e=$('cmp');
+  if(!v||!pp){ e.textContent=''; return; }
+  const d=v-pp, pc=d/pp*100, bien=Math.abs(pc)<=tol;
+  e.className='cmp '+(bien?'ok':'mal');
+  e.textContent=(bien?'✓ ':'✗ ')+(d>0?'+':'')+num(d)+' g · '+(d>0?'+':'')+num(pc,1)+'%';
+}
+async function guardarAlmohada(numero,refId,pp){
+  const p=+$('peso').value;
+  if(!p){ toast('Falta el peso',1); return; }
+  const ok=await POST('alm_almohada',[{numero,turno_id:TURNO.id,referencia_id:+refId,
+    peso:p,peso_pensado:pp}],'return=minimal');
+  if(ok){ toast(numero+' guardada'); vTurnoAbierto(); }
+}
+
+/* ---- cerrar turno ---- */
+async function vCerrar(){
+  cargando();
+  const alm=await GET('alm_almohada?select=peso&turno_id=eq.'+TURNO.id);
+  const kgAlm=alm.reduce((a,x)=>a+(+x.peso||0),0)/1000;
+  set('Cerrar turno',TURNO.fecha,`
+    <div class="tit">Mermas del turno</div>
+    <div class="campo sel"><div class="l">Purga contaminada · se bota (kg)</div>
+      <input id="pc" type="number" inputmode="decimal" placeholder="0,0" oninput="balance(${kgAlm})"></div>
+    <div class="campo sel"><div class="l">Purga no contaminada · se reúsa (kg)</div>
+      <input id="pl" type="number" inputmode="decimal" placeholder="0,0" oninput="balance(${kgAlm})"></div>
+    <div class="campo"><div class="l">Poliuretano devuelto a bodega (kg)</div>
+      <input id="dev" type="number" inputmode="decimal" placeholder="0,0" oninput="balance(${kgAlm})"></div>
+    <div id="bal"></div>
+    <button class="btn verde" onclick="cerrarTurno(${kgAlm})">Cerrar turno</button>
+    <button class="btn sec" onclick="ir('turno')">Volver</button>`);
+  balance(kgAlm);
+}
+function balance(kgAlm){
+  const pc=+$('pc').value||0, pl=+$('pl').value||0, dev=+$('dev').value||0;
+  const car=+TURNO.kg_cargados||0, sin=car-kgAlm-pc-pl-dev;
+  $('bal').innerHTML=`<div class="caja">
+    <div class="f"><span>Entró al turno</span><b>${num(car,1)} kg</b></div>
+    <div class="f"><span>En las almohadas</span><b>${num(kgAlm,1)} kg</b></div>
+    <div class="f"><span>Purgas</span><b>${num(pc+pl,1)} kg</b></div>
+    <div class="f"><span>Devuelto</span><b>${num(dev,1)} kg</b></div>
+    <div class="f perd"><span>Sin explicar · merma</span>
+      <b>${num(sin,1)} kg · ${cop(sin*P('precio_poliuretano'))}</b></div></div>`;
+}
+async function cerrarTurno(kgAlm){
+  const pc=+$('pc').value||0, pl=+$('pl').value||0;
+  await PATCH('alm_turno?id=eq.'+TURNO.id,{cerrado_en:new Date().toISOString(),
+    purga_contaminada:pc,purga_limpia:pl});
+  /* La mano de obra se carga al cerrar, por unidad fabricada. */
+  const alm=await GET('alm_almohada?select=id&turno_id=eq.'+TURNO.id);
+  if(alm.length) await POST('alm_gasto',[{fecha:TURNO.fecha,concepto:'mano de obra',
+    valor:alm.length*P('mano_obra_unidad'),detalle:alm.length+' almohadas'}],'return=minimal');
+  await cargar(); toast('Turno cerrado'); ir('dia');
+}
+
+/* ===================== EMPACAR ===================== */
+/* Solo se pueden embolsar las que ya cumplieron el reposo: una almohada
+   embolsada antes de tiempo se deforma. */
+async function vEmpacar(){
+  cargando();
+  const alm=await GET('alm_almohada?select=*&estado=eq.inyectada&order=creado_en');
+  const hrs=P('horas_reposo')||24, ahora=Date.now();
+  const listas=[], esperando=[];
+  alm.forEach(x=>{ const h=(ahora-new Date(x.creado_en).getTime())/3600000;
+    (h>=hrs?listas:esperando).push({...x,h}); });
+  const fila=x=>{ const r=REFS.find(y=>y.id==x.referencia_id)||{};
+    return `<div class="chk"><div class="bx" onclick="empacar(${x.id})"></div>
+      <span class="id">${esc(x.numero)}</span>
+      <span class="g">${Math.floor(x.h)} h · ${num(x.peso)} g</span></div>`; };
+  const filaEsp=x=>`<div class="chk"><div class="bx" style="border-style:dashed"></div>
+      <span class="id" style="color:var(--tenue)">${esc(x.numero)}</span>
+      <span class="g"><span class="chip esp">faltan ${Math.ceil(hrs-x.h)} h</span></span></div>`;
+  const inv=await GET('alm_almohada?select=referencia_id&estado=eq.empacada');
+  const porRef={}; inv.forEach(x=>porRef[x.referencia_id]=(porRef[x.referencia_id]||0)+1);
+  set('Empacar','Reposo de<br>'+hrs+' horas',`
+    ${listas.length?`<div class="tit">Listas · reposo cumplido (${listas.length})</div>
+      <div class="caja">${listas.map(fila).join('')}</div>`:'<div class="vacio">Ninguna cumplió el reposo todavía.</div>'}
+    ${esperando.length?`<div class="tit">Todavía en reposo (${esperando.length})</div>
+      <div class="caja">${esperando.map(filaEsp).join('')}</div>`:''}
+    <div class="tit">En inventario</div>
+    <div class="caja">${REFS.map(r=>`<div class="f"><span>${esc(r.nombre)}</span>
+      <b>${porRef[r.id]||0}</b></div>`).join('')}</div>`);
+}
+async function empacar(id){
+  const ok=await PATCH('alm_almohada?id=eq.'+id,
+    {estado:'empacada',empacada_en:new Date().toISOString()});
+  if(ok){ await POST('alm_gasto',[{fecha:hoy(),concepto:'bolsa',valor:P('costo_bolsa'),
+    detalle:'1 bolsa'}],'return=minimal'); toast('Empacada'); vEmpacar(); }
+}
+
+/* ===================== VENDER ===================== */
+function precioDe(r,c){ return c>=5?(r.precio_5||r.precio_3||r.precio_1):
+                                c>=3?(r.precio_3||r.precio_1):r.precio_1; }
+function listaDe(c){ return c>=5?'5':c>=3?'3':'1'; }
+function vVender(){
+  const sub=vItems.reduce((a,i)=>a+i.cantidad*i.precio,0);
+  const iva=vIva?sub*P('iva')/100:0;
+  set('Vender','Una o varias<br>referencias',`
+    <div class="campo"><div class="l">Cliente</div>
+      <input id="cli" placeholder="Nombre" value="${esc(window._cli||'')}"></div>
+    <div class="seg">
+      <button class="${vTipo==='empresa'?'on':''}" onclick="vTipo='empresa';vVender()">Empresa</button>
+      <button class="${vTipo==='natural'?'on':''}" onclick="vTipo='natural';vVender()">Persona natural</button></div>
+    <div class="campo sel"><div class="l">Celular · obligatorio</div>
+      <input id="cel" type="tel" inputmode="numeric" placeholder="300 000 0000" value="${esc(window._cel||'')}"></div>
+    <div class="campo"><div class="l">Cédula o NIT · solo si lo pide</div>
+      <input id="doc" placeholder="opcional" value="${esc(window._doc||'')}"></div>
+    <div class="tit">Lo que lleva</div>
+    <div class="caja">${vItems.length?vItems.map((i,n)=>`<div class="f">
+        <span><b>${esc(i.nombre)}</b> · ${i.cantidad} × ${cop(i.precio)}</span>
+        <span><b>${cop(i.cantidad*i.precio)}</b>
+        <button class="btn sec" style="padding:3px 8px;width:auto;margin-left:6px"
+          onclick="vItems.splice(${n},1);vVender()">✕</button></span></div>`).join('')
+      :'<div class="vacio" style="padding:14px">Sin renglones todavía</div>'}</div>
+    <div class="caja"><div class="par" style="grid-template-columns:1fr 62px 66px;gap:6px">
+      <select id="nr" class="pn" style="font-size:13px">${REFS.map(r=>
+        `<option value="${r.id}">${esc(r.nombre)}</option>`).join('')}</select>
+      <input id="nc" type="number" inputmode="numeric" placeholder="cant.">
+      <button class="btn" style="padding:8px 4px;font-size:13px" onclick="anexar()">Anexar</button>
+    </div></div>
+    <div class="seg">
+      <button class="${vIva?'on':''}" onclick="vIva=true;vVender()">Con IVA</button>
+      <button class="${!vIva?'on':''}" onclick="vIva=false;vVender()">Sin IVA</button></div>
+    <div class="caja">
+      <div class="f"><span>Subtotal</span><b>${cop(sub)}</b></div>
+      ${vIva?`<div class="f"><span>IVA ${num(P('iva'))}%</span><b>${cop(iva)}</b></div>`:''}</div>
+    <div class="grande"><div class="n">${cop(sub+iva)}</div>
+      <div class="l">${vItems.reduce((a,i)=>a+i.cantidad,0)} almohadas</div></div>
+    <button class="btn verde" onclick="registrarVenta()">Ingresar venta</button>`);
+}
+function anexar(){
+  const r=REFS.find(x=>x.id==$('nr').value), c=+$('nc').value;
+  if(!r||!c){ toast('Falta referencia o cantidad',1); return; }
+  const p=precioDe(r,c);
+  if(!p){ toast('Esa referencia no tiene precio puesto',1); return; }
+  window._cli=$('cli').value; window._cel=$('cel').value; window._doc=$('doc').value;
+  vItems.push({id:r.id,nombre:r.nombre,cantidad:c,precio:p,lista:listaDe(c)});
+  vVender();
+}
+async function registrarVenta(){
+  const cli=$('cli').value.trim(), cel=$('cel').value.trim();
+  if(!cli||!cel){ toast('Falta el cliente o el celular',1); return; }
+  if(!vItems.length){ toast('No hay renglones',1); return; }
+  const sub=vItems.reduce((a,i)=>a+i.cantidad*i.precio,0);
+  const iva=vIva?sub*P('iva')/100:0;
+  const v=await POST('alm_venta',[{fecha:hoy(),cliente:cli,telefono:cel,
+    documento:$('doc').value.trim()||null,tipo_cliente:vTipo,con_iva:vIva,
+    subtotal:sub,iva:iva,total:sub+iva,
+    cantidad:vItems.reduce((a,i)=>a+i.cantidad,0),lista:vItems[0].lista}]);
+  if(!v) return;
+  await POST('alm_venta_item',vItems.map(i=>({venta_id:v[0].id,referencia_id:i.id,
+    cantidad:i.cantidad,precio_u:i.precio,lista:i.lista})),'return=minimal');
+  /* Se descuentan del inventario las más viejas de cada referencia: lo que
+     entró primero sale primero. */
+  for(const i of vItems){
+    const dis=await GET('alm_almohada?select=id&estado=eq.empacada&referencia_id=eq.'+i.id+'&order=creado_en');
+    const ids=dis.slice(0,i.cantidad).map(x=>x.id);
+    if(ids.length) await PATCH('alm_almohada?id=in.('+ids.join(',')+')',
+      {estado:'vendida',venta_id:v[0].id});
+  }
+  vItems=[]; window._cli=window._cel=window._doc='';
+  toast('Venta registrada · '+cop(sub+iva)); vVender();
+}
+
+/* ===================== CIERRE DEL DÍA ===================== */
+async function vDia(){
+  cargando();
+  const d=hoy();
+  const [turnos,gastos,mats,ventas]=await Promise.all([
+    GET('alm_turno?select=*&fecha=eq.'+d),
+    GET('alm_gasto?select=*&fecha=eq.'+d),
+    GET('alm_material?select=*&fecha=eq.'+d),
+    GET('alm_venta?select=*&fecha=eq.'+d)]);
+  const ids=turnos.map(t=>t.id);
+  const alm=ids.length?await GET('alm_almohada?select=*&turno_id=in.('+ids.join(',')+')'):[];
+  const kgAlm=alm.reduce((a,x)=>a+(+x.peso||0),0)/1000;
+  const purgas=turnos.reduce((a,t)=>a+(+t.purga_contaminada||0)+(+t.purga_limpia||0),0);
+  const cargado=turnos.reduce((a,t)=>a+(+t.kg_cargados||0),0);
+  const sin=Math.max(0,cargado-kgAlm-purgas);
+  const gPoli=kgAlm*P('precio_poliuretano');
+  const gProp=kgAlm*(P('pct_desmoldante')+P('pct_pigmento'))/100*
+              ((P('precio_desmoldante')+P('precio_pasta'))/2);
+  const gEsp=gastos.filter(g=>g.concepto==='espacio').reduce((a,g)=>a+ +g.valor,0);
+  const gMo=gastos.filter(g=>g.concepto==='mano de obra').reduce((a,g)=>a+ +g.valor,0);
+  const gBol=gastos.filter(g=>g.concepto==='bolsa').reduce((a,g)=>a+ +g.valor,0);
+  const gSin=sin*P('precio_poliuretano');
+  const total=gPoli+gProp+gBol+gMo+gEsp+gSin;
+  const vta=ventas.reduce((a,v)=>a+ +v.total,0);
+  const inv=await GET('alm_almohada?select=estado');
+  const listas=inv.filter(x=>x.estado==='empacada').length;
+  const reposo=inv.filter(x=>x.estado==='inyectada').length;
+  set('Cierre del día',d+'<br>'+alm.length+' almohadas',`
+    ${mats.length?`<div class="tit">1 · Materiales comprados hoy</div><div class="caja">
+      ${mats.map(m=>`<div class="f"><span>${esc(m.tipo)} · ${num(m.cantidad,1)} ${esc(m.unidad)}</span>
+        <b>${cop(m.total)}</b></div>`).join('')}</div>`:''}
+    <div class="tit">${mats.length?'2 · ':''}Lo que se gastó hoy</div>
+    <div class="caja">
+      <div class="f"><span>Poliuretano · ${num(kgAlm,1)} kg</span><b>${cop(gPoli)}</b></div>
+      <div class="f"><span>Pasta y desmoldante</span><b>${cop(gProp)}</b></div>
+      <div class="f"><span>Bolsas</span><b>${cop(gBol)}</b></div>
+      <div class="f"><span>Mano de obra · ${alm.length} und</span><b>${cop(gMo)}</b></div>
+      <div class="f"><span>Espacio</span><b>${cop(gEsp)}</b></div>
+      <div class="f perd"><span>Pérdida sin explicar · ${num(sin,1)} kg</span><b>${cop(gSin)}</b></div>
+      <div class="f tot"><span>Costo del día</span><b>${cop(total)}</b></div></div>
+    <div class="tira">
+      <div><div class="n">${cop(vta)}</div><div class="l">vendido hoy</div></div>
+      <div><div class="n">${alm.length?cop(total/alm.length):'—'}</div><div class="l">costo × almohada</div></div>
+    </div>
+    <div class="tit">Queda en inventario</div>
+    <div class="caja">
+      <div class="f"><span>Almohadas listas</span><b>${listas}</b></div>
+      <div class="f"><span>En reposo</span><b>${reposo}</b></div></div>`);
+}
+
+/* ===================== RESUMEN ===================== */
+async function vResumen(){
+  cargando();
+  const [turnos,gastos,ventas,alm]=await Promise.all([
+    GET('alm_turno?select=*&order=fecha.desc'), GET('alm_gasto?select=*'),
+    GET('alm_venta?select=*'), GET('alm_almohada?select=turno_id,peso,estado')]);
+  const porTurno={}; alm.forEach(x=>{ const t=porTurno[x.turno_id]=porTurno[x.turno_id]||{n:0,kg:0};
+    t.n++; t.kg+=(+x.peso||0)/1000; });
+  const porDia={};
+  turnos.forEach(t=>{ const d=porDia[t.fecha]=porDia[t.fecha]||{n:0,kg:0,carg:0,purga:0};
+    const a=porTurno[t.id]||{n:0,kg:0};
+    d.n+=a.n; d.kg+=a.kg; d.carg+=+t.kg_cargados||0;
+    d.purga+=(+t.purga_contaminada||0)+(+t.purga_limpia||0); });
+  Object.keys(porDia).forEach(d=>{ const x=porDia[d];
+    const sin=Math.max(0,x.carg-x.kg-x.purga);
+    const g=gastos.filter(y=>y.fecha===d).reduce((a,y)=>a+ +y.valor,0);
+    x.costo=x.kg*P('precio_poliuretano')
+      + x.kg*(P('pct_desmoldante')+P('pct_pigmento'))/100*((P('precio_desmoldante')+P('precio_pasta'))/2)
+      + g + sin*P('precio_poliuretano');
+    x.sin=sin; });
+  const dias=Object.keys(porDia).sort().reverse();
+  const totVta=ventas.reduce((a,v)=>a+ +v.total,0);
+  const totCosto=dias.reduce((a,d)=>a+porDia[d].costo,0);
+  const util=totVta-totCosto;
+  const esc2=REPARTO.find(r=>util>=r.desde&&(r.hasta==null||util<r.hasta));
+  const pct=esc2?+esc2.pct:0;
+  set('Resumen','Acumulado<br>'+dias.length+' días',`
+    <div class="tit">Día por día</div>
+    <div class="caja">${dias.length?dias.map(d=>`<div class="f">
+      <span><b>${d.slice(8)}/${d.slice(5,7)}</b> · ${porDia[d].n} almoh.</span>
+      <b>${cop(porDia[d].costo)}</b></div>`).join(''):'<div class="vacio">Sin turnos todavía</div>'}</div>
+    <div class="tit">Acumulado</div>
+    <div class="caja">
+      <div class="f"><span>Ventas</span><b>${cop(totVta)}</b></div>
+      <div class="f"><span>Costos</span><b>−${cop(totCosto)}</b></div>
+      <div class="f perd"><span>Pérdida sin explicar</span>
+        <b>${cop(dias.reduce((a,d)=>a+porDia[d].sin,0)*P('precio_poliuretano'))}</b></div></div>
+    <div class="grande"><div class="n">${cop(util)}</div><div class="l">Utilidad acumulada</div></div>
+    <div class="caja">
+      <div class="f"><span>Escalón</span><span class="chip ok">${pct}%</span></div>
+      <div class="f"><span><b>Supervisor</b></span><b>${cop(util*pct/100)}</b></div>
+      <div class="f"><span><b>Dueño</b></span><b>${cop(util*(100-pct)/100)}</b></div></div>`);
+}
+
+/* la pestaña Cerrar no está en el menú: se llega desde el turno abierto */
+const _ir=ir;
+ir=function(v){ if(v==='cerrar'){ VISTA='turno'; pintarNav(); vCerrar(); return; } _ir(v); };
+
+/* ---- aviso de versión nueva, como en Lupe ---- */
+let _chk=0;
+async function mirarVersion(){
+  if(Date.now()-_chk<300000) return; _chk=Date.now();
+  try{
+    const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'});
+    if(!r.ok) return;
+    const m=(await r.text()).match(/const VER='([^']+)'/);
+    if(m&&m[1]!==VER&&!document.getElementById('nv')){
+      const d=document.createElement('div'); d.id='nv';
+      d.textContent='✨ Hay una versión nueva · toca para actualizar';
+      d.onclick=()=>location.reload();
+      d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99;padding:15px;'
+        +'background:#15713D;color:#fff;text-align:center;font-weight:700;cursor:pointer';
+      document.body.appendChild(d);
+    }
+  }catch(e){}
+}
+mirarVersion(); setInterval(mirarVersion,300000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) mirarVersion(); });
+</script>
+</body>
+</html>
