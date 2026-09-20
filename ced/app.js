@@ -4717,7 +4717,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       const e=T[c.estado]||T.vacio;
       const h=filas.filter(f=>f.centro===c.ciudad && f.nivel==='anillo').sort((a,b)=>a.km-b.km);
       const fila=(f,es)=>`<tr${es?' style="background:#fdf6ec"':''}>
-        <td style="padding:5px 8px;border-bottom:1px solid #eceef2${es?';font-weight:700':''}">${esc(f.ciudad)}${es?` <span style="font-weight:400;font-size:10.5px;color:${e[0]}">● ${esc(e[1])}</span>`:''}</td>
+        <td style="padding:5px 8px;border-bottom:1px solid #eceef2${es?';font-weight:700':''}">${esc(f.ciudad)}${es?` <span style="font-weight:400;font-size:10.5px;color:${e[0]}">● ${esc(e[1])}</span>`:''}<div style="font-size:10.5px;color:#8a93a6;font-weight:400">${esc(f.depto||'')}</div></td>
         <td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;color:#8a93a6;font-size:12px">${es?'centro':f.km+' km'}</td>
         ${num(f.poblacion)}${cargadas(f)}${num(f.marcables)}${num(f.interesados,'#C96A0C')}${num(f.registrados,'#1B7A4F')}${num(f.pares,'#1B7A4F')}</tr>`;
       return fila(c,1)+h.map(x=>fila(x,0)).join('');
@@ -4739,6 +4739,24 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     /* Un municipio en cero NO es lo mismo que otro: si ya se barrió y no salió
        nada, es que ahí no hay distribuidores y volver a buscar es botar plata.
        Si nunca se ha barrido, ahí sí puede haber. */
+    /* El país por departamento. Es otra pregunta distinta a la del centro y su
+       anillo: un departamento puede tener cuatro municipios cargados y ningún
+       distribuidor, y eso no se ve mirando ciudad por ciudad. */
+    const porDep = {};
+    filas.forEach(f => {
+      const d = porDep[f.depto] = porDep[f.depto] ||
+        { nombre: f.depto || '—', mun: 0, pob: 0, carg: 0, marc: 0, lla: 0, int: 0, reg: 0, centros: [] };
+      d.mun++; d.pob += f.poblacion || 0; d.carg += f.cargados || 0; d.marc += f.marcables || 0;
+      d.lla += f.llamadas || 0; d.int += f.interesados || 0; d.reg += f.registrados || 0;
+      if (f.nivel === 'centro') d.centros.push(f.ciudad);
+    });
+    /* Ordenado por lo que falta, no alfabético: primero donde ya hay algo que
+       cuidar, y al final lo que está en blanco. */
+    const dptos = Object.values(porDep).sort((a, b) => b.reg - a.reg || b.int - a.int || b.marc - a.marc);
+    const sinReg = dptos.filter(d => !d.reg);
+    const sinInt = dptos.filter(d => !d.int);
+    const sinLla = dptos.filter(d => !d.lla);
+
     const barridoVacio = anillo.filter(f => f.barrido_en && !f.cargados);
     const sinBarrer    = anillo.filter(f => !f.barrido_en && !f.cargados);
     const linea = (col, n, t, q) => n ? `<div style="display:flex;gap:9px;padding:5px 0;border-bottom:1px solid #f0f1f4">
@@ -4771,6 +4789,27 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         ${barridoVacio.length ? `<div style="font-size:11px;color:#8a93a6">${barridoVacio.map(f => esc(f.ciudad)).join(' · ')}</div>` : ''}
         <b>${mil(sinBarrer.length)}</b> en cero y <b>sin barrer</b> — ahí sí puede haber
         ${sinBarrer.length ? `<div style="font-size:11px;color:#8a93a6">${sinBarrer.map(f => esc(f.ciudad)).join(' · ')}</div>` : ''}
+      </div>
+    </div>
+
+    <div class="card" style="overflow-x:auto">
+      <h2 style="font-size:14px;margin-bottom:2px">El país por departamento</h2>
+      <div style="font-size:11.5px;color:#8a93a6;margin-bottom:8px">${dptos.length} departamentos ·
+        <b style="color:#B23A2A">${sinReg.length} sin un solo distribuidor</b>, donde vive el
+        ${Math.round(100 * sinReg.reduce((a, d) => a + d.pob, 0) / Math.max(dptos.reduce((a, d) => a + d.pob, 0), 1))}%
+        de la gente del mapa</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:600px">
+        <thead><tr><th style="text-align:left;padding:6px 8px;font-size:10px;color:#8a93a6;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #333">Departamento</th>${th('Munic.')}${th('Habitantes')}${th('Cargadas')}${th('Marcables')}${th('Interesados')}${th('Registrados')}</tr></thead>
+        <tbody>${dptos.map(d => `<tr${d.reg ? '' : ' style="background:#fdf3f1"'}>
+          <td style="padding:5px 8px;border-bottom:1px solid #eceef2">${esc(d.nombre)}${d.reg ? '' : ' <span style="font-size:10px;color:#B23A2A">sin distribuidor</span>'}
+            <div style="font-size:10.5px;color:#8a93a6">${esc(d.centros.join(' · ')) || '—'}</div></td>
+          ${num(d.mun)}${num(d.pob)}${num(d.carg)}${num(d.marc)}${num(d.int, '#C96A0C')}${num(d.reg, '#1B7A4F')}</tr>`).join('')}</tbody>
+      </table>
+      <div style="margin-top:10px;font-size:12.5px;line-height:1.7">
+        <b>${sinLla.length}</b> departamentos sin una sola llamada hecha:
+        <span style="color:#8a93a6">${esc(sinLla.map(d => d.nombre).join(' · ')) || '—'}</span><br>
+        <b>${sinInt.length}</b> sin un solo interesado:
+        <span style="color:#8a93a6">${esc(sinInt.map(d => d.nombre).join(' · ')) || '—'}</span>
       </div>
     </div>
 
