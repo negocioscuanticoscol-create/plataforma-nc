@@ -4703,6 +4703,10 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const T=this._TERR;
     const num=(v,col)=>`<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;font-variant-numeric:tabular-nums${col&&v?';color:'+col+';font-weight:700':''}">${v?mil(v):'<span style="color:#bbc">—</span>'}</td>`;
     const th=t=>`<th style="text-align:right;padding:6px 8px;font-size:10px;color:#8a93a6;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #333;white-space:nowrap">${t}</th>`;
+    /* Un cero con barrido ya hecho dice "acá no hay"; un cero sin barrer dice
+       "nadie ha mirado". Es la diferencia entre botar plata y encontrar algo. */
+    const cargadas=f=>f.cargados ? `<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;font-variant-numeric:tabular-nums">${mil(f.cargados)}</td>`
+      : `<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;color:#8a93a6" title="${f.barrido_en?'Se barrió el '+f.barrido_en+' y no salió nada':'Todavía no se ha barrido'}">0${f.barrido_en?' <span style="font-size:10px">✓barrido</span>':' <span style="font-size:10px;color:#B23A2A">sin barrer</span>'}</td>`;
 
     const orden=[];
     this._TERRORD.forEach(k=>centros.filter(c=>c.estado===k)
@@ -4715,17 +4719,32 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       const fila=(f,es)=>`<tr${es?' style="background:#fdf6ec"':''}>
         <td style="padding:5px 8px;border-bottom:1px solid #eceef2${es?';font-weight:700':''}">${esc(f.ciudad)}${es?` <span style="font-weight:400;font-size:10.5px;color:${e[0]}">● ${esc(e[1])}</span>`:''}</td>
         <td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;color:#8a93a6;font-size:12px">${es?'centro':f.km+' km'}</td>
-        ${num(f.poblacion)}${num(f.cargados)}${num(f.marcables)}${num(f.interesados,'#C96A0C')}${num(f.registrados,'#1B7A4F')}${num(f.pares,'#1B7A4F')}</tr>`;
+        ${num(f.poblacion)}${cargadas(f)}${num(f.marcables)}${num(f.interesados,'#C96A0C')}${num(f.registrados,'#1B7A4F')}${num(f.pares,'#1B7A4F')}</tr>`;
       return fila(c,1)+h.map(x=>fila(x,0)).join('');
     }).join('');
 
     const sueltos=filas.filter(f=>f.nivel==='suelto').sort((a,b)=>a.km-b.km);
     const filaS=f=>`<tr><td style="padding:5px 8px;border-bottom:1px solid #eceef2">${esc(f.ciudad)}</td>
       <td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;color:#8a93a6;font-size:12px">${f.km} km</td>
-      ${num(f.poblacion)}${num(f.cargados)}${num(f.marcables)}${num(f.interesados,'#C96A0C')}${num(f.registrados,'#1B7A4F')}${num(f.pares,'#1B7A4F')}</tr>`;
+      ${num(f.poblacion)}${cargadas(f)}${num(f.marcables)}${num(f.interesados,'#C96A0C')}${num(f.registrados,'#1B7A4F')}${num(f.pares,'#1B7A4F')}</tr>`;
 
     const conDist=filas.filter(f=>f.registrados||f.pedidos)
       .sort((a,b)=>(b.pares-a.pares)||(b.registrados-a.registrados));
+
+    /* El recuento. Es lo que permite contar de un vistazo y decidir dónde
+       meter la próxima persona o el próximo peso, sin leer las 145 filas. */
+    const cnt = e => centros.filter(c => c.estado === e).length;
+    const nom = e => centros.filter(c => c.estado === e).map(c => c.ciudad).join(', ');
+    const anillo = filas.filter(f => f.nivel !== 'centro');
+    /* Un municipio en cero NO es lo mismo que otro: si ya se barrió y no salió
+       nada, es que ahí no hay distribuidores y volver a buscar es botar plata.
+       Si nunca se ha barrido, ahí sí puede haber. */
+    const barridoVacio = anillo.filter(f => f.barrido_en && !f.cargados);
+    const sinBarrer    = anillo.filter(f => !f.barrido_en && !f.cargados);
+    const linea = (col, n, t, q) => n ? `<div style="display:flex;gap:9px;padding:5px 0;border-bottom:1px solid #f0f1f4">
+        <div style="flex:0 0 26px;text-align:right;font-weight:800;color:${col};font-variant-numeric:tabular-nums">${n}</div>
+        <div style="flex:1;min-width:0"><b style="font-size:12.5px">${esc(t)}</b>
+        <div style="font-size:11px;color:#8a93a6;line-height:1.4">${esc(q)}</div></div></div>` : '';
 
     return `<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
@@ -4734,6 +4753,25 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       </div>
       <div style="font-size:11.5px;color:#8a93a6;margin:2px 0 10px">Corte del ${esc(corte)} · ${filas.length} municipios de más de 50.000 habitantes</div>
       ${this._terrCifras(tot, mil)}
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:14px;margin-bottom:2px">El recuento</h2>
+      <div style="font-size:11.5px;color:#8a93a6;margin-bottom:8px">${centros.length} centros y ${anillo.length} municipios alrededor</div>
+      ${linea(T.vendiendo[0], cnt('vendiendo'), 'Despachan de verdad', nom('vendiendo'))}
+      ${linea(T.caliente[0], cnt('caliente'), 'Con interesados sin cerrar', nom('caliente'))}
+      ${linea(T.abierto[0], cnt('abierto'), 'Firmaron y no han pedido', nom('abierto'))}
+      ${linea(T.tibio[0], cnt('tibio'), 'Uno o dos interesados', nom('tibio'))}
+      ${linea(T.sinllamar[0], cnt('sinllamar'), 'Tienen base y nadie ha llamado', nom('sinllamar'))}
+      ${linea(T.sintraccion[0], cnt('sintraccion'), 'Se llamó y no pegó', nom('sintraccion'))}
+      ${linea(T.vacio[0], cnt('vacio'), 'Sin una sola empresa', nom('vacio'))}
+      <div style="margin-top:10px;padding-top:9px;border-top:1px solid #eceef2;font-size:12.5px;line-height:1.7">
+        <b>${mil(anillo.filter(f => f.cargados).length)}</b> municipios del anillo con datos cargados<br>
+        <b>${mil(barridoVacio.length)}</b> se barrieron y <b>no hay nada</b> — no volver a pagar
+        ${barridoVacio.length ? `<div style="font-size:11px;color:#8a93a6">${barridoVacio.map(f => esc(f.ciudad)).join(' · ')}</div>` : ''}
+        <b>${mil(sinBarrer.length)}</b> en cero y <b>sin barrer</b> — ahí sí puede haber
+        ${sinBarrer.length ? `<div style="font-size:11px;color:#8a93a6">${sinBarrer.map(f => esc(f.ciudad)).join(' · ')}</div>` : ''}
+      </div>
     </div>
 
     <div class="card" style="overflow-x:auto">
