@@ -353,6 +353,43 @@ th{font-size:11px;color:var(--grey);font-weight:600}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 </style>
+<script>
+/* ---------------------------------------------------------------------------
+   PRIMERO LA NUBE, DESPUES LA APP.
+
+   Va en el <head>, antes que React, a proposito: si los datos se bajaran
+   despues, la app ya habria leido un localStorage vacio y pintaria la pantalla
+   en blanco. En un telefono nuevo eso se ve como "se perdio todo".
+
+   fetch es asincrono y no se puede bloquear el arranque, asi que se hace al
+   reves: se baja, se deja en localStorage y se recarga UNA vez por sesion. La
+   marca va en sessionStorage, que muere al cerrar la pestaña, asi que no queda
+   recargando en bucle.
+--------------------------------------------------------------------------- */
+(function(){
+  var c = null;
+  try { c = localStorage.getItem('cv:__codigo'); } catch(e){}
+  if (!c) return;                                  // sin codigo, como siempre
+  try { if (sessionStorage.getItem('cv:bajado')) return; } catch(e){ return; }
+  var KEY = 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+  document.documentElement.style.visibility = 'hidden';   // evita el parpadeo
+  fetch('https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/cv_datos'
+        + '?select=clave,valor&codigo=eq.' + encodeURIComponent(c),
+        { headers: { apikey: KEY, Authorization: 'Bearer ' + KEY } })
+    .then(function(r){ return r.ok ? r.json() : []; })
+    .then(function(f){
+      f.forEach(function(x){
+        try { localStorage.setItem('cv:' + x.clave, JSON.stringify(x.valor)); } catch(e){}
+      });
+      try { sessionStorage.setItem('cv:bajado', '1'); } catch(e){}
+      location.reload();
+    })
+    .catch(function(){
+      try { sessionStorage.setItem('cv:bajado', '1'); } catch(e){}
+      document.documentElement.style.visibility = '';     // sin señal, se abre con lo local
+    });
+})();
+</script>
 </head>
 <body>
 <div id="root"></div>
@@ -3342,7 +3379,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
    este aviso, el teléfono podría quedarse meses con una versión vieja.
    Chequea cada 5 minutos y al volver a la app, comparando esta constante contra
    la del archivo en el servidor. */
-const VER='20260919-2205';
+const VER='20260919-2240-nube';
 let _ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-_ultimoChequeo < 300000) return;
@@ -3372,6 +3409,124 @@ setInterval(mirarVersion, 300000);
 /* Al volver a la app desde el fondo: es cuando más probable es que haya una
    versión nueva y el usuario no se ha enterado. */
 document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) mirarVersion(); });
+</script>
+
+<script>
+/* ---------------------------------------------------------------------------
+   RESPALDO EN LA NUBE — para que los datos no vivan solo en este teléfono.
+
+   Jose: "¿lo estaría haciendo en una subbase esta aplicación o no?". No lo
+   hacía: la app guardaba todo en localStorage y nada en ningún servidor. El
+   iPhone y el Samsung eran dos apps distintas, y un borrado de caché se llevaba
+   meses de registro.
+
+   POR QUÉ ESTÁ AQUÍ ABAJO Y NO DENTRO DE LA APP: el HTML de arriba es React ya
+   compilado. Tocarlo a mano es pedir un error tonto en 534 KB de código. Este
+   bloque no lo toca: envuelve localStorage por fuera. Cuando la app guarda, el
+   envoltorio se entera y sube; cuando arranca, baja lo que haya y lo deja listo
+   ANTES de que React lo lea.
+
+   EL CÓDIGO ES LA LLAVE. Sin código puesto, la app funciona exactamente como
+   antes, solo en el teléfono. Con código, los dos teléfonos ven lo mismo.
+--------------------------------------------------------------------------- */
+(function(){
+  var SB  = 'https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/cv_datos';
+  var KEY = 'sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+  var H   = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
+  var COD = 'cv:__codigo';
+
+  function codigo(){ try { return localStorage.getItem(COD) || ''; } catch(e){ return ''; } }
+
+  function aviso(txt, color){
+    var d = document.getElementById('cvSync') || document.createElement('div');
+    d.id = 'cvSync';
+    d.textContent = txt;
+    d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:2147483646;'
+      + 'padding:calc(7px + env(safe-area-inset-top)) 12px 7px;background:' + (color||'#0B1220')
+      + ';color:#fff;text-align:center;font:600 12.5px system-ui,-apple-system,sans-serif';
+    if (!d.parentNode) document.body.appendChild(d);
+    clearTimeout(d._t); d._t = setTimeout(function(){ if(d.parentNode) d.remove(); }, 2600);
+  }
+
+  /* Subir. Se agrupan los cambios: la app escribe varias claves seguidas al
+     guardar una pantalla, y sin esperar se mandarían cinco peticiones. */
+  var pend = {}, timer = null;
+  function subir(){
+    var c = codigo(); if (!c) return;
+    var filas = Object.keys(pend).map(function(k){
+      var v; try { v = JSON.parse(localStorage.getItem('cv:' + k)); } catch(e){ v = null; }
+      return { codigo: c, clave: k, valor: v === undefined ? null : v, actualizado: new Date().toISOString() };
+    });
+    pend = {};
+    if (!filas.length) return;
+    fetch(SB + '?on_conflict=codigo,clave', {
+      method: 'POST',
+      headers: Object.assign({}, H, { Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify(filas)
+    }).then(function(r){ if(!r.ok) aviso('No se pudo respaldar · se reintenta', '#B45309'); })
+      .catch(function(){ aviso('Sin señal · se guardó en el teléfono', '#B45309'); });
+  }
+
+  /* Se envuelve setItem: así la app no cambia una sola línea y el respaldo
+     ocurre solo, cada vez que ella guarda. */
+  var orig = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function(k, v){
+    orig(k, v);
+    if (k && k.indexOf('cv:') === 0 && k !== COD) {
+      pend[k.slice(3)] = 1;
+      clearTimeout(timer); timer = setTimeout(subir, 1200);
+    }
+  };
+
+  /* Bajar ANTES de que React arranque. Si esto corriera después, la app ya
+     habría leído localStorage vacío y pintaría la pantalla en blanco. */
+  window.cvBajar = function(silencioso){
+    var c = codigo(); if (!c) return Promise.resolve(0);
+    return fetch(SB + '?select=clave,valor&codigo=eq.' + encodeURIComponent(c), { headers: H })
+      .then(function(r){ return r.ok ? r.json() : []; })
+      .then(function(filas){
+        filas.forEach(function(f){ orig('cv:' + f.clave, JSON.stringify(f.valor)); });
+        if (filas.length && !silencioso) aviso('Datos al día · ' + filas.length + ' secciones', '#166534');
+        return filas.length;
+      }).catch(function(){ return 0; });
+  };
+
+  /* El botón para poner el código. Va en una esquina, pequeño, para no estorbar. */
+  function boton(){
+    var b = document.createElement('button');
+    b.id = 'cvCodigoBtn';
+    b.textContent = codigo() ? '☁' : '☁ conectar';
+    b.title = codigo() ? 'Respaldo activo · código ' + codigo() : 'Sin respaldo: los datos viven solo en este teléfono';
+    b.style.cssText = 'position:fixed;right:10px;top:calc(8px + env(safe-area-inset-top));'
+      + 'z-index:2147483645;border:none;border-radius:16px;padding:6px 11px;cursor:pointer;'
+      + 'font:600 12px system-ui,-apple-system,sans-serif;'
+      + (codigo() ? 'background:#DCFCE7;color:#166534' : 'background:#FEF3C7;color:#92400E');
+    b.onclick = function(){
+      var actual = codigo();
+      var c = prompt('Código de sincronización\n\n'
+        + 'Pon el MISMO código en todos tus teléfonos y verás lo mismo en todos.\n'
+        + 'Déjalo vacío para trabajar solo en este aparato.\n\n'
+        + 'Mínimo 6 caracteres.', actual);
+      if (c === null) return;
+      c = c.trim();
+      if (c && c.length < 6) { alert('El código debe tener al menos 6 caracteres.'); return; }
+      try { c ? localStorage.setItem(COD, c) : localStorage.removeItem(COD); } catch(e){}
+      if (c) window.cvBajar().then(function(){ location.reload(); });
+      else location.reload();
+    };
+    document.body.appendChild(b);
+  }
+
+  /* Al volver a la app desde el fondo se baja otra vez: es cuando pudo haber
+     quedado algo escrito en el otro teléfono. */
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden) window.cvBajar(true);
+  });
+
+  try { sessionStorage.setItem('cv:bajado', '1'); } catch(e){}
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boton);
+  else boton();
+})();
 </script>
 </body>
 </html>
