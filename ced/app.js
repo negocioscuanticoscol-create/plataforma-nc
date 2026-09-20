@@ -4619,7 +4619,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         +'y se trabaja desde la principal.</div>'); return; }
     this.loading();
     const EMP = window.NC_EMPRESA || 'feroz';
-    const { data:filas=[], error } = await this.sb.from('nc_territorio')
+    let { data:filas=[], error } = await this.sb.from('nc_territorio')
       .select('*').eq('empresa', EMP).order('poblacion',{ascending:false});
     if(error){ this.set('<div class="empty">No pude leer el territorio: '+esc(error.message)+'</div>'); return; }
     if(!filas.length){
@@ -4628,6 +4628,12 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
 
     const mil=n=>(n||0).toLocaleString('es-CO');
     const T=this._TERR, t=this.terr=this.terr||{};
+    /* Los 'pendiente' son el inventario de lo que NO se ha mirado: los 946
+       municipios del país que quedaron fuera del mapa por el corte de 50.000
+       habitantes. No tienen cifras y no entran en ningún total — salen en su
+       propia lista al final, para poder decidir dónde buscar más. */
+    const pend=filas.filter(f=>f.nivel==='pendiente');
+    filas=filas.filter(f=>f.nivel!=='pendiente');
     const centros=filas.filter(f=>f.nivel==='centro');
     const sum=c=>filas.reduce((a,f)=>a+(f[c]||0),0);
     const corte=filas[0].corte?new Date(filas[0].corte).toLocaleDateString('es-CO',
@@ -4688,7 +4694,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const cab=`<h1>🧭 Territorio</h1>
       <div class="sub">${centros.length} centros y ${filas.length-centros.length} municipios alrededor · corte del ${esc(corte)}</div>`;
 
-    if(t0==='informe'){ this.set(cab + barra + this._terrInforme(filas, centros, tot, corte, mil)); return; }
+    if(t0==='informe'){ this.set(cab + barra + this._terrInforme(filas, centros, tot, corte, mil, pend)); return; }
 
     this.set(cab + barra + `
       <div class="hint" style="margin:8px 0 12px">Primero el centro, después el anillo: si en Montería
@@ -4699,7 +4705,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
 
   /* El informe: las 145 filas agrupadas por centro, para imprimir. No tiene nada
      que tocar a proposito — lo que se imprime tiene que verse igual en papel. */
-  _terrInforme(filas, centros, tot, corte, mil){
+  _terrInforme(filas, centros, tot, corte, mil, pend){
     const T=this._TERR;
     const num=(v,col)=>`<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;font-variant-numeric:tabular-nums${col&&v?';color:'+col+';font-weight:700':''}">${v?mil(v):'<span style="color:#bbc">—</span>'}</td>`;
     const th=t=>`<th style="text-align:right;padding:6px 8px;font-size:10px;color:#8a93a6;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #333;white-space:nowrap">${t}</th>`;
@@ -4841,6 +4847,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       </table>
     </div>
 
+    ${this._terrPendientes(pend, mil, th, num)}
+
     <div class="card" style="overflow-x:auto">
       <h2 style="font-size:14px;margin-bottom:2px">Cada centro con su anillo</h2>
       <div style="font-size:11.5px;color:#8a93a6;margin-bottom:8px">En el orden en que conviene trabajarlos. Las distancias son en línea recta: por carretera siempre es más.</div>
@@ -4868,6 +4876,62 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       ${caja('Registrados',mil(d.registrados),'#1B7A4F')}${caja('Pares',mil(d.pares),'#1B7A4F')}
       ${d.plata?caja('Facturado','$'+mil(d.plata),'#1B7A4F'):''}</div>`;
   },
+  /* ---------- LO QUE FALTA POR MIRAR ----------
+     José: "quiero que pongamos todos los municipios que falten en el informe,
+     para saber qué pueda haber más para buscar... en el informe sí lista los
+     municipios a ese detalle".
+
+     Son los 946 que quedaron fuera del mapa por el corte de 50.000 habitantes.
+     No tienen cifras porque nunca se han barrido: lo único que se sabe de ellos
+     es de qué centro cuelgan y a cuántos kilómetros. Y eso basta para ordenar.
+
+     LA FRANJA DE 30 A 150 KM. Medido sobre los 37 distribuidores que ya hay: 32
+     están en el centro mismo, y el único satélite que compra de verdad es Tuluá,
+     a 76 km. Por debajo de 30 km no tiene sentido buscar distribuidor —el
+     ferretero de Cota, a 12 km, se surte en Bogotá el mismo día—; por encima de
+     150 el flete se come el margen salvo que el municipio tenga mercado propio. */
+  _terrPendientes(pend, mil, th, num){
+    if(!pend || !pend.length) return '';
+    const franja = f => (f.km||0) < 30 ? 'cerca' : (f.km||0) <= 150 ? 'buena' : 'lejos';
+    const buena = pend.filter(f=>franja(f)==='buena');
+    const porDep = {};
+    pend.forEach(f=>{ (porDep[f.depto||'—'] = porDep[f.depto||'—'] || []).push(f); });
+    const deps = Object.entries(porDep)
+      .sort((a,b)=> b[1].filter(x=>franja(x)==='buena').length - a[1].filter(x=>franja(x)==='buena').length
+                 || b[1].length - a[1].length);
+    const COL = { cerca:'#8a93a6', buena:'#1B7A4F', lejos:'#B23A2A' };
+    const ET  = { cerca:'muy cerca', buena:'', lejos:'lejos' };
+
+    return `<div class="card" style="overflow-x:auto">
+      <h2 style="font-size:14px;margin-bottom:2px">Lo que falta por mirar — ${mil(pend.length)} municipios</h2>
+      <div style="font-size:11.5px;color:#8a93a6;margin-bottom:8px">
+        Nunca se han barrido: quedaron fuera del mapa por el corte de 50.000 habitantes.
+        <b style="color:#1B7A4F">${mil(buena.length)}</b> están entre 30 y 150 km de un centro,
+        que es donde un distribuidor tiene razón de existir.
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:560px">
+        <thead><tr><th style="text-align:left;padding:6px 8px;font-size:10px;color:#8a93a6;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #333">Departamento</th>${th('Faltan')}${th('30–150 km')}<th style="text-align:left;padding:6px 8px;font-size:10px;color:#8a93a6;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #333">Municipios</th></tr></thead>
+        <tbody>${deps.map(([dep,ms])=>{
+          const b = ms.filter(x=>franja(x)==='buena').length;
+          const lista = ms.slice().sort((x,y)=>(x.km||0)-(y.km||0)).map(f=>
+            `<span style="color:${COL[franja(f)]};white-space:nowrap">${esc(f.ciudad)}<span style="font-size:10px;color:#8a93a6"> ${f.km||'?'}km${ET[franja(f)]?' '+ET[franja(f)]:''}</span></span>`).join(' · ');
+          return `<tr><td style="padding:6px 8px;border-bottom:1px solid #eceef2;vertical-align:top;white-space:nowrap"><b>${esc(dep)}</b></td>
+            ${num(ms.length)}${num(b,'#1B7A4F')}
+            <td style="padding:6px 8px;border-bottom:1px solid #eceef2;line-height:1.9;font-size:11.5px">${lista}</td></tr>`;
+        }).join('')}</tbody>
+        ${(()=>{ const c=[{v:mil(pend.length)},{v:mil(buena.length),col:'#1B7A4F'},{v:''}];
+          return `<tfoot><tr style="border-top:2px solid #333;font-weight:700;background:#f7f8fa">
+            <td style="padding:7px 8px">${deps.length} departamentos</td>
+            ${c.map(x=>`<td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums${x.col?';color:'+x.col:''}">${x.v}</td>`).join('')}
+          </tr></tfoot>`; })()}
+      </table>
+      <div style="margin-top:9px;font-size:11.5px;color:#8a93a6;line-height:1.6">
+        En verde los de la franja buena · en gris los que están a menos de 30 km de un centro
+        (ahí el comerciante se surte solo y no necesita distribuidor) · en rojo los de más de 150 km.
+      </div>
+    </div>`;
+  },
+
   terrIr(ciudad){ this.terr={ciudad}; this.vTerritorio(); },
   /* Entrega la ciudad al drill que Cobertura ya tenia: ahi se prenden y apagan
      las localidades que aplican. Esa pantalla no se duplica. */
