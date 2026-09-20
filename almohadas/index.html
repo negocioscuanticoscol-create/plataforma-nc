@@ -104,6 +104,8 @@ nav button.on{color:var(--ambar);font-weight:700}
 .f.tot{background:var(--espuma);font-weight:700;border-bottom:none}
 .f.perd{background:var(--rojo-cl);border-bottom:none}
 .f.perd b{color:var(--rojo)}
+.lap{border:1px solid var(--linea);background:var(--papel);border-radius:8px;
+  padding:4px 7px;font-size:14px;cursor:pointer;line-height:1}
 .vacio{text-align:center;color:var(--tenue);padding:26px 12px;font-size:14px}
 .seg{display:flex;gap:6px}
 .seg button{flex:1;padding:10px 4px;border:1px solid var(--linea);border-radius:10px;
@@ -151,7 +153,7 @@ nav button.on{color:var(--ambar);font-weight:700}
    pestaña Costos. Cambiar el precio del poliuretano no debe obligar a publicar
    una versión nueva.
    =========================================================================== */
-const VER='20260920-1';
+const VER='20260920-2';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/';
 const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
@@ -229,13 +231,15 @@ try{ if(localStorage.getItem('alm:ok')==='1'){
 
 /* ===================== NAVEGACIÓN ===================== */
 const VISTAS=[['turno','🏭','Turno'],['empacar','📦','Empacar'],['vender','🏷️','Vender'],
-              ['dia','📅','Día'],['resumen','📊','Resumen'],['costos','⚙️','Costos']];
+              ['inv','📋','Inventario'],['dia','📅','Día'],['resumen','📊','Resumen'],
+              ['costos','⚙️','Costos']];
 function pintarNav(){
   $('nav').innerHTML=VISTAS.map(([v,i,t])=>
     `<button class="${v===VISTA?'on':''}" onclick="ir('${v}')"><span class="i">${i}</span>${t}</button>`).join('');
 }
 function ir(v){ VISTA=v; pintarNav(); window.scrollTo(0,0);
-  ({turno:vTurno,empacar:vEmpacar,vender:vVender,dia:vDia,resumen:vResumen,costos:vCostos}[v])(); }
+  ({turno:vTurno,empacar:vEmpacar,vender:vVender,inv:vInv,dia:vDia,resumen:vResumen,
+    costos:vCostos}[v])(); }
 function set(t,s,html){ $('topT').textContent=t; $('topS').innerHTML=s||''; $('main').innerHTML=html; }
 const cargando=()=>set('…','', '<div class="vacio">Cargando…</div>');
 
@@ -308,11 +312,11 @@ function vAbrirTurno(){
       <input id="w_${r.id}" type="number" inputmode="numeric" value="${r.peso_previsto||''}"></div>`).join('');
   set('Abrir turno',hoy(),`
     <div class="tit">Poliuretano que se carga</div>
-    <div class="campo sel"><div class="l">Kilos para este turno</div>
+    <div class="campo sel"><div class="l">Kilos · KG</div>
       <input id="kg" type="number" inputmode="decimal" placeholder="0,0"></div>
     <div class="tit">Corridas que se piensan hacer</div>
     <div class="caja">
-      <div class="res"><span>Referencia</span><span>Cant. · Peso g</span></div>${filas}</div>
+      <div class="res"><span>Referencia</span><span>Cant. · Peso en GRAMOS</span></div>${filas}</div>
     <div class="caja"><div class="res"><span>Abrir turno cobra el día de bodega</span>
       <b>${cop(diaEspacio())}</b></div></div>
     <button class="btn" onclick="abrirTurno()">Abrir turno · usar el día</button>`);
@@ -351,11 +355,17 @@ async function vTurnoAbierto(){
     const h=porRef[p.referencia_id]||0;
     return `<div class="f"><span>${esc(r.nombre)}</span>
       <b class="${h>=p.cantidad?'ok':''}">${h} de ${p.cantidad}</b></div>`; }).join('');
-  const ultimas=alm.slice(0,4).map(x=>{ const r=REFS.find(y=>y.id==x.referencia_id)||{};
+  /* El lápiz de cada renglón: un peso mal tecleado descuadra el balance del
+     turno y arrastra el costo del día. Tiene que poderse corregir en el momento
+     y sin salir de la pantalla. */
+  const ultimas=alm.slice(0,6).map(x=>{ const r=REFS.find(y=>y.id==x.referencia_id)||{};
     const d=x.peso-(x.peso_pensado||0), pc=x.peso_pensado?Math.round(d/x.peso_pensado*100):0;
     const bien=Math.abs(pc)<=(r.tolerancia||8);
     return `<div class="f"><span><b>${esc(x.numero)}</b> · ${num(x.peso)} g</span>
-      <span class="chip ${bien?'ok':'mal'}">${d>0?'+':''}${num(d)} g</span></div>`;}).join('');
+      <span style="display:flex;align-items:center;gap:6px">
+        <span class="chip ${bien?'ok':'mal'}">${d>0?'+':''}${num(d)} g</span>
+        <button class="lap" onclick="editar(${x.id},'${esc(x.numero)}',${x.peso})">✏️</button>
+      </span></div>`;}).join('');
 
   set('Turno abierto',TURNO.fecha+'<br>'+alm.length+' hechas',`
     <div class="tira">
@@ -368,7 +378,7 @@ async function vTurnoAbierto(){
         ${REFS.map(r=>`<option value="${r.id}" ${r.id==sel?'selected':''}>${esc(r.nombre)}</option>`).join('')}
       </select></div>
     <div class="etiq"><div class="r">Marque esta almohada</div><div class="c">${esc(sig)}</div></div>
-    <div class="peso"><div class="l">Peso real · debía pesar ${num(pp)} g</div>
+    <div class="peso"><div class="l">Peso real en GRAMOS · debía pesar ${num(pp)} g</div>
       <input id="peso" type="number" inputmode="decimal" placeholder="0" oninput="cmpPeso(${pp},${ref?ref.tolerancia||8:8})">
       <div class="cmp" id="cmp"></div></div>
     <button class="btn" onclick="guardarAlmohada('${esc(sig)}',${sel},${pp})">Guardar y dar el siguiente</button>
@@ -393,6 +403,26 @@ function cmpPeso(pp,tol){
   e.className='cmp '+(bien?'ok':'mal');
   e.textContent=(bien?'✓ ':'✗ ')+(d>0?'+':'')+num(d)+' g · '+(d>0?'+':'')+num(pc,1)+'%';
 }
+/* Corregir o borrar una almohada mal registrada. Se pregunta el peso nuevo; si
+   se deja vacío, se borra el registro y ese número queda libre otra vez. */
+async function editar(id,numero,pesoActual){
+  const v=prompt('Almohada ' + numero + ' — peso correcto en gramos.\n'
+    + 'Deja el campo vacío para BORRAR este registro.', pesoActual);
+  if(v===null) return;
+  const t=v.trim();
+  if(t===''){
+    if(!confirm('¿Borrar '+numero+'? El número queda libre para usarse otra vez.')) return;
+    const r=await fetch(SB+'alm_almohada?id=eq.'+id,{method:'DELETE',headers:H});
+    toast(r.ok?numero+' borrada':'No se pudo borrar',!r.ok);
+  } else {
+    const n=+t;
+    if(!n){ toast('Peso inválido',1); return; }
+    const ok=await PATCH('alm_almohada?id=eq.'+id,{peso:n});
+    if(ok) toast(numero+' corregida');
+  }
+  vTurnoAbierto();
+}
+
 async function guardarAlmohada(numero,refId,pp){
   const p=+$('peso').value;
   if(!p){ toast('Falta el peso',1); return; }
@@ -455,9 +485,12 @@ async function vEmpacar(){
     return `<div class="chk"><div class="bx" onclick="empacar(${x.id})"></div>
       <span class="id">${esc(x.numero)}</span>
       <span class="g">${Math.floor(x.h)} h · ${num(x.peso)} g</span></div>`; };
+  /* Se muestran las horas que LLEVA, no solo las que faltan: así se ve de una
+     cuánto tiempo lleva esa almohada en la estantería. */
   const filaEsp=x=>`<div class="chk"><div class="bx" style="border-style:dashed"></div>
       <span class="id" style="color:var(--tenue)">${esc(x.numero)}</span>
-      <span class="g"><span class="chip esp">faltan ${Math.ceil(hrs-x.h)} h</span></span></div>`;
+      <span class="g">lleva ${Math.floor(x.h)} h
+        <span class="chip esp">faltan ${Math.ceil(hrs-x.h)} h</span></span></div>`;
   const inv=await GET('alm_almohada?select=referencia_id&estado=eq.empacada');
   const porRef={}; inv.forEach(x=>porRef[x.referencia_id]=(porRef[x.referencia_id]||0)+1);
   set('Empacar','Reposo de<br>'+hrs+' horas',`
@@ -548,6 +581,75 @@ async function registrarVenta(){
   }
   vItems=[]; window._cli=window._cel=window._doc='';
   toast('Venta registrada · '+cop(sub+iva)); vVender();
+}
+
+
+/* ===================== INVENTARIO =====================
+   Lo que entra, lo que sale y lo que queda. Se mira por referencia —que es como
+   lo pregunta un cliente— y por día, para ver el movimiento.
+
+   ENTRAR es quedar EMPACADA, no inyectada: una almohada en reposo todavía no se
+   puede vender, así que contarla como inventario sería mentirse. */
+async function vInv(){
+  cargando();
+  const alm=await GET('alm_almohada?select=referencia_id,estado,creado_en,empacada_en,venta_id');
+  const ventas=await GET('alm_venta?select=id,fecha');
+  const fVenta={}; ventas.forEach(v=>fVenta[v.id]=v.fecha);
+  const dia=x=>String(x||'').slice(0,10);
+
+  const porRef={};
+  REFS.forEach(r=>porRef[r.id]={rep:0,lis:0,ven:0});
+  alm.forEach(x=>{ const c=porRef[x.referencia_id]; if(!c) return;
+    if(x.estado==='inyectada') c.rep++;
+    else if(x.estado==='empacada') c.lis++;
+    else if(x.estado==='vendida') c.ven++; });
+
+  /* El movimiento diario: entran las que se empacaron ese día, salen las que se
+     vendieron, y el saldo se arrastra. */
+  const mov={};
+  alm.forEach(x=>{
+    if(x.empacada_en){ const d=dia(x.empacada_en);
+      (mov[d]=mov[d]||{e:0,s:0}).e++; }
+    if(x.estado==='vendida'&&x.venta_id&&fVenta[x.venta_id]){
+      const d=fVenta[x.venta_id]; (mov[d]=mov[d]||{e:0,s:0}).s++; }
+  });
+  const dias=Object.keys(mov).sort();
+  let saldo=0; const filasDia=dias.map(d=>{ const m=mov[d]; saldo+=m.e-m.s;
+    return `<div class="f"><span><b>${d.slice(8)}/${d.slice(5,7)}</b></span>
+      <span style="display:flex;gap:10px;align-items:center">
+        <span class="chip ok">+${m.e}</span>
+        <span class="chip ${m.s?'mal':''}">${m.s?'−'+m.s:'—'}</span>
+        <b style="min-width:34px;text-align:right">${saldo}</b></span></div>`; }).reverse().join('');
+
+  const tot=Object.values(porRef).reduce((a,c)=>({rep:a.rep+c.rep,lis:a.lis+c.lis,ven:a.ven+c.ven}),
+    {rep:0,lis:0,ven:0});
+  set('Inventario','Entran, salen<br>y quedan',`
+    <div class="tira">
+      <div><div class="n">${tot.lis}</div><div class="l">listas para vender</div></div>
+      <div><div class="n">${tot.rep}</div><div class="l">en reposo</div></div>
+      <div><div class="n">${tot.ven}</div><div class="l">vendidas</div></div>
+    </div>
+    <div class="tit">Por referencia</div>
+    <div class="caja">
+      <div class="res"><span>Referencia</span><span>Reposo · Listas · Vendidas</span></div>
+      ${REFS.map(r=>{ const c=porRef[r.id];
+        return `<div class="f"><span><b>${esc(r.nombre)}</b></span>
+          <span style="display:flex;gap:12px;align-items:center;font-variant-numeric:tabular-nums">
+            <span style="color:var(--tenue)">${c.rep}</span>
+            <b class="${c.lis?'ok':''}">${c.lis}</b>
+            <span style="color:var(--tenue);min-width:26px;text-align:right">${c.ven}</span>
+          </span></div>`; }).join('')}
+      <div class="f tot"><span>Total</span>
+        <span style="display:flex;gap:12px;font-variant-numeric:tabular-nums">
+          <span>${tot.rep}</span><b>${tot.lis}</b><span>${tot.ven}</span></span></div>
+    </div>
+    <div class="tit">Movimiento día por día</div>
+    <div class="caja">
+      <div class="res"><span>Día</span><span>Entran · Salen · Quedan</span></div>
+      ${filasDia||'<div class="vacio">Todavía no hay movimiento.</div>'}</div>
+    <div class="res" style="border-radius:11px;border:1px solid var(--linea)">
+      Entra al inventario cuando se empaca, no cuando se inyecta: en reposo
+      todavía no se puede vender.</div>`);
 }
 
 /* ===================== CIERRE DEL DÍA ===================== */
