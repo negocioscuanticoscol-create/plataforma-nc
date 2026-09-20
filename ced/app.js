@@ -4705,6 +4705,13 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const th=t=>`<th style="text-align:right;padding:6px 8px;font-size:10px;color:#8a93a6;text-transform:uppercase;letter-spacing:.06em;border-bottom:2px solid #333;white-space:nowrap">${t}</th>`;
     /* Un cero con barrido ya hecho dice "acá no hay"; un cero sin barrer dice
        "nadie ha mirado". Es la diferencia entre botar plata y encontrar algo. */
+    /* La fila de cierre de cada tabla. Jose: "puedes poner al terminar cada una
+       el total de cada columna". Va en <tfoot> y no como una fila mas del cuerpo
+       para que al imprimir no se separe del resto ni se ordene con los datos. */
+    const pie=(etiqueta, cols)=>`<tfoot><tr style="border-top:2px solid #333;font-weight:700;background:#f7f8fa">
+      <td style="padding:7px 8px">${esc(etiqueta)}</td>
+      ${cols.map(c=>`<td style="text-align:right;padding:7px 8px;font-variant-numeric:tabular-nums${c.col?';color:'+c.col:''}">${c.v}</td>`).join('')}
+    </tr></tfoot>`;
     const cargadas=f=>f.cargados ? `<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;font-variant-numeric:tabular-nums">${mil(f.cargados)}</td>`
       : `<td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;color:#8a93a6" title="${f.barrido_en?'Se barrió el '+f.barrido_en+' y no salió nada':'Todavía no se ha barrido'}">0${f.barrido_en?' <span style="font-size:10px">✓barrido</span>':' <span style="font-size:10px;color:#B23A2A">sin barrer</span>'}</td>`;
 
@@ -4804,6 +4811,11 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           <td style="padding:5px 8px;border-bottom:1px solid #eceef2">${esc(d.nombre)}${d.reg ? '' : ' <span style="font-size:10px;color:#B23A2A">sin distribuidor</span>'}
             <div style="font-size:10.5px;color:#8a93a6">${esc(d.centros.join(' · ')) || '—'}</div></td>
           ${num(d.mun)}${num(d.pob)}${num(d.carg)}${num(d.marc)}${num(d.int, '#C96A0C')}${num(d.reg, '#1B7A4F')}</tr>`).join('')}</tbody>
+        ${pie(dptos.length + ' departamentos', [
+          {v: mil(dptos.reduce((a,d)=>a+d.mun,0))}, {v: mil(dptos.reduce((a,d)=>a+d.pob,0))},
+          {v: mil(dptos.reduce((a,d)=>a+d.carg,0))}, {v: mil(dptos.reduce((a,d)=>a+d.marc,0))},
+          {v: mil(dptos.reduce((a,d)=>a+d.int,0)), col:'#C96A0C'},
+          {v: mil(dptos.reduce((a,d)=>a+d.reg,0)), col:'#1B7A4F'}])}
       </table>
       <div style="margin-top:10px;font-size:12.5px;line-height:1.7">
         <b>${sinLla.length}</b> departamentos sin una sola llamada hecha:
@@ -4821,6 +4833,11 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           <td style="padding:5px 8px;border-bottom:1px solid #eceef2">${esc(f.ciudad)}${f.nivel==='centro'?' <span style="font-size:10px;color:#8a93a6">centro</span>':''}</td>
           ${num(f.registrados,'#1B7A4F')}${num(f.pedidos)}${num(f.pares,'#1B7A4F')}
           <td style="text-align:right;padding:5px 8px;border-bottom:1px solid #eceef2;font-variant-numeric:tabular-nums${f.plata?';color:#1B7A4F;font-weight:700':''}">${f.plata?'$'+mil(f.plata):'<span style="color:#bbc">—</span>'}</td></tr>`).join('')}</tbody>
+        ${pie(conDist.length + ' ciudades', [
+          {v: mil(conDist.reduce((a,f)=>a+(f.registrados||0),0)), col:'#1B7A4F'},
+          {v: mil(conDist.reduce((a,f)=>a+(f.pedidos||0),0))},
+          {v: mil(conDist.reduce((a,f)=>a+(f.pares||0),0)), col:'#1B7A4F'},
+          {v: '$'+mil(conDist.reduce((a,f)=>a+(+f.plata||0),0)), col:'#1B7A4F'}])}
       </table>
     </div>
 
@@ -4832,6 +4849,11 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         <tbody>${cuerpo}
           ${sueltos.length?`<tr style="background:#f3f4f6"><td colspan="8" style="padding:5px 8px;font-weight:700;border-bottom:1px solid #eceef2">Sueltos · a más de 300 km de cualquier centro</td></tr>`+sueltos.map(filaS).join(''):''}
         </tbody>
+        ${pie(filas.length + ' municipios', [
+          {v: ''}, {v: mil(filas.reduce((a,f)=>a+(f.poblacion||0),0))},
+          {v: mil(tot.cargados)}, {v: mil(tot.marcables)},
+          {v: mil(tot.interesados), col:'#C96A0C'}, {v: mil(tot.registrados), col:'#1B7A4F'},
+          {v: mil(tot.pares), col:'#1B7A4F'}])}
       </table>
     </div>`;
   },
