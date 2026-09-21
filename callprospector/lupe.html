@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260917-tarifa-por-categoria';
+const VER='20260921-mover-de-base';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1220,6 +1220,13 @@ async function moverDeBase(destino){
        body:JSON.stringify({base_id:destino, notas:(antes?antes+' · ':'')+sello})});
     if(!r.ok) throw new Error(r.status);
     sacarActual();                            // se va de las dos listas, no se vuelve a ver
+    /* El panel se limpia ANTES de repintar. render() se niega a trabajar
+       mientras #panel tenga algo -para no borrarle a nadie lo que esta
+       escribiendo- asi que al dejar abierta la lista de bases la pantalla se
+       quedaba clavada en la empresa que se acababa de mover. Parecia que el
+       boton no habia hecho nada: el dato SI cambiaba de base en la base de
+       datos, pero no pasaba al siguiente y se volvia a intentar. */
+    cerrarCambioBase();
     toast('🏢 Pasó a '+dest.nombre);
     render(); window.scrollTo(0,0);
   }catch(e){
