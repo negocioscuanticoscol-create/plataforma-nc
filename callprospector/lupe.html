@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260921-mover-de-base';
+const VER='20260921-reclasificar';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1013,6 +1013,20 @@ function abrirInteresados(n){ INTER_ABIERTO=(INTER_ABIERTO===n)?'':n; pintarInte
 /* Copiar el celular sin depender de seleccionar y darle Ctrl+C: eso falla
    cuando el foco esta en otra parte de la pagina. Un clic —o Enter, para quien
    trabaja con teclado— y queda en el portapapeles. */
+/* Los dos botones van pequenos y grises: son la excepcion, no lo que se hace
+   en cada fila. El verde de "enviado" tiene que seguir siendo lo que salta. */
+const _cssReclas = document.createElement('style');
+_cssReclas.textContent = `
+.ibx{display:flex;gap:6px;margin-top:7px}
+.ix{flex:1;border:1px solid var(--line);background:transparent;color:var(--dim);
+  border-radius:9px;padding:7px 6px;font-size:11.5px;font-weight:600;cursor:pointer;
+  font-family:inherit;line-height:1.25}
+.ix:hover{border-color:var(--dim);color:#fff}
+.ix.comp:hover{border-color:#e0a13a;color:#e0a13a}
+.ix.nono:hover{border-color:#e05a5a;color:#e05a5a}
+.ix:disabled{opacity:.4;cursor:default}`;
+document.head.appendChild(_cssReclas);
+
 async function copiarNum(el){
   const num = el.dataset.num || el.textContent.replace(/\D/g,'');
   let ok = false;
@@ -1030,6 +1044,68 @@ async function copiarNum(el){
   el.textContent = ok ? '✓ copiado' : 'no se pudo';
   el.classList.add(ok ? 'copiado' : 'falla');
   setTimeout(()=>{ el.textContent = antes; el.classList.remove('copiado','falla'); }, 1100);
+}
+
+/* A donde se mandan los competidores. Se busca por nombre y no por id quemado
+   para que siga funcionando si la base se vuelve a crear. */
+const BASE_COMPETIDORES = 'Distribuidores autorizados de la competencia';
+
+async function reclasificar(id, que){
+  const x = (INTER || []).find(y => String(y.id) === String(id));
+  if (!x) return;
+  const nom = x.lead_nombre || 'este dato';
+  const tel = soloNum(x.whatsapp2 || x.whatsapp || x.lead_cel || '');
+
+  const texto = que === 'competidor'
+    ? '¿' + nom + ' es un COMPETIDOR?\n\nSale de la base que están llamando y pasa a la de competidores. Nadie lo vuelve a marcar.'
+    : '¿NO volver a contactar a ' + nom + '?\n\nEste teléfono queda bloqueado en TODAS las bases, incluso si mañana se vuelve a cargar el dato.';
+  if (!confirm(texto)) return;
+
+  const bts = document.querySelectorAll('.ibx button');
+  bts.forEach(b => b.disabled = true);
+  try {
+    if (que === 'competidor') {
+      /* Se mueve de base Y se marca 'competencia'. Solo moverlo lo dejaria
+         marcable dentro de la base de competidores; solo marcarlo lo dejaria
+         escondido pero revuelto con los prospectos buenos. */
+      const bs = await GET('mkr_bases?select=id,nombre&nombre=ilike.'
+                           + encodeURIComponent('*' + BASE_COMPETIDORES + '*') + '&limit=1');
+      const destino = (Array.isArray(bs) && bs[0]) ? bs[0].id : null;
+      if (!destino) { toast('⚠️ No existe la base de competidores', true); bts.forEach(b => b.disabled = false); return; }
+      const cuerpo = { estado: 'competencia', base_id: destino };
+      const r = await fetch(SB + '/rest/v1/mkr_empresas?id=eq.' + encodeURIComponent(x.lead_id),
+        { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify(cuerpo) });
+      if (!r.ok) throw new Error(r.status);
+      toast('🏭 ' + nom + ' pasó a competidores');
+    } else {
+      /* La lista de no llamar es por TELEFONO, no por empresa: el mismo numero
+         puede estar cargado en cuatro bases con cuatro nombres distintos. */
+      if (!tel || tel.length < 10) { toast('⚠️ No tiene un teléfono válido', true); bts.forEach(b => b.disabled = false); return; }
+      const r = await fetch(SB + '/rest/v1/mkr_no_llamar',
+        { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+          body: JSON.stringify({ telefono: tel.slice(-10),
+            motivo: 'Pidió no ser contactado',
+            nombre: x.lead_nombre || null,
+            base_id: x.base_id || null,
+            agente: YO.nombre || null }) });
+      if (!r.ok && r.status !== 409) throw new Error(r.status);
+      await fetch(SB + '/rest/v1/mkr_empresas?id=eq.' + encodeURIComponent(x.lead_id),
+        { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ estado: 'descartado' }) });
+      toast('🚫 ' + tel.slice(-10) + ' no se vuelve a llamar');
+    }
+    /* Se marca trabajado para que salga de la lista de pendientes: ya no hay
+       nada que mandarle. */
+    await fetch(SB + '/rest/v1/mkr_llamadas?id=eq.' + encodeURIComponent(x.id),
+      { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ trabajado: true }) });
+    INTER = INTER.filter(y => String(y.id) !== String(id));
+    pintarInteresados();
+  } catch (e) {
+    bts.forEach(b => b.disabled = false);
+    toast('⚠️ No se pudo. Revisa la señal.', true);
+  }
 }
 
 function filaInteresado(x, equipo){
@@ -1070,6 +1146,12 @@ function filaInteresado(x, equipo){
         : '<span class="falta" style="font-size:12px">sin teléfono · hay que buscarlo</span>'}
       ${ya ? '' : `<label class="ick"><input type="checkbox"
           onchange="trabajado('${esc(x.id)}')"> enviado</label>`}
+    </div>
+    <div class="ibx">
+      <button class="ix comp" onclick="reclasificar('${esc(x.id)}','competidor')"
+        title="Sale de la base que están llamando y se va con los competidores">🏭 Es competidor</button>
+      <button class="ix nono" onclick="reclasificar('${esc(x.id)}','nollamar')"
+        title="Este teléfono no vuelve a salir en ninguna base">🚫 No contactar</button>
     </div>
     ${nuevo && marcado && nuevo!==marcado
       ? '<div class="iaviso">📲 Manda la info al verde: es el que dieron en la llamada</div>' : ''}
