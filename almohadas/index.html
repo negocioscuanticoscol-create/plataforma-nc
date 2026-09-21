@@ -153,7 +153,7 @@ nav button.on{color:var(--ambar);font-weight:700}
    pestaña Costos. Cambiar el precio del poliuretano no debe obligar a publicar
    una versión nueva.
    =========================================================================== */
-const VER='20260921-3';
+const VER='20260921-4';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/';
 const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
@@ -302,8 +302,6 @@ function vSim(){
   const OK=correrSim(mA,pBueno), MAL=correrSim(mB,pMalo); // las dos puntas
   const PREV=correrSim(mA,A.ideal);                       // el papel
   const tr=tramoReparto(A.u), sup=A.u>0?A.u*tr.pct/100:0;
-  const mejor=A.F.slice().sort((x,y)=>y.porKg-x.porKg)[0];
-  const peor =A.F.slice().sort((x,y)=>x.porKg-y.porKg)[0];
   const cKg=v=>v>=25000?'ok':v>=10000?'esp':'mal';
   const cV =v=>v<=0?'mal':v<5000?'esp':'ok';
   const copS=v=>(v<0?'−$':'$')+Math.abs(Math.round(v)).toLocaleString('es-CO');
@@ -321,9 +319,6 @@ function vSim(){
       <div><div class="n ${A.u>0?'ok':'mal'}">${copS(A.u)}</div><div class="l">con merma buena</div></div>
       <div><div class="n">${num(B.und)}–${num(A.und)}</div><div class="l">almohadas</div></div>
     </div>
-    <div class="res" style="border-radius:11px;border:1px solid var(--linea)">
-      Planeado con <b>${num(pBase)} g</b>, que es con lo que hay que contar. El
-      consumo se sube solo; bajarlo hay que empujarlo.</div>
 
     <div class="tit">Los tres escenarios</div>
     <div class="caja">
@@ -333,9 +328,7 @@ function vSim(){
       ${rej('Si se sube',pMalo,'el peor')}
       <div class="f tot"><span>Lo que decía el papel</span>
         <b>${copS(PREV.u)}<span style="font-size:12px;color:var(--tenue);font-weight:400"> a ${num(A.ideal,0)} g</span></b></div>
-      <div class="res">Entre la mejor y la peor casilla hay
-        <b>${copS(OK.u-MAL.u)}</b>. Eso es lo que está en juego en el peso y la merma,
-        no en el precio.</div>
+      <div class="res"><span>Entre la mejor y la peor casilla</span><b>${copS(OK.u-MAL.u)}</b></div>
     </div>
 
     <div class="tit">Con qué se cuenta</div>
@@ -380,8 +373,7 @@ function vSim(){
         <span style="display:flex;gap:9px;align-items:center;font-variant-numeric:tabular-nums">
           ${x.lista.map(l=>`<b class="${cV(l.v)}" style="min-width:56px;text-align:right">${copS(l.v)}</b>`).join('')}
         </span></div>`).join('')}
-      <div class="res">El <b>${P('sim_mix_3')}% de las ventas se va por lista 3</b>, que es
-        la columna de la derecha. El promedio ponderado tapa lo que pasa ahí.</div>
+      <div class="res"><span>Se vende por lista 3</span><b>${P('sim_mix_3')}%</b></div>
     </div>
 
     <div class="tit">Cuánto deja cada KILO</div>
@@ -390,14 +382,7 @@ function vSim(){
         <span><b>${esc(x.r.nombre)}</b>
           <div style="font-size:12px;color:var(--tenue)">${x.n} por ciclo · se lleva ${num(x.q*x.w,0)} kg</div></span>
         <b class="${cKg(x.porKg)}">${copS(x.porKg)}</b></div>`).join('')}
-      <div class="res" style="border-radius:0">El poliuretano es lo único que se acaba.
-        La pregunta no es cuánto deja una almohada, sino cuánto deja el kilo que se
-        le metió.</div>
     </div>
-    ${mejor&&peor&&mejor!==peor&&peor.porKg>0?`<div class="res" style="border-radius:11px;border:1px solid var(--linea)">
-      <b>${esc(mejor.r.nombre)} deja ${num(mejor.porKg/peor.porKg,1)} veces más por kilo
-      que ${esc(peor.r.nombre)}</b>, y la curva le está mandando
-      ${num(peor.q*peor.w/(A.kgUtil||1)*100,0)}% del poliuretano a la que menos deja.</div>`:''}
 
     <div class="tit">Hasta qué peso aguanta cada una</div>
     <div class="caja">
@@ -409,8 +394,7 @@ function vSim(){
             return `<b class="${col2<=0?'mal':col2<150?'esp':'ok'}" style="min-width:56px;text-align:right">${num(q,0)} g</b>`;
           }).join('')}
         </span></div>`).join('')}
-      <div class="res">Ese es el peso donde el precio alcanza justo para pagar material,
-        mano y bolsa. De ahí para arriba la almohada se fabrica para no ganar nada.</div>
+      <div class="res">Peso donde el precio apenas paga material, mano y bolsa.</div>
     </div>
 
     <div class="tit">De los kilos a las almohadas</div>
@@ -435,41 +419,7 @@ function vSim(){
       <div class="f tot"><span>Queda para el negocio</span><b>${copS(A.u-sup)}</b></div>
     </div>
 
-    <div class="tit">Qué mueve más la aguja</div>
-    <div class="caja">
-      <div class="f"><span><b>Bajar el peso a ${num(pBueno)} g</b>
-        <div style="font-size:12px;color:var(--tenue)">${num(pBase-pBueno)} gramos menos en el promedio</div></span>
-        <b class="ok">+${copS(OK.u-A.u)}</b></div>
-      <div class="f"><span><b>Sostener la merma en ${mA}%</b>
-        <div style="font-size:12px;color:var(--tenue)">no dejarla subir al ${mB}%</div></span>
-        <b class="ok">+${copS(A.u-B.u)}</b></div>
-      <div class="f"><span>Subir todos los precios 5%
-        <div style="font-size:12px;color:var(--tenue)">si el mercado lo aguanta</div></span>
-        <b>+${copS(A.vta*0.05)}</b></div>
-      <div class="f"><span>Bajar el poliuretano 5%
-        <div style="font-size:12px;color:var(--tenue)">negociando con el proveedor</div></span>
-        <b>+${copS(A.KG*P('precio_poliuretano')*0.05)}</b></div>
-      <div class="res">Cada gramo que baje el promedio vale
-        <b>${copS((OK.u-A.u)/Math.max(1,pBase-pBueno))}</b> en el período.</div>
-    </div>
-
-    <div class="tit">Lo que este presupuesto NO está contando</div>
-    <div class="caja">
-      ${[['Las que salen malas','El escenario vende las '+num(A.und)+'. Un 3% de rechazo son '
-          +num(Math.round(A.und*0.03))+' almohadas y '+cop(A.und*0.03*(A.cvar/(A.und||1)))+'.'],
-         ['El flete','Nadie está pagando llevar la almohada al cliente.'],
-         ['Quién vende','No hay comisión, ni celular, ni pauta, ni quien conteste.'],
-         ['La plata quieta','Se compra de contado y se cobra a 30 días: hay que tener '
-          +cop(A.cvar)+' adelantados todo el tiempo.'],
-         ['El IVA','No quita utilidad, pero sale de la caja cada dos meses.'],
-         ['Retención e ICA','Si le vende a empresas le retienen ~3,5% de cada factura.'],
-         ['Quién arregla la máquina','Ni mantenimiento, ni moldes, ni repuestos.'],
-         ['Que el cloruro sea por kilo','A '+cop(P('precio_cloruro'))+' el kilo son '
-          +cop(A.KG*P('pct_cloruro')/100*P('precio_cloruro'))+' del período. Si ese precio es por '
-          +'garrafa y no por kilo, toda esta cuenta cambia.']]
-        .map(([t,d])=>`<div class="f"><span><b>${t}</b>
-          <div style="font-size:12px;color:var(--tenue)">${d}</div></span></div>`).join('')}
-    </div>`);
+`);
 }
 
 async function guardarSim(){
