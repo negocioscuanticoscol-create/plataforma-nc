@@ -3194,6 +3194,13 @@ const App = {
         <select class="field" id="co_color" onchange="App.cotFiltraLista(true)" style="margin:0"></select>
         ${this._rotCot('4 · Lista de precios')}
         <select class="field" id="co_lista" onchange="App.cotRefPrecio()" style="margin:0"></select>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin:9px 0 0;cursor:pointer;
+          color:var(--azul);background:#f2f6ff;border:1px solid #cfe0ff;border-radius:9px;padding:9px 11px">
+          <input type="checkbox" id="co_pmano_on" onchange="App.cotPmanoToggle()" style="width:18px;height:18px;accent-color:var(--azul)">
+          ✏️ Poner el precio a mano
+        </label>
+        <input class="field" id="co_pmano" type="text" inputmode="numeric" placeholder="valor por par, sin IVA"
+               oninput="App.cotRefPrecio()" style="display:none;margin-top:6px">
         <div id="co_ref_precio" class="hint" style="margin-top:6px"></div>
       </div>
 
@@ -3296,6 +3303,13 @@ const App = {
         const sl=$('co_lista');
         if(sl && ec.lista_precio && [].some.call(sl.options,o=>o.value===ec.lista_precio)){
           sl.value=ec.lista_precio; this.cotRefPrecio(); }
+        /* Si se cotizo a mano hay que volver a encender la casilla con el mismo
+           valor. Sin esto el formulario se reabria con el precio de la lista y
+           al guardar le cambiaba el valor al cliente por detras. */
+        if(ec.lista_precio==='Precio a mano'){
+          const pm=$('co_pmano_on'), pv=$('co_pmano');
+          if(pm&&pv){ pm.checked=true; pv.value=+ec.precio_par||0; this.cotPmanoToggle(); }
+        }
         this.toggleCotMuestra(); this.curva();
       }
     }
@@ -3439,6 +3453,15 @@ const App = {
       + (l.nombre===suya ? '  ★ la del cliente' : '')
       + `</option>`).join('');
     sel.value=elegida;
+    /* Al cambiar de referencia o de cliente se apaga el precio a mano. Si se
+       quedara encendido, el valor que alguien escribio para la FORTIA seguiria
+       puesto al pasar a la MILITAR y la cotizacion saldria con un precio que
+       no es de ese producto ni de ninguna lista. */
+    if(forzar){
+      const pm=$('co_pmano_on'), pv=$('co_pmano');
+      if(pm) pm.checked=false;
+      if(pv){ pv.value=''; pv.style.display='none'; }
+    }
     this.cotRefPrecio(); },
 
   /* El precio por par de la referencia escogida, según la lista ESCOGIDA.
@@ -3455,10 +3478,36 @@ const App = {
        punto de partida y se devuelve aparte para poder avisar si no coinciden. */
     const suya=cl.lista_precio||'Distribuidor';
     const nom=(($('co_lista')||{}).value)||suya;
+    /* El precio a mano manda sobre la lista. Se guarda como lista 'Precio a
+       mano' a proposito: el campo existe para poder explicar despues de donde
+       salio el valor por par, y decir que vino de una lista cuando alguien lo
+       escribio seria mentir en el papel que ve el cliente. */
+    if((($('co_pmano_on')||{}).checked)){
+      const m=+String((($('co_pmano')||{}).value)||'').replace(/[^0-9]/g,'')||0;
+      if(m>0) return {valor:m, deLista:false, mano:true, lista:'Precio a mano', suya, ref:r||null};
+    }
     const i=this.LISTAS.indexOf(nom);
     const p=(r && i>=0) ? (r.precios[i]||0) : 0;
     return {valor: p>0?p:C.PRECIO_PAR, deLista: p>0,
             lista: nom, suya, ref:r||null}; },
+
+  /* Al encender la casilla se arranca del precio de la lista, no de cero: casi
+     siempre es un ajuste sobre ese valor y no un numero salido de la nada. */
+  cotPmanoToggle(){
+    const on=(($('co_pmano_on')||{}).checked), e=$('co_pmano'); if(!e) return;
+    e.style.display = on ? 'block' : 'none';
+    if(on){
+      if(!e.value){
+        const k=($('co_color')||{}).value||($('co_ref')||{}).value||'';
+        const r=(this._refsCot||[]).find(x=>x.k===k);
+        const i=this.LISTAS.indexOf((($('co_lista')||{}).value)||'');
+        const base=(r&&i>=0)?(r.precios[i]||0):0;
+        if(base>0) e.value=base;
+      }
+      e.focus();
+    }
+    this.cotRefPrecio();
+  },
   /* Repinta el desplegable de referencias dejando solo las de la categoría
      elegida. Si una referencia todavía no tiene categoría, sale siempre: es
      preferible a que desaparezca de la lista y nadie la encuentre. */
@@ -3518,10 +3567,13 @@ const App = {
     const ojo = (p.suya && p.lista!==p.suya)
       ? `<div style="color:#b45309;font-size:11.5px;margin-top:3px">⚠️ La ficha de este cliente dice <b>${esc(p.suya)}</b>.</div>`
       : '';
-    const txt = (p.deLista
+    const txt = (p.mano
+      ? `<span style="color:var(--azul)">✏️ Precio <b>a mano</b>: <b>${money(p.valor)}</b>/par + IVA.
+         No sale de ninguna lista.</span>`
+      : p.deLista
       ? `Precio lista <b>${esc(p.lista)}</b>: <b>${money(p.valor)}</b>/par + IVA`
       : `<span style="color:#b45309">⚠️ Esta referencia no tiene precio en la lista <b>${esc(p.lista)}</b>.
-         Se usa ${money(C.PRECIO_PAR)}/par. Cárgalo en <b>Precios</b>.</span>`) + ojo;
+         Se usa ${money(C.PRECIO_PAR)}/par. Cárgalo en <b>Precios</b>.</span>`) + (p.mano?'':ojo);
     e.innerHTML = f
       ? '<div style="display:flex;gap:10px;align-items:center">'+f+'<div>'+txt+'</div></div>'
       : txt;
