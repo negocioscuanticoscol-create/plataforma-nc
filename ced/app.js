@@ -3813,7 +3813,46 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   },
 
   async cotizarAPedido(cotId){
-    if(!confirm('¿Convertir esta cotización en un PEDIDO? Quedará pendiente de pago.')) return;
+    const { data:cc } = await this.sb.from('cotizaciones').select('numero,total,cliente_snap').eq('id',cotId).single();
+    if(!cc){ alert('No se encontró la cotización.'); return; }
+    const tot=+cc.total||0;
+    this._c2pId=cotId; this._c2pTot=tot;
+    this.modal(`
+      <h3>📦 Convertir en pedido</h3>
+      <div class="sub">${esc((cc.cliente_snap||{}).nombre||'')} · ${esc(cc.numero||'')}</div>
+      <div class="card" style="padding:9px 11px;margin:8px 0">
+        <div style="display:flex;justify-content:space-between;font-size:14px"><span>Total del pedido</span><b>${money(tot)}</b></div>
+      </div>
+      ${tot>0?`<label>💵 Abono <span style="font-weight:400;color:var(--suave)">— lo que deja hoy (opcional)</span></label>
+      <input class="field" id="c2p_abono" type="text" inputmode="numeric" placeholder="0" oninput="App.c2pCalc()">
+      <label style="margin-top:8px">¿Cómo lo dejó?</label>
+      <select class="field" id="c2p_forma">
+        <option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option>
+        <option value="consignacion">Consignación</option><option value="tarjeta">Tarjeta / datáfono</option>
+        <option value="otro">Otro</option></select>
+      <input class="field" id="c2p_nota" placeholder="Referencia, banco o nota (opcional)" style="margin-top:8px">
+      <div id="c2p_saldo" style="margin-top:9px;font-size:14px;font-weight:800;text-align:right">
+        <span style="color:var(--suave)">Sin abono · queda debiendo ${money(tot)}</span></div>`:''}
+      <div style="margin-top:9px;font-size:12px;color:var(--suave)">📍 Queda en el CED <b>${esc(this.miSede()||'Principal')}</b>.</div>
+      <button class="btn btn-main" onclick="App.cotizarAPedidoOk()">Crear pedido</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+  },
+  c2pCalc(){
+    const v=+String((($('c2p_abono')||{}).value)||'').replace(/[^0-9]/g,'')||0;
+    const tot=this._c2pTot, saldo=tot-v, el=$('c2p_saldo'); if(!el) return;
+    if(v>tot){ el.innerHTML='<span style="color:var(--rojo)">El abono es mayor que el total</span>'; return; }
+    el.innerHTML = v>0
+      ? 'Abonó '+money(v)+' · <span style="color:'+(saldo>0?'var(--rojo)':'var(--verde)')+'">'
+        +(saldo>0?('queda debiendo '+money(saldo)):'PAGADO COMPLETO')+'</span>'
+      : '<span style="color:var(--suave)">Sin abono · queda debiendo '+money(tot)+'</span>';
+  },
+  async cotizarAPedidoOk(){
+    const cotId=this._c2pId;
+    const abono=+String((($('c2p_abono')||{}).value)||'').replace(/[^0-9]/g,'')||0;
+    if(abono>this._c2pTot){ alert('El abono es mayor que el total.'); return; }
+    const abForma=(($('c2p_forma')||{}).value)||null;
+    const abNota=(($('c2p_nota')||{}).value||'').trim()||null;
+    this.cerrarModal();
     const { data:c } = await this.sb.from('cotizaciones').select('*').eq('id',cotId).single();
     const cl=c.cliente_snap||{};
     const d=new Date(), num='PED-'+d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)+'-'+('0'+d.getHours()).slice(-2)+('0'+d.getMinutes()).slice(-2)+('0'+d.getSeconds()).slice(-2);
@@ -3822,13 +3861,20 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       pares:c.pares, total:c.total, tipo_pago:cl.tipo_pago||'contado', estado:(+c.total||0)>0?'pendiente_pago':'autorizado',
       referencia:c.referencia||null, valor_par_nc:c.valor_par_nc||null, valor_par_gpjr:c.valor_par_gpjr||null,
       recomendado:!!c.recomendado, comision_nc:c.comision_nc||0, comision_gpjr:c.comision_gpjr||0,
-      es_muestra:c.es_muestra||false, detalle:c.detalle||null, interno:c.interno||false, asesor:c.asesor||null
+      es_muestra:c.es_muestra||false, detalle:c.detalle||null, interno:c.interno||false, asesor:c.asesor||null,
+      abono:abono||0, abono_forma:abono?abForma:null, abono_nota:abono?abNota:null,
+      abono_en:abono?new Date().toISOString():null
     }).select().single();
     if(error){ alert('Error: '+error.message); return; }
+    if(abono>0){
+      await this.sb.from('pedido_abonos').insert({pedido_id:ped.id,valor:abono,forma:abForma,nota:abNota,recibido_por:this.user.id});
+      await this.hist(ped.id,'abono','💵 Abono '+money(abono)+(abForma?' ('+abForma+')':'')+(abNota?' · '+abNota:'')
+        +' · saldo '+money((+c.total||0)-abono));
+    }
     await this.sb.from('cotizaciones').update({estado:'aceptada'}).eq('id',c.id);
     await this._avanzarEmbudo(c.cliente_id, c.es_muestra?'muestra':'cliente');   // muestra NO vuelve cliente (sigue en CRM); solo un pedido REAL lo convierte
     await this.hist(ped.id,'pendiente_pago','Pedido creado desde cotización '+c.numero);
-    alert('✅ Pedido creado: '+num);
+    alert('✅ Pedido creado: '+num+(abono>0?('\nAbonó '+money(abono)+'\nSaldo '+money((+c.total||0)-abono)):''));
     this.go(this.view);
   },
 
@@ -3961,6 +4007,9 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const tallasTxt=_tk.length?_tk.map(t=>`<b>${esc(t)}</b>×${esc(_cv[t])}`).join(' &nbsp; '):'';
     const detalle = p.es_muestra ? `🎁 ${esc(p.detalle||'Muestra')}` : `${pares} pares · ${esc(p.tipo_pago)}`;
     const totLbl = (p.es_muestra && tot===0) ? 'Sin costo' : money(tot);
+    /* El saldo no se guarda: es la resta. Guardarlo seria tener el mismo dato
+       dos veces y que un dia no cuadren. */
+    const abo=+p.abono||0, sal=tot-abo;
     // liquidación discriminada (proforma): producto + IVA + transporte según la regla
     let liq;
     if(!p.es_muestra){
@@ -3982,6 +4031,9 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         <div class="nom">${esc(cl.nombre||'Cliente')} ${p.es_muestra?'<span class="badge b-cotizada">MUESTRA</span>':''} <span style="font-size:12px;color:var(--suave)">▾</span></div>
         <div class="meta">${esc(p.numero||'')}${(cl.tel||cl.cel2)?` · 📱 <a href="https://wa.me/57${esc((cl.tel||cl.cel2).replace(/\D/g,''))}" target="_blank" onclick="event.stopPropagation()" style="color:#16734a;font-weight:700;text-decoration:none">${esc(cl.tel||cl.cel2)}</a>`:''} · ${detalle}</div>
       </div><div style="text-align:right"><div class="tot">${totLbl}</div>
+        ${abo>0?`<div style="font-size:11.5px;line-height:1.5;margin:2px 0 3px">
+          <span style="color:var(--verde);font-weight:700">abonó ${money(abo)}</span><br>
+          <span style="color:${sal>0?'var(--rojo)':'var(--verde)'};font-weight:800">${sal>0?'debe '+money(sal):'PAGADO'}</span></div>`:''}
         <span class="badge b-${p.estado}">${ESTADOS[p.estado]}</span></div></div>
       <div id="ped_${p.id}" style="display:none;margin-top:8px">
         <div class="meta" style="margin-bottom:4px">${liq}</div>
@@ -3990,6 +4042,19 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           <div style="font-size:13px;line-height:1.8">📍 <b>${esc(env||'— sin dirección registrada —')}</b>${cl.contacto1?`<br>👤 Oficina: <b>${esc(cl.contacto1)}</b>`:''}${(cl.tel||cl.cel2)?`<br>📱 Celular: <b>${esc(cl.tel||cl.cel2)}</b>${(cl.tel&&cl.cel2)?' · '+esc(cl.cel2):''}`:''}${(cl.contacto_recibe||cl.cel_recibe)?`<br>📦 <b>Recibe:</b> ${esc(cl.contacto_recibe||'')}${cl.cel_recibe?' · 📱 '+esc(cl.cel_recibe):''}`:''}${cl.notas?`<br>📝 <b>Notas:</b> ${esc(cl.notas)}`:''}</div>
           ${tallasTxt?`<div style="margin-top:8px;font-size:14px;background:#fff;border:1px solid var(--linea);border-radius:8px;padding:9px 11px"><span style="font-size:11px;font-weight:800;color:var(--naranja)">👟 TALLAS A EMPACAR · ${pares} pares</span><br><div style="margin-top:3px;line-height:2">${tallasTxt}</div></div>`:''}
         </div>
+        ${(tot>0)?`<div class="card" style="background:#f2fbf5;border:1px solid #cfe9d9;margin:6px 0;padding:10px 12px">
+          <div style="display:flex;justify-content:space-between;font-size:13px;line-height:1.9">
+            <span>Total del pedido</span><b>${money(tot)}</b></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;line-height:1.9">
+            <span>Abonado${p.abono_forma?' · '+esc(p.abono_forma):''}</span>
+            <b style="color:var(--verde)">${money(abo)}</b></div>
+          ${p.abono_nota?`<div style="font-size:11.5px;color:var(--suave)">📝 ${esc(p.abono_nota)}</div>`:''}
+          <div style="display:flex;justify-content:space-between;font-size:14.5px;line-height:2;
+            border-top:1px solid #cfe9d9;margin-top:4px;padding-top:4px">
+            <b>${sal>0?'Saldo por pagar':'Saldo'}</b>
+            <b style="color:${sal>0?'var(--rojo)':'var(--verde)'}">${sal>0?money(sal):'PAGADO COMPLETO'}</b></div>
+          ${(sal>0&&this.puede('admin','vendedor','facturacion'))?`<button class="btn-sm" style="background:var(--verde);color:#fff;width:100%;margin-top:7px" onclick="event.stopPropagation();App.modalAbono(${p.id})">💵 Registrar otro abono</button>`:''}
+        </div>`:''}
         ${this.puede('admin')?this._tiemposPedido(p):''}
         ${p.consignacion_validada_por?`<div class="meta" style="color:#16a34a;margin-bottom:4px">💳 Pago validado por <b>${esc(p.consignacion_validada_por)}</b></div>`:''}
         ${(!p.es_muestra && p.guia && p.estado==='pendiente_pago')?`<div style="font-size:11.5px;color:#b3261e;background:#fde8e8;border-radius:7px;padding:6px 9px;margin-bottom:6px">⚠️ CARTERA: enviado SIN validar el pago — falta oprimir 💳 Marcar consignación</div>`:''}
@@ -4002,6 +4067,71 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         </div>`:''}
       </div></div>`;
   },
+  /* Un abono sobre un pedido que ya existe. pedidos.abono es la SUMA y
+     pedido_abonos el detalle: sin el detalle, dos abonos del mismo dia quedan
+     como uno solo y nadie puede decir cual banco lo recibio. */
+  async modalAbono(id){
+    const { data:p } = await this.sb.from('pedidos').select('numero,total,abono,cliente_snap').eq('id',id).single();
+    if(!p){ alert('No se encontró el pedido.'); return; }
+    const tot=+p.total||0, ya=+p.abono||0, falta=tot-ya;
+    const { data:previos=[] } = await this.sb.from('pedido_abonos')
+      .select('*').eq('pedido_id',id).order('creado_en',{ascending:true});
+    this._abonoId=id; this._abonoTot=tot; this._abonoYa=ya;
+    this.modal(`
+      <h3>💵 Registrar abono</h3>
+      <div class="sub">${esc((p.cliente_snap||{}).nombre||'')} · ${esc(p.numero||'')}</div>
+      ${previos.length?`<div class="card" style="padding:9px 11px;margin:8px 0">
+        <div style="font-size:11px;font-weight:700;color:var(--suave);letter-spacing:.06em">ABONOS ANTERIORES</div>
+        ${previos.map(a=>`<div style="display:flex;justify-content:space-between;font-size:12.5px;line-height:1.9">
+          <span>${esc(String(a.creado_en||'').slice(0,10))}${a.forma?' · '+esc(a.forma):''}${a.nota?' · '+esc(a.nota):''}</span>
+          <b style="color:var(--verde)">${money(a.valor)}</b></div>`).join('')}
+      </div>`:''}
+      <div class="card" style="padding:9px 11px;margin:8px 0">
+        <div style="display:flex;justify-content:space-between;font-size:13px;line-height:1.9"><span>Total</span><b>${money(tot)}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;line-height:1.9"><span>Ya abonó</span><b style="color:var(--verde)">${money(ya)}</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;line-height:1.9;border-top:1px solid var(--linea);padding-top:4px"><b>Debe</b><b style="color:var(--rojo)">${money(falta)}</b></div>
+      </div>
+      <label>Valor del abono *</label>
+      <input class="field" id="ab_valor" type="text" inputmode="numeric" placeholder="0" oninput="App.abonoCalc()">
+      <label style="margin-top:8px">¿Cómo lo dejó?</label>
+      <select class="field" id="ab_forma">
+        <option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option>
+        <option value="consignacion">Consignación</option><option value="tarjeta">Tarjeta / datáfono</option>
+        <option value="otro">Otro</option></select>
+      <input class="field" id="ab_nota" placeholder="Referencia, banco o nota (opcional)" style="margin-top:8px">
+      <div id="ab_saldo" style="margin-top:9px;font-size:14px;font-weight:800;text-align:right"></div>
+      <button class="btn btn-main" onclick="App.guardarAbono()">Guardar abono</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+  },
+  abonoCalc(){
+    const v=+String((($('ab_valor')||{}).value)||'').replace(/[^0-9]/g,'')||0;
+    const falta=this._abonoTot-this._abonoYa, queda=falta-v, el=$('ab_saldo'); if(!el) return;
+    if(v>falta){ el.innerHTML='<span style="color:var(--rojo)">Es más de lo que debe ('+money(falta)+')</span>'; return; }
+    el.innerHTML = v>0
+      ? '<span style="color:'+(queda>0?'var(--rojo)':'var(--verde)')+'">'
+        +(queda>0?('Quedaría debiendo '+money(queda)):'Quedaría PAGADO COMPLETO')+'</span>'
+      : '<span style="color:var(--suave)">Debe '+money(falta)+'</span>';
+  },
+  async guardarAbono(){
+    const v=+String((($('ab_valor')||{}).value)||'').replace(/[^0-9]/g,'')||0;
+    if(v<=0){ alert('Escribe el valor del abono.'); return; }
+    const falta=this._abonoTot-this._abonoYa;
+    if(v>falta){ alert('El abono ('+money(v)+') es más de lo que debe ('+money(falta)+').'); return; }
+    const forma=(($('ab_forma')||{}).value)||null;
+    const nota=(($('ab_nota')||{}).value||'').trim()||null;
+    const id=this._abonoId, nuevo=this._abonoYa+v;
+    const { error } = await this.sb.from('pedido_abonos')
+      .insert({pedido_id:id,valor:v,forma,nota,recibido_por:this.user.id});
+    if(error){ alert('Error: '+error.message); return; }
+    await this.sb.from('pedidos').update({abono:nuevo,abono_forma:forma,abono_nota:nota,
+      abono_en:new Date().toISOString(),actualizado_en:new Date().toISOString()}).eq('id',id);
+    await this.hist(id,'abono','💵 Abono '+money(v)+(forma?' ('+forma+')':'')+(nota?' · '+nota:'')
+      +' · saldo '+money(this._abonoTot-nuevo));
+    this.cerrarModal();
+    alert('✅ Abono registrado: '+money(v)+'\nSaldo: '+money(this._abonoTot-nuevo));
+    this.go(this.view);
+  },
+
   accionesPedido(p){
     const r=this.rol(), btns=[];
     if(p.estado==='pendiente_pago' && this.puede('admin','vendedor'))
@@ -4220,6 +4350,21 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       <label style="margin-top:10px">Cantidades por talla</label>
       <div class="grid-tallas" id="cr_grid"></div>
       <div class="estado" style="position:static;margin-top:8px"><div class="ec-falta ok" id="cr_total">Total: $0</div></div>
+      <div id="cr_abono_wrap" style="display:none;margin-top:10px;background:#f4f7fb;border:1px solid #d5e0f7;border-radius:10px;padding:11px 12px">
+        <label style="margin:0">💵 Abono <span style="font-weight:400;color:var(--suave)">— lo que deja hoy</span></label>
+        <input class="field" id="cr_abono" type="text" inputmode="numeric" placeholder="0" oninput="App.crAbonoCalc()">
+        <label style="margin-top:8px">¿Cómo lo dejó?</label>
+        <select class="field" id="cr_abono_forma">
+          <option value="efectivo">Efectivo</option>
+          <option value="transferencia">Transferencia</option>
+          <option value="consignacion">Consignación</option>
+          <option value="tarjeta">Tarjeta / datáfono</option>
+          <option value="otro">Otro</option>
+        </select>
+        <input class="field" id="cr_abono_nota" placeholder="Referencia, banco o nota (opcional)" style="margin-top:8px">
+        <div id="cr_saldo" style="margin-top:9px;font-size:14px;font-weight:800;text-align:right"></div>
+      </div>
+      <div id="cr_ced_aviso" style="margin-top:9px;font-size:12px;color:var(--suave)"></div>
       <button class="btn btn-main" onclick="App.guardarCrear()">Crear</button>
       <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>
     `);
@@ -4241,14 +4386,41 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   _crearTallas(){ let pares=0; const tallas={}; document.querySelectorAll('#cr_grid input').forEach(i=>{const q=+i.value||0; if(q>0){pares+=q; tallas[i.dataset.talla]=q;}}); return {pares,tallas}; },
   crearPreview(){
     const tipo=$('cr_tipo').value, {pares}=this._crearTallas(); let html='Total: $0';
+    /* El total queda guardado como numero, no solo pintado. Leerlo de vuelta
+       del HTML era fragil: ese renglon lleva los pares, las cajas y el IVA, y
+       quitarle los signos pegaba todos los numeros en uno solo. */
+    this._crTot=0;
     if(pares){
       if(tipo==='nono'){ html=`${pares} und · Sin valor comercial`; }
       else if(tipo==='equipo'){ html=`${pares} par(es) · 👔 Sin valor comercial (equipo)`; }
-      else if(tipo==='pie'){ const sub=C.MUESTRA_PAR*pares, iva=Math.round(sub*C.IVA), flete=Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000); html=`${pares} par(es) · ${money(sub)} + IVA ${money(iva)} + 🚚 ${money(flete)} = <b>${money(sub+iva+flete)}</b>`; }
-      else { const sub=C.PRECIO_PAR*pares, iva=Math.round(sub*C.IVA), ok=pares>=C.PARES_CAJA&&pares%C.PARES_CAJA===0, cajas=pares/C.PARES_CAJA, ftxt=cajas>=C.MIN_CAJAS_SIN_FLETE?'flete incluido':'flete al cobro'; html=`${pares} pares (${cajas.toFixed(pares%C.PARES_CAJA?2:0)} caja) · <b>${money(sub+iva)}</b> (IVA incl.) · 🚚 ${ftxt}`+(ok?'':` · ⚠ múltiplo de ${C.PARES_CAJA}`); }
+      else if(tipo==='pie'){ const sub=C.MUESTRA_PAR*pares, iva=Math.round(sub*C.IVA), flete=Math.ceil(pares/(C.MUESTRA_FLETE_PARES||3))*(C.MUESTRA_FLETE||22000); this._crTot=sub+iva+flete; html=`${pares} par(es) · ${money(sub)} + IVA ${money(iva)} + 🚚 ${money(flete)} = <b>${money(sub+iva+flete)}</b>`; }
+      else { const sub=C.PRECIO_PAR*pares, iva=Math.round(sub*C.IVA), ok=pares>=C.PARES_CAJA&&pares%C.PARES_CAJA===0, cajas=pares/C.PARES_CAJA, ftxt=cajas>=C.MIN_CAJAS_SIN_FLETE?'flete incluido':'flete al cobro'; this._crTot=sub+iva; html=`${pares} pares (${cajas.toFixed(pares%C.PARES_CAJA?2:0)} caja) · <b>${money(sub+iva)}</b> (IVA incl.) · 🚚 ${ftxt}`+(ok?'':` · ⚠ múltiplo de ${C.PARES_CAJA}`); }
     }
     $('cr_total').innerHTML=html;
+    this.crAbonoCalc();
   },
+  /* El abono y el saldo mientras se teclea, contra el total que dejo
+     crearPreview. Una sola tarifa, calculada en un solo sitio. */
+  _crTotal(){ return +this._crTot||0; },
+  crAbonoCalc(){
+    const wrap=$('cr_abono_wrap'); if(!wrap) return;
+    const tot=this._crTotal();
+    wrap.style.display = tot>0 ? 'block' : 'none';
+    const av=$('cr_ced_aviso');
+    /* De que sede queda el pedido. Lo decide el usuario con que se entro, no
+       una lista: si se entra como admin cae en Principal y la sucursal nunca
+       lo ve. Mejor decirlo antes de guardar que explicarlo despues. */
+    if(av) av.innerHTML = tot>0 ? '📍 Este pedido queda en el CED <b>'+esc(this.miSede()||'Principal')+'</b>.' : '';
+    if(tot<=0) return;
+    const ab=+String((($('cr_abono')||{}).value)||'').replace(/[^0-9]/g,'')||0;
+    const saldo=tot-ab, el=$('cr_saldo'); if(!el) return;
+    if(ab>tot){ el.innerHTML='<span style="color:var(--rojo)">El abono es mayor que el total ('+money(tot)+')</span>'; return; }
+    el.innerHTML = ab>0
+      ? 'Abonó '+money(ab)+' · <span style="color:'+(saldo>0?'var(--rojo)':'var(--verde)')+'">'
+        +(saldo>0?('queda debiendo '+money(saldo)):'PAGADO COMPLETO')+'</span>'
+      : '<span style="color:var(--suave)">Sin abono · queda debiendo '+money(tot)+'</span>';
+  },
+
   async guardarCrear(){
     const tipo=$('cr_tipo').value, cid=$('mu_cliente').value;
     const asesor=(($('cr_asesor')||{}).value||'').trim();
@@ -4279,11 +4451,27 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       referencia:(cl&&cl.referencia)||'701',recomendado:!!(cl&&cl.recomendado),valor_par_nc:vNC,valor_par_gpjr:vGPJR,comision_nc:vNC*pares,comision_gpjr:vGPJR*pares};
     if(esMuestra){ reg.es_muestra=true; reg.muestra_tipo=muestraTipo; }
     if(tipo==='equipo'){ reg.interno=true; reg.asesor=asesor; if(recoge) reg.transporte='Recoge: '+recoge; }
+    /* El abono entra CON el pedido, no despues. Si se deja para otro momento,
+       la plata que el cliente ya dejo no figura en ninguna parte y el saldo
+       miente desde el primer dia. */
+    const abono=total>0?(+String((($('cr_abono')||{}).value)||'').replace(/[^0-9]/g,'')||0):0;
+    if(abono>total){ alert('El abono ('+money(abono)+') es mayor que el total ('+money(total)+').'); return; }
+    const abForma=(($('cr_abono_forma')||{}).value)||null;
+    const abNota=(($('cr_abono_nota')||{}).value||'').trim()||null;
+    if(abono>0){ reg.abono=abono; reg.abono_forma=abForma; reg.abono_nota=abNota; reg.abono_en=new Date().toISOString(); }
     const { data:ped, error } = await this.sb.from('pedidos').insert(reg).select().single();
     if(error){ alert('Error: '+error.message); return; }
+    if(abono>0){
+      await this.sb.from('pedido_abonos').insert({pedido_id:ped.id,valor:abono,forma:abForma,nota:abNota,recibido_por:this.user.id});
+      await this.hist(ped.id, estado, '💵 Abono '+money(abono)+(abForma?' ('+abForma+')':'')+(abNota?' · '+abNota:'')+' · saldo '+money(total-abono));
+    }
     await this.hist(ped.id, estado, detalle+(total>0?(' · '+money(total)):' · sin valor comercial'));
     this.cerrarModal();
-    alert('✅ '+(tipo==='equipo'?'Pedido de equipo':(esMuestra?'Muestra':'Pedido'))+' creado: '+num+(total>0?('\nTotal '+money(total)+(estado==='pendiente_pago'?' (pasa por pago)':'')):'\nSin valor comercial — pasa a Despachos'));
+    alert('✅ '+(tipo==='equipo'?'Pedido de equipo':(esMuestra?'Muestra':'Pedido'))+' creado: '+num
+      +(total>0?('\nTotal '+money(total)
+        +(abono>0?('\nAbonó '+money(abono)+'\nSaldo '+money(total-abono)):'')
+        +(estado==='pendiente_pago'?'\n(pasa por pago)':''))
+       :'\nSin valor comercial — pasa a Despachos'));
     this.go(esMuestra?this.view:(tipo==='equipo'?'despachos':'pedidos'));
   },
 
