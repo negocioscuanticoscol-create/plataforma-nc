@@ -153,7 +153,7 @@ nav button.on{color:var(--ambar);font-weight:700}
    pestaña Costos. Cambiar el precio del poliuretano no debe obligar a publicar
    una versión nueva.
    =========================================================================== */
-const VER='20260921-2';
+const VER='20260921-3';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/';
 const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
@@ -235,10 +235,13 @@ try{ if(localStorage.getItem('alm:ok')==='1'){
    producir; Resumen explica lo que ya pasó. Los dos usan las mismas funciones
    de costo, así que no pueden dar números distintos para la misma almohada.
 
-   Manda el KILO, no la unidad. Hay 1.000 kg de poliuretano y de ahí salen las
+   Manda el KILO, no la unidad. Hay unos kilos de poliuretano y de ahí salen las
    almohadas que salgan: por eso el escenario no pregunta cuántas se hacen al
-   día —eso lo decide el peso— sino cuántos kilos hay y qué tan pesada sale
-   cada una. */
+   día —eso lo decide el peso— sino cuántos kilos hay y qué tan pesada sale cada
+   una.
+
+   Y se planea con TRES pesos, no con uno. El consumo se va para arriba solo; se
+   baja empujando. Planear con el peso bueno es planear con plata que no existe. */
 
 /* Lo que cuestan los químicos de UN kilo de almohada. Una sola definición para
    toda la app: el escenario, el cierre del día y el resumen leen de aquí. */
@@ -255,25 +258,23 @@ function costoAlm(r){
           mo:P('mano_obra_unidad'),bolsa:P('costo_bolsa'),
           total:kg*costoMatKg()+P('mano_obra_unidad')+P('costo_bolsa')};
 }
-/* El precio promedio real, no el de la lista 1: si el 70% se va por lista 3,
-   el precio que manda es el ponderado. */
-function precioProm(r){
-  return (r.precio_1||0)*P('sim_mix_1')/100
-       + (r.precio_3||0)*P('sim_mix_2')/100
-       + (r.precio_5||0)*P('sim_mix_3')/100;
-}
+const LISTAS=[['Lista 1','precio_1','sim_mix_1'],['Lista 2','precio_3','sim_mix_2'],
+              ['Lista 3','precio_5','sim_mix_3']];
+function precioProm(r){ return LISTAS.reduce((a,[,c,m])=>a+(r[c]||0)*P(m)/100,0); }
 function tramoReparto(u){
   return REPARTO.find(x=>u>=x.desde&&(x.hasta==null||u<x.hasta))||{pct:0,nota:''};
 }
 function curva(){ return REFS.map(r=>({r,n:P('sim_cur_'+r.id)})).filter(x=>x.n>0); }
-/* Cuánto pesaría en promedio una almohada si todas salieran en su peso previsto. */
 function pesoIdeal(){
   const c=curva(), n=c.reduce((a,x)=>a+x.n,0);
   return n?c.reduce((a,x)=>a+x.n*(x.r.peso_previsto||0),0)/n:0;
 }
+/* El peso al que una referencia deja de dar plata a un precio dado: donde lo que
+   cobra apenas paga el material, la mano y la bolsa. */
+function pesoQuiebre(precio){
+  return costoMatKg()?(precio-P('mano_obra_unidad')-P('costo_bolsa'))/costoMatKg()*1000:0;
+}
 
-/* El corazón del escenario. Se le dice cuánta merma y cuánto pesa la almohada
-   promedio, y devuelve el período completo. */
 function correrSim(merma,peso){
   const KG=P('sim_kg'), ideal=pesoIdeal(), f=ideal?peso/ideal:1, c=curva();
   const kgCiclo=c.reduce((a,x)=>a+x.n*(x.r.peso_previsto||0)*f,0)/1000;
@@ -283,55 +284,75 @@ function correrSim(merma,peso){
     const co=w*costoMatKg()+P('mano_obra_unidad')+P('costo_bolsa');
     return {r:x.r,n:x.n,w,p,c:co,q:Math.floor(ciclos*x.n),m:p-co,
             pct:p?(p-co)/p*100:0, porKg:w?(p-co)/w:0,
-            /* A cuántos gramos deja de dar plata: el peso donde el precio
-               apenas alcanza para pagar el material, la mano y la bolsa. */
-            quiebre:costoMatKg()?(p-P('mano_obra_unidad')-P('costo_bolsa'))/costoMatKg()*1000:0};
+            lista:LISTAS.map(([n,col])=>({n,v:(x.r[col]||0)-co}))};
   });
   const und=F.reduce((a,x)=>a+x.q,0), vta=F.reduce((a,x)=>a+x.q*x.p,0);
   const kgUtil=F.reduce((a,x)=>a+x.q*x.w,0);
   const mat=KG*costoMatKg();          // el material entra completo, merma incluida
   const mo=und*P('mano_obra_unidad'), bol=und*P('costo_bolsa');
   const cvar=mat+mo+bol, fijo=P('espacio_periodo');
-  const u=vta-cvar-fijo;
-  return {KG,merma,peso,f,ideal,F,und,vta,kgUtil,mat,mo,bol,cvar,fijo,u,
+  return {KG,merma,peso,f,ideal,F,und,vta,kgUtil,mat,mo,bol,cvar,fijo,u:vta-cvar-fijo,
           perdido:mat-kgUtil*costoMatKg()};
 }
 
 function vSim(){
-  const mMin=P('sim_merma_min'), mMax=P('sim_merma_max'), peso=P('sim_peso_real');
-  const A=correrSim(mMin,peso), B=correrSim(mMax,peso);
-  const IDEAL=correrSim(mMin,A.ideal);
-  const fugaPeso=IDEAL.u-A.u, fugaMerma=A.u-B.u;
-  const sobre=A.ideal?(peso/A.ideal-1)*100:0;
-  const grExtra=Math.max(1,peso-A.ideal);
-  const porGramo=fugaPeso/grExtra;
+  const mA=P('sim_merma_min'), mB=P('sim_merma_max');
+  const pBueno=P('sim_peso_ideal'), pBase=P('sim_peso_real'), pMalo=P('sim_peso_malo');
+  const A=correrSim(mA,pBase), B=correrSim(mB,pBase);     // con el que hay que contar
+  const OK=correrSim(mA,pBueno), MAL=correrSim(mB,pMalo); // las dos puntas
+  const PREV=correrSim(mA,A.ideal);                       // el papel
   const tr=tramoReparto(A.u), sup=A.u>0?A.u*tr.pct/100:0;
   const mejor=A.F.slice().sort((x,y)=>y.porKg-x.porKg)[0];
   const peor =A.F.slice().sort((x,y)=>x.porKg-y.porKg)[0];
-  const cKg=p=>p>=30000?'ok':p>=15000?'esp':'mal';
-  const cPct=p=>p>=40?'ok':p>=25?'esp':'mal';
+  const cKg=v=>v>=25000?'ok':v>=10000?'esp':'mal';
+  const cV =v=>v<=0?'mal':v<5000?'esp':'ok';
+  const copS=v=>(v<0?'−$':'$')+Math.abs(Math.round(v)).toLocaleString('es-CO');
+  const rej=(nom,pz,det)=>{ const a=correrSim(mA,pz), b=correrSim(mB,pz);
+    return `<div class="f"><span><b>${nom}</b>
+        <div style="font-size:12px;color:var(--tenue)">${num(pz)} g · ${det}</div></span>
+      <span style="display:flex;gap:11px;align-items:center;font-variant-numeric:tabular-nums">
+        <b class="${a.u>0?'ok':'mal'}" style="min-width:76px;text-align:right">${copS(a.u)}</b>
+        <b class="${b.u>0?(b.u>a.u*0.7?'ok':'esp'):'mal'}" style="min-width:76px;text-align:right">${copS(b.u)}</b>
+      </span></div>`; };
 
-  set('Escenario',num(A.KG)+' kg · '+num(peso)+' g promedio',`
+  set('Escenario',num(A.KG)+' kg · '+num(pBase)+' g promedio',`
     <div class="tira">
-      <div><div class="n ${A.u>0?'ok':'mal'}">${cop(B.u)}</div><div class="l">utilidad · mal día</div></div>
-      <div><div class="n ${A.u>0?'ok':'mal'}">${cop(A.u)}</div><div class="l">utilidad · buen día</div></div>
+      <div><div class="n ${A.u>0?'ok':'mal'}">${copS(B.u)}</div><div class="l">con merma mala</div></div>
+      <div><div class="n ${A.u>0?'ok':'mal'}">${copS(A.u)}</div><div class="l">con merma buena</div></div>
       <div><div class="n">${num(B.und)}–${num(A.und)}</div><div class="l">almohadas</div></div>
+    </div>
+    <div class="res" style="border-radius:11px;border:1px solid var(--linea)">
+      Planeado con <b>${num(pBase)} g</b>, que es con lo que hay que contar. El
+      consumo se sube solo; bajarlo hay que empujarlo.</div>
+
+    <div class="tit">Los tres escenarios</div>
+    <div class="caja">
+      <div class="res"><span>Peso promedio</span><span>Merma ${mA}% · Merma ${mB}%</span></div>
+      ${rej('Si se logra bajar',pBueno,'bajando la básica')}
+      ${rej('Con lo que hay que contar',pBase,'el realista')}
+      ${rej('Si se sube',pMalo,'el peor')}
+      <div class="f tot"><span>Lo que decía el papel</span>
+        <b>${copS(PREV.u)}<span style="font-size:12px;color:var(--tenue);font-weight:400"> a ${num(A.ideal,0)} g</span></b></div>
+      <div class="res">Entre la mejor y la peor casilla hay
+        <b>${copS(OK.u-MAL.u)}</b>. Eso es lo que está en juego en el peso y la merma,
+        no en el precio.</div>
     </div>
 
     <div class="tit">Con qué se cuenta</div>
     <div class="caja">
       <div class="par"><div class="pn">Kilos de poliuretano<small>todo el período</small></div>
         <input id="s_sim_kg" type="number" inputmode="decimal" value="${A.KG}"></div>
-      <div class="par"><div class="pn">Peso promedio REAL<small>gramos que pesa de verdad</small></div>
-        <input id="s_sim_peso_real" type="number" inputmode="decimal" value="${peso}"></div>
+      <div class="par"><div class="pn">Peso si se logra bajar<small>gramos · el ideal</small></div>
+        <input id="s_sim_peso_ideal" type="number" inputmode="decimal" value="${pBueno}"></div>
+      <div class="par"><div class="pn">Peso con el que se cuenta<small>gramos · el realista</small></div>
+        <input id="s_sim_peso_real" type="number" inputmode="decimal" value="${pBase}"></div>
+      <div class="par"><div class="pn">Peso del peor escenario<small>gramos</small></div>
+        <input id="s_sim_peso_malo" type="number" inputmode="decimal" value="${pMalo}"></div>
       <div class="par"><div class="pn">Merma buena<small>% · los moldes con la misma curva</small></div>
-        <input id="s_sim_merma_min" type="number" inputmode="decimal" value="${mMin}"></div>
+        <input id="s_sim_merma_min" type="number" inputmode="decimal" value="${mA}"></div>
       <div class="par"><div class="pn">Merma mala<small>% · corriendo los dos moldes de la básica</small></div>
-        <input id="s_sim_merma_max" type="number" inputmode="decimal" value="${mMax}"></div>
-      <div class="res ${Math.abs(sobre)>5?'mal':''}"><span>Si todas salieran en su peso previsto</span>
-        <b>${num(A.ideal,0)} g</b></div>
-      <div class="res ${Math.abs(sobre)>5?'mal':''}"><span>Están saliendo</span>
-        <b class="${sobre>0?'mal':'ok'}">${sobre>0?'+':''}${num(sobre,1)}%</b></div>
+        <input id="s_sim_merma_max" type="number" inputmode="decimal" value="${mB}"></div>
+      <div class="res"><span>Si todas salieran en su peso previsto</span><b>${num(A.ideal,0)} g</b></div>
     </div>
 
     <div class="tit">La curva · por cada ciclo</div>
@@ -339,63 +360,69 @@ function vSim(){
       ${REFS.map(r=>`<div class="par"><div class="pn">${esc(r.nombre)}
         <small>previsto ${num(r.peso_previsto)} g</small></div>
         <input id="s_sim_cur_${r.id}" type="number" inputmode="numeric" value="${P('sim_cur_'+r.id)}"></div>`).join('')}
-      <div class="res"><span>Un ciclo son ${num(curva().reduce((a,x)=>a+x.n,0))} almohadas</span>
-        <b>${num(curva().reduce((a,x)=>a+x.n*(x.r.peso_previsto||0)*A.f,0)/1000,2)} kg</b></div>
     </div>
 
     <div class="tit">Por qué lista se vende</div>
     <div class="caja">
-      <div class="par"><div class="pn">Lista 1<small>una unidad</small></div>
-        <input id="s_sim_mix_1" type="number" inputmode="numeric" value="${P('sim_mix_1')}"></div>
-      <div class="par"><div class="pn">Lista 2<small>3 o más</small></div>
-        <input id="s_sim_mix_2" type="number" inputmode="numeric" value="${P('sim_mix_2')}"></div>
-      <div class="par"><div class="pn">Lista 3<small>5 o más</small></div>
-        <input id="s_sim_mix_3" type="number" inputmode="numeric" value="${P('sim_mix_3')}"></div>
-      <div class="res ${P('sim_mix_1')+P('sim_mix_2')+P('sim_mix_3')==100?'':'mal'}">
-        <span>Suma</span><b>${P('sim_mix_1')+P('sim_mix_2')+P('sim_mix_3')}%</b></div>
+      ${LISTAS.map(([n,,m],i)=>`<div class="par"><div class="pn">${n}
+        <small>${['una unidad','3 o más','5 o más'][i]}</small></div>
+        <input id="s_${m}" type="number" inputmode="numeric" value="${P(m)}"></div>`).join('')}
+      <div class="res ${LISTAS.reduce((a,[,,m])=>a+P(m),0)==100?'':'mal'}">
+        <span>Suma</span><b>${LISTAS.reduce((a,[,,m])=>a+P(m),0)}%</b></div>
     </div>
     <button class="btn" onclick="guardarSim()">Recalcular</button>
 
-    <div class="tit">De los kilos a las almohadas</div>
+    <div class="tit">Qué deja cada una · en cada lista</div>
     <div class="caja">
-      <div class="f"><span>Poliuretano</span><b>${num(A.KG)} kg</b></div>
-      <div class="f"><span>− Merma del ${mMin}%<div style="font-size:12px;color:var(--tenue)">purgas, derrames, lo que no cuajó</div></span>
-        <b class="mal">−${num(A.KG*mMin/100,0)} kg</b></div>
-      <div class="f"><span>= Se vuelve almohada</span><b>${num(A.KG*(1-mMin/100),0)} kg</b></div>
-      <div class="f"><span>÷ ${num(peso)} g cada una</span><b>${num(A.und)} almohadas</b></div>
-      <div class="f tot"><span>Con la merma mala del ${mMax}%</span><b>${num(B.und)} almohadas</b></div>
-      <div class="res">Esos ${num(A.und-B.und)} de diferencia son ${cop(fugaMerma)} de utilidad.</div>
-    </div>
-
-    <div class="tit">Qué deja cada una</div>
-    <div class="caja">
-      <div class="res"><span>Referencia</span><span>Cuesta · Vende · Deja</span></div>
+      <div class="res"><span>A ${num(pBase)} g promedio</span><span>L1 · L2 · L3</span></div>
       ${A.F.map(x=>`<div class="f"><span><b>${esc(x.r.nombre)}</b>
-          <div style="font-size:12px;color:var(--tenue)">${num(x.w*1000,0)} g reales · ${x.q} und</div></span>
-        <span style="display:flex;gap:10px;align-items:center;font-variant-numeric:tabular-nums">
-          <span style="color:var(--tenue);min-width:56px;text-align:right">${cop(x.c)}</span>
-          <span style="min-width:56px;text-align:right">${cop(x.p)}</span>
-          <b class="${cPct(x.pct)}" style="min-width:56px;text-align:right">${cop(x.m)}</b>
-          <span class="chip ${cPct(x.pct)}" style="min-width:40px;text-align:center">${num(x.pct,0)}%</span>
+          <div style="font-size:12px;color:var(--tenue)">${num(x.w*1000,0)} g · cuesta ${cop(x.c)}</div></span>
+        <span style="display:flex;gap:9px;align-items:center;font-variant-numeric:tabular-nums">
+          ${x.lista.map(l=>`<b class="${cV(l.v)}" style="min-width:56px;text-align:right">${copS(l.v)}</b>`).join('')}
         </span></div>`).join('')}
+      <div class="res">El <b>${P('sim_mix_3')}% de las ventas se va por lista 3</b>, que es
+        la columna de la derecha. El promedio ponderado tapa lo que pasa ahí.</div>
     </div>
 
-    <div class="tit">Lo que de verdad importa · cuánto deja cada KILO</div>
+    <div class="tit">Cuánto deja cada KILO</div>
     <div class="caja">
       ${A.F.slice().sort((x,y)=>y.porKg-x.porKg).map(x=>`<div class="f">
         <span><b>${esc(x.r.nombre)}</b>
           <div style="font-size:12px;color:var(--tenue)">${x.n} por ciclo · se lleva ${num(x.q*x.w,0)} kg</div></span>
-        <b class="${cKg(x.porKg)}">${cop(x.porKg)}</b></div>`).join('')}
+        <b class="${cKg(x.porKg)}">${copS(x.porKg)}</b></div>`).join('')}
       <div class="res" style="border-radius:0">El poliuretano es lo único que se acaba.
         La pregunta no es cuánto deja una almohada, sino cuánto deja el kilo que se
         le metió.</div>
     </div>
-    ${mejor&&peor&&mejor!==peor?`<div class="res" style="border-radius:11px;border:1px solid var(--linea)">
-      <b>${esc(mejor.r.nombre)} deja ${num(mejor.porKg/(peor.porKg||1),1)} veces más por kilo
-      que ${esc(peor.r.nombre)}</b> (${cop(mejor.porKg)} contra ${cop(peor.porKg)}), y la curva
-      le está mandando ${num(peor.q*peor.w/A.kgUtil*100,0)}% del poliuretano a la que menos deja.</div>`:''}
+    ${mejor&&peor&&mejor!==peor&&peor.porKg>0?`<div class="res" style="border-radius:11px;border:1px solid var(--linea)">
+      <b>${esc(mejor.r.nombre)} deja ${num(mejor.porKg/peor.porKg,1)} veces más por kilo
+      que ${esc(peor.r.nombre)}</b>, y la curva le está mandando
+      ${num(peor.q*peor.w/(A.kgUtil||1)*100,0)}% del poliuretano a la que menos deja.</div>`:''}
 
-    <div class="tit">La cuenta · con la merma buena</div>
+    <div class="tit">Hasta qué peso aguanta cada una</div>
+    <div class="caja">
+      <div class="res"><span>Sale en</span><span>Quiebra en L1 · L2 · L3</span></div>
+      ${A.F.map(x=>`<div class="f"><span><b>${esc(x.r.nombre)}</b>
+          <div style="font-size:12px;color:var(--tenue)">sale en ${num(x.w*1000,0)} g</div></span>
+        <span style="display:flex;gap:9px;align-items:center;font-variant-numeric:tabular-nums">
+          ${LISTAS.map(([,col])=>{ const q=pesoQuiebre(x.r[col]||0), col2=q-x.w*1000;
+            return `<b class="${col2<=0?'mal':col2<150?'esp':'ok'}" style="min-width:56px;text-align:right">${num(q,0)} g</b>`;
+          }).join('')}
+        </span></div>`).join('')}
+      <div class="res">Ese es el peso donde el precio alcanza justo para pagar material,
+        mano y bolsa. De ahí para arriba la almohada se fabrica para no ganar nada.</div>
+    </div>
+
+    <div class="tit">De los kilos a las almohadas</div>
+    <div class="caja">
+      <div class="f"><span>Poliuretano</span><b>${num(A.KG)} kg</b></div>
+      <div class="f"><span>− Merma del ${mA}%</span><b class="mal">−${num(A.KG*mA/100,0)} kg</b></div>
+      <div class="f"><span>= Se vuelve almohada</span><b>${num(A.KG*(1-mA/100),0)} kg</b></div>
+      <div class="f"><span>÷ ${num(pBase)} g cada una</span><b>${num(A.und)} almohadas</b></div>
+      <div class="f tot"><span>Con la merma mala del ${mB}%</span><b>${num(B.und)} almohadas</b></div>
+    </div>
+
+    <div class="tit">La cuenta · ${num(pBase)} g y merma ${mA}%</div>
     <div class="caja">
       <div class="f"><span>Ventas</span><b>${cop(A.vta)}</b></div>
       <div class="f"><span>− Material · ${num(A.KG)} kg a ${cop(costoMatKg())} el kilo<div style="font-size:12px;color:var(--tenue)">poliuretano ${cop(P('precio_poliuretano'))} + químicos ${cop(costoQuimKg())}</div></span>
@@ -403,45 +430,27 @@ function vSim(){
       <div class="f"><span>− Mano de obra · ${num(A.und)} und</span><b>${cop(A.mo)}</b></div>
       <div class="f"><span>− Bolsas</span><b>${cop(A.bol)}</b></div>
       <div class="f"><span>− Bodega<div style="font-size:12px;color:var(--tenue)">se paga completa, se trabaje o no</div></span><b>${cop(A.fijo)}</b></div>
-      <div class="f tot"><span>Utilidad</span><b class="${A.u>0?'ok':'mal'}">${cop(A.u)}</b></div>
+      <div class="f tot"><span>Utilidad</span><b class="${A.u>0?'ok':'mal'}">${copS(A.u)}</b></div>
       <div class="f"><span>− Supervisor · ${tr.pct}%</span><b>${cop(sup)}</b></div>
-      <div class="f tot"><span>Queda para el negocio</span><b>${cop(A.u-sup)}</b></div>
-      <div class="res"><span>Con la merma mala del ${mMax}%</span><b class="mal">${cop(B.u)}</b></div>
+      <div class="f tot"><span>Queda para el negocio</span><b>${copS(A.u-sup)}</b></div>
     </div>
 
-    <div class="tit">Dónde se está yendo la plata</div>
+    <div class="tit">Qué mueve más la aguja</div>
     <div class="caja">
-      <div class="f"><span><b>El sobrepeso</b>
-        <div style="font-size:12px;color:var(--tenue)">${num(peso)} g contra ${num(A.ideal,0)} g previstos</div></span>
-        <b class="mal">${cop(fugaPeso)}</b></div>
-      <div class="f"><span><b>La merma</b>
-        <div style="font-size:12px;color:var(--tenue)">pasar del ${mMin}% al ${mMax}%</div></span>
-        <b class="mal">${cop(fugaMerma)}</b></div>
-      <div class="f"><span>Material que no se volvió almohada
-        <div style="font-size:12px;color:var(--tenue)">ya está adentro de la merma</div></span>
-        <span style="color:var(--tenue)">${cop(A.perdido)}</span></div>
-      <div class="f tot"><span>Las dos juntas</span><b class="mal">${cop(fugaPeso+fugaMerma)}</b></div>
-      <div class="res"><span>Sobre una utilidad ideal de ${cop(IDEAL.u)}</span>
-        <b class="mal">${num((fugaPeso+fugaMerma)/(IDEAL.u||1)*100,0)}%</b></div>
-    </div>
-    <div class="res" style="border-radius:11px;border:1px solid var(--linea)">
-      Cada gramo de más en el promedio cuesta <b>${cop(porGramo)}</b> en el período.
-      Bajar el promedio 40 gramos vale ${cop(porGramo*40)} — más que cualquier
-      ahorro que se consiga negociando la bolsa o el desmoldante.</div>
-
-    <div class="tit">Hasta qué peso aguanta</div>
-    <div class="caja">
-      <div class="res"><span>Referencia</span><span>Real · Quiebre · Colchón</span></div>
-      ${A.F.map(x=>{ const col=x.quiebre-x.w*1000, pc=x.quiebre?col/x.quiebre*100:0;
-        return `<div class="f"><span><b>${esc(x.r.nombre)}</b></span>
-        <span style="display:flex;gap:12px;align-items:center;font-variant-numeric:tabular-nums">
-          <span style="min-width:52px;text-align:right">${num(x.w*1000,0)} g</span>
-          <span style="color:var(--tenue);min-width:52px;text-align:right">${num(x.quiebre,0)} g</span>
-          <b class="${pc>=30?'ok':pc>=15?'esp':'mal'}" style="min-width:56px;text-align:right">${num(col,0)} g</b>
-        </span></div>`; }).join('')}
-      <div class="res">El quiebre es el peso donde el precio de lista alcanza justo
-        para pagar material, mano y bolsa. De ahí para arriba esa almohada se
-        fabrica para no ganar nada.</div>
+      <div class="f"><span><b>Bajar el peso a ${num(pBueno)} g</b>
+        <div style="font-size:12px;color:var(--tenue)">${num(pBase-pBueno)} gramos menos en el promedio</div></span>
+        <b class="ok">+${copS(OK.u-A.u)}</b></div>
+      <div class="f"><span><b>Sostener la merma en ${mA}%</b>
+        <div style="font-size:12px;color:var(--tenue)">no dejarla subir al ${mB}%</div></span>
+        <b class="ok">+${copS(A.u-B.u)}</b></div>
+      <div class="f"><span>Subir todos los precios 5%
+        <div style="font-size:12px;color:var(--tenue)">si el mercado lo aguanta</div></span>
+        <b>+${copS(A.vta*0.05)}</b></div>
+      <div class="f"><span>Bajar el poliuretano 5%
+        <div style="font-size:12px;color:var(--tenue)">negociando con el proveedor</div></span>
+        <b>+${copS(A.KG*P('precio_poliuretano')*0.05)}</b></div>
+      <div class="res">Cada gramo que baje el promedio vale
+        <b>${copS((OK.u-A.u)/Math.max(1,pBase-pBueno))}</b> en el período.</div>
     </div>
 
     <div class="tit">Lo que este presupuesto NO está contando</div>
@@ -464,8 +473,9 @@ function vSim(){
 }
 
 async function guardarSim(){
-  const claves=['sim_kg','sim_peso_real','sim_merma_min','sim_merma_max',
-                'sim_mix_1','sim_mix_2','sim_mix_3'].concat(REFS.map(r=>'sim_cur_'+r.id));
+  const claves=['sim_kg','sim_peso_ideal','sim_peso_real','sim_peso_malo',
+                'sim_merma_min','sim_merma_max','sim_mix_1','sim_mix_2','sim_mix_3']
+                .concat(REFS.map(r=>'sim_cur_'+r.id));
   for(const k of claves){
     const e=$('s_'+k); if(!e) continue;
     const v=+e.value||0;
