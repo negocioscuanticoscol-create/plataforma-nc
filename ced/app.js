@@ -4394,8 +4394,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
         const {data:clr}=await this.sb.from('clientes').select('nombre,tel').eq('id',(pp||{}).cliente_id).single();
         if(clr&&clr.tel) await this._programarRecompra('feroz', clr.tel, clr.nombre, (pp||{}).numero||('PED-'+id), guia);
       }catch(e){} }
-      const { data:pp } = await this.sb.from('pedidos').select('curva,numero').eq('id',id).single();
-      if(pp) await this.descontarInventario(id, pp.curva, 'Despacho '+(pp.numero||''));
+      const { data:pp } = await this.sb.from('pedidos').select('curva,numero,referencia,items,ced').eq('id',id).single();
+      if(pp) await this.descontarInventario(id, pp.curva, 'Despacho '+(pp.numero||''), pp);
       this.cerrarModal(); this.go(this.view);
       setTimeout(()=>{ if(confirm('Pedido despachado ✅\n¿Avisar al cliente por WhatsApp ahora?')) this.waCliente(id); },300);
     } else {
@@ -5695,15 +5695,23 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     }
   },
 
-  // ---- aplicar movimientos (actualiza stock + registra kardex) ----
-  async aplicarMovs(items, motivoDef, fechaISO){
-    const tallas=[...new Set(items.map(i=>i.talla))];
-    const { data:rows=[] } = await this.sb.from('inventario').select('talla,stock').eq('referencia','701').in('talla',tallas);
-    const map={}; rows.forEach(r=>map[r.talla]=r.stock);
-    const ups=items.map(i=>({referencia:'701',talla:i.talla,stock:(map[i.talla]||0)+i.delta,actualizado_en:new Date().toISOString()}));
-    const mov=items.map(i=>{const o={referencia:'701',talla:i.talla,tipo:i.tipo,cantidad:i.cantidad,motivo:i.motivo||motivoDef,usuario:this.user.id};if(fechaISO)o.creado_en=fechaISO;return o;});
-    if(ups.length) await this.sb.from('inventario').upsert(ups,{onConflict:'referencia,talla'});
-    if(mov.length) await this.sb.from('inv_movimientos').insert(mov);
+  /* ---- aplicar movimientos: stock + kardex ----
+     Ya no escribe el stock por su cuenta. Lo hacia con la llave
+     (referencia,talla), que NO existe en la tabla -la real lleva ced, color y
+     dueno-, asi que Postgres devolvia 42P10 y la escritura rebotaba siempre,
+     en silencio. Ahora pasa por _invSumar, que es la unica que sabe escribir
+     bien el saldo, revisa el error y deja el kardex cuadrado con el stock. */
+  async aplicarMovs(items, motivoDef, fechaISO, ref, color){
+    const R = ref || '701';
+    const C = color || '';
+    let ok = 0;
+    for(const i of items){
+      const r = await this._invSumar(R, C, i.talla, i.delta,
+        i.tipo || (i.delta<0?'salida':'entrada'), i.motivo || motivoDef,
+        {ced:(this.cedUser&&this.cedUser.ced)||'Feroz', creado_en:fechaISO});
+      if(r) ok++;
+    }
+    return ok;
   },
   fechaISO(inputId){ const v=$(inputId)&&$(inputId).value; return v?(v+'T12:00:00'):null; },
   hoyISO(){ const d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); },
@@ -5753,20 +5761,28 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     if(!confirm(`TOMA DE INVENTARIO ${fechaTxt}\nDIFERENCIAS ENCONTRADAS:\n\n`+difs.join('\n')+'\n\n¿Aplicar el ajuste por conteo?')) return;
     await this.aplicarMovs(items,'Toma de inventario', this.fechaISO('cont_fecha')); this.toast('Toma de inventario aplicada ✅'); this.ptab='mov'; this.vPlanta();
   },
-  async descontarInventario(pedido_id, curva, motivo){
-    if(!curva) return;
-    const tallas=Object.keys(curva).map(Number).filter(n=>!isNaN(n));
-    if(!tallas.length) return;
-    const { data:rows=[] } = await this.sb.from('inventario').select('talla,stock').eq('referencia','701').in('talla',tallas);
-    const map={}; rows.forEach(r=>map[r.talla]=r.stock);
-    const ups=[], movs=[];
-    for(const [t,q] of Object.entries(curva)){
-      const cant=+q||0; if(!cant) continue;
-      ups.push({referencia:'701',talla:+t,stock:(map[+t]||0)-cant,actualizado_en:new Date().toISOString()});
-      movs.push({referencia:'701',talla:+t,tipo:'salida',cantidad:cant,motivo,pedido_id,usuario:this.user.id});
+  /* Descuenta lo que sale con un pedido. Antes escribia el stock con la llave
+     (referencia,talla) -que no existe: la real lleva ced, color y dueno-, asi
+     que Postgres devolvia 42P10 y el descuento rebotaba SIEMPRE mientras el
+     kardex si quedaba escrito. De ahi que hubiera 19 salidas registradas y el
+     stock congelado en la fecha de la primera carga.
+     Ahora pasa por _invSumar, y la referencia y el color salen del pedido en
+     vez de estar quemados en la 701. */
+  async descontarInventario(pedido_id, curva, motivo, ped){
+    if(!curva) return 0;
+    const P = ped || {};
+    const items = Array.isArray(P.items) && P.items.length ? P.items : null;
+    const ref = (items ? items[0].referencia : P.referencia) || '701';
+    const col = (items ? (items[0].color||'') : '') || '';
+    const mio = P.ced || (this.cedUser && this.cedUser.ced) || 'Feroz';
+    let n = 0;
+    for(const [t, qq] of Object.entries(curva)){
+      const cant = +qq || 0; if(!cant) continue;
+      const ok = await this._invSumar(ref, col, String(t), -cant, 'salida', motivo,
+        {ced: mio, pedido_id, dueno: 'ced'});
+      if(ok) n += cant;
     }
-    if(ups.length) await this.sb.from('inventario').upsert(ups,{onConflict:'referencia,talla'});
-    if(movs.length) await this.sb.from('inv_movimientos').insert(movs);
+    return n;
   },
 
   /* ---------- PERMISOS (qué ve cada rol) ---------- */
@@ -8331,12 +8347,31 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const dueno = e.dueno || 'ced';
     /* La sede a la que entra: la que escogieron, o la mía si no eligieron. */
     const mio = e.ced || (this.cedUser&&this.cedUser.ced) || 'Feroz';
-    const actual=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color
-                                      && String(r.talla)===String(talla) && (r.dueno||'ced')===dueno
-                                      && r.ced===mio);
-    const nuevo=(+((actual&&actual.stock)||0))+cant;
-    if(nuevo<0){ alert('No alcanza: de '+this.refVisible(ref,dueno)+' talla '+talla
-                     +' hay '+((actual&&actual.stock)||0)+' pares.'); return false; }
+    /* El saldo se lee de la BASE, no del arreglo en memoria. Antes salia de
+       this._inv, que solo lo llena la pantalla de Inventario: llamada desde
+       Despachos o desde una proforma veia 0 y pisaba el saldo real. */
+    let actual=null;
+    try{
+      const { data } = await this.sb.from('inventario').select('stock')
+        .eq('ced',mio).eq('referencia',ref).eq('color',color)
+        .eq('talla',String(talla)).eq('dueno',dueno).maybeSingle();
+      actual=data||null;
+    }catch(err){ actual=null; }
+    if(!actual){   // por si la fila vieja quedo con la talla como numero
+      const c=(this._inv||[]).find(r=>r.referencia===ref && (r.color||'')===color
+        && String(r.talla)===String(talla) && (r.dueno||'ced')===dueno && r.ced===mio);
+      if(c) actual={stock:c.stock};
+    }
+    const habia=+((actual&&actual.stock)||0);
+    const nuevo=habia+cant;
+    /* Jose: AVISAR, no bloquear. Si el inventario inicial quedo mal cargado,
+       bloquear frena una venta de verdad. Queda en negativo, se ve en rojo y
+       el movimiento dice que salio sin existencias. */
+    if(nuevo<0){
+      this.toast('⚠️ '+this.refVisible(ref,dueno)+' talla '+talla+': había '+habia
+                +' y salieron '+Math.abs(cant)+'. Queda en '+nuevo);
+      motivo = (motivo||'') + ' · SIN EXISTENCIAS (quedó en '+nuevo+')';
+    }
     const fila={referencia:ref, color:color, talla:talla, stock:nuevo, dueno,
                 actualizado_en:new Date().toISOString(), ced:mio};
     if(e.proveedor)    fila.proveedor=e.proveedor;
@@ -8348,12 +8383,18 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     if(e.minimo)       fila.minimo=e.minimo;
     const { error } = await this.sb.from('inventario')
       .upsert(fila,{onConflict:'ced,referencia,color,talla,dueno'});
+    /* Si esto falla NO se escribe el kardex: un movimiento sin su saldo es
+       peor que ninguno, porque el kardex dice que salio y el stock dice que
+       no. Asi fue justamente como el inventario quedo congelado en junio. */
     if(error){ alert('No se pudo guardar el inventario: '+error.message); return false; }
-    await this.sb.from('inv_movimientos').insert({ referencia:ref, color:color, talla:talla, tipo:tipo,
+    const kardex={ referencia:ref, color:color, talla:talla, tipo:tipo,
       cantidad:Math.abs(cant), motivo:motivo, usuario:(this.perfil&&this.perfil.nombre)||'',
       dueno, proveedor:e.proveedor||null, proveedor_id:e.proveedor_id||null,
       costo:e.costo||null, documento:e.documento||null,
-      descripcion:e.descripcion||null, ced:mio });
+      descripcion:e.descripcion||null, ced:mio };
+    if(e.pedido_id) kardex.pedido_id=e.pedido_id;
+    if(e.creado_en) kardex.creado_en=e.creado_en;   // para cargas con fecha
+    await this.sb.from('inv_movimientos').insert(kardex);
     return true;
   },
 
