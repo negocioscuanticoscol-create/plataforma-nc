@@ -3146,6 +3146,25 @@ const App = {
             <div class="hint" id="co_mflete_prev" style="margin-top:4px">Lo que cotice la transportadora. Va aparte, no entra al IVA.</div>
           </div></div>
       </div>
+      <div class="card" style="border-left:4px solid var(--naranja)">
+        <label style="margin:0"><b>🏢 ¿Qué CED genera la venta? *</b></label>
+        <select class="field" id="co_ced" onchange="App.cotCedCambio()" style="margin-top:6px">
+          ${(()=>{
+            /* Solo quien ve la red completa puede escoger otra sede: la base
+               tiene una regla que RECHAZA guardar una cotizacion de una sede
+               ajena, asi que ofrecerlo seria ofrecer un error. */
+            const mia=this.miSede(), red=this._veRed();
+            const lista = red ? (this._ceds||[]).filter(c=>c.activo!==false)
+                              : (this._ceds||[]).filter(c=>c.nombre===mia);
+            const def = mia || this._sedePrincipal() || 'Feroz';
+            return (lista.length?lista:[{nombre:def}]).map(c=>
+              `<option value="${esc(c.nombre)}"${c.nombre===def?' selected':''}>${esc(c.nombre)}`
+              + (c.ciudad?' · '+esc(c.ciudad):'') + `</option>`).join('');
+          })()}
+        </select>
+        <div class="hint" style="margin-top:5px">La sede que hace la venta y se queda con ella.
+          ${this._veRed()?'':'Solo puedes cotizar para la tuya.'}</div>
+      </div>
       <div class="card" style="border-left:4px solid var(--azul)">
         <label style="margin:0"><b>🧾 ¿Quién factura? *</b></label>
         <select class="field" id="co_factura" onchange="App.cotFacturaPreview()" style="margin-top:6px">
@@ -3268,6 +3287,9 @@ const App = {
            distingue por el precio que quedo escrito, no por el tipo. */
         const mt=$('co_muestra_tipo'); if(mt) mt.value=ec.es_muestra?(ec.muestra_tipo==='pie'?'pie':(ec.muestra_tipo==='nono'?'svc':(ec.muestra_tipo==='parsv'?'parsv':((+ec.precio_par===(C.MUESTRA_PAR_ESPECIAL||25000))?'par25':'par')))):'';
         const ci=$('co_iva'); if(ci) ci.checked=(+ec.iva>0);
+        const cd2=$('co_ced');
+        if(cd2 && ec.ced && [].some.call(cd2.options,o=>o.value===ec.ced)){
+          cd2.value=ec.ced; this.cotCedCambio(); }
         const cv=ec.curva||{}; document.querySelectorAll('#co_grid input').forEach(i=>{ const t=i.dataset.talla; if(cv[t]!=null) i.value=cv[t]; });
         if(ec.muestra_tipo==='pie'){ const ks=Object.keys(cv); const pc=$('co_pie_cant'); if(pc) pc.value=ec.pares||1; const pt=$('co_pie_talla'); if(pt&&ks[0]) pt.value=ks[0]; }
         /* El transporte tampoco se restauraba: al reabrir una cotizacion el
@@ -3752,6 +3774,7 @@ const App = {
         detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esParSV?`Muestra PAR · SIN valor comercial (regalo) · ${cu.pares} par(es) · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(precioM)} = ${money(sub)} + IVA ${money(iva)} + 🚚 ${flete?('transporte '+money(flete)+(_ft==='bogota'?' (Bogotá)':(_ft==='otro'?' (cotizado)':''))+' (aparte)'):'SIN transporte'} · ${partes}`))),
         pares:cu.pares,cajas:0,resto:0,curva:cu.tallas,precio_par:sinValor?0:precioM,subtotal:sub,iva,total,flete_al_cobro:false,estado:'cotizada',
         interno:esVend,asesor:esVend?asesorV:null,
+        ced:(($('co_ced')||{}).value)||this.miSede()||null,
         vendedor_id:this.user.id,referencia:(cl&&cl.referencia)||'701',recomendado:!!(cl&&cl.recomendado),comision_nc:0,comision_gpjr:0};
       const error=await this._saveCot(reg);
       if(error){ alert('Error: '+error.message); return; }
@@ -3836,13 +3859,28 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       // mostrando la dirección y el teléfono que el cliente vio ese día.
       ced_snap: this._sedeCot ? {nombre:this._sedeCot.nombre_comercial||this._sedeCot.nombre,
         ciudad:this._sedeCot.ciudad, direccion:this._sedeCot.direccion,
-        telefono:this._sedeCot.telefono, nit:this._sedeCot.nit} : null};
+        telefono:this._sedeCot.telefono, nit:this._sedeCot.nit} : null,
+      /* El CED va explicito. Sin esto lo ponia un trigger a partir del usuario
+         con que se entro, asi que un admin cotizando para Av 68 guardaba la
+         venta en Principal y la sede nunca la veia. */
+      ced: (($('co_ced')||{}).value)||this.miSede()||null};
     const error=await this._saveCot(reg);
     if(error){ alert('Error: '+error.message); return; }
     await this._avanzarEmbudo(cid,'interesado');   // aparece en CRM → Prospectos con la gestión
     const we=editing; this._editCotId=null; this._editCot=null;
     alert('✅ Cotización '+(we?'actualizada':'guardada')+': '+num+'\nTotal '+money(total));
     this.go('cotizaciones');
+  },
+
+  /* Al cambiar el CED cambia la foto que va en la proforma -direccion, telefono
+     y NIT de esa sede- y se sugiere la empresa que esa sede suele usar para
+     facturar. Solo se SUGIERE: quien factura se sigue escogiendo aparte. */
+  cotCedCambio(){
+    const nom=(($('co_ced')||{}).value)||'';
+    this._sedeCot=(this._ceds||[]).find(c=>c.nombre===nom)||this._sedeCot;
+    const sf=(this._sedeCot||{}).facturador_id, sel=$('co_factura');
+    if(sf && sel && !sel.value && [].some.call(sel.options,o=>o.value===sf)) sel.value=sf;
+    this.cotFacturaPreview();
   },
 
   /* Muestra los datos de facturacion apenas se escoge quien factura, para que
@@ -3910,6 +3948,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const d=new Date(), num='PED-'+d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2)+'-'+('0'+d.getHours()).slice(-2)+('0'+d.getMinutes()).slice(-2)+('0'+d.getSeconds()).slice(-2);
     const { data:ped, error } = await this.sb.from('pedidos').insert({
       numero:num, cotizacion_id:c.id, cliente_id:c.cliente_id, cliente_snap:cl, curva:c.curva,
+      ced:c.ced||null,
       pares:c.pares, total:c.total, tipo_pago:cl.tipo_pago||'contado', estado:(+c.total||0)>0?'pendiente_pago':'autorizado',
       referencia:c.referencia||null, valor_par_nc:c.valor_par_nc||null, valor_par_gpjr:c.valor_par_gpjr||null,
       recomendado:!!c.recomendado, comision_nc:c.comision_nc||0, comision_gpjr:c.comision_gpjr||0,
