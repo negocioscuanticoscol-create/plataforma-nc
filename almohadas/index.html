@@ -153,7 +153,7 @@ nav button.on{color:var(--ambar);font-weight:700}
    pestaña Costos. Cambiar el precio del poliuretano no debe obligar a publicar
    una versión nueva.
    =========================================================================== */
-const VER='20260920-5';
+const VER='20260921-1';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/';
 const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
@@ -229,17 +229,199 @@ try{ if(localStorage.getItem('alm:ok')==='1'){
   cargar().then(()=>{ pintarNav(); ir('turno'); });
 } }catch(e){}
 
+/* ===================== ESCENARIO ===================== */
+/* Lo que el negocio DEBERÍA dar si todo sale como está presupuestado. No mira
+   la base: mira los costos de la pestaña Costos y una mezcla que se teclea acá.
+   Sirve para decidir antes de producir, no para explicar lo que ya pasó —eso es
+   Resumen—. Los dos usan las mismas funciones de costo, así que no pueden dar
+   números distintos para la misma almohada. */
+
+/* Lo que cuestan los químicos de UN kilo de almohada. Una sola definición para
+   toda la app: el escenario, el cierre del día y el resumen leen de aquí. */
+function costoQuimKg(){
+  return P('pct_desmoldante')/100*P('precio_desmoldante')
+       + P('pct_pigmento')/100*P('precio_pasta')
+       + P('pct_cloruro')/100*P('precio_cloruro');
+}
+function costoMatKg(){ return P('precio_poliuretano')+costoQuimKg(); }
+
+/* El costo variable de una almohada: lo que desaparece cada vez que se hace
+   una más. El arriendo NO va aquí —se paga igual se hagan 10 o 1.000—. */
+function costoAlm(r){
+  const kg=(r.peso_previsto||0)/1000;
+  const poli=kg*P('precio_poliuretano'), quim=kg*costoQuimKg();
+  const mo=P('mano_obra_unidad'), bolsa=P('costo_bolsa');
+  return {kg,poli,quim,mo,bolsa,total:poli+quim+mo+bolsa};
+}
+/* El precio promedio real, no el de la lista 1: si el 70% se va a vender por
+   lista 3, el precio que manda es el ponderado. */
+function precioProm(r){
+  return (r.precio_1||0)*P('sim_mix_1')/100
+       + (r.precio_3||0)*P('sim_mix_2')/100
+       + (r.precio_5||0)*P('sim_mix_3')/100;
+}
+function tramoReparto(u){
+  return REPARTO.find(x=>u>=x.desde&&(x.hasta==null||u<x.hasta))||{pct:0};
+}
+
+function vSim(){
+  const dias=P('sim_dias')||1;
+  const F=REFS.map(r=>{
+    const q=P('sim_qd_'+r.id), c=costoAlm(r), p=precioProm(r);
+    return {r,q,c,p,mes:q*dias,m:p-c.total,pct:p?(p-c.total)/p*100:0};
+  });
+  const T=(f)=>F.reduce((a,x)=>a+f(x),0);
+  const und=T(x=>x.mes), undDia=T(x=>x.q);
+  const vta=T(x=>x.mes*x.p), cvar=T(x=>x.mes*x.c.total);
+  const kgMes=T(x=>x.mes*x.c.kg);
+  const fijo=P('espacio_periodo');
+  const contrib=vta-cvar, util=contrib-fijo;
+  const tr=tramoReparto(util), sup=util>0?util*tr.pct/100:0;
+  const cPoli=T(x=>x.mes*x.c.poli), cQuim=T(x=>x.mes*x.c.quim);
+  const cMo=T(x=>x.mes*x.c.mo), cBol=T(x=>x.mes*x.c.bolsa);
+  const cCloruro=kgMes*P('pct_cloruro')/100*P('precio_cloruro');
+  const cDesmo=kgMes*P('pct_desmoldante')/100*P('precio_desmoldante');
+  const equil=und?Math.ceil(fijo/(contrib/und)):0;
+  const sens=p=>util-kgMes*P('precio_poliuretano')*p/100;
+
+  const color=p=>p>=40?'ok':p>=25?'esp':'mal';
+  const gasto=(n,v,d)=>`<div class="f"><span>${n}${d?`<div style="font-size:12px;color:var(--tenue)">${d}</div>`:''}</span>
+      <span style="text-align:right"><b>${cop(v)}</b>
+        <div style="font-size:12px;color:var(--tenue)">${vta?num(v/vta*100,1):0}%</div></span></div>`;
+
+  set('Escenario',dias+' días · '+num(undDia)+' al día',`
+    <div class="tira">
+      <div><div class="n ${util>0?'ok':'mal'}">${cop(util)}</div><div class="l">utilidad del mes</div></div>
+      <div><div class="n">${cop(vta)}</div><div class="l">ventas</div></div>
+      <div><div class="n">${num(und)}</div><div class="l">almohadas</div></div>
+    </div>
+
+    <div class="tit">Cuántas al día</div>
+    <div class="caja">
+      ${REFS.map(r=>`<div class="par"><div class="pn">${esc(r.nombre)}
+        <small>${num(r.peso_previsto)} g</small></div>
+        <input id="s_sim_qd_${r.id}" type="number" inputmode="numeric" value="${P('sim_qd_'+r.id)}"></div>`).join('')}
+      <div class="par"><div class="pn">Días de trabajo al mes</div>
+        <input id="s_sim_dias" type="number" inputmode="numeric" value="${dias}"></div>
+      <div class="res"><span>${num(undDia)} al día × ${dias} días</span><b>${num(und)} almohadas</b></div>
+    </div>
+
+    <div class="tit">Por qué lista se vende</div>
+    <div class="caja">
+      <div class="par"><div class="pn">Lista 1<small>precio de una unidad</small></div>
+        <input id="s_sim_mix_1" type="number" inputmode="numeric" value="${P('sim_mix_1')}"></div>
+      <div class="par"><div class="pn">Lista 2<small>3 o más</small></div>
+        <input id="s_sim_mix_2" type="number" inputmode="numeric" value="${P('sim_mix_2')}"></div>
+      <div class="par"><div class="pn">Lista 3<small>5 o más</small></div>
+        <input id="s_sim_mix_3" type="number" inputmode="numeric" value="${P('sim_mix_3')}"></div>
+      <div class="res ${P('sim_mix_1')+P('sim_mix_2')+P('sim_mix_3')==100?'':'mal'}">
+        <span>Suma</span><b>${P('sim_mix_1')+P('sim_mix_2')+P('sim_mix_3')}%</b></div>
+    </div>
+    <button class="btn" onclick="guardarSim()">Recalcular</button>
+
+    <div class="tit">Qué deja cada almohada</div>
+    <div class="caja">
+      <div class="res"><span>Referencia</span><span>Cuesta · Se vende · Deja</span></div>
+      ${F.map(x=>`<div class="f"><span><b>${esc(x.r.nombre)}</b>
+          <div style="font-size:12px;color:var(--tenue)">${x.q} al día · ${num(x.c.kg,2)} kg</div></span>
+        <span style="display:flex;gap:11px;align-items:center;font-variant-numeric:tabular-nums">
+          <span style="color:var(--tenue);min-width:58px;text-align:right">${cop(x.c.total)}</span>
+          <span style="min-width:58px;text-align:right">${cop(x.p)}</span>
+          <b class="${color(x.pct)}" style="min-width:58px;text-align:right">${cop(x.m)}</b>
+          <span class="chip ${color(x.pct)}" style="min-width:42px;text-align:center">${num(x.pct,0)}%</span>
+        </span></div>`).join('')}
+    </div>
+    ${(()=>{ const mej=F.slice().sort((x,y)=>y.pct-x.pct)[0], peo=F.slice().sort((x,y)=>x.pct-y.pct)[0];
+      return mej&&peo&&mej!==peo?`<div class="res" style="border-radius:11px;border:1px solid var(--linea)">
+        <b>${esc(mej.r.nombre)} es la que más deja</b> (${num(mej.pct,0)}%) y
+        ${esc(peo.r.nombre)} la que menos (${num(peo.pct,0)}%). Cambiar una
+        ${esc(peo.r.nombre)} por una ${esc(mej.r.nombre)} son
+        ${cop(mej.m-peo.m)} de más en el bolsillo.</div>`:''; })()}
+
+    <div class="tit">A dónde se va la plata · el mes</div>
+    <div class="caja">
+      ${gasto('Poliuretano',cPoli,num(kgMes,0)+' kg a '+cop(P('precio_poliuretano'))+' el kilo')}
+      ${gasto('Cloruro',cCloruro,num(kgMes*P('pct_cloruro')/100,0)+' kg a '+cop(P('precio_cloruro'))+' el kilo')}
+      ${gasto('Desmoldante',cDesmo,num(kgMes*P('pct_desmoldante')/100,0)+' kg a '+cop(P('precio_desmoldante'))+' el kilo')}
+      ${gasto('Mano de obra',cMo,num(und)+' almohadas a '+cop(P('mano_obra_unidad')))}
+      ${gasto('Bolsas',cBol,num(und)+' a '+cop(P('costo_bolsa')))}
+      ${gasto('Bodega',fijo,'se paga completo, se trabaje o no')}
+      <div class="f tot"><span>Costo del mes</span><b>${cop(cvar+fijo)}</b></div>
+    </div>
+
+    <div class="tit">La cuenta</div>
+    <div class="caja">
+      <div class="f"><span>Ventas</span><b>${cop(vta)}</b></div>
+      <div class="f"><span>− Costo de lo que se fabricó</span><b>${cop(cvar)}</b></div>
+      <div class="f"><span>= Deja la producción</span><b>${cop(contrib)}</b></div>
+      <div class="f"><span>− Bodega</span><b>${cop(fijo)}</b></div>
+      <div class="f tot"><span>Utilidad del mes</span><b class="${util>0?'ok':'mal'}">${cop(util)}</b></div>
+      <div class="f"><span>− Supervisor · ${tr.pct}%<div style="font-size:12px;color:var(--tenue)">${esc(tr.nota||'')}</div></span>
+        <b>${cop(sup)}</b></div>
+      <div class="f tot"><span>Queda para el negocio</span><b>${cop(util-sup)}</b></div>
+    </div>
+
+    <div class="tit">Qué tan apretado está</div>
+    <div class="caja">
+      <div class="f"><span>Punto de equilibrio<div style="font-size:12px;color:var(--tenue)">almohadas al mes para no perder</div></span>
+        <b class="ok">${num(equil)}</b></div>
+      <div class="f"><span>Se van a hacer</span><b>${num(und)}</b></div>
+      <div class="f"><span>Si el poliuretano sube 10%<div style="font-size:12px;color:var(--tenue)">a ${cop(P('precio_poliuretano')*1.1)} el kilo</div></span>
+        <b class="${sens(10)>0?'esp':'mal'}">${cop(sens(10))}</b></div>
+      <div class="f"><span>Si sube 25%<div style="font-size:12px;color:var(--tenue)">a ${cop(P('precio_poliuretano')*1.25)} el kilo</div></span>
+        <b class="${sens(25)>0?'esp':'mal'}">${cop(sens(25))}</b></div>
+      <div class="res">El arriendo es chico al lado del material: el negocio no se
+        cae por vender poco, se cae si sube el poliuretano o el cloruro.</div>
+    </div>
+
+    <div class="tit">Lo que este presupuesto NO está contando</div>
+    <div class="caja">
+      ${[['La merma','Ni una purga, ni un derrame, ni un kilo perdido. Un 4% sobre '
+          +num(kgMes,0)+' kg son '+cop(kgMes*0.04*P('precio_poliuretano'))+' al mes.'],
+         ['Las almohadas que salen malas','El escenario supone que se venden las '
+          +num(und)+'. Un 3% de rechazo son '+num(Math.round(und*0.03))
+          +' almohadas y '+cop(und*0.03*(cvar/und))+'.'],
+         ['El flete','Nadie está pagando llevar la almohada al cliente.'],
+         ['Quién vende','No hay comisión, ni celular, ni pauta, ni quien conteste.'],
+         ['La plata quieta','Se compra de contado y se cobra a 30 días. Con '
+          +cop(vta)+' de ventas hay que tener '+cop(cvar)+' adelantados todo el tiempo.'],
+         ['El IVA','No quita utilidad, pero sale de la caja cada dos meses.'],
+         ['Retención e ICA','Si le vende a empresas le retienen ~3,5% de cada factura.'],
+         ['El espacio del reposo',num(undDia)+' almohadas quedan 24 h en estantería. '
+          +'Tienen que caber todos los días.'],
+         ['Quién arregla la máquina','Ni mantenimiento, ni moldes, ni repuestos.']]
+        .map(([t,d])=>`<div class="f"><span><b>${t}</b>
+          <div style="font-size:12px;color:var(--tenue)">${d}</div></span></div>`).join('')}
+    </div>
+    <div class="res" style="border-radius:11px;border:1px solid var(--linea)">
+      Los primeros dos huecos solos valen cerca de
+      <b>${cop(kgMes*0.04*P('precio_poliuretano')+und*0.03*(cvar/und))}</b> al mes,
+      un ${num((kgMes*0.04*P('precio_poliuretano')+und*0.03*(cvar/und))/util*100,0)}%
+      de la utilidad. No son detalles.</div>`);
+}
+
+async function guardarSim(){
+  const claves=['sim_dias','sim_mix_1','sim_mix_2','sim_mix_3']
+    .concat(REFS.map(r=>'sim_qd_'+r.id));
+  for(const k of claves){
+    const e=$('s_'+k); if(!e) continue;
+    const v=+e.value||0;
+    if(v!==P(k)) await PATCH('alm_param?clave=eq.'+k,{valor:v});
+  }
+  await cargar(); vSim();
+}
+
 /* ===================== NAVEGACIÓN ===================== */
 const VISTAS=[['turno','🏭','Turno'],['empacar','📦','Empacar'],['vender','🏷️','Vender'],
               ['inv','📋','Inventario'],['dia','📅','Día'],['resumen','📊','Resumen'],
-              ['costos','⚙️','Costos']];
+              ['sim','📈','Escenario'],['costos','⚙️','Costos']];
 function pintarNav(){
   $('nav').innerHTML=VISTAS.map(([v,i,t])=>
     `<button class="${v===VISTA?'on':''}" onclick="ir('${v}')"><span class="i">${i}</span>${t}</button>`).join('');
 }
 function ir(v){ VISTA=v; pintarNav(); window.scrollTo(0,0);
   ({turno:vTurno,empacar:vEmpacar,vender:vVender,inv:vInv,dia:vDia,resumen:vResumen,
-    costos:vCostos}[v])(); }
+    sim:vSim,costos:vCostos}[v])(); }
 function set(t,s,html){ $('topT').textContent=t; $('topS').innerHTML=s||''; $('main').innerHTML=html; }
 const cargando=()=>set('…','', '<div class="vacio">Cargando…</div>');
 
@@ -277,12 +459,14 @@ function nombreParam(k){
     mano_obra_unidad:'Mano de obra por almohada',precio_poliuretano:'Poliuretano',
     precio_cloruro:'Cloruro',precio_desmoldante:'Desmoldante',precio_pasta:'Pasta · pigmento',
     costo_bolsa:'Bolsa',pct_desmoldante:'Desmoldante %',pct_pigmento:'Pasta %',
+    pct_cloruro:'Cloruro %',
     horas_reposo:'Reposo antes de embolsar',iva:'IVA'}[k]||k;
 }
 function resumenGrupo(k){
   if(k==='Fijos') return `<div class="res"><span>Cada día que se abre turno cuesta</span><b>${cop(diaEspacio())}</b></div>`;
   if(k==='Mano de obra') return `<div class="res"><span>Un día de 100 almohadas</span><b>${cop(P('mano_obra_unidad')*100)}</b></div>`;
   if(k==='Materiales') return `<div class="res"><span>10 kg de poliuretano</span><b>${cop(P('precio_poliuretano')*10)}</b></div>`;
+  if(k==='Proporciones') return `<div class="res"><span>Químicos de un kilo de almohada</span><b>${cop(costoQuimKg())}</b></div>`;
   return '';
 }
 async function guardarCostos(){
@@ -748,8 +932,7 @@ async function vDia(){
   const cargado=turnos.reduce((a,t)=>a+(+t.kg_cargados||0),0);
   const sin=Math.max(0,cargado-kgAlm-purgas);
   const gPoli=kgAlm*P('precio_poliuretano');
-  const gProp=kgAlm*(P('pct_desmoldante')+P('pct_pigmento'))/100*
-              ((P('precio_desmoldante')+P('precio_pasta'))/2);
+  const gProp=kgAlm*costoQuimKg();
   const gEsp=gastos.filter(g=>g.concepto==='espacio').reduce((a,g)=>a+ +g.valor,0);
   const gMo=gastos.filter(g=>g.concepto==='mano de obra').reduce((a,g)=>a+ +g.valor,0);
   const gBol=gastos.filter(g=>g.concepto==='bolsa').reduce((a,g)=>a+ +g.valor,0);
@@ -766,7 +949,7 @@ async function vDia(){
     <div class="tit">${mats.length?'2 · ':''}Lo que se gastó hoy</div>
     <div class="caja">
       <div class="f"><span>Poliuretano · ${num(kgAlm,1)} kg</span><b>${cop(gPoli)}</b></div>
-      <div class="f"><span>Pasta y desmoldante</span><b>${cop(gProp)}</b></div>
+      <div class="f"><span>Cloruro, desmoldante y pasta</span><b>${cop(gProp)}</b></div>
       <div class="f"><span>Bolsas</span><b>${cop(gBol)}</b></div>
       <div class="f"><span>Mano de obra · ${alm.length} und</span><b>${cop(gMo)}</b></div>
       <div class="f"><span>Espacio</span><b>${cop(gEsp)}</b></div>
@@ -799,7 +982,7 @@ async function vResumen(){
     const sin=Math.max(0,x.carg-x.kg-x.purga);
     const g=gastos.filter(y=>y.fecha===d).reduce((a,y)=>a+ +y.valor,0);
     x.costo=x.kg*P('precio_poliuretano')
-      + x.kg*(P('pct_desmoldante')+P('pct_pigmento'))/100*((P('precio_desmoldante')+P('precio_pasta'))/2)
+      + x.kg*costoQuimKg()
       + g + sin*P('precio_poliuretano');
     x.sin=sin; });
   const dias=Object.keys(porDia).sort().reverse();
