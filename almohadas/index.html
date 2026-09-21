@@ -153,7 +153,7 @@ nav button.on{color:var(--ambar);font-weight:700}
    pestaña Costos. Cambiar el precio del poliuretano no debe obligar a publicar
    una versión nueva.
    =========================================================================== */
-const VER='20260921-4';
+const VER='20260921-5';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/';
 const KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
@@ -479,16 +479,17 @@ function vCostos(){
 }
 function nombreParam(k){
   return {espacio_periodo:'Arriendo del espacio',espacio_dias:'Se divide en (días)',
-    mano_obra_unidad:'Mano de obra por almohada',precio_poliuretano:'Poliuretano',
-    precio_cloruro:'Cloruro',precio_desmoldante:'Desmoldante',precio_pasta:'Pasta · pigmento',
-    costo_bolsa:'Bolsa',pct_desmoldante:'Desmoldante %',pct_pigmento:'Pasta %',
+    mano_obra_unidad:'Mano de obra por almohada',precio_poliuretano:'Poliuretano · con IVA',
+    precio_cloruro:'Cloruro · con IVA',precio_desmoldante:'Desmoldante · con IVA',
+    precio_pasta:'Pasta · pigmento',costo_bolsa:'Bolsa · con IVA',pct_desmoldante:'Desmoldante %',pct_pigmento:'Pasta %',
     pct_cloruro:'Cloruro %',
     horas_reposo:'Reposo antes de embolsar',iva:'IVA'}[k]||k;
 }
 function resumenGrupo(k){
   if(k==='Fijos') return `<div class="res"><span>Cada día que se abre turno cuesta</span><b>${cop(diaEspacio())}</b></div>`;
   if(k==='Mano de obra') return `<div class="res"><span>Un día de 100 almohadas</span><b>${cop(P('mano_obra_unidad')*100)}</b></div>`;
-  if(k==='Materiales') return `<div class="res"><span>10 kg de poliuretano</span><b>${cop(P('precio_poliuretano')*10)}</b></div>`;
+  if(k==='Materiales') return `<div class="res"><span>10 kg de poliuretano</span><b>${cop(P('precio_poliuretano')*10)}</b></div>
+    <div class="res">Los precios van <b>con IVA</b>: no hay empresa que lo descuente, así que es costo.</div>`;
   if(k==='Proporciones') return `<div class="res"><span>Químicos de un kilo de almohada</span><b>${cop(costoQuimKg())}</b></div>`;
   return '';
 }
