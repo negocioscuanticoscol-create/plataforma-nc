@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260921-reclasificar';
+const VER='20260921-reclas-2';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1061,8 +1061,12 @@ async function reclasificar(id, que){
     : '¿NO volver a contactar a ' + nom + '?\n\nEste teléfono queda bloqueado en TODAS las bases, incluso si mañana se vuelve a cargar el dato.';
   if (!confirm(texto)) return;
 
-  const bts = document.querySelectorAll('.ibx button');
-  bts.forEach(b => b.disabled = true);
+  /* Se va del tablero DE UNA, sin esperar la red, igual que hace 'enviado'.
+     Si algo falla se devuelve a la lista: mas vale que reaparezca a que se
+     quede ahi tres segundos pareciendo que el boton no hizo nada. */
+  const antes = INTER.slice();
+  INTER = INTER.filter(y => String(y.id) !== String(id));
+  pintarInteresados();
   try {
     if (que === 'competidor') {
       /* Se mueve de base Y se marca 'competencia'. Solo moverlo lo dejaria
@@ -1071,7 +1075,8 @@ async function reclasificar(id, que){
       const bs = await GET('mkr_bases?select=id,nombre&nombre=ilike.'
                            + encodeURIComponent('*' + BASE_COMPETIDORES + '*') + '&limit=1');
       const destino = (Array.isArray(bs) && bs[0]) ? bs[0].id : null;
-      if (!destino) { toast('⚠️ No existe la base de competidores', true); bts.forEach(b => b.disabled = false); return; }
+      if (!destino) { INTER = antes; pintarInteresados();
+        toast('⚠️ No existe la base de competidores', true); return; }
       const cuerpo = { estado: 'competencia', base_id: destino };
       const r = await fetch(SB + '/rest/v1/mkr_empresas?id=eq.' + encodeURIComponent(x.lead_id),
         { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
@@ -1081,7 +1086,8 @@ async function reclasificar(id, que){
     } else {
       /* La lista de no llamar es por TELEFONO, no por empresa: el mismo numero
          puede estar cargado en cuatro bases con cuatro nombres distintos. */
-      if (!tel || tel.length < 10) { toast('⚠️ No tiene un teléfono válido', true); bts.forEach(b => b.disabled = false); return; }
+      if (!tel || tel.length < 10) { INTER = antes; pintarInteresados();
+        toast('⚠️ No tiene un teléfono válido', true); return; }
       const r = await fetch(SB + '/rest/v1/mkr_no_llamar',
         { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
           body: JSON.stringify({ telefono: tel.slice(-10),
@@ -1095,15 +1101,17 @@ async function reclasificar(id, que){
           body: JSON.stringify({ estado: 'descartado' }) });
       toast('🚫 ' + tel.slice(-10) + ' no se vuelve a llamar');
     }
-    /* Se marca trabajado para que salga de la lista de pendientes: ya no hay
-       nada que mandarle. */
-    await fetch(SB + '/rest/v1/mkr_llamadas?id=eq.' + encodeURIComponent(x.id),
+    /* Trabajado, igual que 'enviado', para que no vuelva a salir al recargar:
+       la lista se pide con trabajado=not.is.true.
+       Lo que NO se hace es mandarlo al embudo del CRM como sí hace 'enviado':
+       un competidor o un bloqueado no es un prospecto y no tiene nada que
+       hacer en el CRM. */
+    const r2 = await fetch(SB + '/rest/v1/mkr_llamadas?id=eq.' + encodeURIComponent(x.id),
       { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify({ trabajado: true }) });
-    INTER = INTER.filter(y => String(y.id) !== String(id));
-    pintarInteresados();
+    if (!r2.ok) throw new Error(r2.status);
   } catch (e) {
-    bts.forEach(b => b.disabled = false);
+    INTER = antes; pintarInteresados();       // vuelve a la lista
     toast('⚠️ No se pudo. Revisa la señal.', true);
   }
 }
