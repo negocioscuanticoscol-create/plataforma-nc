@@ -182,17 +182,57 @@
     <div class="tit">Centro Empresarial de Dotaciones</div>
     <div id="login-form">
       <label>Usuario</label>
-      <input id="lg_email" type="email" inputmode="email" placeholder="tu usuario" autocomplete="username">
+      <input id="lg_email" type="text" name="ced_u" placeholder="tu usuario"
+             autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
+             readonly onfocus="this.removeAttribute('readonly')">
       <label id="lbl_nombre" class="hide">Tu nombre</label>
-      <input id="lg_nombre" class="field hide" placeholder="Nombre y apellido" style="border-radius:10px">
+      <input id="lg_nombre" class="field hide" placeholder="Nombre y apellido"
+             autocomplete="off" style="border-radius:10px">
       <label>Clave</label>
-      <input id="lg_pass" type="password" placeholder="••••••••" autocomplete="current-password">
+      <input id="lg_pass" type="password" name="ced_k" placeholder="••••••••"
+             autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')">
       <button class="btn btn-main" id="btn_login" onclick="App.login()">Entrar</button>
       <button class="btn btn-ghost hide" id="btn_signup" onclick="App.signup()">Crear cuenta</button>
       <div class="hint" style="text-align:center;margin-top:12px">Las cuentas las crea el administrador desde <b>Usuarios</b>.</div>
       <div class="switch hide" id="sw_login" onclick="App.modoSignup(false)">Ya tengo cuenta · Entrar</div>
       <div class="msg" id="lg_msg"></div>
     </div>
+    <script>
+    /* ===== BLINDAJE DEL LOGIN =================================================
+       TODAS las apps de la plataforma viven en el mismo dominio
+       (negocioscuanticoscol-create.github.io), y Chrome guarda las claves POR
+       DOMINIO, no por carpeta. Por eso la clave que alguien guardo entrando a
+       Conviertete o a Lupe se le ofrecia aqui, y el CED aparecia con el usuario
+       de otra app escrito. Delante de un cliente eso es grave.
+
+       Tres cierres, porque ninguno solo alcanza:
+         1. autocomplete "off" y "new-password" -- Chrome respeta new-password
+            para no meter claves guardadas, pero ignora "off" a secas.
+         2. readonly hasta que se toca el campo -- Chrome no autocompleta un
+            campo de solo lectura, y el readonly se cae al primer toque.
+         3. borrar de todos modos lo que haya quedado -- por si una version del
+            navegador se salta los dos anteriores.
+       El unico que SI puede escribir el usuario es ?u= de la propia URL, para
+       abrir la sede que toca. La clave NUNCA se prellena, ni por URL. ===== */
+    (function(){
+      var u=document.getElementById('lg_email'), k=document.getElementById('lg_pass');
+      if(!u||!k) return;
+      var quiere=''; try{ quiere=(new URLSearchParams(location.search).get('u')||'').trim(); }catch(e){}
+      function limpiar(){
+        if(u.value!==quiere && document.activeElement!==u) u.value=quiere;
+        if(document.activeElement!==k) k.value='';
+      }
+      limpiar();
+      [60,300,900].forEach(function(ms){ setTimeout(limpiar, ms); });
+      /* Al volver con el boton atras el navegador repinta los campos como
+         estaban. pageshow es el unico evento que avisa de eso. */
+      window.addEventListener('pageshow', function(){ setTimeout(limpiar,0); });
+      if(quiere){
+        u.setAttribute('readonly','readonly');   // el usuario ya viene puesto
+        setTimeout(function(){ k.removeAttribute('readonly'); k.focus(); }, 120);
+      }
+    })();
+    </script>
     <!-- marcas que representa la red · son logos, no botones -->
     <div class="marcas">
       <div class="mtit">Marcas que representamos</div>
@@ -237,7 +277,7 @@
 <script>
   // Versión fija → el navegador CACHEA los archivos (carga 1 vez y luego instantáneo).
   // Cuando se cambie el código, subir este número (NCVER) y el usuario hace Ctrl+Shift+R una vez.
-  var NCVER='20260921-abono-saldo';
+  var NCVER='20260921-abono-login';
   ['config.js','geo-co.js','app.js'].forEach(function(s){
     document.write('<scr'+'ipt src="'+s+'?v='+NCVER+'"><\/scr'+'ipt>');
   });

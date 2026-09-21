@@ -138,11 +138,11 @@
     <div class="tit">Plataforma interna</div>
     <div id="login-form">
       <label>Correo</label>
-      <input id="lg_email" type="email" inputmode="email" placeholder="tucorreo@correo.com" autocomplete="username">
+      <input id="lg_email" type="email" inputmode="email" placeholder="tucorreo@correo.com" name="sm_u" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
       <label id="lbl_nombre" class="hide">Tu nombre</label>
       <input id="lg_nombre" class="field hide" placeholder="Nombre y apellido" style="border-radius:10px">
       <label>Contraseña</label>
-      <input id="lg_pass" type="password" placeholder="••••••••" autocomplete="current-password">
+      <input id="lg_pass" type="password" placeholder="••••••••" name="sm_k" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')">
       <button class="btn btn-main" id="btn_login" onclick="App.login()">Entrar</button>
       <button class="btn btn-ghost hide" id="btn_signup" onclick="App.signup()">Crear cuenta</button>
       <div class="switch" id="sw_signup" onclick="App.modoSignup(true)">¿Primera vez? Crear cuenta</div>

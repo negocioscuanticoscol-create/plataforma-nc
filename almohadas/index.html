@@ -128,7 +128,7 @@ nav button.on{color:var(--ambar);font-weight:700}
 <div id="login">
   <h1>Almohadas<br>Crudas</h1>
   <div class="sub">Poliuretano viscoelástico</div>
-  <input id="clave" type="password" placeholder="Clave" autocomplete="current-password">
+  <input id="clave" type="password" placeholder="Clave" name="alm_k" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')">
   <button class="btn" onclick="entrar()">Entrar</button>
   <div id="loginMsg" style="color:var(--rojo);font-size:13.5px;min-height:20px"></div>
 </div>

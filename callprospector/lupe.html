@@ -439,9 +439,9 @@ function pintarGate(){
       <label for="gCed">Tu centro</label>
       <select id="gCed"><option value="">Cargando centros…</option></select>
       <label for="gU" style="margin-top:11px">Tu celular o tu usuario</label>
-      <input id="gU" placeholder="3001234567" autocapitalize="none" autocomplete="username">
+      <input id="gU" placeholder="3001234567" autocapitalize="none" name="lp_u" autocomplete="off" readonly onfocus="this.removeAttribute('readonly')">
       <label for="gP" style="margin-top:11px">Clave</label>
-      <input id="gP" type="password" placeholder="Tu clave" autocomplete="current-password">
+      <input id="gP" type="password" placeholder="Tu clave" name="lp_k" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')">
       <div id="gHallado"></div>
       <button onclick="hacerEntrar()">Entrar</button>
       <div class="link" onclick="gate('inscribir')">Quiero inscribirme</div>`;
