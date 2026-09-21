@@ -3018,21 +3018,29 @@ const App = {
     const sede = c.ced_snap || {nombre:c.ced_comercial || c.ced || ''};
     const sedeLinea = [sede.direccion, sede.ciudad, sede.telefono?'Tel '+sede.telefono:''].filter(Boolean).join(' · ');
     const sinCuenta = !emisor.banco && !!c.factura_snap;
-    const cuenta = emisor.banco
-      ? `${emisor.banco} · ${emisor.tipo_cuenta||'Ahorros'} ${emisor.cuenta||''} · ${emisor.titular||emisor.nombre}`
+    /* La cuenta y el titular van separados: el numero se copia tal cual para
+       consignar, y el nombre de la empresa es lo que el banco pide aparte. */
+    const cuentaLinea = emisor.banco
+      ? `${emisor.banco} · ${emisor.tipo_cuenta||'Ahorros'} ${emisor.cuenta||''}`
       : (sinCuenta ? `⚠️ ${emisor.nombre||'Este facturador'} todavía no tiene cuenta bancaria cargada.`
                    : C.CUENTA);
+    const titularLinea = emisor.banco ? (emisor.titular||emisor.nombre||'') : '';
+    const cuenta = cuentaLinea + (titularLinea?' · '+titularLinea:'');
 
     /* Color de la marca que atiende. Estaba fijo en el naranja de Feroz, asi que
        la proforma de Alpaca salia con los colores de otra marca. */
     const AC = (sede.color && /^#[0-9a-fA-F]{6}$/.test(sede.color)) ? sede.color : '#E8620C';
-    const txt=[`*PROFORMA ${c.numero||''}* - ${emisor.nombre||'INDUSTRIAS FEROZ SAS'}`,`Cliente: ${cl.nombre||''}${cl.nit?' NIT '+cl.nit:''}`];
+    const txt=[`*PROFORMA ${c.numero||''}*`,
+               `Te atiende: ${sede.nombre||''}`,
+               `Factura: ${emisor.nombre||'INDUSTRIAS FEROZ SAS'}${emisor.nit?' NIT '+emisor.nit:''}`,
+               `Cliente: ${cl.nombre||''}${cl.nit?' NIT '+cl.nit:''}`];
     if(Array.isArray(c.items)&&c.items.length>1) c.items.forEach(it=>
       txt.push(`Ref. ${it.referencia||''}${it.color?' '+it.color:''} - ${it.pares||0} par(es) x ${money(it.precio_par||0)} = ${money(it.subtotal||0)}`));
     else txt.push(`${concepto} - ${pares} par(es)`);
     if(sub) txt.push(`Subtotal: ${money(sub)}`); if(iva) txt.push(`IVA: ${money(iva)}`);
-    txt.push(`Transporte: ${fl.lbl}`,`TOTAL: ${money(tot)}`,'',`Para confirmar consigna en:`,cuenta);
-    if(sedeLinea) txt.push('', `Te atiende ${sede.nombre||''}: ${sedeLinea}`);
+    txt.push(`Transporte: ${fl.lbl}`,`TOTAL: ${money(tot)}`,'',`Para confirmar consigna en:`,cuentaLinea);
+    if(titularLinea) txt.push(`a nombre de ${titularLinea}`);
+    if(sedeLinea) txt.push('', `${sede.nombre||''}: ${sedeLinea}`);
     const wa=(cl.tel?('https://wa.me/57'+String(cl.tel).replace(/\D/g,'')):'https://wa.me/')+'?text='+encodeURIComponent(txt.join('\n'));
     return `<!doctype html><html><head><meta charset="utf-8"><title>Proforma ${esc(c.numero||'')}</title>
     <style>*{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}body{margin:0;padding:24px;color:#1a1a1a;background:#f3f4f6}
@@ -3042,13 +3050,15 @@ const App = {
     .pf-body{padding:22px 26px}.box{font-size:13px;line-height:1.5;margin-bottom:14px}.box b{color:${AC}}
     table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left}th{background:#faf7f4;font-size:12px}
     .tot{margin-top:8px}.tot table td{border:none;padding:4px 10px}.tot .big{font-size:20px;font-weight:800;color:${AC}}
-    .cuenta{margin-top:16px;background:#f0fff6;border:1.5px solid #16a34a;border-radius:8px;padding:12px 14px;font-size:13px}
+    .emisor{margin-top:16px;background:#f5f7fa;border:1.5px solid #cbd5e1;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.5}
+    .emisor b{color:#475569}
+    .cuenta{margin-top:10px;background:#f0fff6;border:1.5px solid #16a34a;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.5}
     .cuenta.falta{background:#fdecec;border-color:#c62828;color:#8a1c1c;font-weight:700}
     .acts{padding:0 26px 24px;display:flex;gap:10px}.acts a,.acts button{flex:1;text-align:center;padding:12px;border-radius:8px;border:none;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
     .b1{background:#111;color:#fff}.b2{background:#25D366;color:#fff}@media print{body{background:#fff;padding:0}.acts{display:none}.pf{box-shadow:none}}</style></head><body>
       <div class="pf">
         <div class="hd"><div><h1>${esc(sede.nombre||'FEROZ')}</h1>
-            <div class="sub">${esc(emisor.nombre||'INDUSTRIAS FEROZ SAS')}${emisor.nit?' · NIT '+esc(emisor.nit):''}</div>
+            <div class="sub">Centro operativo que atiende este pedido</div>
             ${sedeLinea?`<div class="sub">${esc(sedeLinea)}</div>`:''}</div>
           <div style="text-align:right"><div style="font-size:18px;font-weight:800">PROFORMA</div><div class="sub">${esc(c.numero||'')}</div><div class="sub">${fecha}</div></div></div>
         <div class="pf-body">
@@ -3066,7 +3076,12 @@ const App = {
             <tr><td>IVA (19%)</td><td style="text-align:right">${money(iva)}</td></tr>
             <tr><td>🚚 Transporte</td><td style="text-align:right">${fl.val?money(fl.val):esc(fl.lbl)}</td></tr>
             <tr><td class="big">TOTAL</td><td style="text-align:right" class="big">${money(tot)}</td></tr></table></div>
-          <div class="cuenta${sinCuenta?' falta':''}"><b>${sinCuenta?'⚠️ Falta la cuenta de quien factura':'💳 Para confirmar tu pedido, consigna en:'}</b><br><span style="font-family:'IBM Plex Mono',Consolas,'Courier New',monospace;letter-spacing:.5px;font-weight:600">${esc(cuenta)}</span><br><span style="color:#16a34a">Envía el comprobante por WhatsApp y lo despachamos.</span>
+          <div class="emisor"><b>🧾 Esta compra la factura</b><br>
+            <span style="font-size:15px;font-weight:800">${esc(emisor.nombre||'INDUSTRIAS FEROZ SAS')}</span>${emisor.nit?`<br>NIT ${esc(emisor.nit)}`:''}${emisor.direccion?`<br>${esc(emisor.direccion)}${emisor.ciudad?', '+esc(emisor.ciudad):''}`:''}</div>
+          <div class="cuenta${sinCuenta?' falta':''}"><b>${sinCuenta?'⚠️ Falta la cuenta de quien factura':'💳 Para confirmar tu pedido, consigna en:'}</b><br>
+            <span style="font-family:Consolas,'Courier New',monospace;letter-spacing:.5px;font-weight:700;font-size:14.5px">${esc(cuentaLinea)}</span>
+            ${titularLinea?`<br><span style="font-size:12.5px">a nombre de <b>${esc(titularLinea)}</b></span>`:''}
+            <br><span style="color:#16a34a">Envía el comprobante por WhatsApp y lo despachamos.</span>
             ${sedeLinea?`<div style="margin-top:9px;padding-top:9px;border-top:1px dashed #86efac;color:#166534;font-size:12.5px"><b>Te atiende ${esc(sede.nombre||'')}</b> · ${esc(sedeLinea)}</div>`:''}</div>
         </div>
         <div class="acts"><button class="b1" onclick="window.print()">🖨️ Imprimir / PDF</button><a class="b2" href="${wa}" target="_blank">📱 Enviar por WhatsApp</a></div>
@@ -3859,7 +3874,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       // mostrando la dirección y el teléfono que el cliente vio ese día.
       ced_snap: this._sedeCot ? {nombre:this._sedeCot.nombre_comercial||this._sedeCot.nombre,
         ciudad:this._sedeCot.ciudad, direccion:this._sedeCot.direccion,
-        telefono:this._sedeCot.telefono, nit:this._sedeCot.nit} : null,
+        telefono:this._sedeCot.telefono, nit:this._sedeCot.nit,
+        color:this._sedeCot.color||null} : null,
       /* El CED va explicito. Sin esto lo ponia un trigger a partir del usuario
          con que se entro, asi que un admin cotizando para Av 68 guardaba la
          venta en Principal y la sede nunca la veia. */
