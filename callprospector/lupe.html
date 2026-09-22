@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260922-interesados-negocio';
+const VER='20260922-paso2-solo-admin';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -773,7 +773,12 @@ async function abrirBase(b){
   CIUDAD=''; idx=0;
 
   $('bases').style.display='none';
-  ['hd','main','rank','inter','tarifas','ft'].forEach(id=>$(id).style.display='');
+  ['hd','main','rank','tarifas','ft'].forEach(id=>$(id).style.display='');
+  /* La lista de interesados —el 2º paso, el remarketing— es SOLO del que lo
+     hace. A la telemarketer no le sale: ella captura el interesado en el
+     formulario y sigue llamando. Si le saliera con la casilla 'enviado', la
+     marcaria al capturar y el interesado nunca llegaria al remarketing. */
+  $('inter').style.display = esAdmin() ? '' : 'none';
   $('yo').textContent=YO.nombre;
   pintarTag();
   pintarTarifas();
@@ -948,6 +953,9 @@ function filtrarCiudad(v){
 let INTER=[];
 async function cargarInteresados(){
   if(!YO) return;
+  /* Solo el que hace el 2º paso ve esta lista. La telemarketer no la carga:
+     su trabajo termina al guardar el formulario del interesado. */
+  if(!esAdmin()){ INTER=[]; return; }
   /* 'trabajado=is.false' dejaba por fuera a los que quedaron en NULL —los que
      entraron por el marcador viejo, que no mandaba esa columna—: 19 interesados
      invisibles, nadie les mando nada. 'not.is.true' es lo que se queria decir:
