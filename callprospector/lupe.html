@@ -302,7 +302,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260921-reclas-2';
+const VER='20260922-interesados-negocio';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -953,7 +953,7 @@ async function cargarInteresados(){
      invisibles, nadie les mando nada. 'not.is.true' es lo que se queria decir:
      todo lo que todavia no esta trabajado, sea false o este vacio. */
   const base='mkr_llamadas?select=id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
-    +'whatsapp2,correo,creado_en,validado,estado_venta,agente,agente_id'
+    +'whatsapp2,correo,creado_en,validado,estado_venta,agente,agente_id,base_id'
     +'&resultado=eq.Interesado&trabajado=not.is.true&base_id=not.is.null&order=creado_en.desc';
   /* El administrador ve los de TODA la red: el segundo paso —mandar la info por
      WhatsApp— no siempre lo hace quien marco. Los demas ven los suyos. */
@@ -977,6 +977,22 @@ function nombreDeHoy(f){
   return f ? f.agente : null;
 }
 
+/* A que negocio pertenece un interesado. Sale de la BASE de donde vino la
+   llamada, no del agente: la misma Sara marca calzado y colchones el mismo dia,
+   y cada uno va a un CRM distinto. Es la misma regla de alEmbudo. */
+const NEGOCIO = { ced:'👞 Calzado · Feroz', nido:'🛏️ Colchones · Nido', smart:'📦 Smart' };
+function negocioDe(x){
+  const b = x && x.base_id && TODAS_BASES[String(x.base_id)];
+  if(!b) return '· sin base';
+  return NEGOCIO[b.destino_app] || ('· ' + (b.destino_app || 'sin ruta'));
+}
+/* El nombre de la base, para el renglon de adentro: dentro de Nido no es lo
+   mismo un distribuidor de colchones que una tractomula. */
+function baseDe(x){
+  const b = x && x.base_id && TODAS_BASES[String(x.base_id)];
+  return b ? (b.nombre || '') : '';
+}
+
 function pintarInteresados(){
   const b=$('inBody'), i=$('inInfo'); if(!b) return;
   i.textContent = INTER.length ? INTER.length+' por trabajar' : 'ninguno pendiente';
@@ -989,19 +1005,34 @@ function pintarInteresados(){
   /* Administrador: primero POR QUIEN, y al tocar un nombre se abren los suyos.
      Con la lista de toda la red de corrido no se sabe a quien reclamarle ni
      por donde va cada una. */
-  const por={};
-  INTER.forEach(x=>{ const k=nombreDeHoy(x)||'(sin nombre)'; (por[k]=por[k]||[]).push(x); });
-  const nombres=Object.keys(por).sort((a,c)=>por[c].length-por[a].length);
-  b.innerHTML=nombres.map(n=>{
-    const l=por[n], ab=(INTER_ABIERTO===n);
-    const sinCel=l.filter(x=>!(x.whatsapp||x.lead_cel)).length;
-    return `<div class="qgrupo${ab?' ab':''}">
-      <div class="qcab" onclick="abrirInteresados('${js(n)}')">
-        <span class="fl">${ab?'▾':'▸'}</span>
-        <b>${esc(n)}</b>
-        <span class="qn">${l.length} por mandar${sinCel?' · '+sinCel+' sin celular':''}</span>
-      </div>
-      ${ab?l.map(filaInteresado).join(''):''}
+  /* Dos niveles: primero el NEGOCIO -porque cada uno tiene su CRM, su guion y
+     quien le manda la informacion-, y adentro quien lo marco. Antes era una
+     sola lista por persona: con Sara trabajando calzado y colchones el mismo
+     dia, no habia forma de saber a donde iba cada interesado. */
+  const neg={};
+  INTER.forEach(x=>{ const g=negocioDe(x); (neg[g]=neg[g]||[]).push(x); });
+  const orden=Object.keys(neg).sort((a,c)=>neg[c].length-neg[a].length);
+
+  b.innerHTML=orden.map(g=>{
+    const todos=neg[g];
+    const por={};
+    todos.forEach(x=>{ const k=nombreDeHoy(x)||'(sin nombre)'; (por[k]=por[k]||[]).push(x); });
+    const nombres=Object.keys(por).sort((a,c)=>por[c].length-por[a].length);
+    const sinCelG=todos.filter(x=>!(x.whatsapp||x.lead_cel)).length;
+    return `<div class="qneg">
+      <div class="qnegcab"><b>${esc(g)}</b>
+        <span>${todos.length} por mandar${sinCelG?' · '+sinCelG+' sin celular':''}</span></div>
+      ${nombres.map(n=>{
+        const l=por[n], llave=g+' ‹ '+n, ab=(INTER_ABIERTO===llave);
+        const sinCel=l.filter(x=>!(x.whatsapp||x.lead_cel)).length;
+        return `<div class="qgrupo${ab?' ab':''}">
+          <div class="qcab" onclick="abrirInteresados('${js(llave)}')">
+            <span class="fl">${ab?'▾':'▸'}</span>
+            <b>${esc(n)}</b>
+            <span class="qn">${l.length} por mandar${sinCel?' · '+sinCel+' sin celular':''}</span>
+          </div>
+          ${ab?l.map(x=>filaInteresado(x, false, true)).join(''):''}
+        </div>`; }).join('')}
     </div>`;
   }).join('');
 }
@@ -1017,6 +1048,12 @@ function abrirInteresados(n){ INTER_ABIERTO=(INTER_ABIERTO===n)?'':n; pintarInte
    en cada fila. El verde de "enviado" tiene que seguir siendo lo que salta. */
 const _cssReclas = document.createElement('style');
 _cssReclas.textContent = `
+.qneg{margin:0 0 14px}
+.qnegcab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
+  padding:9px 12px;background:var(--card2);border:1px solid var(--line);
+  border-radius:11px 11px 0 0;border-bottom:none;font-size:13.5px}
+.qnegcab b{letter-spacing:.01em}
+.qnegcab span{font-size:11.5px;color:var(--dim);white-space:nowrap}
 .ibx{display:flex;gap:6px;margin-top:7px}
 .ix{flex:1;border:1px solid var(--line);background:transparent;color:var(--dim);
   border-radius:9px;padding:7px 6px;font-size:11.5px;font-weight:600;cursor:pointer;
@@ -1116,7 +1153,7 @@ async function reclasificar(id, que){
   }
 }
 
-function filaInteresado(x, equipo){
+function filaInteresado(x, equipo, verBase){
   const lindo=t=>String(t||'').replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3');
   /* Los dos numeros, separados a proposito:
      - el MARCADO es por donde se llamo;
@@ -1140,6 +1177,7 @@ function filaInteresado(x, equipo){
   const quien = x.contacto ? `<div class="iq">👤 ${esc(x.contacto)}</div>`
                            : `<div class="iq falta">👤 sin nombre de contacto</div>`;
   const det=[x.lead_ciudad||'',
+             verBase ? '📁 '+esc(baseDe(x)) : '',
              (equipo && x.agente) ? '📞 '+esc(nombreDeHoy(x)) : '',
              x.correo ? '✉️ '+esc(x.correo) : '',
              x.validado ? '' : '<span class="falta">sin datos · no ha pagado</span>',
