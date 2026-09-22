@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Respaldo de WhatsApp · Negocios Cuánticos</title>
+<style>
+  :root{
+    --verde:#00a884; --verde-osc:#017561; --tinta:#111b21; --gris:#667781;
+    --papel:#f7f9fa; --linea:#e2e8ec; --caja:#ffffff;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--papel);
+    color:var(--tinta);line-height:1.55;padding:0 20px calc(40px + env(safe-area-inset-bottom))}
+  .env{max-width:640px;margin:0 auto}
+  header{text-align:center;padding:48px 0 8px}
+  .marca{font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gris)}
+  h1{font-size:29px;font-weight:700;margin:14px 0 8px;letter-spacing:-.02em}
+  .lema{color:var(--gris);font-size:16px;max-width:26em;margin:0 auto}
+
+  .card{background:var(--caja);border:1px solid var(--linea);border-radius:18px;
+    padding:26px 24px;margin:26px 0;box-shadow:0 2px 14px rgba(17,27,33,.04)}
+
+  .descarga{text-align:center}
+  .btn{display:inline-block;background:var(--verde);color:#fff;font-size:18px;font-weight:700;
+    text-decoration:none;padding:17px 40px;border-radius:12px;margin:6px 0 4px;
+    box-shadow:0 6px 18px rgba(0,168,132,.32);transition:transform .1s}
+  .btn:active{transform:translateY(1px)}
+  .peso{color:var(--gris);font-size:13px;margin-top:10px}
+  .solo-pc{background:#fff4e5;border:1px solid #f5d9a8;color:#8a5a12;border-radius:10px;
+    padding:11px 14px;font-size:13.5px;margin-top:18px;font-weight:500}
+
+  h2{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--verde-osc);
+    margin-bottom:16px}
+  .paso{display:flex;gap:15px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--linea)}
+  .paso:last-child{border-bottom:none}
+  .num{flex:0 0 30px;height:30px;background:var(--verde);color:#fff;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
+  .paso div b{display:block;font-size:15.5px;margin-bottom:1px}
+  .paso div span{color:var(--gris);font-size:14px}
+
+  .candado{background:#e7f7f1;border:1px solid #b9e6d7;border-radius:12px;padding:16px 18px;
+    font-size:14px;color:var(--verde-osc);line-height:1.6}
+  .candado b{color:var(--tinta)}
+  footer{text-align:center;color:var(--gris);font-size:12.5px;padding:20px 0 0}
+</style>
+</head>
+<body>
+<div class="env">
+
+  <header>
+    <div class="marca">Negocios Cuánticos</div>
+    <h1>Respalda tu WhatsApp</h1>
+    <p class="lema">Guarda todo tu historial de conversaciones en tu computador, en un solo archivo de Excel.</p>
+  </header>
+
+  <div class="card descarga">
+    <a class="btn" href="RespaldoWhatsApp.exe" download>⬇ Descargar</a>
+    <div class="peso">Para computador con Windows · 37 MB</div>
+    <div class="solo-pc">💻 Abre esta página <b>en tu computador</b>, no en el celular. El respaldo corre en el computador y el celular solo se usa para escanear un código.</div>
+  </div>
+
+  <div class="card">
+    <h2>Cómo funciona</h2>
+    <div class="paso"><div class="num">1</div><div><b>Descarga y abre el programa</b><span>Doble clic al archivo. Si Windows pregunta, toca “Más información → Ejecutar de todos modos”. Es seguro.</span></div></div>
+    <div class="paso"><div class="num">2</div><div><b>Aparece un código QR</b><span>Se abre solo en tu navegador. No tienes que instalar nada.</span></div></div>
+    <div class="paso"><div class="num">3</div><div><b>Escanéalo con tu celular</b><span>WhatsApp → ⋮ → Dispositivos vinculados → Vincular un dispositivo.</span></div></div>
+    <div class="paso"><div class="num">4</div><div><b>Espera unos minutos</b><span>Deja el celular con internet y la pantalla encendida mientras baja tu historial.</span></div></div>
+    <div class="paso"><div class="num">5</div><div><b>Listo: tu Excel queda en el Escritorio</b><span>Cuando termine, envíanoslo por WhatsApp y lo analizamos por ti.</span></div></div>
+  </div>
+
+  <div class="card candado">
+    🔒 <b>Tu información es tuya.</b> El respaldo se guarda <b>solo en tu computador</b> — no se sube a internet ni a ningún servidor. El programa solo <b>lee</b> tus conversaciones para guardarlas: no envía ningún mensaje. Al terminar, la conexión con tu WhatsApp se cierra sola.
+  </div>
+
+  <footer>Negocios Cuánticos · negocioscuanticoscol@gmail.com</footer>
+
+</div>
+</body>
+</html>
