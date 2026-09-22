@@ -847,6 +847,7 @@ function App() {
   const retoDia = diasEntre(cfg.reto || RETO_INICIO, fecha) + 1;
   const retoTotal = diasEntre(cfg.reto || RETO_INICIO, RETO_FIN) + 1;
   const faltan = Math.max(diasEntre(fecha, RETO_FIN), 0);
+  const [dias, setDias] = usePersist("dias", {});
   const retoStats = (() => {
     const ini = cfg.reto || RETO_INICIO;
     if (fecha < ini) return null;
@@ -868,7 +869,6 @@ function App() {
       full
     };
   })();
-  const [dias, setDias] = usePersist("dias", {});
   const dia = dias[fecha] || {
     done: {},
     vals: {}
@@ -3379,7 +3379,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
    este aviso, el teléfono podría quedarse meses con una versión vieja.
    Chequea cada 5 minutos y al volver a la app, comparando esta constante contra
    la del archivo en el servidor. */
-const VER='20260919-2240-nube';
+const VER='20260922-arranca';
 let _ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-_ultimoChequeo < 300000) return;
