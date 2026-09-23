@@ -4153,28 +4153,14 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
           <span style="color:${sal>0?'var(--rojo)':'var(--verde)'};font-weight:800">${sal>0?'debe '+money(sal):'PAGADO'}</span></div>`:''}
         <span class="badge b-${p.estado}">${ESTADOS[p.estado]}</span></div></div>
       <div id="ped_${p.id}" style="display:none;margin-top:8px">
-        <div class="meta" style="margin-bottom:4px">${liq}</div>
+        <!-- Ficha corta (Jose, 23-sep-2026): "en los CED hay mucha informacion; solo
+             datos de envio, picking, Autorizar y Poner guia". La liquidacion, los
+             abonos, el saldo y los tiempos salieron de aqui; siguen en Cartera. -->
         <div class="card" style="background:#f4f7fb;border:1px dashed var(--naranja);margin:6px 0;padding:10px 12px">
           <div style="font-size:11px;font-weight:700;color:var(--naranja);margin-bottom:5px">📦 DATOS DE ENVÍO · picking & packing</div>
           <div style="font-size:13px;line-height:1.8">📍 <b>${esc(env||'— sin dirección registrada —')}</b>${cl.contacto1?`<br>👤 Oficina: <b>${esc(cl.contacto1)}</b>`:''}${(cl.tel||cl.cel2)?`<br>📱 Celular: <b>${esc(cl.tel||cl.cel2)}</b>${(cl.tel&&cl.cel2)?' · '+esc(cl.cel2):''}`:''}${(cl.contacto_recibe||cl.cel_recibe)?`<br>📦 <b>Recibe:</b> ${esc(cl.contacto_recibe||'')}${cl.cel_recibe?' · 📱 '+esc(cl.cel_recibe):''}`:''}${cl.notas?`<br>📝 <b>Notas:</b> ${esc(cl.notas)}`:''}</div>
           ${tallasTxt?`<div style="margin-top:8px;font-size:14px;background:#fff;border:1px solid var(--linea);border-radius:8px;padding:9px 11px"><span style="font-size:11px;font-weight:800;color:var(--naranja)">👟 TALLAS A EMPACAR · ${pares} pares</span><br><div style="margin-top:3px;line-height:2">${tallasTxt}</div></div>`:''}
         </div>
-        ${(tot>0)?`<div class="card" style="background:#f2fbf5;border:1px solid #cfe9d9;margin:6px 0;padding:10px 12px">
-          <div style="display:flex;justify-content:space-between;font-size:13px;line-height:1.9">
-            <span>Total del pedido</span><b>${money(tot)}</b></div>
-          <div style="display:flex;justify-content:space-between;font-size:13px;line-height:1.9">
-            <span>Abonado${p.abono_forma?' · '+esc(p.abono_forma):''}</span>
-            <b style="color:var(--verde)">${money(abo)}</b></div>
-          ${p.abono_nota?`<div style="font-size:11.5px;color:var(--suave)">📝 ${esc(p.abono_nota)}</div>`:''}
-          <div style="display:flex;justify-content:space-between;font-size:14.5px;line-height:2;
-            border-top:1px solid #cfe9d9;margin-top:4px;padding-top:4px">
-            <b>${sal>0?'Saldo por pagar':'Saldo'}</b>
-            <b style="color:${sal>0?'var(--rojo)':'var(--verde)'}">${sal>0?money(sal):'PAGADO COMPLETO'}</b></div>
-          ${(sal>0&&this.puede('admin','vendedor','facturacion'))?`<button class="btn-sm" style="background:var(--verde);color:#fff;width:100%;margin-top:7px" onclick="event.stopPropagation();App.modalAbono(${p.id})">💵 Registrar otro abono</button>`:''}
-        </div>`:''}
-        ${this.puede('admin')?this._tiemposPedido(p):''}
-        ${p.consignacion_validada_por?`<div class="meta" style="color:#16a34a;margin-bottom:4px">💳 Pago validado por <b>${esc(p.consignacion_validada_por)}</b></div>`:''}
-        ${(!p.es_muestra && p.guia && p.estado==='pendiente_pago')?`<div style="font-size:11.5px;color:#b3261e;background:#fde8e8;border-radius:7px;padding:6px 9px;margin-bottom:6px">⚠️ CARTERA: enviado SIN validar el pago — falta oprimir 💳 Marcar consignación</div>`:''}
         <div class="acciones-item">${this.accionesPedido(p)}</div>
         ${p.guia?`<div style="display:flex;align-items:center;gap:6px;margin-top:8px;background:#eef4ff;border:1px solid #cfe0ff;border-radius:9px;padding:8px 10px">
           <span style="font-size:11px;color:#3a48b3;white-space:nowrap">🚚 ${esc(p.transporte||'Guía')}</span>
@@ -4249,33 +4235,20 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     this.go(this.view);
   },
 
+  /* DOS BOTONES (Jose, 23-sep-2026): "solo poner Autorizar, y Poner guia para
+     pasar a despachado". Consignacion, validar, recibi en bodega, despachar,
+     avisar, rastrear y guia recibida salieron de la ficha: el pago se maneja en
+     Cartera y poner la guia ES despachar. Las funciones siguen existiendo por
+     si otra pantalla las usa. Anular queda chiquito, solo admin: un pedido mal
+     hecho tiene que poder cancelarse. */
   accionesPedido(p){
-    const r=this.rol(), btns=[];
-    if(p.estado==='pendiente_pago' && this.puede('admin','vendedor'))
-      btns.push(`<button class="btn-sm" style="background:var(--azul);color:#fff" onclick="App.accConsignar(${p.id})">💳 Marcar consignación</button>`);
+    const btns=[];
     if(p.estado==='pendiente_pago' && this.puede('admin','facturacion','vendedor'))
-      btns.push(`<button class="btn-sm" style="background:#b45309;color:#fff" onclick="App.accAutorizarCredito(${p.id})">📝 Autorizar a crédito</button>`);
-    // poner/editar la guía en cualquier etapa de envío (incluye despachado/entregado)
+      btns.push(`<button class="btn-sm" style="background:#b45309;color:#fff" onclick="App.accAutorizarCredito(${p.id})">📝 Autorizar</button>`);
     if(['pendiente_pago','consignado','autorizado','despachado','entregado'].includes(p.estado) && this.puede('admin','bodega','vendedor'))
-      btns.push(`<button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="App.accPonerGuia(${p.id})">🚚 ${p.guia?'Editar guía':'Poner guía'}</button>`);
-    // Guía recibida: el cliente ya recibió el paquete (disponible cuando hay guía y aún no se marca entregado)
-    if(p.guia && ['pendiente_pago','consignado','autorizado'].includes(p.estado) && this.puede('admin','bodega','vendedor'))
-      btns.push(`<button class="btn-sm" style="background:var(--verde);color:#fff" onclick="App.accEntregar(${p.id})">✅ Guía recibida</button>`);
-    if(p.estado==='consignado' && this.puede('admin','facturacion'))
-      btns.push(`<button class="btn-sm" style="background:var(--azul);color:#fff" onclick="App.accAutorizar(${p.id})">✓ Validar y autorizar</button>`);
-    // ⏱ BODEGA: el bodeguero marca que RECIBIÓ el pedido (arranca el cronómetro de picking & packing)
-    if(p.estado==='autorizado' && !p.recibido_en && this.puede('admin','bodega'))
-      btns.push(`<button class="btn-sm" style="background:#0b1f2a;color:#fff;font-weight:700" onclick="App.accRecibir(${p.id})">📥 Recibí (bodega)</button>`);
-    if(p.estado==='autorizado' && this.puede('admin','bodega'))
-      btns.push(`<button class="btn-sm" style="background:var(--verde);color:#fff" onclick="App.accDespachar(${p.id})">🚚 Despachar</button>`);
-    if(p.estado==='despachado'){
-      const cl=p.cliente_snap||{}; const tel=(cl.tel||'').replace(/\D/g,'');
-      if(tel) btns.push(`<button class="btn-sm" style="background:#25D366;color:#fff" onclick="App.waCliente(${p.id})">📲 Avisar al cliente</button>`);
-      if(p.guia) btns.push(`<button class="btn-sm btn-ghost" style="border:1px solid var(--linea)" onclick="window.open('https://www.google.com/search?q='+encodeURIComponent('rastrear guia ${esc(p.transporte||'')} ${esc(p.guia)}'),'_blank')">🔎 Rastrear</button>`);
-      if(this.puede('admin','bodega')) btns.push(`<button class="btn-sm" style="background:var(--verde);color:#fff" onclick="App.accEntregar(${p.id})">✅ Guía recibida</button>`);
-    }
+      btns.push(`<button class="btn-sm" style="background:var(--verde);color:#fff" onclick="App.accPonerGuia(${p.id})">🚚 ${p.guia?'Editar guía':'Poner guía'}</button>`);
     if(this.puede('admin') && !['entregado','anulado'].includes(p.estado))
-      btns.push(`<button class="btn-sm" style="background:#fff;color:var(--rojo);border:1px solid #f2c2c2" onclick="App.accAnular(${p.id})">Anular</button>`);
+      btns.push(`<button class="btn-sm" style="background:transparent;color:var(--rojo);border:none;font-size:12px;opacity:.75" onclick="App.accAnular(${p.id})">Anular</button>`);
     return btns.join('') || '<span class="hint">Esperando la etapa anterior…</span>';
   },
   copiarGuia(g){ g=String(g||'');
@@ -4285,7 +4258,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
   },
 
   async accAutorizarCredito(id){
-    if(!confirm('¿Autorizar este pedido A CRÉDITO?\n\nPasa a 💳 Cartera (por cobrar) y ya puedes despacharlo. La venta queda registrada. Cuando el cliente pague, oprimes "Marcar pagado" en Cartera.')) return;
+    if(!confirm('¿Autorizar este pedido?\n\nQueda autorizado y listo para ponerle la guía (eso lo despacha). El cobro se sigue en 💳 Cartera.')) return;
     await this.sb.from('pedidos').update({estado:'autorizado', tipo_pago:'credito', autorizado_por:this.user.id, autorizado_en:new Date().toISOString(), actualizado_en:new Date().toISOString()}).eq('id',id);
     this.go(this.view);
   },
@@ -4322,8 +4295,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const { data:p } = await this.sb.from('pedidos').select('transporte,guia').eq('id',id).single();
     const tSel=(p&&p.transporte)||'Interrapidísimo', gVal=(p&&p.guia)||'';
     this.modal(`
-      <h3>🚚 ${modo==='despachar'?'Despachar pedido':'Registrar guía'}</h3>
-      <div class="hint">${modo==='despachar'?'Marca el pedido como despachado.':'Registra la guía aunque el pedido aún espere el pago.'}</div>
+      <h3>🚚 ${modo==='despachar'?'Poner guía y despachar':'Editar guía'}</h3>
+      <div class="hint">${modo==='despachar'?'Al guardar, el pedido pasa a despachado y se descuenta del inventario.':'El pedido ya salió; aquí solo se corrige la guía.'}</div>
       <label>Transportadora</label>
       <select class="field" id="g_transp">${this.TRANSPORTADORAS.map(t=>`<option ${t===tSel?'selected':''}>${t}</option>`).join('')}</select>
       <label>N° de guía <span style="color:var(--suave);font-weight:400">(vacío si es Propio)</span></label>
@@ -4421,7 +4394,14 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       this.cerrarModal(); this.toast('🚚 Guía registrada ✅ — ya aparece en Despachos'); this.go(this.view);
     }
   },
-  async accPonerGuia(id){ this._modalGuia(id,'poner'); },
+  /* Poner la guia ES despachar (Jose, 23-sep-2026): si el pedido todavia no
+     esta despachado, abre el modo 'despachar' -que cambia el estado, descuenta
+     inventario y programa la recompra-. Si ya salio, solo se edita la guia. */
+  async accPonerGuia(id){
+    const { data:p } = await this.sb.from('pedidos').select('estado').eq('id',id).single();
+    const yaSalio = p && ['despachado','entregado'].includes(p.estado);
+    this._modalGuia(id, yaSalio ? 'poner' : 'despachar');
+  },
   async accEntregar(id){
     await this.sb.from('pedidos').update({estado:'entregado',entregado_en:new Date().toISOString(),actualizado_en:new Date().toISOString()}).eq('id',id);
     await this.hist(id,'entregado','Entregado. Ciclo cerrado.');
