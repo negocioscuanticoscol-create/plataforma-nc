@@ -98,13 +98,46 @@ dotaciones 33% (60) · distribuidora de calzado 18% (178) · calzado de segurida
 | uniformes | 59 | 13 | 34 | 22% | 29% | 20% |
 | distribuidora / comercializadora | 50 | 10 | 27 | 20% | 43–75% | 13% |
 
-**Perfil ideal, en orden:**
-1. **Nombre con "dotación/dotaciones"** en cualquier tamaño de ciudad, con **celular**: 76% de acierto, 4% basura. Es el negocio.
-2. **Nombre con "seguridad industrial", "suministros industriales", "industrial(es)"** en **pueblo o intermedia** con celular: 42–67%.
-3. **Nombre con "ferretería" en municipio < 100 mil** con celular: 60% en la llamada — **pero 0 de 40 respondieron el paso 2 del 23-sep**. Sirve solo si el paso 2 lo confirma (regla 3.3).
-4. Ciudades que sí: Pereira, Manizales, Yopal, Tunja y los corredores de Boyacá, Huila, Casanare, Risaralda, Caldas.
+### 2.1b Lo que dice el PASO 2 (cruce del 23-sep con los chats de WhatsApp de José)
+De 281 interesados de Lupe, **18 respondieron el segundo contacto (6%)** y **ninguno ha comprado todavía**;
+los 8 clientes que han comprado entraron por pauta u otro canal, no por Lupe.
 
-**HIPÓTESIS con 10–14 contestadas que valen probar:** "empresariales" 54%, "agropecuaria" 55%, "eléctricos" 45% (solo cuando también dice ferretería).
+| Respondieron el paso 2 | Interesados | Respondieron | % |
+|---|---:|---:|---:|
+| sector **calzado** (barrido viejo de ciudades: Pereira, Tunja, Tuluá, Floridablanca, Manizales, Itagüí, Sogamoso) | 167 | **15** | **9%** |
+| sector dotación | 24 | 2 | 8% |
+| **sector ferretería/agro (pueblos)** | 63 | **0** | **0%** |
+| Distribuidores potenciales | 26 | 1 | 4% |
+| **municipio < 100 mil** | 111 | 2 | **2%** |
+| intermedia 100–300 mil | 89 | 8 | 9% |
+| **capital 300 mil – 1 M** | 58 | 8 | **14%** |
+| palabra de Google "ferretería" / "insumos agropecuarios" | 61 | 0 | 0% |
+| carga anterior / barrido Maps | 193 / 87 | 16 / 2 | 8% / 2% |
+
+Los 18 que respondieron se llaman así: Induseg Seguridad Industrial, Sofía Dotaciones Empresariales,
+Distriseg Dotaciones y EPP, Bio Suministros, Dotaciones San Patricio, Indigo Distribuciones (bota caucho),
+Prodenim, Almacén Militar Deltáctica, Lorand Uniformes y Dotaciones, Guantes Terry, Calzado Ibáñez,
+Industrias de Calzado Iris, Uniformes de dotación y bordados, Seguridad Industrial El Galeras, Pamba…
+**Distribuidores de dotación y calzado, en ciudades intermedias y capitales.** Ni una ferretería de pueblo.
+
+⚠️ **Esto invierte la lectura de la llamada.** El acierto de la llamada decía "pueblo 40%, ciudad 15%";
+el paso 2 dice "ciudad 9–14%, pueblo 2%". El "sí" de pueblo era cortesía. La basura de ciudad era real,
+pero **lo que no era basura en ciudad es exactamente el cliente**. Muestra: 18 respuestas — las celdas
+individuales son **HIPÓTESIS**; la diferencia ferretería 0/63 contra calzado-ciudad 15/167 no lo es.
+
+**Perfil ideal, en orden (corregido con el paso 2):**
+1. **Nombre de distribuidor de dotación** (dotaciones, seguridad industrial, suministros, uniformes,
+   EPP, "distri…", almacén militar) con **celular**, en **ciudad intermedia o capital**: ahí están los
+   18 que respondieron. Se llega filtrando el nombre, no evitando la ciudad.
+2. Ciudades que sí respondieron: Floridablanca 2/4, Tuluá 2/5, Pereira 4/14, Pitalito, Sogamoso, Anapoima,
+   Itagüí, Tunja 2/10. Ciudades con interesados y **cero** respuesta: Yopal 0/10, Duitama 0/9, Pasto, Funza,
+   Madrid, Buga.
+3. Bogotá, Medellín, Cali, Barranquilla con nombre de distribuidor: **sin probar** (4 interesados). Es la
+   prueba que falta.
+4. **Ferretería/agro de pueblo: fuera** mientras no responda una sola (0 de 63 hasta hoy).
+
+**HIPÓTESIS con 10–14 contestadas:** "empresariales" 54%, "eléctricos" 45% (solo con ferretería) — medidas
+en la llamada, no en el paso 2.
 
 ### 2.2 Anti-perfil (dejar de cargar)
 | Qué | Evidencia |
@@ -153,10 +186,10 @@ dotaciones 33% (60) · distribuidora de calzado 18% (178) · calzado de segurida
 
 **Cuánto probar antes de regar:** una palabra o ciudad nueva sale en máximo 3 ciudades y no se juzga con menos de 20 llamadas; se declara buena con ≥25% de acierto **y ≥10% de respuesta al paso 2**; se apaga con <15% o si ≥20% de lo que trae es competencia.
 
-### 3.3 Tres cambios, por impacto en la tasa de interesados
-1. **Cargar solo por "dotación / seguridad industrial / suministros industriales" con celular, y sacar el fijo y el "calzado" de ciudad.** Impacto: esas palabras dan 42–76% de acierto contra 20% de la base; solo el "calzado" de ciudad son 1.175 llamadas al 14–17% con 66% basura. Aplicado en parte el 22–23 sep (2.254 apartados, 604 descartados); falta que el barrido cargue "dotación" en Bogotá y Medellín por localidades, que están sin probar (19 llamadas).
-2. **Medir el paso 2, no la llamada.** Marca "respondió" en la lista de interesados (columna ya creada; falta el botón en Lupe) y cada sector se juzga por % de respuesta. Impacto: evita repetir el 23-sep (50 interesados, $125.000 pagados, 0 respuestas) y decide con datos si ferretería de pueblo sigue o sale.
-3. **Contacto y tipo de negocio obligatorios al marcar Interesado** (+ cargo, a quién compra, pares/mes). Impacto: hoy 45% de los interesados no tienen nombre y el 100% no tiene tamaño; con eso el paso 2 tiene destinatario y por fin existe un tamaño de empresa para cruzar.
+### 3.3 Tres cambios, por impacto en interesados QUE RESPONDEN (no en la tasa de la llamada)
+1. **Cargar y llamar primero nombres de distribuidor de dotación en ciudades intermedias y capitales, con celular; ferretería/agro de pueblo de último.** Evidencia: 15 de las 18 respuestas al paso 2 salieron de ahí; ferretería/agro 0 de 63. Cómo: filtro por nombre (dotaciones, seguridad industrial, suministros, uniformes, EPP, distri…) sobre lo que ya hay en Bogotá/Medellín (864 de dotación sin probar) y en las intermedias que sí respondieron; el "calzado" de zapatería sigue apartado.
+2. **Medir el paso 2 y juzgar por él.** Columna `respondio` ya creada y cargada con los 18 del 23-sep; falta el botón en la lista de interesados de Lupe para que José lo marque en el momento. Regla: un sector o palabra se declara bueno con ≥10% de respuesta, no con el acierto de la llamada (el 23-sep dio 43% de acierto y 0% de respuesta).
+3. **Contacto y tipo de negocio obligatorios al marcar Interesado** (+ cargo, a quién compra, pares/mes). Hoy 45% de los interesados no tienen nombre y 0% tiene tamaño; sin eso el paso 2 sale a ciegas y no hay con qué distinguir el "sí" de cortesía del distribuidor.
 
 ---
 
