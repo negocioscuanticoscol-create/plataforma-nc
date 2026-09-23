@@ -3443,7 +3443,14 @@ const App = {
        de 'inventario', asi que un CED sin existencias -Alpaca, recien abierto- no
        podia cotizar NADA: sus 24 referencias estaban cargadas y no aparecian.
        Ahora entran las dos fuentes; el inventario solo dice si hay o no hay. */
-    const meter=(x,f)=>{ const k=kk(x); if(!x.referencia || m[k]) return;
+    const meter=(x,f)=>{ let k=kk(x); if(!x.referencia || m[k]) return;
+      /* CATALOGO UNICO (23-sep-2026): las referencias del flyer viven UNA vez,
+         sin sede (ced NULL), y la base se las muestra a todas las sedes. Si la
+         sede no tiene ficha propia para lo que hay en bodega, se usa la
+         compartida y el stock se cuelga de ESA entrada: antes la FEROZ salia
+         dos veces en Feroz, una del catalogo y otra del inventario sin precio. */
+      if(!f && !fichas[k]){ const kc='||'+(x.referencia||'')+'||'+(x.color||'');
+        if(fichas[kc]){ if(m[kc]){ m[kc].enBodega=true; return; } k=kc; f=fichas[kc]; } }
       f=f||fichas[k]||{};
       m[k]={k, ced:x.ced||'', referencia:x.referencia, color:x.color||'',
             descripcion:f.descripcion||'', categoria:f.categoria||'', mostrarCed:red,
