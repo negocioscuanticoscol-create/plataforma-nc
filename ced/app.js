@@ -2997,7 +2997,10 @@ const App = {
   async proforma(id){
     const { data:c } = await this.sb.from('cotizaciones').select('*').eq('id',id).single();
     if(!c){ alert('No se encontró la cotización.'); return; }
-    const w=window.open('','_blank','width=860,height=920');
+    /* Pestaña normal, no ventana de 860x920: en pantallas de portátil esa
+       ventana quedaba más alta que el monitor y el pie con la cuenta bancaria
+       se salía por debajo sin barra para bajar (José, 23-sep-2026). */
+    const w=window.open('','_blank');
     if(!w){ alert('Permite las ventanas emergentes para ver/imprimir la proforma.'); return; }
     w.document.write(this._proformaHTML(c)); w.document.close();
   },
