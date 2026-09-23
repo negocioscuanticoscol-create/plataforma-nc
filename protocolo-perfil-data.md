@@ -125,7 +125,16 @@ el paso 2 dice "ciudad 9–14%, pueblo 2%". El "sí" de pueblo era cortesía. La
 pero **lo que no era basura en ciudad es exactamente el cliente**. Muestra: 18 respuestas — las celdas
 individuales son **HIPÓTESIS**; la diferencia ferretería 0/63 contra calzado-ciudad 15/167 no lo es.
 
-**Perfil ideal, en orden (corregido con el paso 2):**
+### 2.1c Los que COMPRARON (8 clientes de CED con pedido)
+Ninguno llegó por una llamada de Lupe: son clientes creados en CED entre junio y septiembre (correría,
+pauta, referidos). Su perfil es una sola cosa: **distribuidor de dotación/calzado, en ciudad —
+Bogotá ×3, Pereira, Tuluá, Medellín, Cali — con nombre de distribuidor** ("…Dotaciones", "Calzado…",
+"Chanclas…", "Distribuidora…"). **Cero pueblos, cero ferreterías.** Dos de ellos estaban en el pozo de Lupe
+sin llamar (uno en la base de *baja probabilidad* por estar en Cali): la regla de ciudad los habría enterrado;
+la regla de nombre los habría puesto de primeros. El 23-sep se cruzaron todos los clientes de CED contra
+el pozo y quedaron `reservado` para que Lupe no llame en frío a quien ya compra.
+
+**Perfil ideal, en orden (corregido con el paso 2 y con los compradores):**
 1. **Nombre de distribuidor de dotación** (dotaciones, seguridad industrial, suministros, uniformes,
    EPP, "distri…", almacén militar) con **celular**, en **ciudad intermedia o capital**: ahí están los
    18 que respondieron. Se llega filtrando el nombre, no evitando la ciudad.
@@ -181,6 +190,9 @@ en la llamada, no en el paso 2.
 - **salvo** que también diga: dotación, seguridad industrial, EPP, protección personal, calzado de seguridad, calzado industrial, almacén, comercializadora, suministros, distribuidora, ferretería/ferre/ferro-eléctricos, agroveterinaria, depósito.
 - el municipio está en la lista quemada (§2.2) con la misma palabra.
 - el teléfono ya existe en Lupe (cualquier base, tres columnas, últimos 10 dígitos).
+- **el teléfono ya es cliente de CED** (tabla `clientes`, `tel` y `cel2`): entra como `reservado`, nunca `por_llamar`.
+  El 23-sep había **22 clientes con pedido todavía "por llamar" en Lupe y 9 ya habían recibido llamada en frío**
+  ("a mí ya me llamaron de ustedes"). Quedaron reservados; falta que el cruce corra solo al crear un cliente.
 - la palabra ya se buscó en esa ciudad (`mkr_busqueda`).
 - **cada fila guarda la palabra que la trajo** (`sector` = palabra de búsqueda, y `notas`) para poder medirla.
 
