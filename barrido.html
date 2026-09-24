@@ -1,6 +1,6 @@
 <!doctype html><html lang="es"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Barrido Presencial</title>
+<title>Sabueso</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif}
 body{background:#0f1620;color:#eaf1f8;max-width:480px;margin:0 auto;padding:0 0 90px}
@@ -34,7 +34,7 @@ textarea{min-height:58px;resize:vertical}
   align-items:center;justify-content:center;padding:24px;text-align:center}
 /* radio suave, NO 50%: un circulo perfecto le cortaria el pin de arriba y el texto de abajo */
 #gate img{width:100%;max-width:290px;height:auto;border-radius:26px;box-shadow:0 14px 44px #000a}
-#gate .wm{font-size:30px;font-weight:800;letter-spacing:-.02em}
+#gate .wm{font-size:30px;font-weight:800;letter-spacing:-.02em;margin-top:14px}
 #gate .wm span{color:#E8620C}
 #gate .sl{font-size:13.5px;color:#8ea3b5;margin-top:16px;max-width:300px;line-height:1.5}
 #gate button{margin-top:26px;width:100%;max-width:300px;background:#E8620C;color:#fff;border:none;
@@ -42,12 +42,13 @@ textarea{min-height:58px;resize:vertical}
 #gate button:active{background:#c85209}
 </style></head><body>
 <div id="gate">
-  <img src="assets/logo-barrido.png" alt="Barrido Presencial"
-       onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'wm',innerHTML:'🐕 BARRIDO <span>PRESENCIAL</span>'}))">
+  <img src="assets/logo-sabueso.png" alt="Sabueso"
+       onerror="this.style.display='none'">
+  <div class="wm">🐕 SABUESO</div>
   <div class="sl">Buscamos puerta a puerta tus clientes.</div>
   <button onclick="entrar()">Entrar</button>
 </div>
-<header><b>🥾 BARRIDO <span>PRESENCIAL</span></b><div id="gps" class="bad">📍 Obteniendo ubicación…</div></header>
+<header><b>🐕 SABUESO</b><div id="gps" class="bad">📍 Obteniendo ubicación…</div></header>
 <main>
   <div class="cnt" id="cnt">Hoy: 0 negocios</div>
 
