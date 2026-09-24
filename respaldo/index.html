@@ -4,87 +4,196 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Respaldo de WhatsApp · Negocios Cuánticos</title>
+<!-- Página del cliente: descarga + protocolo completo. El mismo contenido que el PDF
+     "Respaldo de WhatsApp - Negocios Cuanticos"; si se cambia uno, cambiar el otro. -->
 <style>
-  :root{
-    --verde:#00a884; --verde-osc:#017561; --tinta:#111b21; --gris:#667781;
-    --papel:#f7f9fa; --linea:#e2e8ec; --caja:#ffffff;
-  }
+  
+  :root{ --verde:#00a884; --verde-osc:#017561; --tinta:#111b21; --gris:#667781; --linea:#e2e8ec; --ambar:#d9932a; --ambar-fondo:#fff9f0; --ambar-linea:#f0dcb8; --azul:#0b5cad; --azul-fondo:#eaf2fb; --morado:#4c3fa3; --morado-fondo:#f1effa; --marino:#0f1e35; --oro:#c9a24a; }
   *{box-sizing:border-box;margin:0}
-  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--papel);
-    color:var(--tinta);line-height:1.55;padding:0 20px calc(40px + env(safe-area-inset-bottom))}
-  .env{max-width:640px;margin:0 auto}
-  header{text-align:center;padding:48px 0 8px}
-  .marca{font-size:12.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gris)}
-  h1{font-size:29px;font-weight:700;margin:14px 0 8px;letter-spacing:-.02em}
-  .lema{color:var(--gris);font-size:16px;max-width:26em;margin:0 auto}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;color:var(--tinta);line-height:1.55;font-size:15px;background:#f7f9fa;margin:0;padding:0 16px calc(40px + env(safe-area-inset-bottom))}
+  .env{max-width:720px;margin:0 auto;padding-top:16px}
 
-  .card{background:var(--caja);border:1px solid var(--linea);border-radius:18px;
-    padding:26px 24px;margin:26px 0;box-shadow:0 2px 14px rgba(17,27,33,.04)}
+  /* ---- cabecera con el logo (fondo marino, va a todo el ancho) ---- */
+  .cab{margin:0 0 18px}
+  .cab img{display:block;width:100%;height:auto;border-radius:14px}
+  .cab .der{font-size:12px;color:var(--gris);text-align:right;margin-top:6px}
 
-  .descarga{text-align:center}
-  .btn{display:inline-block;background:var(--verde);color:#fff;font-size:18px;font-weight:700;
-    text-decoration:none;padding:17px 40px;border-radius:12px;margin:6px 0 4px;
-    box-shadow:0 6px 18px rgba(0,168,132,.32);transition:transform .1s}
+  h1{font-size:27px;font-weight:800;margin:0 0 4px;letter-spacing:-.02em}
+  .lema{color:var(--gris);font-size:14.5px;margin-bottom:16px}
+  h2{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--verde-osc);margin:18px 0 8px;padding-bottom:4px;border-bottom:2px solid var(--verde)}
+  p{margin-bottom:9px}
+  .intro{background:var(--morado-fondo);border:1.5px solid #d6d0f0;border-radius:12px;padding:14px 16px;margin:0 0 6px}
+  .intro h2{color:var(--morado);border-color:var(--morado);margin-top:0}
+  .intro .clave{font-weight:700;color:var(--morado)}
+
+  .link{background:#e7f7f1;border:1.5px solid #b9e6d7;border-radius:10px;padding:12px 14px;margin:10px 0 14px}
+  .link b{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--verde-osc);margin-bottom:4px}
+  .link a{font-size:15px;font-weight:700;color:var(--tinta);text-decoration:none;word-break:break-all}
+  .link small{display:block;color:var(--gris);margin-top:4px}
+
+  /* ---- proceso (etapas) ---- */
+  .etapas{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:8px 0 6px}
+  .etapa{border:1.5px solid var(--linea);border-radius:12px;padding:12px 13px;break-inside:avoid;position:relative}
+  .etapa .e{display:inline-block;background:var(--verde);color:#fff;font-weight:800;font-size:12px;border-radius:20px;padding:1px 10px;margin-bottom:6px}
+  .etapa b{display:block;font-size:14px;margin-bottom:3px}
+  .etapa span{color:#3b4a54;font-size:12.5px}
+  .etapa.nc .e{background:var(--morado)}
+  .quien{font-size:11px;color:var(--gris);text-transform:uppercase;letter-spacing:.08em;margin-top:6px;display:block}
+
+  /* ---- pasos ---- */
+  .paso{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--linea);break-inside:avoid}
+  .paso:last-child{border-bottom:none}
+  .num{flex:0 0 28px;height:28px;background:var(--verde);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;margin-top:1px}
+  .paso > div > b{display:block;font-size:14.5px;margin-bottom:1px}
+  .paso > div > span{color:#3b4a54;font-size:13px}
+  .tecla{display:inline-block;background:#f0f2f5;border:1px solid #cfd6dc;border-bottom-width:2px;border-radius:5px;padding:0 7px;font-weight:700;color:var(--tinta);white-space:nowrap}
+  .alerta{background:var(--ambar-fondo);border:1.5px solid var(--ambar-linea);border-radius:12px;padding:12px 14px;margin:10px 0;break-inside:avoid}
+  .alerta h3{font-size:14px;color:#8a5a12;margin-bottom:6px}
+  .alerta .num{background:var(--ambar)}
+  .escudo{background:var(--azul-fondo);border:1.5px solid #bcd3ec;border-radius:12px;padding:12px 14px;margin:10px 0;break-inside:avoid}
+  .escudo h3{font-size:14px;color:var(--azul);margin-bottom:6px}
+  .escudo .num{background:var(--azul)}
+  .pantalla{background:#fff;border:1px solid #cfd6dc;border-radius:8px;padding:8px 12px;margin:6px 0 8px 40px;font-size:12.5px;color:#3b4a54;max-width:420px}
+  .pantalla b{color:var(--tinta)}
+  .pantalla .btn{display:inline-block;border:1px solid #8a9aa8;border-radius:3px;padding:1px 10px;font-weight:700;margin-top:4px;background:#f6f8fa}
+  .comando{font-family:Consolas,"Courier New",monospace;font-size:12px;background:#1e1e1e;color:#e8e8e8;border-radius:8px;padding:10px 14px;margin:6px 0 8px 40px;word-break:break-all}
+  .candado{background:#e7f7f1;border:1px solid #b9e6d7;border-radius:10px;padding:10px 14px;font-size:12.5px;color:var(--verde-osc);margin-top:12px}
+  .candado b{color:var(--tinta)}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+  td{padding:6px 8px;border-bottom:1px solid var(--linea);vertical-align:top}
+  td:first-child{width:44%;font-weight:700}
+
+  /* ---- pie ---- */
+  .contacto{margin-top:18px;background:var(--marino);color:#fff;border-radius:12px;padding:16px 18px;text-align:center;break-inside:avoid}
+  .contacto b{font-size:20px;letter-spacing:.02em;display:block;margin-top:4px;color:var(--oro)}
+  .contacto span{color:#cfd6dc;font-size:13px}
+  footer{text-align:center;color:var(--gris);font-size:11.5px;margin-top:12px;letter-spacing:.06em}
+  
+
+  .descarga{background:#fff;border:1px solid var(--linea);border-radius:18px;padding:26px 22px;margin:14px 0 18px;text-align:center;box-shadow:0 2px 14px rgba(17,27,33,.05)}
+  .btn{display:inline-block;background:var(--verde);color:#fff;font-size:18px;font-weight:700;text-decoration:none;padding:17px 40px;border-radius:12px;margin:4px 0;box-shadow:0 6px 18px rgba(0,168,132,.32)}
   .btn:active{transform:translateY(1px)}
   .peso{color:var(--gris);font-size:13px;margin-top:10px}
-  .solo-pc{background:#fff4e5;border:1px solid #f5d9a8;color:#8a5a12;border-radius:10px;
-    padding:11px 14px;font-size:13.5px;margin-top:18px;font-weight:500}
-
-  h2{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--verde-osc);
-    margin-bottom:16px}
-  .paso{display:flex;gap:15px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--linea)}
-  .paso:last-child{border-bottom:none}
-  .num{flex:0 0 30px;height:30px;background:var(--verde);color:#fff;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
-  .paso div b{display:block;font-size:15.5px;margin-bottom:1px}
-  .paso div span{color:var(--gris);font-size:14px}
-
-  .aviso{background:#fff9f0;border-color:#f0dcb8}
-  .numa{flex:0 0 30px;height:30px;background:#d9932a;color:#fff;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px}
-  .candado{background:#e7f7f1;border:1px solid #b9e6d7;border-radius:12px;padding:16px 18px;
-    font-size:14px;color:var(--verde-osc);line-height:1.6}
-  .candado b{color:var(--tinta)}
-  footer{text-align:center;color:var(--gris);font-size:12.5px;padding:20px 0 0}
+  .solo-pc{background:#fff4e5;border:1px solid #f5d9a8;color:#8a5a12;border-radius:10px;padding:11px 14px;font-size:14px;margin-top:16px;font-weight:500;text-align:left}
+  .intro,.link,.alerta,.escudo,.candado,.contacto{background-color:#fff}
+  .intro{background:var(--morado-fondo)} .link{background:#e7f7f1} .alerta{background:var(--ambar-fondo)} .escudo{background:var(--azul-fondo)} .candado{background:#e7f7f1} .contacto{background:var(--marino)}
+  .comando{user-select:all;-webkit-user-select:all}
+  table{background:#fff;border-radius:10px;overflow:hidden}
+  @media(max-width:520px){ .comando{margin-left:0} .pantalla{margin-left:0;max-width:none} td:first-child{width:40%} }
 </style>
 </head>
-<body>
-<div class="env">
+<body><div class="env">
 
-  <header>
-    <div class="marca">Negocios Cuánticos</div>
-    <h1>Respalda tu WhatsApp</h1>
-    <p class="lema">Guarda todo tu historial de conversaciones en tu computador, en un solo archivo de Excel.</p>
-  </header>
-
-  <div class="card descarga">
-    <a class="btn" href="RespaldoWhatsApp.exe" download>⬇ Descargar</a>
-    <div class="peso">Para computador con Windows · 37 MB</div>
-    <div class="solo-pc">💻 Abre esta página <b>en tu computador</b>, no en el celular. El respaldo corre en el computador y el celular solo se usa para escanear un código.</div>
-  </div>
-
-  <div class="card aviso">
-    <h2 style="color:#8a5a12">Es normal que salgan estos avisos</h2>
-    <p style="margin-bottom:14px;color:var(--tinta)">Como es un programa nuevo, el navegador y Windows preguntan por precaución. <b>No significa que sea peligroso.</b> Solo haz esto:</p>
-    <div class="paso"><div class="numa">1</div><div><b>Al descargar</b><span>Si el navegador dice “descarga sospechosa” o “bloqueada”, toca la <b>flechita ▸</b> al lado del archivo y elige <b>Conservar</b>.</span></div></div>
-    <div class="paso"><div class="numa">2</div><div><b>Al abrirlo</b><span>Si Windows dice “Windows protegió tu PC”, toca <b>Más información</b> y luego <b>Ejecutar de todos modos</b>.</span></div></div>
-  </div>
-
-  <div class="card">
-    <h2>Cómo funciona</h2>
-    <div class="paso"><div class="num">1</div><div><b>Descarga y abre el programa</b><span>Doble clic al archivo. Si Windows pregunta, toca “Más información → Ejecutar de todos modos”. Es seguro.</span></div></div>
-    <div class="paso"><div class="num">2</div><div><b>Aparece un código QR</b><span>Se abre solo en tu navegador. No tienes que instalar nada.</span></div></div>
-    <div class="paso"><div class="num">3</div><div><b>Escanéalo con tu celular</b><span>WhatsApp → ⋮ → Dispositivos vinculados → Vincular un dispositivo.</span></div></div>
-    <div class="paso"><div class="num">4</div><div><b>Espera unos minutos</b><span>Deja el celular con internet y la pantalla encendida mientras baja tu historial.</span></div></div>
-    <div class="paso"><div class="num">5</div><div><b>Listo: tu Excel queda en el Escritorio</b><span>Cuando termine, envíanoslo por WhatsApp y lo analizamos por ti.</span></div></div>
-  </div>
-
-  <div class="card candado">
-    🔒 <b>Tu información es tuya.</b> El respaldo se guarda <b>solo en tu computador</b> — no se sube a internet ni a ningún servidor. El programa solo <b>lee</b> tus conversaciones para guardarlas: no envía ningún mensaje. Al terminar, la conexión con tu WhatsApp se cierra sola.
-  </div>
-
-  <footer>Negocios Cuánticos · negocioscuanticoscol@gmail.com</footer>
-
+<div class="cab">
+  <img src="logo-nc.png" alt="Negocios Cuánticos · Data · Decisiones · Estrategia · Ventas">
+  <div class="der">Respaldo de WhatsApp · Guía para el cliente</div>
 </div>
-</body>
+<div class="descarga">
+  <a class="btn" href="RespaldoWhatsApp.exe" download>⬇ Descargar el programa</a>
+  <div class="peso">Para computador con Windows · 37 MB · no se instala nada</div>
+  <div class="solo-pc">💻 Abre esta página <b>en tu computador</b>, no en el celular. El respaldo corre en el computador y el celular solo se usa para escanear un código. Más abajo está el paso a paso completo.</div>
+</div>
+
+
+<h1>Respaldo de WhatsApp</h1>
+<p class="lema">Parte de la herramienta de Negocios Cuánticos para entender a tus clientes y clonar tu mejor servicio.</p>
+
+<div class="intro">
+  <h2>Por qué hacemos esto</h2>
+  <p>En tu WhatsApp está guardado algo que ningún informe te da: <span class="clave">cómo te han abordado tus clientes y cómo los has abordado tú</span>. Qué preguntan primero, qué los convence, qué los frena, cuánto tardas en responder, con qué palabras cierras una venta y con cuáles se pierde.</p>
+  <p>Ese conocimiento hoy vive disperso en miles de conversaciones y se pierde cada vez que cambia la persona que atiende. <span class="clave">Es muy importante no perderlo.</span> Por eso el primer paso de nuestra herramienta es respaldarlo completo.</p>
+  <p>Con el respaldo hacemos tres cosas: lo <span class="clave">analizamos</span> para saber qué funciona y qué no, armamos contigo un <span class="clave">protocolo de mejora continua</span> para que la atención sea cada vez mejor y medible, y con ese protocolo construimos los <span class="clave">robots (asistentes automáticos) necesarios para clonar tu servicio al cliente</span>: que respondan como tu mejor vendedor, a cualquier hora, sin que se pierda un solo mensaje.</p>
+</div>
+
+<h2>El proceso completo</h2>
+<div class="etapas">
+  <div class="etapa"><span class="e">1</span><b>Respaldo</b><span>Bajas tu historial de WhatsApp a un archivo de Excel en tu computador. Solo lee, no envía nada, y se desconecta sola.</span><span class="quien">Lo haces tú · 20 min</span></div>
+  <div class="etapa"><span class="e">2</span><b>Entrega</b><span>Nos envías el Excel por WhatsApp. Tu información no se sube a ningún servidor: viaja de tu computador a nosotros y a nadie más.</span><span class="quien">Lo haces tú · 1 min</span></div>
+  <div class="etapa nc"><span class="e">3</span><b>Análisis</b><span>Clasificamos cada conversación: por dónde llegó el cliente, qué preguntó, cómo se respondió, cuánto tardó y si terminó en venta.</span><span class="quien">Negocios Cuánticos</span></div>
+  <div class="etapa nc"><span class="e">4</span><b>Hallazgos</b><span>Te entregamos qué está funcionando, qué se está perdiendo y las preguntas que se repiten. Con datos, no con opiniones.</span><span class="quien">Negocios Cuánticos</span></div>
+  <div class="etapa nc"><span class="e">5</span><b>Protocolo de mejora continua</b><span>Armamos contigo el guion de atención: respuestas, tiempos y cierres. Queda escrito y se mide cada mes.</span><span class="quien">Juntos</span></div>
+  <div class="etapa nc"><span class="e">6</span><b>Robots</b><span>Con el protocolo construimos el asistente que atiende igual que tu mejor persona, 24 horas, y aprende de cada nuevo respaldo.</span><span class="quien">Negocios Cuánticos</span></div>
+</div>
+<p style="color:var(--gris);font-size:12.5px">El ciclo se repite: cada respaldo nuevo alimenta el análisis, el análisis mejora el protocolo y el protocolo mejora al robot. Así el conocimiento de tu negocio no se pierde nunca más.</p>
+
+
+
+<h2>Paso a paso · Cómo hacer el respaldo</h2>
+
+<div class="link">
+  <b>El enlace (ábrelo en el computador, no en el celular)</b>
+  <a href="https://negocioscuanticoscol-create.github.io/plataforma-nc/respaldo/">negocioscuanticoscol-create.github.io/plataforma-nc/respaldo/</a>
+  <small>Solo funciona en computador con Windows. El celular se usa únicamente para escanear un código.</small>
+</div>
+
+<h2>Parte 1 · Descargar el programa</h2>
+<div class="paso"><div class="num">1</div><div><b>Abre el enlace en el computador</b><span>En Chrome o Edge. Sale una página verde que dice “Respalda tu WhatsApp”.</span></div></div>
+<div class="paso"><div class="num">2</div><div><b>Toca el botón verde <span class="tecla">⬇ Descargar</span></b><span>El archivo se llama <b>RespaldoWhatsApp.exe</b> y pesa 37 MB. Queda en tu carpeta <b>Descargas</b>.</span></div></div>
+
+<div class="alerta">
+  <h3>⚠️ Si el navegador dice “descarga sospechosa” o “bloqueado”</h3>
+  <p style="margin-bottom:6px">Es normal: los navegadores frenan cualquier programa nuevo que no conozcan. <b>No significa que sea peligroso.</b> Haz esto:</p>
+  <div class="paso"><div class="num">A</div><div><b>En Chrome</b><span>Arriba a la derecha aparece el ícono de descargas. Pon el mouse sobre el archivo y toca la <b>flechita ▸</b> o los <b>tres puntos ⋮</b> → <span class="tecla">Conservar</span>. Si vuelve a preguntar, toca <span class="tecla">Conservar de todos modos</span>.</span></div></div>
+  <div class="paso"><div class="num">B</div><div><b>En Edge</b><span>En la descarga toca los <b>tres puntos ⋯</b> → <span class="tecla">Conservar</span> → <span class="tecla">Mostrar más</span> → <span class="tecla">Conservar de todos modos</span>.</span></div></div>
+</div>
+
+<h2>Parte 2 · Abrir el programa</h2>
+<div class="paso"><div class="num">3</div><div><b>Abre la carpeta Descargas y dale doble clic a <b>RespaldoWhatsApp.exe</b></b><span>Si no ves la extensión .exe, es el archivo que se llama “RespaldoWhatsApp”.</span></div></div>
+
+<div class="escudo">
+  <h3>🛡️ Si sale una ventana azul con un escudo: “Windows protegió tu PC”</h3>
+  <p style="margin-bottom:6px">Esto es lo que casi todo el mundo se encuentra. Windows lo hace con cualquier programa que no venga de una empresa grande. Solo son dos toques:</p>
+  <div class="paso"><div class="num">A</div><div><b>Toca el texto <span class="tecla">Más información</span></b><span>Es un enlace pequeño, debajo del mensaje. El botón “No ejecutar” NO se toca.</span></div></div>
+  <div class="pantalla"><b>Windows protegió tu PC</b><br>Microsoft Defender SmartScreen impidió el inicio de una aplicación desconocida…<br><u style="color:var(--azul)">Más información</u></div>
+  <div class="paso"><div class="num">B</div><div><b>Aparece un botón nuevo: toca <span class="tecla">Ejecutar de todos modos</span></b><span>Con eso el programa arranca. Este aviso sale solo la primera vez.</span></div></div>
+  <div class="pantalla">Aplicación: RespaldoWhatsApp.exe &nbsp;·&nbsp; Editor: Editor desconocido<br><span class="btn">Ejecutar de todos modos</span> &nbsp; <span class="btn" style="font-weight:400">No ejecutar</span></div>
+  <div class="paso"><div class="num">C</div><div><b>Si NO aparece “Más información”, o el programa sigue sin abrir</b><span>Se desbloquea con un comando. No hay que entender nada: solo copiar y pegar.</span></div></div>
+  <div class="paso"><div class="num">C1</div><div><b>Toca la lupa 🔍 de la barra de Windows (abajo, al lado del botón de inicio) y escribe <span class="tecla">PowerShell</span></b><span>Sale “Windows PowerShell”. Dale clic derecho → <span class="tecla">Ejecutar como administrador</span> y toca <span class="tecla">Sí</span>. Se abre una ventana azul con texto: esa es la consola.</span></div></div>
+  <div class="paso"><div class="num">C2</div><div><b>Copia esta línea completa, pégala en esa ventana y toca <span class="tecla">Enter</span></b></div></div>
+  <div class="comando">Unblock-File -Path "$env:USERPROFILE\Downloads\RespaldoWhatsApp.exe"; Start-Process "$env:USERPROFILE\Downloads\RespaldoWhatsApp.exe"</div>
+  <div class="paso"><div class="num">C3</div><div><b>Listo: el archivo queda desbloqueado y el programa arranca solo</b><span>No sale ningún mensaje de confirmación, es normal. Si no arranca, vuelve al paso 3 y dale doble clic.</span></div></div>
+  <div class="paso"><div class="num">C4</div><div><b>Si la consola dice “acceso denegado” o “no se puede encontrar la ruta”</b><span>El archivo no quedó en Descargas. Pega esta otra línea, que lo busca donde esté y lo abre:</span></div></div>
+  <div class="comando">Get-ChildItem "$env:USERPROFILE" -Recurse -Filter RespaldoWhatsApp.exe -ErrorAction SilentlyContinue | Select-Object -First 1 | ForEach-Object { Unblock-File $_.FullName; Start-Process $_.FullName }</div>
+</div>
+
+<div class="paso"><div class="num">4</div><div><b>Se abre una ventana negra y, enseguida, tu navegador con un código QR</b><span><b>No cierres la ventana negra</b>: es el programa trabajando. Si el navegador no se abre solo, espera unos segundos.</span></div></div>
+
+<h2>Parte 3 · Conectar el celular</h2>
+<div class="paso"><div class="num">5</div><div><b>En el celular abre WhatsApp</b><span>Si tienes WhatsApp y WhatsApp Business en el mismo celular, abre el que quieres respaldar. Fíjate bien: es muy fácil escanear con el equivocado.</span></div></div>
+<div class="paso"><div class="num">6</div><div><b>Ve a Dispositivos vinculados</b><span><b>Android:</b> toca los tres puntos ⋮ arriba a la derecha → <span class="tecla">Dispositivos vinculados</span>.<br><b>iPhone:</b> toca <span class="tecla">Configuración</span> abajo a la derecha → <span class="tecla">Dispositivos vinculados</span>.</span></div></div>
+<div class="paso"><div class="num">7</div><div><b>Toca <span class="tecla">Vincular un dispositivo</span> y apunta la cámara al QR del computador</b><span>Si pide huella o clave del celular, ponla. En un par de segundos la pantalla del computador cambia a “Bajando tus conversaciones…”.</span></div></div>
+
+<h2>Parte 4 · Esperar</h2>
+<div class="paso"><div class="num">8</div><div><b>Deja el celular con internet, desbloqueado y con WhatsApp abierto en la pantalla</b><span>Si bloqueas el celular o sales de WhatsApp, la descarga se frena. Mientras tanto no lo uses para otra cosa.</span></div></div>
+<div class="paso"><div class="num">9</div><div><b>Verás el contador de mensajes subiendo</b><span>Puede tardar de 5 a 20 minutos según cuánto historial tengas. Los primeros mensajes pueden demorar 2 minutos en aparecer: es normal.</span></div></div>
+<div class="paso"><div class="num">10</div><div><b>Cuando diga <b>✅ Listo</b>, ya terminó</b><span>El programa se desconecta solo de tu WhatsApp. Ya puedes cerrar la ventana negra y el navegador.</span></div></div>
+
+<h2>Parte 5 · Tu archivo</h2>
+<div class="paso"><div class="num">11</div><div><b>En el Escritorio queda una carpeta “Respaldo WhatsApp” con la fecha</b><span>Adentro está el Excel, que se llama igual: <b>Respaldo WhatsApp 2026-xx-xx.xlsx</b>. Tiene una hoja con las conversaciones y otra con todos los mensajes.</span></div></div>
+<div class="paso"><div class="num">12</div><div><b>Envíanos ese Excel por WhatsApp al 350 224 1852</b><span>Con eso arrancamos el análisis y te contamos qué encontramos.</span></div></div>
+
+<h2>Si algo no sale</h2>
+<table>
+  <tr><td>El antivirus borró o “puso en cuarentena” el archivo</td><td>Abre el antivirus, busca “Cuarentena” o “Historial de protección” y elige <b>Restaurar</b> o <b>Permitir</b>. Luego vuelve al paso 3.</td></tr>
+  <tr><td>No se abre el navegador con el QR</td><td>Cierra la ventana negra y abre el programa otra vez. Si sigue igual, reinicia el computador e inténtalo de nuevo.</td></tr>
+  <tr><td>El QR venció o dice “Vuelve a intentarlo”</td><td>Cierra todo y abre el programa de nuevo. El QR dura poco a propósito.</td></tr>
+  <tr><td>Dice “No se pudo conectar. Revisa el internet.”</td><td>Revisa que el computador Y el celular tengan internet, y repite desde el paso 3.</td></tr>
+  <tr><td>Dice “Se cerró la conexión desde el celular.”</td><td>Alguien tocó “Cerrar sesión” en Dispositivos vinculados. Repite desde el paso 3.</td></tr>
+  <tr><td>El contador no sube</td><td>Desbloquea el celular y deja WhatsApp abierto en la pantalla. Espera 2 minutos.</td></tr>
+  <tr><td>Quedó “Respaldo de WhatsApp” en Dispositivos vinculados</td><td>Se quita solo al terminar. Si sigue ahí, tócalo y elige <b>Cerrar sesión</b>. No pasa nada.</td></tr>
+</table>
+
+<div class="candado">
+  🔒 <b>Tu información es tuya.</b> El respaldo se guarda <b>solo en tu computador</b>: no se sube a internet ni a ningún servidor. El programa solo <b>lee</b> tus conversaciones para guardarlas, no envía ningún mensaje ni cambia nada en tu WhatsApp. Al terminar, la conexión se cierra sola.
+</div>
+
+<div class="contacto">
+  <span>Si encuentras alguna inquietud, comunícate al</span>
+  <b>📱 350 224 1852</b>
+  <span>WhatsApp · Negocios Cuánticos</span>
+</div>
+
+<footer>NEGOCIOS CUÁNTICOS · DATA · DECISIONES · ESTRATEGIA · VENTAS · negocioscuanticoscol@gmail.com</footer>
+
+</div></body>
 </html>
