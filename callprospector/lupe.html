@@ -126,7 +126,9 @@ main{flex:1;padding:13px 15px 0}
 @media(max-width:360px){.empw .rat{width:44px} .emp{font-size:19px}}
 .sub{color:var(--dim);font-size:13.5px;margin-bottom:2px}
 .cont{color:var(--naranja2);font-size:13.5px;font-weight:600}
-.num{font-size:28px;font-weight:800;letter-spacing:.5px;margin:13px 0 3px}
+.num{font-size:28px;font-weight:800;letter-spacing:.5px;margin:13px 0 3px;cursor:pointer}
+.mail{margin:2px 0 6px;font-size:13px}.mail small{display:block;font-size:11px;opacity:.55;margin-top:2px}
+.chipmail{cursor:pointer;display:inline-block;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:4px 10px;word-break:break-all}
 .call{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--ok);color:#03291D;
   text-decoration:none;font-size:20px;font-weight:800;padding:17px;border-radius:14px;margin:15px 0 4px}
 .call:active{filter:brightness(.9)}
@@ -302,7 +304,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260922-paso2-solo-admin';
+const VER='20260924-copiar-correo';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -707,7 +709,7 @@ async function abrirBase(b){
      (cliente, sector, ciudad…) no existen como columnas en mkr_bases —solo `ced`,
      y en todas dice 'todos'— asi que cualquier base cargaba los prospectos de
      TODAS. Se abria "Lacteos" y salia una ferreteria del Tolima. */
-  let q='mkr_leads?select=id,nombre,contacto,cel,extension,tipo_tel,ciudad,departamento,barrio,sector,direccion&aplica=is.true'
+  let q='mkr_leads?select=id,nombre,contacto,cel,extension,tipo_tel,ciudad,departamento,barrio,sector,direccion,email&aplica=is.true'
         +'&base_id=eq.'+encodeURIComponent(b.id);
   SEG.forEach(k=>{ const v=b[k]; if(v&&v!=='todos') q+='&'+k+'=eq.'+encodeURIComponent(v); });
   /* Por prioridad: los mejores primero. Sin orden, PostgREST los devuelve como
@@ -918,7 +920,8 @@ function render(){
     <div class="empw"><img class="rat" src="raton-chico.png" alt=""><div class="emp">${esc(l.nombre||'Sin nombre')}</div></div>
     ${l.departamento&&l.departamento!=='todos'?`<div class="sub">${esc(l.departamento)}</div>`:''}
     ${l.contacto?`<div class="cont">${esc(l.contacto)}</div>`:''}
-    <div class="num mono">${esc(cel.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3'))}</div>
+    <div class="num mono" data-num="${esc(cel)}" onclick="copiarNum(this)" title="Toca para copiar el número">${esc(cel.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3'))}</div>
+    ${l.email?`<div class="mail"><span class="chipmail" data-txt="${esc(l.email)}" onclick="copiarNum(this)" title="Toca para copiar el correo">✉️ ${esc(l.email)}</span><small>toca para copiar</small></div>`:''}
     <a class="call" href="tel:+57${esc(cel)}">📞 LLAMAR</a>
     ${l.extension?`<div class="ext">Al contestar, marca la extensión <b>${esc(l.extension)}</b></div>`:''}
     <div class="res">${botones}</div>
@@ -1073,7 +1076,7 @@ _cssReclas.textContent = `
 document.head.appendChild(_cssReclas);
 
 async function copiarNum(el){
-  const num = el.dataset.num || el.textContent.replace(/\D/g,'');
+  const num = el.dataset.txt || el.dataset.num || el.textContent.replace(/\D/g,'');
   let ok = false;
   try{ await navigator.clipboard.writeText(num); ok = true; }
   catch(e){
@@ -1187,7 +1190,7 @@ function filaInteresado(x, equipo, verBase){
   const det=[x.lead_ciudad||'',
              verBase ? '📁 '+esc(baseDe(x)) : '',
              (equipo && x.agente) ? '📞 '+esc(nombreDeHoy(x)) : '',
-             x.correo ? '✉️ '+esc(x.correo) : '',
+             x.correo ? '<span class="chipmail" data-txt="'+esc(x.correo)+'" onclick="copiarNum(this)" title="Toca para copiar el correo">✉️ '+esc(x.correo)+'</span>' : '',
              x.validado ? '' : '<span class="falta">sin datos · no ha pagado</span>',
              ya ? '<b style="color:#25D366">enviado</b>' : ''
             ].filter(Boolean).join(' · ');
