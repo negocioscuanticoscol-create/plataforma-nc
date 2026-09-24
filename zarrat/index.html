@@ -1,6 +1,15 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ZARRAT · Atelier</title>
+<title>ZARRAT · Marroquinería</title>
+<!-- ZARRAT v2 (24-sep-2026). Rehecha desde cero para maletas y carteras de cuero.
+     La línea es una sola y va en el orden de las pestañas:
+       Producto → Ficha técnica (costos) → Precios → Pedidos
+     y las dos pestañas que la ficha "jala": Proveedores (materia prima, con sus
+     materiales y precios) y Manufactureros (quien lo hace y cuánto cobra).
+     La versión anterior quedó copiada en _PLAYBOOK/copia-zarrat-para-dias/. -->
 <style>
   :root{
     --paper:#f5f2ec; --card:#fffdf9; --ink:#17150f; --ink2:#4a463c; --mut:#918a7a;
@@ -10,1237 +19,472 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--paper);color:var(--ink);font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
-  .wrap{max-width:900px;margin:0 auto;padding:0 16px 90px}
-  /* ---- header ---- */
-  header{background:var(--ink);color:var(--paper);padding:16px 0;margin-bottom:0}
-  .hd{max-width:900px;margin:0 auto;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 16px 90px}
+  header{background:var(--ink);color:var(--paper);padding:16px 0}
+  .hd{max-width:960px;margin:0 auto;padding:0 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
   .brand{font-family:Georgia,"Times New Roman",serif;font-size:26px;letter-spacing:.34em;font-weight:400;text-indent:.34em}
   .brand small{display:block;font-family:"Segoe UI",sans-serif;font-size:9.5px;letter-spacing:.28em;color:var(--acc2);text-indent:.28em;margin-top:2px}
-  .hd .quien{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a49a86}
-  /* ---- nav ---- */
+  .hd .quien{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#a49a86;text-align:right}
+  .hd .quien a{color:var(--acc2);text-decoration:none}
   nav{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;overflow-x:auto}
-  .nv{max-width:900px;margin:0 auto;padding:0 10px}
-  .nvfila{display:flex;gap:2px;overflow-x:auto}
-  .nvfila+.nvfila{border-top:1px solid var(--line2)}
-  .nvfila+.nvfila button{padding:10px 12px;font-size:12px}
+  .nv{max-width:960px;margin:0 auto;padding:0 10px;display:flex;gap:2px;overflow-x:auto}
   nav button{flex:0 0 auto;background:none;border:none;padding:13px 12px;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer;border-bottom:2.5px solid transparent;white-space:nowrap;font-family:inherit}
   nav button.on{color:var(--ink);border-bottom-color:var(--acc)}
-  /* ---- generales ---- */
-  h1{font-family:Georgia,serif;font-size:24px;font-weight:400;letter-spacing:.01em;margin:22px 0 3px}
+  h1{font-family:Georgia,serif;font-size:24px;font-weight:400;margin:22px 0 3px}
   .sub{color:var(--mut);font-size:13px;margin-bottom:16px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:var(--sh)}
-  label{display:block;font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);margin:9px 0 4px}
-  input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font-size:15px;font-family:inherit}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px;box-shadow:var(--sh)}
+  .card h3{font-family:Georgia,serif;font-weight:400;font-size:17px;margin-bottom:10px}
+  label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin:10px 0 4px}
+  input,select,textarea{width:100%;background:#fff;border:1px solid var(--line);border-radius:9px;padding:10px 11px;font-size:14px;font-family:inherit;color:var(--ink)}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--acc2)}
   textarea{min-height:64px;resize:vertical}
-  .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-  .btn{padding:12px 18px;border:none;border-radius:8px;background:var(--ink);color:var(--paper);font-weight:700;font-size:14px;cursor:pointer;font-family:inherit}
-  .btn.acc{background:var(--acc)}
-  .btn.gh{background:transparent;border:1px solid var(--line);color:var(--ink2)}
+  input.n{text-align:right;font-variant-numeric:tabular-nums}
+  input.mini{padding:6px 8px;font-size:13px}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 12px}
+  @media(max-width:560px){.g3{grid-template-columns:1fr 1fr}}
+  .btn{background:var(--acc);color:#fff;border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn.gh{background:transparent;color:var(--acc);border:1px solid var(--acc2)}
+  .btn.sm{padding:6px 10px;font-size:12px;border-radius:8px}
+  .btn.bad{background:var(--bad)} .btn.ok{background:var(--ok)}
   .btn.full{width:100%;margin-top:12px}
-  .btn.sm{padding:7px 12px;font-size:12px;border-radius:7px}
-  /* ---- items ---- */
-  .item{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:13px 15px;margin-bottom:9px;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-  .item .nm{font-weight:700;font-size:15px}
-  .item .mt{font-size:12.5px;color:var(--mut);margin-top:2px}
-  .item.done{opacity:.5}
-  .item.done .nm{text-decoration:line-through}
-  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:20px;background:var(--line2);color:var(--ink2)}
-  .tag.a{background:#f0e6d6;color:var(--acc)}
-  .empty{text-align:center;color:var(--mut);padding:34px 12px;font-size:14px}
-  /* ---- KPIs ---- */
-  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:var(--sh)}
-  .kpi b{display:block;font-size:22px;font-family:Georgia,serif;font-weight:400;letter-spacing:-.01em}
-  .kpi span{font-size:11px;color:var(--mut);letter-spacing:.05em}
-  .kpi.eq{grid-column:1/-1;background:var(--ink);color:var(--paper);border-color:var(--ink)}
-  .kpi.eq b{color:var(--acc2);font-size:28px}
-  .kpi.eq span{color:#a49a86}
-  /* ---- catalogo ---- */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-  .pz{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--sh)}
-  .pz .img{aspect-ratio:3/4;background:#efeae0 center/cover no-repeat;position:relative}
-  .pz .img::after{content:"ZARRAT";position:absolute;bottom:6px;right:8px;font-family:Georgia,serif;font-size:9px;letter-spacing:.22em;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.6)}
-  .pz .in{padding:9px 11px}
-  .pz .n{font-weight:700;font-size:13.5px;line-height:1.25}
-  .pz .v{color:var(--acc);font-weight:800;font-size:14px;margin-top:2px}
-  .pz .f{font-size:10.5px;color:var(--mut);margin-top:1px}
-  /* ---- medidas ---- */
-  .med{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:9px}
-  .med .m label{margin-top:0}
-  .med input{text-align:center;font-weight:700}
-  /* ---- crm ---- */
-  .etapas{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
-  .et{font-size:11px;padding:5px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;background:#fff;color:var(--mut)}
-  .et.on{background:var(--acc);color:#fff;border-color:var(--acc);font-weight:700}
-  .hint{font-size:12px;color:var(--mut);margin-top:5px}
-  @media(max-width:640px){.g2,.g3{grid-template-columns:1fr}.kpis{grid-template-columns:1fr}}
+  .fila{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .top{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .buscar{max-width:280px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+  .p{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--sh);cursor:pointer}
+  .p .img{aspect-ratio:1;background:#eee8dc center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:40px;color:var(--line)}
+  .p .b{padding:10px 12px}
+  .p .cat{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--acc)}
+  .p .n{font-family:Georgia,serif;font-size:16px;line-height:1.25}
+  .p .m{font-size:12px;color:var(--mut);margin-top:4px}
+  .p .pr{display:flex;justify-content:space-between;font-size:13px;margin-top:6px}
+  .p .pr b{font-size:15px}
+  .tag{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:20px;background:var(--line2);color:var(--ink2);margin-right:4px}
+  .tag.web{background:#e2efe4;color:var(--ok)} .tag.off{background:#f3e3e0;color:var(--bad)} .tag.warn{background:#f7e7d8;color:var(--warn)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+  td{padding:7px 6px;border-bottom:1px solid var(--line2);vertical-align:middle}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr.tot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:none}
+  .item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line2)}
+  .item:last-child{border-bottom:none}
+  .item .nm{font-weight:600} .item .dt{font-size:12.5px;color:var(--mut)}
+  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:12px}
+  .kpi div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+  .kpi span{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+  .kpi b{font-size:19px;font-variant-numeric:tabular-nums}
+  .hint{font-size:12.5px;color:var(--mut)}
+  .vacio{text-align:center;color:var(--mut);padding:30px 10px}
+  .est{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600}
+  .est.nuevo{background:#e8e2f3;color:#5a4a8a} .est.proceso{background:#f7e7d8;color:var(--warn)} .est.terminado{background:#e2efe4;color:var(--ok)} .est.entregado{background:var(--line2);color:var(--mut)} .est.anulado{background:#f3e3e0;color:var(--bad)}
+  .x{background:none;border:none;color:var(--bad);cursor:pointer;font-size:16px;padding:2px 6px}
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:10px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:99}
+  #toast.on{opacity:1}
+  footer{text-align:center;color:var(--mut);font-size:11px;padding:20px}
 </style>
-
+</head>
+<body>
 <header><div class="hd">
-  <div class="brand">ZARRAT<small>MAESTROS DEL ESTILO EN UN SOLO SITIO</small></div>
-  <div class="quien">Sistema de gestión</div>
+  <div class="brand">ZARRAT<small>MARROQUINERÍA · MALETAS Y CARTERAS</small></div>
+  <div class="quien"><a href="catalogo.html" target="_blank">Ver catálogo web ↗</a></div>
 </div></header>
-
 <nav><div class="nv" id="nav"></div></nav>
-
-<div class="wrap"><div id="main"></div></div>
+<div class="wrap"><div id="main"><div class="vacio">Cargando…</div></div></div>
+<div id="toast"></div>
+<footer>ZARRAT · v<span id="ver"></span></footer>
 
 <script>
+const VER='20260924-v2';
+document.getElementById('ver').textContent=VER;
 const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 const $$=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+const num=s=>+String(s??'').replace(/[^\d.-]/g,'')||0;
+const r100=n=>Math.round((+n||0)/100)*100;
 const hoy=()=>new Date().toISOString().slice(0,10);
-const mesAct=()=>new Date().toISOString().slice(0,7);
+let tt; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),2200); }
 
-/* El servidor NUNCA devuelve mas de 1000 filas aunque se le pida mas, y lo hace
-   en silencio. GETALL pide de a 1000 hasta agotar, para que ninguna pantalla
-   se quede corta cuando la tabla crece. */
+/* El servidor corta en 1.000 filas sin avisar: se pide de a 1.000 hasta agotar. */
 async function GETALL(p){
-  const base=String(p).replace(/[?&](limit|offset)=\d+/g,'');
-  const sep=base.includes('?')?'&':'?';
-  const out=[];
+  const base=String(p).replace(/[?&](limit|offset)=\d+/g,''), sep=base.includes('?')?'&':'?', out=[];
   for(let i=0,off=0;i<60;i++,off+=1000){
     let r; try{ r=await fetch(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H}); }catch(e){ break; }
-    if(!r.ok) break;
-    let b; try{ b=await r.json(); }catch(e){ break; }
-    if(!Array.isArray(b)||!b.length) break;
-    out.push(...b);
-    if(b.length<1000) break;
+    if(!r.ok) break; let b; try{ b=await r.json(); }catch(e){ break; }
+    if(!Array.isArray(b)||!b.length) break; out.push(...b); if(b.length<1000) break;
   }
   return out;
 }
-async function api(p,o={}){
-  try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H,...o}); const t=await r.text();
-    if(!r.ok){ console.warn('API',p,t.slice(0,120)); return []; }
-    const d=t?JSON.parse(t):[]; return Array.isArray(d)?d:[]; }   // siempre array: nunca tumba la vista
-  catch(e){ console.warn('API',p,e.message); return []; }
-}
-const get=p=>api(p);
-// si una vista revienta, se avisa en pantalla en vez de dejarla en blanco
+const post=(t,b,pref)=>fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:pref||'return=representation'},body:JSON.stringify(b)})
+  .then(async r=>{ const x=await r.text(); if(!r.ok){ alert('No se pudo guardar: '+x.slice(0,140)); throw new Error(x); } return x?JSON.parse(x):null; });
+const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)})
+  .then(async r=>{ if(!r.ok){ alert('No se pudo guardar: '+(await r.text()).slice(0,140)); throw new Error('patch'); } });
+const del=(t,q)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'DELETE',headers:H});
 function safe(fn,nom){ return async()=>{ try{ await fn(); }catch(e){ console.error(nom,e);
   $('main').innerHTML=`<div class="card" style="border-left:4px solid var(--bad)"><b>No pude cargar ${nom}</b><div class="hint">${esc(e.message)}</div>
   <button class="btn gh full" onclick="go('${nom}')">Reintentar</button></div>`; } }; }
-const post=(t,b,pref)=>fetch(SB+'/rest/v1/'+t,{method:'POST',headers:{...H,Prefer:pref||'return=representation'},body:JSON.stringify(b)})
-  .then(async r=>{ const x=await r.text(); if(!r.ok){ alert('No se pudo guardar: '+x.slice(0,120)); throw new Error(x); } return x?JSON.parse(x):null; });
-const patch=(t,q,b)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(b)});
-const del=(t,q)=>fetch(SB+'/rest/v1/'+t+'?'+q,{method:'DELETE',headers:H});
 
-/* Dos filas: arriba lo que se ARMA (el taller), abajo lo que se VENDE (la calle).
-   Buscar «costos» y «cotizaciones» en la misma tira era lo que hacía perder el hilo. */
-const TABS_ARMA=[['pend','🏗️ Estructura'],['gastos','💰 Gastos'],['prov','🚚 Proveedores'],
-                 ['costos','🧵 Costos'],['catalogo','🖼️ Catálogo'],['medidas','📐 Medidas']];
-const TABS_VENDE=[['clientes','👥 Clientes'],['crm','📇 CRM'],
-                  ['cotiz','📋 Cotizaciones'],['pedidos','🧾 Pedidos'],['ventas','🛒 Ventas']];
-const TABS=[...TABS_ARMA,...TABS_VENDE];
-let TAB='pend', CLI=[], PRENDAS=[], CAT=[];
-const _tira=T=>'<div class="nvfila">'+T.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('')+'</div>';
-$('nav').innerHTML=_tira(TABS_ARMA)+_tira(TABS_VENDE);
-function go(t){
-  TAB=t; TABS.forEach(([v])=>{const b=$('t_'+v); if(b)b.className=(v===t?'on':'');});
-  const V={pend:vPend,gastos:vGastos,clientes:vClientes,medidas:vMedidas,catalogo:vCatalogo,prov:vProv,costos:vCostos,cotiz:vCotiz,pedidos:vPedidos,ventas:vVentas,crm:vCrm}[t];
-  if(V) safe(V,t)();
+/* ═══════ DATOS ═══════ todo cabe en memoria: son decenas de filas, no miles */
+let PROV=[], MAT=[], MANU=[], PROD=[], FICHA=[], CLI=[], PED=[], CFG={margen:100};
+const CATS=['Maleta','Cartera','Bolso','Billetera','Morral','Cinturón','Otro'];
+const CATMAT=['Cuero','Forro','Herrajes','Hilos y pegantes','Cierres','Empaque','Otro'];
+const UNID=['unidad','dm²','m','m²','cm','par','juego','gramo','kilo'];
+async function cargar(){
+  const [pr,ma,mn,pd,fi,cl,pe,cf]=await Promise.all([
+    GETALL('zarrat_proveedores?select=*&order=nombre'), GETALL('zarrat_materiales?select=*&order=nombre'),
+    GETALL('zarrat_manufactureros?select=*&order=nombre'), GETALL('zarrat_producto?select=*&order=categoria,nombre'),
+    GETALL('zarrat_ficha?select=*&order=orden,id'), GETALL('zarrat_clientes?select=*&order=nombre'),
+    GETALL('zarrat_pedidos?select=*&order=creado_en.desc'), GETALL('zarrat_config?select=*')]);
+  PROV=pr; MAT=ma; MANU=mn; PROD=pd; FICHA=fi; CLI=cl; PED=pe;
+  const m=cf.find(x=>x.clave==='margen'); if(m) CFG.margen=+m.valor||100;
+}
+const provDe=id=>PROV.find(p=>p.id===id), matDe=id=>MAT.find(m=>m.id===id), manuDe=id=>MANU.find(m=>m.id===id), prodDe=id=>PROD.find(p=>p.id===id);
+const nomProv=id=>(provDe(id)||{}).nombre||'—', nomManu=id=>(manuDe(id)||{}).nombre||'—';
+
+/* ═══════ COSTOS ═══════ una sola forma de calcular, usada en todas las pestañas.
+   Una línea de la ficha vale cantidad × precio VIVO del material (lo que hoy
+   cobra el proveedor). Solo si la línea trae valor_unit se usa ese, congelado. */
+const vUnit=l=>l.valor_unit!=null?+l.valor_unit:+((matDe(l.material_id)||{}).valor_unit||0);
+const lineas=pid=>FICHA.filter(l=>l.producto_id===pid);
+const costoMat=p=>lineas(p.id).reduce((s,l)=>s+(+l.cantidad||0)*vUnit(l),0);
+const costo=p=>costoMat(p)+(+p.mano_obra||0)+(+p.otros_costos||0);
+const margenDe=p=>p.margen!=null&&p.margen!==''?+p.margen:CFG.margen;
+const precioSug=p=>r100(costo(p)*(1+margenDe(p)/100));
+const precio=p=>p.precio_venta!=null&&+p.precio_venta>0?+p.precio_venta:precioSug(p);
+const utilidad=p=>precio(p)-costo(p);
+const margenReal=p=>costo(p)>0?Math.round((precio(p)/costo(p)-1)*100):0;
+
+/* ═══════ NAVEGACIÓN ═══════ en el orden de la línea de producción */
+const TABS=[['prod','🧳 Productos'],['ficha','🧵 Ficha técnica'],['precios','🏷️ Precios'],['pedidos','🧾 Pedidos'],
+            ['prov','🚚 Proveedores'],['manu','✂️ Manufactureros'],['clientes','👥 Clientes']];
+let TAB='prod';
+$('nav').innerHTML=TABS.map(([v,n])=>`<button id="t_${v}" onclick="go('${v}')">${n}</button>`).join('');
+function go(t,arg){
+  TAB=t; TABS.forEach(([v])=>{ const b=$('t_'+v); if(b) b.className=(v===t?'on':''); });
+  const V={prod:vProd,ficha:()=>vFicha(arg),precios:vPrecios,pedidos:vPedidos,prov:vProv,manu:vManu,clientes:vClientes}[t];
+  if(V) safe(V,t)(); window.scrollTo(0,0);
 }
 
-
-/* ═══════ PEDIDOS · la cotización que se volvió compromiso ═══════
-   La cotización es una propuesta; el pedido es lo que hay que entregar. Se convierte
-   sin volver a escribir nada y ahí mismo va la programación: a qué hora se arranca y
-   a qué hora tiene que estar listo. Anular no borra: el pedido se queda con su motivo
-   y deja de contar, porque saber qué se cayó y por qué vale más que la lista limpia. */
-const ESTPED=['nuevo','en proceso','terminado','entregado'];
-let PEDS=[], PEDEDIT=null;
-const dtLocal=iso=>{ if(!iso) return ''; const d=new Date(iso), p=n=>String(n).padStart(2,'0');
-  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes()); };
-const dtTxt=iso=>{ if(!iso) return '—'; try{ return new Date(iso).toLocaleString('es-CO',
-  {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return '—'; } };
-/* Cuánto trabajo hay entre arrancar y entregar. Sirve para cotizar el siguiente igual. */
-const dur=(a,b)=>{ if(!a||!b) return ''; const h=(new Date(b)-new Date(a))/3.6e6;
-  if(h<=0) return ''; return h<24?h.toFixed(1)+' h':(h/24).toFixed(1)+' días'; };
-async function aPedido(cid){
-  const c=(await get('zarrat_cotizaciones?id=eq.'+cid))[0]; if(!c){ alert('No encontré la cotización'); return; }
-  const ya=await get('zarrat_pedidos?cotizacion_id=eq.'+cid+'&anulado=is.false');
-  if(ya.length&&!confirm('Esta cotización ya tiene un pedido. ¿Crear otro?')) return;
-  await post('zarrat_pedidos',{folio:c.folio,cotizacion_id:c.id,cliente_id:c.cliente_id,
-    cliente_nombre:c.cliente_nombre,tipo:c.tipo,items:c.items||[],total:+c.total||0,
-    costo_interno:+c.costo_interno||0,estado:'nuevo',notas:c.notas||null},'return=minimal');
-  await patch('zarrat_cotizaciones','id=eq.'+cid,{estado:'vendida'});
-  go('pedidos');
+/* ═══════ 1 · PRODUCTOS ═══════ */
+let EDIT=null;
+async function vProd(){
+  const act=PROD.filter(p=>p.activo!==false);
+  $('main').innerHTML=`<h1>Productos</h1><div class="sub">Lo que ZARRAT vende. Cada producto tiene su ficha técnica, y de ahí salen el costo y el precio.</div>
+  <div class="kpi"><div><span>Productos</span><b>${act.length}</b></div><div><span>En la web</span><b>${act.filter(p=>p.publicar_web).length}</b></div>
+    <div><span>Sin ficha</span><b>${act.filter(p=>!lineas(p.id).length).length}</b></div><div><span>Sin precio</span><b>${act.filter(p=>!(+p.precio_venta>0)).length}</b></div></div>
+  <div class="top"><input class="buscar" id="q" placeholder="Buscar producto…" oninput="pintarProd()"><button class="btn" onclick="formProd()">+ Nuevo producto</button></div>
+  <div id="fp"></div><div class="grid" id="lp"></div>`;
+  pintarProd();
 }
+function pintarProd(){
+  const q=($('q')||{}).value||'', l=PROD.filter(p=>p.activo!==false&&(!q||((p.nombre||'')+' '+(p.sku||'')+' '+(p.categoria||'')).toLowerCase().includes(q.toLowerCase())));
+  $('lp').innerHTML=l.length?l.map(p=>`<div class="p" onclick="formProd(${p.id})">
+    <div class="img" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'👜'}</div>
+    <div class="b"><div class="cat">${esc(p.categoria||'')}${p.sku?' · '+esc(p.sku):''}</div><div class="n">${esc(p.nombre)}</div>
+    <div class="m">${p.manufacturero_id?'✂️ '+esc(nomManu(p.manufacturero_id)):'<span class="tag warn">sin manufacturero</span>'} ${lineas(p.id).length?'':'<span class="tag warn">sin ficha</span>'}</div>
+    <div class="pr"><span class="hint">costo ${$$(costo(p))}</span><b>${$$(precio(p))}</b></div>
+    <div style="margin-top:6px">${p.publicar_web?'<span class="tag web">🌐 en la web</span>':'<span class="tag">no publicado</span>'}<span class="tag">margen ${margenReal(p)}%</span></div></div></div>`).join('')
+    :'<div class="vacio">Todavía no hay productos. Crea el primero con el botón de arriba.</div>';
+}
+function formProd(id){
+  const p=id?prodDe(id):{};
+  EDIT=id||null;
+  const opc=(arr,v,libre)=>arr.map(c=>`<option ${c===v?'selected':''}>${esc(c)}</option>`).join('')+(libre&&v&&!arr.includes(v)?`<option selected>${esc(v)}</option>`:'');
+  $('fp').innerHTML=`<div class="card"><h3>${id?'Editar producto':'Nuevo producto'}</h3>
+    <div class="g2"><div><label>Nombre</label><input id="f_n" value="${esc(p.nombre||'')}" placeholder="Ej: Cartera Amelia"></div>
+      <div><label>Categoría</label><select id="f_c">${opc(CATS,p.categoria||'Cartera',true)}</select></div></div>
+    <div class="g2"><div><label>SKU / código</label><input id="f_s" value="${esc(p.sku||'')}" placeholder="Ej: CAR-001"></div>
+      <div><label>Manufacturero (quien lo hace)</label><select id="f_m"><option value="">— sin asignar —</option>${MANU.filter(m=>m.activo!==false).map(m=>`<option value="${m.id}" ${m.id===p.manufacturero_id?'selected':''}>${esc(m.nombre)}</option>`).join('')}</select></div></div>
+    <label>Descripción (sale en la web)</label><textarea id="f_d">${esc(p.descripcion||'')}</textarea>
+    <div class="g2"><div><label>Foto</label><input type="file" id="f_f" accept="image/*"></div>
+      <div><label>Foto actual</label><div class="hint">${p.foto_url?`<a href="${esc(p.foto_url)}" target="_blank">ver foto</a>`:'ninguna'}</div></div></div>
+    <div class="fila" style="margin-top:12px"><label style="margin:0"><input type="checkbox" id="f_w" ${p.publicar_web?'checked':''} style="width:auto;margin-right:6px">Publicar en la web</label></div>
+    <div class="fila" style="margin-top:14px"><button class="btn" onclick="guardarProd()">Guardar</button><button class="btn gh" onclick="$('fp').innerHTML=''">Cancelar</button>
+      ${id?`<button class="btn gh" onclick="go('ficha',${id})">🧵 Ir a la ficha técnica</button><button class="btn gh" style="margin-left:auto;color:var(--bad);border-color:var(--bad)" onclick="borrarProd(${id})">Retirar</button>`:''}</div>
+    <div class="hint" style="margin-top:8px">Los costos, la mano de obra y el precio se trabajan en la Ficha técnica y en Precios.</div></div>`;
+  $('fp').scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function subirFoto(f){
+  if(!f) return null;
+  const ext=(f.name.split('.').pop()||'jpg').toLowerCase(), path='zarrat/'+Date.now()+'.'+ext;
+  const r=await fetch(SB+'/storage/v1/object/documentos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':f.type||'image/jpeg'},body:f});
+  if(!r.ok){ alert('No se pudo subir la foto'); return null; }
+  return SB+'/storage/v1/object/public/documentos/'+path;
+}
+async function guardarProd(){
+  const n=$('f_n').value.trim(); if(!n){ alert('Falta el nombre'); return; }
+  const foto=await subirFoto($('f_f').files[0]);
+  const b={nombre:n, categoria:$('f_c').value, sku:$('f_s').value.trim()||null, descripcion:$('f_d').value.trim()||null,
+    manufacturero_id:$('f_m').value?+$('f_m').value:null, publicar_web:$('f_w').checked};
+  if(foto) b.foto_url=foto;
+  if(EDIT){ await patch('zarrat_producto','id=eq.'+EDIT,b); Object.assign(prodDe(EDIT),b); toast('Producto guardado'); }
+  else{ const r=await post('zarrat_producto',b); PROD.push(r[0]); toast('Producto creado · ahora arma su ficha'); await vProd(); go('ficha',r[0].id); return; }
+  $('fp').innerHTML=''; pintarProd();
+}
+async function borrarProd(id){
+  if(!confirm('¿Retirar este producto? No se borra: queda inactivo y sale de la web.')) return;
+  await patch('zarrat_producto','id=eq.'+id,{activo:false,publicar_web:false}); prodDe(id).activo=false; prodDe(id).publicar_web=false;
+  $('fp').innerHTML=''; pintarProd(); toast('Producto retirado');
+}
+
+/* ═══════ 2 · FICHA TÉCNICA ═══════ el producto jala materiales (con su
+   proveedor y precio) y al manufacturero; de ahí sale el costo. */
+let FP=null;
+async function vFicha(pid){
+  const act=PROD.filter(p=>p.activo!==false);
+  if(pid) FP=pid; if(!FP&&act.length) FP=act[0].id;
+  $('main').innerHTML=`<h1>Ficha técnica</h1><div class="sub">Qué lleva cada producto, de qué proveedor, cuánto, y quién lo fabrica. El costo se calcula solo.</div>
+    <div class="card"><label>Producto</label><select id="fs" onchange="FP=+this.value;vFicha()"><option value="">— escoge —</option>${act.map(p=>`<option value="${p.id}" ${p.id===FP?'selected':''}>${esc(p.nombre)}${p.sku?' · '+esc(p.sku):''}</option>`).join('')}</select></div>
+    <div id="fx"></div>`;
+  if(!FP){ $('fx').innerHTML='<div class="vacio">Primero crea un producto en la pestaña Productos.</div>'; return; }
+  pintarFicha();
+}
+function pintarFicha(){
+  const p=prodDe(FP); if(!p) return;
+  const L=lineas(p.id);
+  const optMat=MAT.filter(m=>m.activo!==false).length?PROV.map(pr=>{ const ms=MAT.filter(m=>m.proveedor_id===pr.id&&m.activo!==false); return ms.length?`<optgroup label="${esc(pr.nombre)}">${ms.map(m=>`<option value="${m.id}">${esc(m.nombre)}${m.color?' · '+esc(m.color):''} — ${$$(m.valor_unit)}/${esc(m.unidad||'u')}</option>`).join('')}</optgroup>`:''; }).join('')
+    +(MAT.some(m=>!m.proveedor_id)?`<optgroup label="Sin proveedor">${MAT.filter(m=>!m.proveedor_id&&m.activo!==false).map(m=>`<option value="${m.id}">${esc(m.nombre)} — ${$$(m.valor_unit)}</option>`).join('')}</optgroup>`:'')
+    :'';
+  $('fx').innerHTML=`<div class="card"><h3>${esc(p.nombre)} <span class="hint">· ${esc(p.categoria||'')}</span></h3>
+    <table><tr><th>Material</th><th>Proveedor</th><th class="n">Cant.</th><th>Unidad</th><th class="n">Precio unit.</th><th class="n">Subtotal</th><th></th></tr>
+    ${L.map(l=>{ const m=matDe(l.material_id)||{}; return `<tr>
+      <td>${esc(l.nombre||m.nombre||'—')}</td><td class="hint">${esc(m.proveedor_id?nomProv(m.proveedor_id):'—')}</td>
+      <td class="n" style="width:84px"><input class="n mini" value="${+l.cantidad||0}" onchange="cambiarLinea(${l.id},'cantidad',this.value)"></td>
+      <td>${esc(l.unidad||m.unidad||'')}</td>
+      <td class="n" style="width:120px"><input class="n mini" value="${l.valor_unit!=null?+l.valor_unit:''}" placeholder="${Math.round(+m.valor_unit||0)}" title="Vacío = precio vivo del proveedor" onchange="cambiarLinea(${l.id},'valor_unit',this.value)"></td>
+      <td class="n">${$$((+l.cantidad||0)*vUnit(l))}</td><td><button class="x" onclick="quitarLinea(${l.id})" title="Quitar">✕</button></td></tr>`; }).join('')}
+    ${L.length?'':'<tr><td colspan="7" class="vacio">Esta ficha no tiene materiales todavía.</td></tr>'}
+    <tr><td colspan="7" style="padding-top:12px"><div class="fila">
+      <select id="fm" style="flex:1;min-width:220px"><option value="">+ agregar material…</option>${optMat}</select>
+      <input id="fq" class="n" placeholder="cant." style="width:90px" value="1">
+      <button class="btn sm" onclick="agregarLinea()">Agregar</button></div>
+      ${MAT.length?'':'<div class="hint" style="margin-top:6px">No hay materiales: créalos en Proveedores, dentro de cada proveedor.</div>'}</td></tr>
+    <tr class="tot"><td colspan="5">Materiales</td><td class="n">${$$(costoMat(p))}</td><td></td></tr></table></div>
+
+    <div class="card"><h3>Mano de obra y otros</h3>
+    <div class="g3"><div><label>Manufacturero</label><select id="fmn" onchange="guardarCostos()"><option value="">— sin asignar —</option>${MANU.filter(m=>m.activo!==false).map(m=>`<option value="${m.id}" ${m.id===p.manufacturero_id?'selected':''}>${esc(m.nombre)}</option>`).join('')}</select></div>
+      <div><label>Mano de obra por unidad</label><input id="fmo" class="n" value="${+p.mano_obra||0}" onchange="guardarCostos()"></div>
+      <div><label>Otros costos (empaque, transporte…)</label><input id="foc" class="n" value="${+p.otros_costos||0}" onchange="guardarCostos()"></div></div>
+    <table style="margin-top:12px"><tr><td>Materiales</td><td class="n">${$$(costoMat(p))}</td></tr><tr><td>Mano de obra</td><td class="n">${$$(p.mano_obra)}</td></tr><tr><td>Otros</td><td class="n">${$$(p.otros_costos)}</td></tr>
+      <tr class="tot"><td>COSTO TOTAL</td><td class="n">${$$(costo(p))}</td></tr>
+      <tr><td class="hint">Precio sugerido con margen ${margenDe(p)}%</td><td class="n">${$$(precioSug(p))}</td></tr>
+      <tr><td class="hint">Precio de venta actual</td><td class="n"><b>${$$(precio(p))}</b> <span class="hint">(${margenReal(p)}%)</span></td></tr></table>
+    <div class="fila" style="margin-top:12px"><button class="btn gh" onclick="go('precios')">🏷️ Ir a Precios</button><button class="btn gh" onclick="copiarFicha()">Copiar la ficha de otro producto</button></div></div>`;
+}
+async function agregarLinea(){
+  const mid=+$('fm').value, q=num($('fq').value)||1; if(!mid){ alert('Escoge un material'); return; }
+  const m=matDe(mid); const r=await post('zarrat_ficha',{producto_id:FP,material_id:mid,nombre:m.nombre,unidad:m.unidad,cantidad:q,orden:lineas(FP).length});
+  FICHA.push(r[0]); pintarFicha();
+}
+async function cambiarLinea(id,campo,v){
+  const l=FICHA.find(x=>x.id===id); const val=campo==='valor_unit'?(String(v).trim()===''?null:num(v)):num(v);
+  await patch('zarrat_ficha','id=eq.'+id,{[campo]:val}); l[campo]=val; pintarFicha();
+}
+async function quitarLinea(id){ await del('zarrat_ficha','id=eq.'+id); FICHA=FICHA.filter(x=>x.id!==id); pintarFicha(); }
+async function guardarCostos(){
+  const p=prodDe(FP); const b={manufacturero_id:$('fmn').value?+$('fmn').value:null, mano_obra:num($('fmo').value), otros_costos:num($('foc').value)};
+  await patch('zarrat_producto','id=eq.'+FP,b); Object.assign(p,b); pintarFicha(); toast('Costos guardados');
+}
+async function copiarFicha(){
+  const otros=PROD.filter(p=>p.id!==FP&&lineas(p.id).length); if(!otros.length){ alert('Ningún otro producto tiene ficha.'); return; }
+  const n=prompt('¿De cuál producto? Escribe el número:\n'+otros.map((p,i)=>(i+1)+'. '+p.nombre).join('\n')); const o=otros[(+n||0)-1]; if(!o) return;
+  for(const l of lineas(o.id)){ const r=await post('zarrat_ficha',{producto_id:FP,material_id:l.material_id,nombre:l.nombre,unidad:l.unidad,cantidad:l.cantidad,valor_unit:l.valor_unit,orden:l.orden}); FICHA.push(r[0]); }
+  const p=prodDe(FP), b={mano_obra:o.mano_obra,otros_costos:o.otros_costos,manufacturero_id:p.manufacturero_id||o.manufacturero_id};
+  await patch('zarrat_producto','id=eq.'+FP,b); Object.assign(p,b); pintarFicha(); toast('Ficha copiada de '+o.nombre);
+}
+
+/* ═══════ 3 · PRECIOS ═══════ costo → margen → precio. Se edita en la misma tabla. */
+async function vPrecios(){
+  const act=PROD.filter(p=>p.activo!==false);
+  $('main').innerHTML=`<h1>Lista de precios</h1><div class="sub">El costo viene de la ficha. El margen general aplica a todos; cada producto puede tener el suyo. El precio de venta se puede fijar a mano.</div>
+    <div class="card"><div class="fila"><div><label>Margen general sobre el costo (%)</label><input id="mg" class="n" value="${CFG.margen}" style="width:120px" onchange="guardarMargen(this.value)"></div>
+      <div class="hint" style="align-self:flex-end;padding-bottom:12px">Ej: costo $100.000 con margen 100% → precio sugerido $200.000. Se redondea a la centena.</div></div></div>
+    <div class="card" style="overflow-x:auto"><table><tr><th>Producto</th><th class="n">Costo</th><th class="n">Margen %</th><th class="n">Sugerido</th><th class="n">Precio venta</th><th class="n">Mayorista</th><th class="n">Utilidad</th><th>Web</th></tr>
+    ${act.map(p=>`<tr><td><b>${esc(p.nombre)}</b><div class="hint">${esc(p.categoria||'')}${lineas(p.id).length?'':' · <span style="color:var(--warn)">sin ficha</span>'}</div></td>
+      <td class="n">${$$(costo(p))}</td>
+      <td class="n" style="width:90px"><input class="n mini" value="${p.margen!=null?p.margen:''}" placeholder="${CFG.margen}" onchange="guardarPrecio(${p.id},'margen',this.value)"></td>
+      <td class="n">${$$(precioSug(p))}</td>
+      <td class="n" style="width:120px"><input class="n mini" value="${p.precio_venta!=null?Math.round(p.precio_venta):''}" placeholder="${precioSug(p)}" onchange="guardarPrecio(${p.id},'precio_venta',this.value)"></td>
+      <td class="n" style="width:120px"><input class="n mini" value="${p.precio_mayor!=null?Math.round(p.precio_mayor):''}" onchange="guardarPrecio(${p.id},'precio_mayor',this.value)"></td>
+      <td class="n" style="color:${utilidad(p)>0?'var(--ok)':'var(--bad)'}">${$$(utilidad(p))}<div class="hint">${margenReal(p)}%</div></td>
+      <td><input type="checkbox" ${p.publicar_web?'checked':''} style="width:auto" onchange="guardarPrecio(${p.id},'publicar_web',this.checked)"></td></tr>`).join('')}
+    ${act.length?'':'<tr><td colspan="8" class="vacio">Sin productos.</td></tr>'}</table></div>
+    <div class="fila"><a class="btn gh" href="catalogo.html" target="_blank">🌐 Ver el catálogo web</a><button class="btn gh" onclick="usarSugeridos()">Poner el precio sugerido a los que no tienen precio</button></div>`;
+}
+async function guardarMargen(v){ CFG.margen=num(v)||0; await post('zarrat_config?on_conflict=clave',{clave:'margen',valor:String(CFG.margen)},'resolution=merge-duplicates,return=minimal'); vPrecios(); toast('Margen general guardado'); }
+async function guardarPrecio(id,campo,v){
+  const val=campo==='publicar_web'?!!v:(String(v).trim()===''?null:num(v));
+  await patch('zarrat_producto','id=eq.'+id,{[campo]:val}); prodDe(id)[campo]=val; vPrecios();
+}
+async function usarSugeridos(){
+  const l=PROD.filter(p=>p.activo!==false&&!(+p.precio_venta>0)&&costo(p)>0);
+  for(const p of l){ await patch('zarrat_producto','id=eq.'+p.id,{precio_venta:precioSug(p)}); p.precio_venta=precioSug(p); }
+  vPrecios(); toast(l.length+' precio(s) puestos');
+}
+
+/* ═══════ 4 · PEDIDOS ═══════ lo que hay que fabricar y entregar. Se toma
+   escogiendo productos de la lista de precios; el costo interno queda guardado
+   para saber la utilidad real de cada pedido. */
+const ESTADOS=['nuevo','en proceso','terminado','entregado'];
+let PL=[];
 async function vPedidos(){
-  PEDS=await get('zarrat_pedidos?order=creado_en.desc&limit=300');
-  if(PEDEDIT&&!PEDS.some(x=>x.id===PEDEDIT)) PEDEDIT=null;
-  const vivos=PEDS.filter(x=>!x.anulado);
-  const tot=vivos.reduce((s,x)=>s+(+x.total||0),0);
-  const cost=vivos.reduce((s,x)=>s+(+x.costo_interno||0),0);
-  const porEst=e=>vivos.filter(x=>(x.estado||'nuevo')===e).length;
-  $('main').innerHTML=`<h1>Pedidos</h1>
-    <div class="sub">${vivos.length} vivos · ${PEDS.length-vivos.length} anulados · lo que hay comprometido y para cuándo</div>
-    <div class="card"><div class="g3">
-      <div><div class="hint">COMPROMETIDO</div><div style="font-size:19px;font-weight:800;color:var(--acc)">${$$(tot)}</div></div>
-      <div><div class="hint">COSTO</div><div style="font-size:19px;font-weight:800">${$$(cost)}</div></div>
-      <div><div class="hint">DEJA</div><div style="font-size:19px;font-weight:800;color:var(--ok)">${$$(tot-cost)}</div></div>
-    </div>
-    <div class="hint" style="margin-top:8px">${ESTPED.map(e=>`${esc(e)}: <b>${porEst(e)}</b>`).join(' · ')}</div></div>
-    ${PEDS.length?PEDS.map(x=>pedFila(x)).join(''):'<div class="empty">Sin pedidos todavía. Se crean desde Cotizaciones con el botón «→ Pedido».</div>'}`;
+  const vivos=PED.filter(p=>!p.anulado);
+  const mes=hoy().slice(0,7), delMes=vivos.filter(p=>String(p.creado_en||'').startsWith(mes));
+  $('main').innerHTML=`<h1>Pedidos</h1><div class="sub">Se toma el pedido con los precios de la lista. Anular no borra: queda con su motivo.</div>
+    <div class="kpi"><div><span>Pedidos del mes</span><b>${delMes.length}</b></div><div><span>Vendido el mes</span><b>${$$(delMes.reduce((s,p)=>s+(+p.total||0),0))}</b></div>
+      <div><span>Utilidad del mes</span><b>${$$(delMes.reduce((s,p)=>s+(+p.total||0)-(+p.costo_interno||0),0))}</b></div><div><span>Por entregar</span><b>${vivos.filter(p=>p.estado!=='entregado').length}</b></div></div>
+    <div class="top"><span></span><button class="btn" onclick="formPedido()">+ Tomar pedido</button></div><div id="fpd"></div>
+    <div class="card">${PED.length?PED.map(p=>`<div class="item"><div><div class="nm">${esc(p.folio||'')} · ${esc(p.cliente_nombre||'Sin cliente')}</div>
+      <div class="dt">${(p.creado_en||'').slice(0,10)} · ${(p.items||[]).map(i=>(i.cantidad??1)+'× '+(i.nombre??i.n??'?')).join(', ')}${p.notas?' · '+esc(p.notas):''}</div>
+      ${p.anulado?`<div class="dt" style="color:var(--bad)">Anulado: ${esc(p.anulado_nota||'')}</div>`:''}</div>
+      <div style="text-align:right"><b>${$$(p.total)}</b><div class="hint">utilidad ${$$((+p.total||0)-(+p.costo_interno||0))}</div>
+      ${p.anulado?'<span class="est anulado">anulado</span>':`<span class="est ${p.estado==='en proceso'?'proceso':esc(p.estado||'nuevo')}">${esc(p.estado||'nuevo')}</span>
+        ${p.estado!=='entregado'?`<button class="btn sm gh" onclick="avanzar(${p.id})">→ ${ESTADOS[Math.min(ESTADOS.indexOf(p.estado||'nuevo')+1,3)]}</button>`:''}
+        <button class="x" title="Anular" onclick="anular(${p.id})">✕</button>`}</div></div>`).join(''):'<div class="vacio">Todavía no hay pedidos.</div>'}</div>`;
 }
-function pedFila(x){
-  const anu=!!x.anulado, ed=PEDEDIT===x.id;
-  const d=dur(x.hora_inicio,x.hora_fin);
-  const tarde=!anu&&x.hora_fin&&new Date(x.hora_fin)<new Date()&&x.estado!=='entregado'&&x.estado!=='terminado';
-  return `<div class="item" style="display:block${anu?';opacity:.55;border-left:4px solid var(--bad)':(tarde?';border-left:4px solid var(--warn)':'')}">
-    <div style="display:flex;justify-content:space-between;gap:10px;align-items:start">
-      <div style="min-width:0">
-        <div class="nm"${anu?' style="text-decoration:line-through"':''}>${esc(x.cliente_nombre||'—')}
-          <span class="tag ${x.estado==='entregado'?'a':''}">${esc(x.estado||'nuevo')}</span>
-          ${tarde?'<span class="tag" style="background:#f6e6d8;color:var(--warn)">se pasó la hora</span>':''}</div>
-        <div class="mt">${esc(x.folio||'')} · ${esc(x.tipo||'')} · 📅 ${(x.creado_en||'').slice(0,10)}</div>
-        <div class="mt">${(x.items||[]).map(i=>esc(i.n)+' '+$$(i.v)).join(' · ')||'sin ítems'}</div>
-        <div class="mt">🕒 arranca ${dtTxt(x.hora_inicio)} → entrega ${dtTxt(x.hora_fin)}${d?' · <b>'+d+'</b>':''}</div>
-        ${anu?`<div class="mt" style="color:var(--bad);font-weight:700">ANULADO${x.anulado_por?' por '+esc(x.anulado_por):''}${
-          x.anulado_en?' · '+String(x.anulado_en).slice(0,10):''}${x.anulado_nota?' — '+esc(x.anulado_nota):''}</div>`:''}
-      </div>
-      <div style="text-align:right;flex:none"><div class="nm" style="color:var(--acc)"${anu?' style="text-decoration:line-through"':''}>${$$(x.total)}</div>
-        ${anu?`<button class="btn sm gh" style="margin-top:5px" onclick="pedReact(${x.id})">reactivar</button>`
-             :`<button class="btn sm gh" style="margin-top:5px" onclick="pedEdit(${ed?'null':x.id})">${ed?'cerrar':'✎ editar'}</button>`}</div>
-    </div>
-    ${ed?`<div style="border:1px dashed var(--acc);border-radius:9px;padding:11px;margin-top:10px;background:#faf7f1">
-      <div class="g3">
-        <div><label>Estado</label><select id="pd_e_${x.id}">${ESTPED.map(e=>`<option ${e===(x.estado||'nuevo')?'selected':''}>${e}</option>`).join('')}</select></div>
-        <div><label>Arranca</label><input type="datetime-local" id="pd_i_${x.id}" value="${dtLocal(x.hora_inicio)}"></div>
-        <div><label>Debe estar listo</label><input type="datetime-local" id="pd_f_${x.id}" value="${dtLocal(x.hora_fin)}"></div></div>
-      <label>Notas</label><input id="pd_n_${x.id}" value="${esc(x.notas||'')}" placeholder="Detalles del trabajo, quién lo hace…">
-      <div style="display:flex;gap:8px;margin-top:11px">
-        <button class="btn acc" onclick="pedSave(${x.id})">Guardar</button>
-        <button class="btn gh" onclick="pedEdit(null)">Cancelar</button>
-        <button class="btn gh" style="margin-left:auto;color:var(--bad)" onclick="pedAnular(${x.id})">Anular pedido</button></div>
-    </div>`:''}</div>`;
+function formPedido(){
+  PL=[];
+  $('fpd').innerHTML=`<div class="card"><h3>Nuevo pedido</h3>
+    <div class="g2"><div><label>Cliente</label><select id="pc"><option value="">— nuevo cliente —</option>${CLI.map(c=>`<option value="${c.id}">${esc(c.nombre)}${c.telefono?' · '+esc(c.telefono):''}</option>`).join('')}</select></div>
+      <div><label>Si es nuevo: nombre y teléfono</label><div class="fila"><input id="pn" placeholder="Nombre"><input id="pt" placeholder="Celular" style="max-width:140px"></div></div></div>
+    <label>Productos</label><div class="fila"><select id="pp" style="flex:1;min-width:200px"><option value="">+ agregar producto…</option>${PROD.filter(p=>p.activo!==false).map(p=>`<option value="${p.id}">${esc(p.nombre)} — ${$$(precio(p))}</option>`).join('')}</select>
+      <input id="pq" class="n" value="1" style="width:80px"><button class="btn sm" onclick="addPL()">Agregar</button></div>
+    <div id="pl"></div>
+    <label>Notas (color, personalización, fecha de entrega…)</label><textarea id="pno"></textarea>
+    <div class="fila" style="margin-top:12px"><button class="btn" onclick="guardarPedido()">Guardar pedido</button><button class="btn gh" onclick="$('fpd').innerHTML=''">Cancelar</button></div></div>`;
 }
-function pedEdit(id){ PEDEDIT=(id===null||id==='null')?null:id; vPedidos(); }
-async function pedSave(id){
-  const v=k=>(($('pd_'+k+'_'+id)||{}).value||'').trim();
-  const iso=t=>t?new Date(t).toISOString():null;
-  await patch('zarrat_pedidos','id=eq.'+id,{estado:v('e'),hora_inicio:iso(v('i')),
-    hora_fin:iso(v('f')),notas:v('n')||null});
-  PEDEDIT=null; vPedidos();
+function addPL(){ const p=prodDe(+$('pp').value); if(!p) return; const q=num($('pq').value)||1;
+  const e=PL.find(x=>x.producto_id===p.id); if(e) e.cantidad+=q; else PL.push({producto_id:p.id,nombre:p.nombre,cantidad:q,precio:precio(p),costo:costo(p)}); pintarPL(); }
+function pintarPL(){
+  $('pl').innerHTML=`<table><tr><th>Producto</th><th class="n">Cant.</th><th class="n">Precio</th><th class="n">Subtotal</th><th></th></tr>
+    ${PL.map((l,i)=>`<tr><td>${esc(l.nombre)}</td><td class="n" style="width:80px"><input class="n mini" value="${l.cantidad}" onchange="PL[${i}].cantidad=num(this.value)||1;pintarPL()"></td>
+      <td class="n" style="width:120px"><input class="n mini" value="${Math.round(l.precio)}" onchange="PL[${i}].precio=num(this.value);pintarPL()"></td>
+      <td class="n">${$$(l.cantidad*l.precio)}</td><td><button class="x" onclick="PL.splice(${i},1);pintarPL()">✕</button></td></tr>`).join('')}
+    <tr class="tot"><td colspan="3">Total</td><td class="n">${$$(PL.reduce((s,l)=>s+l.cantidad*l.precio,0))}</td><td></td></tr></table>`;
 }
-async function pedAnular(id){
-  const m=prompt('¿Por qué se anula este pedido?\n(el cliente desistió, no pagó, se cambió el diseño…)','');
-  if(m===null) return;
-  if(!String(m).trim()){ alert('Escribe por qué se anula.'); return; }
-  await patch('zarrat_pedidos','id=eq.'+id,{anulado:true,anulado_en:new Date().toISOString(),
-    anulado_nota:String(m).trim(),anulado_por:'Zarrat'});
-  PEDEDIT=null; vPedidos();
+async function guardarPedido(){
+  if(!PL.length){ alert('Agrega al menos un producto'); return; }
+  let cid=$('pc').value?+$('pc').value:null, cnom=cid?(CLI.find(c=>c.id===cid)||{}).nombre:$('pn').value.trim();
+  if(!cid){ if(!cnom){ alert('Escribe el nombre del cliente'); return; } const r=await post('zarrat_clientes',{nombre:cnom,telefono:$('pt').value.trim()||null}); CLI.push(r[0]); cid=r[0].id; }
+  const d=hoy().replace(/-/g,''), n=PED.filter(p=>(p.folio||'').startsWith('Z'+d)).length+1, folio='Z'+d+'-'+String(n).padStart(2,'0');
+  const total=PL.reduce((s,l)=>s+l.cantidad*l.precio,0), ci=PL.reduce((s,l)=>s+l.cantidad*l.costo,0);
+  const r=await post('zarrat_pedidos',{folio,cliente_id:cid,cliente_nombre:cnom,tipo:'venta',items:PL,total,costo_interno:ci,estado:'nuevo',notas:$('pno').value.trim()||null});
+  PED.unshift(r[0]); toast('Pedido '+folio+' guardado'); vPedidos();
 }
-async function pedReact(id){ if(!confirm('¿Reactivar? Vuelve a contar en los totales.'))return;
-  await patch('zarrat_pedidos','id=eq.'+id,{anulado:false,anulado_en:null,anulado_nota:null,anulado_por:null});
-  vPedidos(); }
+async function avanzar(id){ const p=PED.find(x=>x.id===id), e=ESTADOS[Math.min(ESTADOS.indexOf(p.estado||'nuevo')+1,3)];
+  const b={estado:e}; if(e==='en proceso'&&!p.hora_inicio) b.hora_inicio=new Date().toISOString(); if(e==='terminado') b.hora_fin=new Date().toISOString();
+  await patch('zarrat_pedidos','id=eq.'+id,b); Object.assign(p,b); vPedidos(); }
+async function anular(id){ const m=prompt('¿Por qué se anula este pedido?'); if(m===null) return;
+  const b={anulado:true,anulado_en:new Date().toISOString(),anulado_nota:m||null}; await patch('zarrat_pedidos','id=eq.'+id,b); Object.assign(PED.find(x=>x.id===id),b); vPedidos(); }
 
-/* ═══════ PROVEEDORES · de aquí nace el material ═══════
-   Un material escrito suelto dentro de un costo se pierde: nadie sabe a quién se le
-   compró ni a cómo estaba. Acá el material vive con su proveedor, su unidad y su
-   precio, y desde Costos se jala ya armado. */
-let PROV=[], MATS=[], PROVEDIT=null;
+/* ═══════ 5 · PROVEEDORES ═══════ de materia prima, cada uno con sus materiales
+   y precios. Ese precio es el que jala la ficha técnica. */
+let PV=null;
 async function vProv(){
-  PROV=await get('zarrat_proveedores?order=nombre.asc&limit=300');
-  MATS=await get('zarrat_materiales?order=nombre.asc&limit=800');
-  if(PROVEDIT&&!PROV.some(x=>x.id===PROVEDIT)) PROVEDIT=null;
-  const mp=id=>MATS.filter(m=>m.proveedor_id===id);
-  $('main').innerHTML=`<h1>Proveedores</h1>
-    <div class="sub">${PROV.length} proveedores · ${MATS.length} materiales. De acá salen los materiales de la hoja de costos.</div>
-    <div class="card">
-      <div class="g3"><div><label>Proveedor</label><input id="pv_n" placeholder="Ej: Marroquinero Restrepo"></div>
-        <div><label>Tipo</label><select id="pv_tp">${TIPOPROV.map(t=>`<option>${t}</option>`).join('')}</select></div>
-        <div><label>Contacto</label><input id="pv_c" placeholder="Con quién se habla"></div></div>
-      <div class="g3"><div><label>Teléfono</label><input id="pv_t" placeholder="310 000 0000"></div>
-        <div><label>Dirección</label><input id="pv_d"></div>
-        <div><label>Ciudad</label><input id="pv_ci" placeholder="Bogotá"></div></div>
-      <div><label>Correo</label><input id="pv_e"></div>
-      <label>Notas</label><input id="pv_no" placeholder="Días de entrega, mínimos, formas de pago…">
-      <button class="btn acc full" onclick="provAdd()">+ Agregar proveedor</button>
-    </div>
-    ${PROV.length?PROV.map(v=>`<div class="card">
-      ${PROVEDIT===v.id?`
-      <!-- Un proveedor cambia de telefono, se muda o pasa a otro contacto: si solo se
-           puede borrar y volver a crear, se pierden los materiales que cuelgan de el. -->
-      <div style="border:1px dashed var(--acc);border-radius:9px;padding:11px;background:#faf7f1">
-        <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--acc);margin-bottom:8px">EDITANDO PROVEEDOR</div>
-        <div class="g3"><div><label>Proveedor</label><input id="pe_n_${v.id}" value="${esc(v.nombre||'')}"></div>
-          <div><label>Tipo</label><select id="pe_tp_${v.id}">${TIPOPROV.map(t=>`<option ${t===(v.tipo||'Proveedor')?'selected':''}>${t}</option>`).join('')}</select></div>
-          <div><label>Contacto</label><input id="pe_c_${v.id}" value="${esc(v.contacto||'')}"></div></div>
-        <div class="g3"><div><label>Teléfono</label><input id="pe_t_${v.id}" value="${esc(v.telefono||'')}"></div>
-          <div><label>Dirección</label><input id="pe_d_${v.id}" value="${esc(v.direccion||'')}"></div>
-          <div><label>Ciudad</label><input id="pe_ci_${v.id}" value="${esc(v.ciudad||'')}"></div></div>
-        <div><label>Correo</label><input id="pe_e_${v.id}" value="${esc(v.email||'')}"></div>
-        <label>Notas</label><input id="pe_no_${v.id}" value="${esc(v.notas||'')}" placeholder="Días de entrega, mínimos, formas de pago…">
-        <div style="display:flex;gap:8px;margin-top:11px">
-          <button class="btn acc" onclick="provSave(${v.id})">Guardar cambios</button>
-          <button class="btn gh" onclick="provEdit(null)">Cancelar</button>
-          <button class="btn gh" style="margin-left:auto;color:var(--bad)" onclick="provDel(${v.id})">Quitar proveedor</button></div>
-      </div>`:`
-      <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
-        <div><h2 style="margin:0">${esc(v.nombre)}
-          <span class="chip" style="font-size:10.5px;vertical-align:middle;margin-left:6px;background:${
-            v.tipo==='Maquilador'?'var(--acc)':'var(--line)'};color:${v.tipo==='Maquilador'?'#fff':'var(--ink2)'};
-            padding:2px 9px;border-radius:20px;font-weight:700">${esc(v.tipo||'Proveedor')}</span></h2>
-          <div class="hint">${[v.contacto,v.telefono,v.ciudad,v.direccion,v.email].filter(Boolean).map(esc).join(' · ')||'sin datos de contacto'}</div>
-          ${v.notas?`<div class="hint">${esc(v.notas)}</div>`:''}</div>
-        <div style="display:flex;gap:6px;flex:none">
-          <button class="btn gh sm" onclick="provEdit(${v.id})">✎ editar</button>
-          <button class="btn gh sm" onclick="provDel(${v.id})">✕</button></div></div>`}
-      <div style="font-weight:800;color:var(--acc);font-size:11.5px;letter-spacing:.06em;margin:12px 0 6px">MATERIALES QUE VENDE</div>
-      ${mp(v.id).length?`<div style="display:grid;grid-template-columns:1.2fr 78px 78px 96px 96px 92px 92px auto;gap:5px;
-        font-size:9px;color:var(--mut);font-weight:700;text-transform:uppercase;padding:0 2px 3px">
-        <span>Material</span><span>Calibre</span><span>Color</span><span>Ref. nuestra</span>
-        <span>Unidad</span><span>Valor</span><span>Ref. prov.</span><span></span></div>`+mp(v.id).map(m=>`<div style="display:grid;grid-template-columns:1.2fr 78px 78px 96px 96px 92px 92px auto;gap:5px;align-items:center;margin-bottom:5px">
-        <input value="${esc(m.nombre)}" onchange="matSet(${m.id},'nombre',this.value)">
-        <input value="${esc(m.calibre||'')}" placeholder="—" onchange="matSet(${m.id},'calibre',this.value)">
-        <input value="${esc(m.color||'')}" placeholder="—" onchange="matSet(${m.id},'color',this.value)">
-        <input value="${esc(m.referencia||'')}" placeholder="—" onchange="matSet(${m.id},'referencia',this.value)">
-        <select onchange="matSet(${m.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===m.unidad?'selected':''}>${u}</option>`).join('')}</select>
-        <input type="number" value="${+m.valor_unit||0}" title="Valor por unidad" onchange="matSet(${m.id},'valor_unit',this.value)">
-        <input value="${esc(m.ref_prov||'')}" placeholder="—" onchange="matSet(${m.id},'ref_prov',this.value)">
-        <button class="btn gh" style="padding:4px 9px" onclick="matDel(${m.id})">✕</button>
-        ${m.notas?`<div style="grid-column:1/-1;font-size:11.5px;color:var(--mut);margin:-2px 0 4px 2px">${esc(m.notas)}</div>`:''}
-        </div>`).join('')
-        :'<div class="hint">Todavía no tiene materiales cargados.</div>'}
-      <!-- El material se crea COMPLETO: si toca crearlo y despues editarlo fila por
-           fila, se queda a medias con el precio en cero. -->
-      <div style="border:1px dashed var(--line);border-radius:9px;padding:10px;margin-top:10px;background:#faf7f1">
-        <div style="font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--mut);margin-bottom:7px">
-          NUEVO MATERIAL DE ${esc((v.nombre||'').toUpperCase())}</div>
-        <div class="g2"><div><label>Material</label><input id="mn_${v.id}" placeholder="Ej: Cuero natural graso"></div>
-          <div><label>Tipo de material</label><select id="mc_${v.id}">${CATMAT.map(k=>`<option>${k}</option>`).join('')}</select></div></div>
-        <div class="g3"><div><label>Calibre</label><input id="mca_${v.id}" placeholder="Ej: 1.4 mm"></div>
-          <div><label>Color</label><input id="mco_${v.id}" placeholder="Ej: Miel"></div>
-          <div><label>Referencia del material</label><input id="mrf_${v.id}" placeholder="La nuestra"></div></div>
-        <div class="g3"><div><label>Unidad</label><select id="mu_${v.id}">${UNIDS.map(u=>`<option ${u==='unidad'?'selected':''}>${u}</option>`).join('')}</select></div>
-          <div><label>Valor por unidad</label><input id="mv_${v.id}" type="number" placeholder="0"></div>
-          <div><label>Referencia del proveedor</label><input id="mr_${v.id}" placeholder="Con qué código lo pide él"></div></div>
-        <label>Notas</label><input id="mo_${v.id}" placeholder="Color, calibre, mínimo de compra…">
-        <button class="btn acc full" onclick="matAdd(${v.id})">+ Agregar material</button>
-      </div>
-    </div>`).join(''):'<div class="card"><div class="hint">Todavía no hay proveedores. Agrega el primero arriba.</div></div>'}`;
+  $('main').innerHTML=`<h1>Proveedores</h1><div class="sub">Quién vende la materia prima y a cuánto. Cambiar un precio aquí recalcula todas las fichas que lo usan.</div>
+    <div class="top"><span></span><button class="btn" onclick="formProv()">+ Nuevo proveedor</button></div><div id="fpv"></div>
+    <div id="lpv">${PROV.filter(p=>p.activo!==false).map(p=>{ const ms=MAT.filter(m=>m.proveedor_id===p.id&&m.activo!==false); return `<div class="card">
+      <div class="item" style="border:none;padding:0"><div><div class="nm">${esc(p.nombre)} <span class="hint">· ${ms.length} material${ms.length===1?'':'es'}</span></div>
+        <div class="dt">${[p.contacto,p.telefono,p.ciudad].filter(Boolean).map(esc).join(' · ')}${p.notas?' · '+esc(p.notas):''}</div></div>
+        <div class="fila"><button class="btn sm gh" onclick="formProv(${p.id})">Editar</button><button class="btn sm gh" onclick="PV=PV===${p.id}?null:${p.id};vProv()">${PV===p.id?'Cerrar':'Materiales'}</button></div></div>
+      ${PV===p.id?`<table style="margin-top:12px"><tr><th>Material</th><th>Categoría</th><th>Unidad</th><th class="n">Precio</th><th></th></tr>
+        ${ms.map(m=>`<tr><td>${esc(m.nombre)}${m.color?' <span class="hint">· '+esc(m.color)+'</span>':''}${m.ref_prov?' <span class="hint">· ref '+esc(m.ref_prov)+'</span>':''}</td><td class="hint">${esc(m.categoria||'')}</td><td>${esc(m.unidad||'')}</td>
+          <td class="n" style="width:130px"><input class="n mini" value="${Math.round(+m.valor_unit||0)}" onchange="precioMat(${m.id},this.value)"></td>
+          <td><button class="x" onclick="quitarMat(${m.id})">✕</button></td></tr>`).join('')}
+        <tr><td colspan="5" style="padding-top:10px"><div class="fila"><input id="mn" placeholder="Nuevo material (ej: Cuero vacuno napa)" style="flex:2;min-width:180px"><input id="mc" placeholder="color" style="max-width:110px">
+          <select id="mk" style="max-width:150px">${CATMAT.map(c=>`<option>${c}</option>`).join('')}</select><select id="mu" style="max-width:100px">${UNID.map(u=>`<option>${u}</option>`).join('')}</select>
+          <input id="mv" class="n" placeholder="precio" style="max-width:110px"><button class="btn sm" onclick="nuevoMat(${p.id})">Agregar</button></div></td></tr></table>`:''}</div>`; }).join('')||'<div class="vacio">Sin proveedores todavía.</div>'}</div>`;
 }
-async function provAdd(){
-  const nom=($('pv_n').value||'').trim(); if(!nom){ alert('Falta el nombre del proveedor'); return; }
-  await post('zarrat_proveedores',{nombre:nom,tipo:($('pv_tp')||{}).value||'Proveedor',
-    contacto:$('pv_c').value.trim(),telefono:$('pv_t').value.trim(),
-    direccion:$('pv_d').value.trim(),ciudad:$('pv_ci').value.trim(),email:$('pv_e').value.trim(),
-    notas:$('pv_no').value.trim()||null,activo:true},'return=minimal');
-  vProv();
+function formProv(id){
+  const p=id?provDe(id):{};
+  $('fpv').innerHTML=`<div class="card"><h3>${id?'Editar':'Nuevo'} proveedor</h3>
+    <div class="g2"><div><label>Nombre</label><input id="v_n" value="${esc(p.nombre||'')}"></div><div><label>Contacto</label><input id="v_c" value="${esc(p.contacto||'')}"></div></div>
+    <div class="g3"><div><label>Teléfono</label><input id="v_t" value="${esc(p.telefono||'')}"></div><div><label>Ciudad</label><input id="v_ci" value="${esc(p.ciudad||'')}"></div><div><label>Correo</label><input id="v_e" value="${esc(p.email||'')}"></div></div>
+    <label>Notas</label><textarea id="v_no">${esc(p.notas||'')}</textarea>
+    <div class="fila" style="margin-top:12px"><button class="btn" onclick="guardarProv(${id||0})">Guardar</button><button class="btn gh" onclick="$('fpv').innerHTML=''">Cancelar</button>
+      ${id?`<button class="btn gh" style="margin-left:auto;color:var(--bad);border-color:var(--bad)" onclick="retirar('zarrat_proveedores',${id},PROV,vProv)">Retirar</button>`:''}</div></div>`;
 }
-function provEdit(id){ PROVEDIT=id; vProv(); }
-async function provSave(id){
-  const g=k=>(($('pe_'+k+'_'+id)||{}).value||'').trim();
-  const nom=g('n'); if(!nom){ alert('El proveedor necesita nombre'); return; }
-  await patch('zarrat_proveedores','id=eq.'+id,{nombre:nom,
-    tipo:(($('pe_tp_'+id)||{}).value)||'Proveedor',contacto:g('c'),telefono:g('t'),
-    direccion:g('d'),ciudad:g('ci'),email:g('e'),notas:g('no')||null});
-  PROVEDIT=null; vProv();
+async function guardarProv(id){
+  const b={nombre:$('v_n').value.trim(),contacto:$('v_c').value.trim()||null,telefono:$('v_t').value.trim()||null,ciudad:$('v_ci').value.trim()||null,email:$('v_e').value.trim()||null,notas:$('v_no').value.trim()||null,tipo:'materia prima'};
+  if(!b.nombre){ alert('Falta el nombre'); return; }
+  if(id){ await patch('zarrat_proveedores','id=eq.'+id,b); Object.assign(provDe(id),b); } else { const r=await post('zarrat_proveedores',b); PROV.push(r[0]); PV=r[0].id; }
+  toast('Proveedor guardado'); vProv();
 }
-async function provDel(id){
-  const cuantos=MATS.filter(m=>m.proveedor_id===id).length;
-  if(!confirm(cuantos?`Este proveedor tiene ${cuantos} material(es). ¿Quitarlo? Los materiales quedan sin proveedor.`
-    :'¿Quitar este proveedor?')) return;
-  await del('zarrat_proveedores','id=eq.'+id); vProv();
+async function nuevoMat(pid){
+  const n=$('mn').value.trim(); if(!n){ alert('Escribe el nombre del material'); return; }
+  const r=await post('zarrat_materiales',{nombre:n,color:$('mc').value.trim()||null,categoria:$('mk').value,unidad:$('mu').value,valor_unit:num($('mv').value),proveedor_id:pid,activo:true});
+  MAT.push(r[0]); vProv();
 }
-async function matAdd(pid){
-  const nom=(($('mn_'+pid)||{}).value||'').trim(); if(!nom){ alert('Ponle nombre al material'); return; }
-  const val=+(($('mv_'+pid)||{}).value)||0;
-  if(!val&&!confirm('Este material va sin precio. ¿Guardarlo así?')) return;
-  const t=k=>(($('m'+k+'_'+pid)||{}).value||'').trim()||null;
-  await post('zarrat_materiales',{nombre:nom,categoria:$('mc_'+pid).value,proveedor_id:pid,
-    unidad:($('mu_'+pid)||{}).value||'unidad',valor_unit:val,
-    calibre:t('ca'),color:t('co'),referencia:t('rf'),ref_prov:t('r'),notas:t('o'),
-    activo:true},'return=minimal');
-  vProv();
-}
-async function matSet(id,campo,v){
-  const b={}; b[campo]=(campo==='valor_unit')?(+v||0):v;
-  await patch('zarrat_materiales','id=eq.'+id,b); vProv();
-}
-async function matDel(id){ if(!confirm('¿Quitar este material?'))return;
-  await del('zarrat_materiales','id=eq.'+id); vProv(); }
+async function precioMat(id,v){ const m=matDe(id); await patch('zarrat_materiales','id=eq.'+id,{valor_unit:num(v)}); m.valor_unit=num(v); toast('Precio guardado · las fichas ya lo usan'); }
+async function quitarMat(id){ if(!confirm('¿Retirar este material? Las fichas que lo usan se quedan con la cantidad pero sin precio.')) return;
+  await patch('zarrat_materiales','id=eq.'+id,{activo:false}); matDe(id).activo=false; vProv(); }
+async function retirar(tabla,id,arr,vista){ if(!confirm('¿Retirar? Queda inactivo, no se borra.')) return; await patch(tabla,'id=eq.'+id,{activo:false}); arr.find(x=>x.id===id).activo=false; $('fpv')&&($('fpv').innerHTML=''); vista(); }
 
-/* ═══════ COSTOS · la hoja de costo de lo que se manda a hacer ═══════
-   Esto NO es la prenda a la medida (esa se cotiza con las medidas del cliente). Es lo
-   que se produce por referencia: maletas, calzado, marroquinería. El producto es el
-   MISMO del catálogo -ahí vive su valor de venta- y aquí se le abre el despiece:
-   cada materia prima y cada paso de mano de obra, con valor unitario y cantidad.
-   Según la categoría salen los materiales que esa categoría suele llevar, para no
-   arrancar de una hoja en blanco. Se pueden borrar y agregar los que sean. */
-const MATCAT={
-  'Maletas y bolsos':['Cuero','Lona','Forro (tela)','Cremallera','Argollas','Medias lunas','Hilo','Herrajes'],
-  'Marroquinería'   :['Cuero','Forro','Broches','Hilo','Tinta de cantos','Herrajes'],
-  'Calzado'         :['Cuero','Forro','Suela','Plantilla','Cordones','Pegante','Hilo'],
-  'Confección'      :['Tela','Forro','Entretela','Cremallera','Botones','Hilo'],
-};
-const UNIDS=['unidad','metro','decímetro','pie cuadrado','par','juego','gramo','pliego'];
-/* La categoria del MATERIAL es el tipo de material, no el producto que se va a hacer:
-   un proveedor vende cueros y otro herrajes, y en la hoja de costos se busca asi. */
-const CATMAT=['Cueros','Telas y forros','Herrajes','Cremalleras','Suelas y plantillas',
-              'Hilos','Pegantes y químicos','Empaque','Mano de obra y maquila','Otros'];
-/* La maquila entra como proveedor: es la misma relación -le encargas, te cobra- y
-   cuando suba el armado se repreciar igual que el cuero, en un solo sitio. */
-const CATMO='Mano de obra y maquila';
-/* Quien vende material y quien maquila no se manejan igual: al maquilador se le
-   programa y se le paga por prenda, al proveedor se le pide y se le recibe. */
-const TIPOPROV=['Proveedor','Maquilador','Ambos'];
-let MODS=[], MODMAT=[], REFS=[], REFMAT=[], MODSEL=null, REFSEL=null;
-async function vCostos(){
-  [MODS,MATS,PROV]=await Promise.all([
-    get('zarrat_modelo?activo=is.true&order=id'),
-    get('zarrat_materiales?order=nombre.asc&limit=800'),
-    get('zarrat_proveedores?order=nombre.asc&limit=300')]);
-  if(MODSEL&&!MODS.some(m=>m.id===MODSEL)) MODSEL=null;
-  if(!MODSEL&&MODS.length) MODSEL=MODS[0].id;
-  MODMAT = MODSEL?await get('zarrat_modelo_mat?modelo_id=eq.'+MODSEL+'&order=orden'):[];
-  REFS   = MODSEL?await get('zarrat_referencia?modelo_id=eq.'+MODSEL+'&order=id'):[];
-  if(REFSEL&&!REFS.some(r=>r.id===REFSEL)) REFSEL=null;
-  REFMAT = REFSEL?await get('zarrat_ref_mat?referencia_id=eq.'+REFSEL+'&order=orden'):[];
-  const m=MODS.find(x=>x.id===MODSEL);
-  $('main').innerHTML=`<h1>Costos</h1>
-    <div class="sub">El <b>modelo</b> es la receta: qué lleva y cuánto. La <b>referencia</b> es esa receta
-      en un color, un forro y unos apliques concretos — y es lo que se vende.</div>
-    <div class="card">
-      <div class="g2">
-        <div><label>Modelo</label><select onchange="modSel(this.value)">
-          ${MODS.map(x=>`<option value="${x.id}" ${x.id===MODSEL?'selected':''}>${esc(x.nombre)}</option>`).join('')}
-        </select></div>
-        <div><label>…o crea uno nuevo</label>
-          <div style="display:flex;gap:6px"><input id="mo_n" placeholder="Ej: Bolso de mano">
-            <button class="btn gh" onclick="modNuevo()">+ modelo</button></div></div>
-      </div>
-      ${m&&m.descripcion?`<div class="hint" style="margin-top:8px">${esc(m.descripcion)}</div>`:''}
-    </div>
-    ${m?recetaHTML(m):''}
-    ${m?refsHTML():''}
-    ${REFSEL?fichaHTML():''}`;
+/* ═══════ 6 · MANUFACTUREROS ═══════ quien fabrica. La ficha lo jala y le pone
+   la mano de obra por unidad. */
+async function vManu(){
+  $('main').innerHTML=`<h1>Manufactureros</h1><div class="sub">Los talleres o personas que fabrican. Cada producto tiene el suyo y su valor de mano de obra en la ficha.</div>
+    <div class="top"><span></span><button class="btn" onclick="formManu()">+ Nuevo manufacturero</button></div><div id="fmu"></div>
+    <div class="card">${MANU.filter(m=>m.activo!==false).map(m=>{ const ps=PROD.filter(p=>p.manufacturero_id===m.id&&p.activo!==false); return `<div class="item"><div>
+      <div class="nm">${esc(m.nombre)}${m.especialidad?' <span class="tag">'+esc(m.especialidad)+'</span>':''}</div>
+      <div class="dt">${[m.contacto,m.telefono,m.ciudad].filter(Boolean).map(esc).join(' · ')}${m.notas?' · '+esc(m.notas):''}</div>
+      <div class="dt">${ps.length?'Hace: '+ps.map(p=>esc(p.nombre)+' ('+$$(p.mano_obra)+')').join(', '):'Todavía sin productos asignados'}</div></div>
+      <button class="btn sm gh" onclick="formManu(${m.id})">Editar</button></div>`; }).join('')||'<div class="vacio">Sin manufactureros todavía.</div>'}</div>`;
 }
-function modSel(v){ MODSEL=+v||null; REFSEL=null; vCostos(); }
-async function modNuevo(){
-  const n=($('mo_n').value||'').trim(); if(!n){ alert('Ponle nombre al modelo'); return; }
-  const r=await post('zarrat_modelo',{nombre:n,activo:true});
-  MODSEL=(Array.isArray(r)?r[0]:r).id; REFSEL=null; vCostos();
+function formManu(id){
+  const m=id?manuDe(id):{};
+  $('fmu').innerHTML=`<div class="card"><h3>${id?'Editar':'Nuevo'} manufacturero</h3>
+    <div class="g2"><div><label>Nombre / taller</label><input id="m_n" value="${esc(m.nombre||'')}"></div><div><label>Especialidad</label><input id="m_e" value="${esc(m.especialidad||'')}" placeholder="maletas, carteras, billeteras…"></div></div>
+    <div class="g3"><div><label>Contacto</label><input id="m_c" value="${esc(m.contacto||'')}"></div><div><label>Teléfono</label><input id="m_t" value="${esc(m.telefono||'')}"></div><div><label>Ciudad</label><input id="m_ci" value="${esc(m.ciudad||'')}"></div></div>
+    <label>Notas (tiempos, mínimos, cómo cobra)</label><textarea id="m_no">${esc(m.notas||'')}</textarea>
+    <div class="fila" style="margin-top:12px"><button class="btn" onclick="guardarManu(${id||0})">Guardar</button><button class="btn gh" onclick="$('fmu').innerHTML=''">Cancelar</button>
+      ${id?`<button class="btn gh" style="margin-left:auto;color:var(--bad);border-color:var(--bad)" onclick="retirar('zarrat_manufactureros',${id},MANU,vManu)">Retirar</button>`:''}</div></div>`;
 }
-const PAPELES=['cuerpo','correas','forro','cremallera','herraje','aplique','insumo','mo'];
-function recetaHTML(m){
-  const G='grid-template-columns:96px 1.3fr 130px 80px auto';
-  const f=x=>`<div style="display:grid;${G};gap:6px;align-items:center;margin-bottom:5px">
-    <select onchange="modMatSet(${x.id},'papel',this.value)">${PAPELES.map(p=>`<option ${p===x.papel?'selected':''}>${p}</option>`).join('')}</select>
-    <input value="${esc(x.nombre)}" onchange="modMatSet(${x.id},'nombre',this.value)">
-    <select onchange="modMatSet(${x.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===x.unidad?'selected':''}>${u}</option>`).join('')}</select>
-    <input type="number" step="0.01" value="${+x.cantidad||1}" onchange="modMatSet(${x.id},'cantidad',this.value)">
-    <button class="btn gh" style="padding:4px 9px" onclick="modMatDel(${x.id})">✕</button></div>`;
-  return `<div class="card">
-    <h2 style="margin:0 0 3px">Receta de ${esc(m.nombre)}</h2>
-    <div class="hint" style="margin-bottom:10px">Qué lleva y en qué cantidad, sin decir de qué color.
-      Cambiar algo acá afecta a las ${REFS.length} referencias de este modelo.</div>
-    <div style="display:grid;${G};gap:6px;font-size:9.5px;color:var(--mut);font-weight:700;
-      text-transform:uppercase;padding:0 2px 4px">
-      <span>Papel</span><span>Qué es</span><span>Unidad</span><span>Cant.</span><span></span></div>
-    ${MODMAT.filter(x=>x.grupo==='material').map(f).join('')||'<div class="hint">Sin materiales.</div>'}
-    <div style="font-weight:800;color:var(--acc);font-size:11.5px;letter-spacing:.06em;margin:12px 0 6px">MANO DE OBRA</div>
-    ${MODMAT.filter(x=>x.grupo==='mano_obra').map(f).join('')||'<div class="hint">Sin pasos.</div>'}
-    <div style="display:flex;gap:6px;margin-top:9px">
-      <button class="btn gh" onclick="modMatAdd('material')">+ material</button>
-      <button class="btn gh" onclick="modMatAdd('mano_obra')">+ paso</button></div>
-  </div>`;
-}
-async function modMatAdd(g){ await post('zarrat_modelo_mat',{modelo_id:MODSEL,papel:g==='mano_obra'?'mo':'insumo',
-  nombre:'',unidad:'unidad',cantidad:1,grupo:g,orden:MODMAT.length},'return=minimal'); vCostos(); }
-async function modMatSet(id,c,v){ const b={}; b[c]=(c==='cantidad')?(+v||0):v;
-  await patch('zarrat_modelo_mat','id=eq.'+id,b); vCostos(); }
-async function modMatDel(id){ if(!confirm('¿Quitar de la receta? Se quita del modelo, no de las referencias ya hechas.'))return;
-  await del('zarrat_modelo_mat','id=eq.'+id); vCostos(); }
-
-function refsHTML(){
-  return `<div class="card">
-    <h2 style="margin:0 0 3px">Referencias</h2>
-    <div class="hint" style="margin-bottom:10px">Cada una es este modelo en un color, un forro y unos apliques.</div>
-    ${REFS.length?REFS.map(r=>`<div class="item" style="cursor:pointer${r.id===REFSEL?';border-color:var(--acc)':''}"
-      onclick="refSel(${r.id})">
-      <div><div class="nm">${esc(r.codigo||'')} · ${esc(r.nombre||'')}</div>
-        <div class="mt">${[r.color,r.forro,r.apliques].filter(x=>x&&x!=='—').map(esc).join(' · ')||'sin definir'}</div></div>
-      <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(r.precio)}</div>
-        <div class="mt">${r.id===REFSEL?'abierta':'ver ficha'}</div></div></div>`).join('')
-      :'<div class="hint">Todavía sin referencias.</div>'}
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;margin-top:10px">
-      <input id="rf_n" placeholder="Nombre (ej: Cuero verde)">
-      <input id="rf_c" placeholder="Color / material">
-      <input id="rf_f" placeholder="Forro">
-      <button class="btn acc" onclick="refNueva()">+ referencia</button></div>
-  </div>`;
-}
-function refSel(id){ REFSEL=(REFSEL===id?null:id); vCostos(); }
-async function refNueva(){
-  const n=($('rf_n').value||'').trim(); if(!n){ alert('Ponle nombre a la referencia'); return; }
-  const m=MODS.find(x=>x.id===MODSEL)||{};
-  const cod='ZR-'+(m.nombre||'M').split(' ').map(w=>w[0]).join('').toUpperCase()
-    +'-'+n.replace(/[^A-Za-zÁÉÍÓÚÑ]/g,'').slice(0,3).toUpperCase();
-  const r=await post('zarrat_referencia',{modelo_id:MODSEL,codigo:cod,nombre:n,
-    color:($('rf_c').value||'').trim()||null,forro:($('rf_f').value||'').trim()||null,
-    precio:0,activo:true});
-  const nid=(Array.isArray(r)?r[0]:r).id;
-  const ln=MODMAT.map((l,i)=>({referencia_id:nid,modelo_mat_id:l.id,nombre:l.nombre,unidad:l.unidad,
-    cantidad:l.cantidad,valor_unit:0,grupo:l.grupo,orden:i}));
-  if(ln.length) await post('zarrat_ref_mat',ln,'return=minimal');
-  REFSEL=nid; vCostos();
-}
-function fichaHTML(){
-  const r=REFS.find(x=>x.id===REFSEL); if(!r) return '';
-  const sum=g=>REFMAT.filter(x=>x.grupo===g).reduce((s,x)=>s+(+x.valor_unit||0)*(+x.cantidad||0),0);
-  const cm=sum('material'), co=sum('mano_obra'), tot=cm+co, venta=+r.precio||0;
-  const marg=venta?((venta-tot)/venta*100):0;
-  const G='grid-template-columns:1.25fr .85fr 96px 92px 66px 92px auto';
-  const selMat=(x,mo)=>{
-    const gr={}; (MATS||[]).filter(mm=>mo?(mm.categoria===CATMO):(mm.categoria!==CATMO))
-      .forEach(mm=>{ (gr[mm.categoria||'Otros']=gr[mm.categoria||'Otros']||[]).push(mm); });
-    const act=(MATS||[]).find(mm=>mm.id===x.material_id);
-    let h=`<select onchange="refMat(${x.id},this.value)">`;
-    h+=`<option value=""${act?'':' selected'}>${esc(x.nombre||(mo?'— elige el taller —':'— elige material —'))}</option>`;
-    Object.keys(gr).sort().forEach(g=>{ h+=`<optgroup label="${esc(g)}">`;
-      gr[g].forEach(mm=>{ const et=[mm.nombre,mm.calibre,mm.color].filter(Boolean).join(' · ');
-        h+=`<option value="${mm.id}"${act&&act.id===mm.id?' selected':''}>${esc(et)}</option>`; });
-      h+='</optgroup>'; });
-    return h+'</select>'; };
-  const provDe=x=>{ const mm=(MATS||[]).find(y=>y.id===x.material_id); if(!mm) return '<span class="dim">—</span>';
-    const v=(PROV||[]).find(y=>y.id===mm.proveedor_id); return v?esc(v.nombre):'<span class="dim">sin proveedor</span>'; };
-  const f=x=>`<div style="display:grid;${G};gap:6px;align-items:center;margin-bottom:5px">
-    ${selMat(x,x.grupo==='mano_obra')}
-    <span style="font-size:11.5px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${provDe(x)}</span>
-    <select onchange="refMatSet(${x.id},'unidad',this.value)">${UNIDS.map(u=>`<option ${u===x.unidad?'selected':''}>${u}</option>`).join('')}</select>
-    <input type="number" value="${+x.valor_unit||0}" onchange="refMatSet(${x.id},'valor_unit',this.value)">
-    <input type="number" step="0.01" value="${+x.cantidad||1}" onchange="refMatSet(${x.id},'cantidad',this.value)">
-    <b style="text-align:right">${$$((+x.valor_unit||0)*(+x.cantidad||0))}</b>
-    <button class="btn gh" style="padding:4px 9px" onclick="refMatDel(${x.id})">✕</button></div>`;
-  const campo=(k,t,ph)=>`<div><label>${t}</label><input value="${esc(r[k]||'')}" placeholder="${ph||''}"
-      onchange="refSet('${k}',this.value)"></div>`;
-  return `<div class="card" style="border-color:var(--acc)">
-    <h2 style="margin:0 0 3px">Ficha técnica · ${esc(r.codigo||'')}</h2>
-    <div class="hint" style="margin-bottom:10px">Lo que hace distinta a esta referencia dentro del modelo.</div>
-    <div class="g3">${campo('nombre','Nombre')}${campo('codigo','Referencia')}${campo('color','Color / material')}</div>
-    <div class="g3">${campo('forro','Forro')}${campo('apliques','Apliques')}${campo('personalizacion','Personalización','Iniciales, grabado…')}</div>
-    <div class="g3">${campo('medidas','Medidas','largo × alto × fondo')}${campo('taller','Taller que la hizo')}
-      <div><label>Precio de venta</label><input type="number" value="${+r.precio||0}" onchange="refSet('precio',this.value)"></div></div>
-    <div style="font-weight:800;color:var(--acc);font-size:11.5px;letter-spacing:.06em;margin:16px 0 6px">MATERIALES</div>
-    <div style="display:grid;${G};gap:6px;font-size:9.5px;color:var(--mut);font-weight:700;text-transform:uppercase;padding:0 2px 4px">
-      <span>Material</span><span>Proveedor</span><span>Unidad</span><span>Vr. unit.</span><span>Cant.</span><span style="text-align:right">Total</span><span></span></div>
-    ${REFMAT.filter(x=>x.grupo==='material').map(f).join('')}
-    <div style="font-weight:800;color:var(--acc);font-size:11.5px;letter-spacing:.06em;margin:14px 0 6px">MANO DE OBRA</div>
-    ${REFMAT.filter(x=>x.grupo==='mano_obra').map(f).join('')}
-    <div style="border-top:2px solid var(--line);margin-top:14px;padding-top:11px;font-size:14px;line-height:2">
-      <div>Materia prima <b>${$$(cm)}</b></div>
-      <div>Mano de obra <b>${$$(co)}</b></div>
-      <div style="font-size:17px;color:var(--acc)"><b>COSTO ${$$(tot)}</b></div>
-      ${venta?`<div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">
-        Venta <b>${$$(venta)}</b> → deja <b style="color:${venta-tot>0?'var(--ok)':'var(--bad)'}">${$$(venta-tot)}</b>
-        · margen <b style="color:${marg>=50?'var(--ok)':(marg>=30?'var(--acc)':'var(--bad)')}">${marg.toFixed(0)}%</b></div>`
-       :`<div class="hint" style="margin-top:8px">Ponle precio de venta arriba para ver el margen.</div>`}
-    </div>
-    <button class="btn gh" style="margin-top:12px" onclick="refDel(${r.id})">Quitar esta referencia</button>
-  </div>`;
-}
-async function refSet(c,v){ const b={}; b[c]=(c==='precio')?(+v||0):(v||null);
-  await patch('zarrat_referencia','id=eq.'+REFSEL,b); vCostos(); }
-async function refMat(id,matId){
-  if(!matId){ vCostos(); return; }
-  const m=(MATS||[]).find(x=>x.id===+matId); if(!m) return;
-  await patch('zarrat_ref_mat','id=eq.'+id,{material_id:m.id,
-    nombre:[m.nombre,m.calibre,m.color].filter(Boolean).join(' · '),
-    unidad:m.unidad||'unidad',valor_unit:+m.valor_unit||0});
-  vCostos();
-}
-async function refMatSet(id,c,v){ const b={}; b[c]=(c==='unidad')?v:(+v||0);
-  await patch('zarrat_ref_mat','id=eq.'+id,b); vCostos(); }
-async function refMatDel(id){ await del('zarrat_ref_mat','id=eq.'+id); vCostos(); }
-async function refDel(id){ if(!confirm('¿Quitar esta referencia y su ficha?'))return;
-  await del('zarrat_ref_mat','referencia_id=eq.'+id);
-  await del('zarrat_referencia','id=eq.'+id); REFSEL=null; vCostos(); }
-
-/* ═══════ 1 · ESTRUCTURACIÓN ═══════ */
-const CATS=['Pendientes','Investigación','Directorio proveedores','Herramientas'];
-const RESP=['María Zarrate','Claudia Ruiz','José Calderón'];
-let FCAT='Pendientes', EDIT=null, ROWS=[];
-async function vPend(){
-  ROWS=await get('zarrat_pendientes?order=fecha.asc&limit=400');
-  const n=c=>ROWS.filter(x=>(x.categoria||'Pendientes')===c).length;
-  const dc=ROWS.filter(x=>(x.categoria||'Pendientes')===FCAT);
-  const pen=dc.filter(x=>x.estado!=='hecho'), hech=dc.filter(x=>x.estado==='hecho');
-  const e=EDIT||{};
-  $('main').innerHTML=`<h1>Estructuración</h1><div class="sub">Elige el cajón, llena el formulario y toca cualquier registro para editarlo</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-    ${CATS.map(c=>`<button class="btn ${c===FCAT?'acc':'gh'}" style="flex:1;min-width:130px;padding:14px 10px;font-size:13px" onclick="setCat('${c}')">
-      ${c}<div style="font-family:Georgia,serif;font-size:19px;margin-top:2px">${n(c)}</div></button>`).join('')}
-  </div>
-  <div class="card" ${EDIT?'style="border-color:var(--acc);border-width:2px"':''}>
-    ${EDIT?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <b style="color:var(--acc);font-size:13px">✎ Editando registro</b>
-      <button class="btn sm gh" onclick="EDIT=null;vPend()">Cancelar</button></div>`:''}
-    <div class="g2">
-      <div><label>Cajón</label><select id="p_c">${CATS.map(c=>`<option ${c===(e.categoria||FCAT)?'selected':''}>${c}</option>`).join('')}</select></div>
-      <div><label>Responsable</label><select id="p_r"><option value="">— sin asignar —</option>${RESP.map(r=>`<option ${r===e.responsable?'selected':''}>${r}</option>`).join('')}</select></div>
-    </div>
-    <label>Tarea / tipo</label><input id="p_ti" placeholder="Ej: entregar vestido · proveedor de telas · investigar bordadoras" value="${esc(e.titulo||'')}">
-    <div class="g2"><div><label>Empresa</label><input id="p_em" placeholder="Razón social / marca" value="${esc(e.empresa||'')}"></div>
-      <div><label>Contacto</label><input id="p_co" placeholder="Nombre de la persona" value="${esc(e.contacto||'')}"></div></div>
-    <div class="g2"><div><label>Teléfono</label><input id="p_t" inputmode="tel" value="${esc(e.telefono||'')}"></div>
-      <div><label>Correo</label><input id="p_ma" inputmode="email" placeholder="correo@…" value="${esc(e.correo||'')}"></div></div>
-    <div class="g2"><div><label>Instagram</label><input id="p_ig" placeholder="@usuario" value="${esc(e.instagram||'')}"></div>
-      <div><label>Fecha</label><input type="date" id="p_f" value="${esc(e.fecha||hoy())}"></div></div>
-    <label>Dirección</label><input id="p_d" placeholder="Dónde" value="${esc(e.direccion||'')}">
-    <label>Página web / enlace</label><input id="p_w" placeholder="https://…" value="${esc(e.web||'')}">
-    <label>Notas</label><textarea id="p_n" placeholder="Detalle…">${esc(e.notas||'')}</textarea>
-    <button class="btn full ${EDIT?'acc':''}" onclick="addPend()">${EDIT?'💾 Guardar cambios':'+ Agregar'}</button>
-  </div>
-  <h1 style="font-size:18px">${esc(FCAT)} · ${pen.length}</h1>
-  ${pen.length?pen.map(it).join(''):'<div class="empty">Nada en este cajón ✦</div>'}
-  ${hech.length?`<h1 style="font-size:18px;margin-top:22px">Cerrados · ${hech.length}</h1>${hech.slice(0,25).map(it).join('')}`:''}`;
-  if(EDIT) window.scrollTo({top:0,behavior:'smooth'});
-  function it(x){const done=x.estado==='hecho';
-    return `<div class="item ${done?'done':''}" style="cursor:pointer" onclick="editar(${x.id})" title="Toca para editar"><div>
-      <div class="nm">${esc(x.titulo)}${x.empresa?` <span style="font-weight:400;color:var(--mut)">· ${esc(x.empresa)}</span>`:''}</div>
-      <div class="mt">${x.responsable?`<span class="tag a">👤 ${esc(x.responsable)}</span> `:''}📅 ${esc(x.fecha||'')}${x.contacto?' · 🙋 '+esc(x.contacto):''}${x.telefono?' · 📱 '+esc(x.telefono):''}</div>
-      ${(x.correo||x.instagram||x.direccion)?`<div class="mt">${x.correo?'✉️ '+esc(x.correo):''}${x.instagram?(x.correo?' · ':'')+'📷 '+esc(x.instagram):''}${x.direccion?((x.correo||x.instagram)?' · ':'')+'📍 '+esc(x.direccion):''}</div>`:''}
-      ${x.web?`<div class="mt">🔗 <a href="${esc(x.web)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--acc);font-weight:700">${esc(String(x.web).replace(/^https?:\/\//,'').slice(0,44))}</a></div>`:''}
-      ${x.notas?`<div class="mt">📝 ${esc(x.notas)}</div>`:''}</div>
-      <div style="display:flex;gap:5px;flex-direction:column" onclick="event.stopPropagation()">
-        <button class="btn sm ${done?'gh':'acc'}" onclick="togPend(${x.id},'${done?'pendiente':'hecho'}')">${done?'↩︎':'✓'}</button>
-        <button class="btn sm gh" onclick="delRow('zarrat_pendientes',${x.id},vPend)">✕</button></div></div>`;}
-}
-function setCat(c){ FCAT=c; EDIT=null; vPend(); }
-function editar(id){ EDIT=ROWS.find(x=>x.id===id)||null; vPend(); }
-async function addPend(){
-  const t=$('p_ti').value.trim(); if(!t)return alert('Escribe qué es o qué se necesita.');
-  const b={fecha:$('p_f').value||hoy(),titulo:t,categoria:$('p_c').value,responsable:$('p_r').value||null,
-    empresa:$('p_em').value.trim()||null, contacto:$('p_co').value.trim()||null,
-    instagram:$('p_ig').value.trim()||null, correo:$('p_ma').value.trim()||null,
-    telefono:$('p_t').value.trim(),direccion:$('p_d').value.trim(),web:$('p_w').value.trim()||null,notas:$('p_n').value.trim()};
-  if(EDIT){ await patch('zarrat_pendientes','id=eq.'+EDIT.id,b); EDIT=null; }
-  else await post('zarrat_pendientes',b,'return=minimal');
-  FCAT=b.categoria; vPend();
-}
-const togPend=(id,e)=>patch('zarrat_pendientes','id=eq.'+id,{estado:e}).then(vPend);
-const delRow=(t,id,cb)=>{ if(confirm('¿Eliminar?')) del(t,'id=eq.'+id).then(cb); };
-
-/* ═══════ 2 · GASTOS + PUNTO DE EQUILIBRIO ═══════ */
-let EGASTO=null, GASTOS=[], HISTG=[];
-async function vGastos(){
-  const m=mesAct();
-  const [g,cf,vt]=await Promise.all([get('zarrat_gastos?mes=eq.'+m+'&order=valor.desc'),get('zarrat_config?clave=eq.margen'),get('zarrat_ventas?limit=500')]);
-  GASTOS=g; const eg=EGASTO||{};
-  const metaMargen=+((cf[0]||{}).valor||40);           // la META que ella se pone
-  const fijos=g.filter(x=>x.tipo==='fijo').reduce((s,x)=>s+(+x.valor||0),0);
-  const varia=g.filter(x=>x.tipo!=='fijo').reduce((s,x)=>s+(+x.valor||0),0);
-  const tot=fijos+varia;
-  // ✦ MARGEN REAL: sale de las ventas que YA hizo (no de un número inventado)
-  const vTot=vt.reduce((s,x)=>s+(+x.total||0),0);
-  const vMar=vt.reduce((s,x)=>s+(+x.margen_contrib||0),0);
-  const real=vTot>0?(vMar/vTot*100):0;
-  const usa=real>0?real:metaMargen;                     // si aún no hay ventas, usa la meta
-  const pe=usa>0?fijos/(usa/100):0;                     // punto de equilibrio con el margen REAL
-  const dif=real-metaMargen;
-  $('main').innerHTML=`<h1>Gastos y rentabilidad</h1><div class="sub">${m} · el % sale de tus ventas reales, no de un estimado</div>
-  <div class="kpis">
-    <div class="kpi"><b>${$$(fijos)}</b><span>GASTOS FIJOS</span></div>
-    <div class="kpi"><b>${$$(varia)}</b><span>VARIABLES</span></div>
-    <div class="kpi eq"><b>${$$(pe)}</b><span>PUNTO DE EQUILIBRIO — hay que vender esto al mes para no perder</span></div>
-  </div>
-  <div class="card" style="border-left:4px solid ${real>0?(dif>=0?'var(--ok)':'var(--warn)'):'var(--line)'}">
-    <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)">TU RENTABILIDAD REAL</div>
-    ${vTot>0?`
-      <div style="display:flex;align-items:baseline;gap:10px;margin-top:3px">
-        <b style="font-family:Georgia,serif;font-size:32px;color:${dif>=0?'var(--ok)':'var(--warn)'}">${real.toFixed(1)}%</b>
-        <span style="font-size:13px;color:var(--mut)">de margen de contribución</span></div>
-      <div class="hint">Calculado con <b>${vt.length}</b> venta(s): aportaron <b>${$$(vMar)}</b> sobre <b>${$$(vTot)}</b> vendidos.</div>
-      <div class="hint" style="color:${dif>=0?'var(--ok)':'var(--warn)'};font-weight:700">
-        ${dif>=0?`✦ Vas ${dif.toFixed(1)} puntos POR ENCIMA de tu meta (${metaMargen}%).`:`⚠ Vas ${(-dif).toFixed(1)} puntos POR DEBAJO de tu meta (${metaMargen}%). Sube precios o baja costos.`}</div>
-    `:`<div style="font-family:Georgia,serif;font-size:26px;color:var(--mut);margin-top:3px">— sin ventas aún —</div>
-      <div class="hint">Cuando registres ventas, aquí sale tu margen REAL (no un estimado). Por ahora uso tu meta del ${metaMargen}%.</div>`}
-  </div>
-  <div class="card">
-    <label>Meta de margen (%) — solo para comparar</label>
-    <div style="display:flex;gap:8px"><input id="g_m" type="number" value="${metaMargen}" min="1" max="99" style="flex:1">
-      <button class="btn acc" onclick="setMargen()">Guardar meta</button></div>
-    <div class="hint">Punto de equilibrio = Gastos fijos ÷ margen real (<b>${usa.toFixed(1)}%</b>) = <b>${$$(pe)}</b> al mes.</div>
-  </div>
-  <div class="card" ${EGASTO?'style="border-color:var(--acc);border-width:2px"':''}>
-    ${EGASTO?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <b style="color:var(--acc);font-size:13px">✎ Editando gasto</b>
-      <button class="btn sm gh" onclick="EGASTO=null;vGastos()">Cancelar</button></div>`:''}
-    <div class="g2">
-      <div><label>Rubro</label><input id="g_r" placeholder="Ej: Arriendo local" value="${esc(eg.rubro||'')}" oninput="sugiere()"></div>
-      <div><label>Tipo</label><select id="g_t"><option value="fijo" ${eg.tipo!=='variable'?'selected':''}>Fijo</option><option value="variable" ${eg.tipo==='variable'?'selected':''}>Variable</option></select></div>
-    </div>
-    <label>Categoría</label>
-    <select id="g_c">${['Local','Taller de costura','Servicios (luz/agua)','Teléfono/Internet','Empleados','Materia prima','Transporte','Publicidad','Otros'].map(c=>`<option ${c===eg.categoria?'selected':''}>${c}</option>`).join('')}</select>
-    <div class="g2" style="margin-top:4px">
-      <div><label>📊 Valor estimado</label><input id="g_ve" inputmode="numeric" placeholder="0" value="${eg.valor_estimado||''}"><div class="hint" id="g_sug"></div></div>
-      <div><label>🧾 Valor definitivo <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--mut)">(cuando llegue el recibo)</span></label>
-        <input id="g_vd" inputmode="numeric" placeholder="—" value="${eg.valor_definitivo||''}"></div>
-    </div>
-    <button class="btn full ${EGASTO?'acc':''}" onclick="addGasto()">${EGASTO?'💾 Guardar cambios':'+ Agregar gasto'}</button>
-  </div>
-  <h1 style="font-size:18px">Gastos de ${m} · ${g.length} <span style="font-size:13px;color:var(--mut)">(total ${$$(tot)})</span></h1>
-  ${g.length?g.map(x=>{const df=x.valor_definitivo!=null&&x.valor_definitivo!=='';
-    return `<div class="item" style="cursor:pointer" title="Toca para editar" onclick="editGasto(${x.id})"><div>
-    <div class="nm">${esc(x.rubro)}</div>
-    <div class="mt"><span class="tag ${x.tipo==='fijo'?'a':''}">${esc(x.tipo)}</span> ${esc(x.categoria||'')}
-      ${df?'<span class="tag" style="background:#e6f0e8;color:var(--ok)">🧾 definitivo</span>':'<span class="tag">📊 estimado</span>'}</div>
-    ${df&&+x.valor_estimado?`<div class="mt">Estimaste ${$$(x.valor_estimado)} → llegó <b>${$$(x.valor_definitivo)}</b>
-      <span style="color:${+x.valor_definitivo>+x.valor_estimado?'var(--bad)':'var(--ok)'};font-weight:700">
-      (${+x.valor_definitivo>+x.valor_estimado?'+':''}${$$(+x.valor_definitivo-+x.valor_estimado)})</span></div>`:''}</div>
-    <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.valor)}</div>
-    <button class="btn sm gh" style="margin-top:5px" onclick="event.stopPropagation();delRow('zarrat_gastos',${x.id},vGastos)">✕</button></div></div>`;}).join('')
-    :'<div class="empty">Aún no has cargado gastos de este mes.</div>'}`;
-  HISTG=await get('zarrat_gastos?valor_definitivo=not.is.null&select=rubro,valor_definitivo&limit=500');
-  sugiere();
-}
-function editGasto(id){ EGASTO=GASTOS.find(x=>x.id===id)||null; vGastos(); }
-function sugiere(){
-  const el=$('g_sug'), r=$('g_r'); if(!el||!r) return;
-  const rub=r.value.trim().toLowerCase();
-  const h=(HISTG||[]).filter(x=>(x.rubro||'').toLowerCase()===rub && x.valor_definitivo!=null);
-  if(!rub||!h.length){ el.textContent=''; return; }
-  const prom=Math.round(h.reduce((s,x)=>s+(+x.valor_definitivo||0),0)/h.length);
-  el.innerHTML=`✦ Según ${h.length} recibo(s) reales, el promedio es <b>${$$(prom)}</b>
-    <button class="btn sm gh" style="padding:3px 9px;margin-left:5px" onclick="$('g_ve').value=${prom}">usar</button>`;
-}
-async function setMargen(){await post('zarrat_config?on_conflict=clave',{clave:'margen',valor:$('g_m').value},'resolution=merge-duplicates,return=minimal');vGastos();}
-async function addGasto(){
-  const r=$('g_r').value.trim();
-  const ve=+($('g_ve').value||'').replace(/\D/g,'')||0;
-  const vdRaw=($('g_vd').value||'').replace(/\D/g,'');
-  const vd=vdRaw?+vdRaw:null;
-  if(!r) return alert('Escribe el rubro.');
-  if(!ve && !vd) return alert('Pon al menos el valor estimado.');
-  const b={mes:mesAct(),rubro:r,tipo:$('g_t').value,categoria:$('g_c').value,
-    valor_estimado:ve, valor_definitivo:vd, valor:(vd!=null?vd:ve)};   // ✦ el definitivo manda
-  if(EGASTO){ await patch('zarrat_gastos','id=eq.'+EGASTO.id,b); EGASTO=null; }
-  else await post('zarrat_gastos',b,'return=minimal');
-  vGastos();
+async function guardarManu(id){
+  const b={nombre:$('m_n').value.trim(),especialidad:$('m_e').value.trim()||null,contacto:$('m_c').value.trim()||null,telefono:$('m_t').value.trim()||null,ciudad:$('m_ci').value.trim()||null,notas:$('m_no').value.trim()||null};
+  if(!b.nombre){ alert('Falta el nombre'); return; }
+  if(id){ await patch('zarrat_manufactureros','id=eq.'+id,b); Object.assign(manuDe(id),b); } else { const r=await post('zarrat_manufactureros',b); MANU.push(r[0]); }
+  toast('Manufacturero guardado'); vManu();
 }
 
-/* ═══════ 3 · CLIENTES (con edición) ═══════ */
-let ECLI=null;
+/* ═══════ 7 · CLIENTES ═══════ */
 async function vClientes(){
-  CLI=await get('zarrat_clientes?order=creado_en.desc&limit=500');
-  const e=ECLI||{};
-  $('main').innerHTML=`<h1>Clientes</h1><div class="sub">${CLI.length} registrados · toca uno para editarlo</div>
-  <div class="card" ${ECLI?'style="border-color:var(--acc);border-width:2px"':''}>
-    ${ECLI?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <b style="color:var(--acc);font-size:13px">✎ Editando cliente</b>
-      <button class="btn sm gh" onclick="ECLI=null;vClientes()">Cancelar</button></div>`:''}
-    <div class="g2"><div><label>Nombre *</label><input id="c_n" placeholder="Nombre completo" value="${esc(e.nombre||'')}"></div>
-      <div><label>Teléfono</label><input id="c_t" inputmode="tel" value="${esc(e.telefono||'')}"></div></div>
-    <div class="g2"><div><label>WhatsApp</label><input id="c_w" inputmode="tel" value="${esc(e.whatsapp||'')}"></div>
-      <div><label>Email</label><input id="c_e" inputmode="email" value="${esc(e.email||'')}"></div></div>
-    <div class="g2"><div><label>Instagram</label><input id="c_i" placeholder="@usuario" value="${esc(e.instagram||'')}"></div>
-      <div><label>Dirección</label><input id="c_d" value="${esc(e.direccion||'')}"></div></div>
-    <div class="g2">
-      <div><label>¿Por dónde llegó?</label><select id="c_ca" onchange="cRef()">
-        <option value="local" ${(e.canal||'local')==='local'?'selected':''}>🏠 Local (llegó por su cuenta)</option>
-        <option value="referido" ${e.canal==='referido'?'selected':''}>⭐ Referido (lo recomendaron)</option>
-        <option value="instagram" ${e.canal==='instagram'?'selected':''}>📷 Instagram</option>
-        <option value="digital" ${e.canal==='digital'?'selected':''}>💬 Digital (pauta)</option></select></div>
-      <div id="c_refbox" style="${e.canal==='referido'?'':'display:none'}"><label>¿Quién lo refirió?</label><input id="c_rp" placeholder="Nombre" value="${esc(e.referido_por||'')}"></div>
-    </div>
-    <label>Notas</label><textarea id="c_no" placeholder="Preferencias, tallas, ocasión…">${esc(e.notas||'')}</textarea>
-    <button class="btn full ${ECLI?'acc':''}" onclick="addCli()">${ECLI?'💾 Guardar cambios':'+ Registrar cliente'}</button>
-  </div>
-  <input id="c_q" placeholder="🔎 Buscar…" oninput="filtCli()" style="margin-bottom:10px">
-  <div id="c_list">${CLI.map(cliCard).join('')||'<div class="empty">Sin clientes aún.</div>'}</div>`;
-  if(ECLI) window.scrollTo({top:0,behavior:'smooth'});
+  $('main').innerHTML=`<h1>Clientes</h1><div class="sub">Quién compra. Desde el pedido también se crean.</div>
+    <div class="top"><input class="buscar" id="cq" placeholder="Buscar…" oninput="pintarCli()"><button class="btn" onclick="formCli()">+ Nuevo cliente</button></div><div id="fcl"></div><div class="card" id="lcl"></div>`;
+  pintarCli();
 }
-const cliCard=c=>`<div class="item cli" style="cursor:pointer" title="Toca para editar" onclick="editCli(${c.id})" data-t="${esc(((c.nombre||'')+' '+(c.telefono||'')+' '+(c.instagram||'')).toLowerCase())}"><div>
-  <div class="nm">${esc(c.nombre)}</div>
-  <div class="mt">${c.telefono?'📱 '+esc(c.telefono):''}${c.whatsapp?' · 💬 '+esc(c.whatsapp):''}${c.instagram?' · 📷 '+esc(c.instagram):''}</div>
-  <div class="mt">${c.email?'✉️ '+esc(c.email):''}${c.direccion?' · 📍 '+esc(c.direccion):''}</div>
-  ${c.notas?`<div class="mt">📝 ${esc(c.notas)}</div>`:''}</div>
-  <div style="display:flex;flex-direction:column;gap:5px" onclick="event.stopPropagation()">
-    ${c.whatsapp||c.telefono?`<a class="btn sm acc" style="text-decoration:none;text-align:center" href="https://wa.me/57${String(c.whatsapp||c.telefono).replace(/\D/g,'')}" target="_blank">💬</a>`:''}
-    <button class="btn sm gh" onclick="delRow('zarrat_clientes',${c.id},vClientes)">✕</button></div></div>`;
-function editCli(id){ ECLI=CLI.find(x=>x.id===id)||null; vClientes(); }
-function filtCli(){const q=$('c_q').value.toLowerCase();document.querySelectorAll('.cli').forEach(e=>{e.style.display=(!q||e.dataset.t.includes(q))?'':'none';});}
-function cRef(){ const r=$('c_ca').value==='referido'; $('c_refbox').style.display=r?'block':'none'; }
-async function addCli(){const n=$('c_n').value.trim(); if(!n)return alert('El nombre es obligatorio.');
-  const ca=$('c_ca').value;
-  const b={nombre:n,telefono:$('c_t').value.trim(),whatsapp:$('c_w').value.trim(),email:$('c_e').value.trim(),
-    instagram:$('c_i').value.trim(),direccion:$('c_d').value.trim(),notas:$('c_no').value.trim(),
-    canal:ca, referido_por:(ca==='referido'?($('c_rp').value.trim()||null):null)};
-  if(ECLI){ await patch('zarrat_clientes','id=eq.'+ECLI.id,b); ECLI=null; }
-  else { const c=await post('zarrat_clientes',b);
-    if(c&&c[0]) await post('zarrat_crm?on_conflict=cliente_id',{cliente_id:c[0].id,etapa:'contacto'},'resolution=merge-duplicates,return=minimal'); }
-  vClientes();}
-
-/* ═══════ 4 · MEDIDAS (ficha técnica) ═══════ */
-let EFICHA=null, HIST=[];
-async function vMedidas(){
-  [CLI,PRENDAS]=await Promise.all([get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_tipos_prenda?order=nombre.asc')]);
-  HIST=await get('zarrat_medidas?order=creado_en.desc&limit=60');
-  const hist=HIST; const e=EFICHA||{};
-  $('main').innerHTML=`<h1>Medidas · Ficha técnica</h1><div class="sub">Elige el cliente y la prenda — o toca una ficha guardada para editarla</div>
-  <div class="card" ${EFICHA?'style="border-color:var(--acc);border-width:2px"':''}>
-    ${EFICHA?`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <b style="color:var(--acc);font-size:13px">✎ Editando ficha</b>
-      <button class="btn sm gh" onclick="EFICHA=null;vMedidas()">Cancelar</button></div>`:''}
-    <div class="g2">
-      <div><label>Cliente</label><select id="m_c"><option value="">— elige —</option>${CLI.map(c=>`<option value="${c.id}" ${c.id===e.cliente_id?'selected':''}>${esc(c.nombre)}</option>`).join('')}</select></div>
-      <div><label>Tipo de prenda</label><select id="m_p" onchange="camposPrenda()"><option value="">— elige —</option>${PRENDAS.map(p=>`<option value="${esc(p.nombre)}" ${p.nombre===e.tipo_prenda?'selected':''}>${esc(p.nombre)}</option>`).join('')}</select></div>
-    </div>
-    <div id="m_campos"></div>
-  </div>
-  <div class="card">
-    <div style="font-weight:700;font-size:13px;margin-bottom:6px">➕ ¿Otra prenda? Créala con sus medidas</div>
-    <div class="g2"><div><label>Nombre de la prenda</label><input id="np_n" placeholder="Ej: Chaleco"></div>
-      <div><label>Medidas (separadas por coma)</label><input id="np_c" placeholder="Pecho, Cintura, Largo…"></div></div>
-    <button class="btn gh full" onclick="addPrenda()">Crear tipo de prenda</button>
-  </div>
-  <h1 style="font-size:18px">Fichas guardadas</h1>
-  ${hist.length?hist.map(m=>{const c=CLI.find(x=>x.id===m.cliente_id)||{};const ks=Object.entries(m.medidas||{}).filter(([,v])=>v);
-    const tc=m.tela_provee==='cliente';
-    return `<div class="item" style="cursor:pointer" title="Toca para editar la ficha" onclick="editFicha(${m.id})"><div><div class="nm">${esc(c.nombre||'Cliente')} · <span class="tag a">${esc(m.tipo_prenda)}</span></div>
-      <div class="mt">📅 ${esc(m.fecha||'')}</div>
-      <div class="mt">${ks.map(([k,v])=>`<b>${esc(k)}</b> ${esc(v)}`).join(' · ')||'—'}</div>
-      ${m.tipo_tela||m.valor_tela?`<div class="mt">🧵 ${esc(m.tipo_tela||'Tela')}${m.metros_tela?` · ${m.metros_tela} m`:''} · ${tc?'<b>la trae el cliente</b> (costo $0)':`<b style="color:var(--acc)">${$$(m.valor_tela)}</b>`}</div>`:''}
-      ${m.notas?`<div class="mt">📝 ${esc(m.notas)}</div>`:''}</div>
-      <button class="btn sm gh" onclick="event.stopPropagation();delRow('zarrat_medidas',${m.id},vMedidas)">✕</button></div>`;}).join('')
-    :'<div class="empty">Aún no hay fichas de medidas.</div>'}`;
+function pintarCli(){
+  const q=($('cq')||{}).value||'', l=CLI.filter(c=>!q||((c.nombre||'')+' '+(c.telefono||'')+' '+(c.instagram||'')).toLowerCase().includes(q.toLowerCase()));
+  $('lcl').innerHTML=l.map(c=>{ const ps=PED.filter(p=>p.cliente_id===c.id&&!p.anulado); return `<div class="item"><div><div class="nm">${esc(c.nombre)}</div>
+    <div class="dt">${[c.telefono,c.instagram,c.direccion].filter(Boolean).map(esc).join(' · ')}</div><div class="dt">${ps.length} pedido${ps.length===1?'':'s'} · ${$$(ps.reduce((s,p)=>s+(+p.total||0),0))}</div></div>
+    <button class="btn sm gh" onclick="formCli(${c.id})">Editar</button></div>`; }).join('')||'<div class="vacio">Sin clientes todavía.</div>';
 }
-function camposPrenda(){
-  const p=PRENDAS.find(x=>x.nombre===$('m_p').value);
-  if(!p){$('m_campos').innerHTML='';return;}
-  const e=EFICHA||{}, mv=e.medidas||{}, cl=e.tela_provee==='cliente';
-  $('m_campos').innerHTML=`<label style="margin-top:14px">Medidas · ${esc(p.nombre)} (cm)</label>
-    <div class="med">${(p.campos||[]).map((c,i)=>`<div class="m"><label>${esc(c)}</label><input id="md_${i}" data-k="${esc(c)}" inputmode="decimal" placeholder="—" value="${esc(mv[c]||'')}"></div>`).join('')}</div>
-    <div class="card" style="background:#faf7f1;margin:14px 0 0;padding:12px 14px">
-      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:2px">LA TELA</div>
-      <div class="g2"><div><label>Tipo de tela</label><input id="m_tt" placeholder="Ej: Paño, seda, lino" value="${esc(e.tipo_tela||'')}"></div>
-        <div><label>¿Quién la provee?</label><select id="m_tp" onchange="telaProv()">
-          <option value="nosotros" ${!cl?'selected':''}>La proveemos nosotros</option>
-          <option value="cliente" ${cl?'selected':''}>La provee el cliente</option></select></div></div>
-      <div class="g2" id="m_telabox" style="${cl?'display:none':''}"><div><label>Metros</label><input id="m_tm" inputmode="decimal" placeholder="0" value="${e.metros_tela||''}"></div>
-        <div><label>Valor de la tela ($)</label><input id="m_tv" inputmode="numeric" placeholder="0" value="${e.valor_tela||''}"></div></div>
-      <div class="hint" id="m_th">${cl?'✦ La tela la trae el cliente → <b>no cuesta</b>.':'Este valor entra como <b>costo</b> al cotizar la prenda.'}</div>
-    </div>
-    <label>Notas de la prenda</label><textarea id="m_n" placeholder="Color, detalles, fecha de entrega…">${esc(e.notas||'')}</textarea>
-    <button class="btn acc full" onclick="saveMedidas()">${EFICHA?'💾 Guardar cambios':'💾 Guardar ficha'}</button>`;
+function formCli(id){
+  const c=id?CLI.find(x=>x.id===id):{};
+  $('fcl').innerHTML=`<div class="card"><h3>${id?'Editar':'Nuevo'} cliente</h3>
+    <div class="g2"><div><label>Nombre</label><input id="c_n" value="${esc(c.nombre||'')}"></div><div><label>Celular / WhatsApp</label><input id="c_t" value="${esc(c.telefono||'')}"></div></div>
+    <div class="g2"><div><label>Instagram</label><input id="c_i" value="${esc(c.instagram||'')}"></div><div><label>Correo</label><input id="c_e" value="${esc(c.email||'')}"></div></div>
+    <label>Dirección</label><input id="c_d" value="${esc(c.direccion||'')}"><label>Notas</label><textarea id="c_no">${esc(c.notas||'')}</textarea>
+    <div class="fila" style="margin-top:12px"><button class="btn" onclick="guardarCli(${id||0})">Guardar</button><button class="btn gh" onclick="$('fcl').innerHTML=''">Cancelar</button></div></div>`;
 }
-function telaProv(){
-  const c=$('m_tp').value==='cliente';
-  $('m_telabox').style.display=c?'none':'grid';
-  $('m_th').innerHTML=c?'✦ La tela la trae el cliente → <b>no cuesta</b> (no entra al costo de la prenda).':'Este valor entra como <b>costo</b> al cotizar la prenda.';
-  if(c){$('m_tv').value='';$('m_tm').value='';}
-}
-async function saveMedidas(){
-  const ci=$('m_c').value, tp=$('m_p').value;
-  if(!ci||!tp)return alert('Elige cliente y tipo de prenda.');
-  const med={}; document.querySelectorAll('[id^=md_]').forEach(i=>{if(i.value.trim())med[i.dataset.k]=i.value.trim();});
-  if(!Object.keys(med).length)return alert('Escribe al menos una medida.');
-  const prov=$('m_tp').value;
-  const b={cliente_id:+ci,tipo_prenda:tp,medidas:med,notas:$('m_n').value.trim(),
-    tipo_tela:$('m_tt').value.trim()||null, tela_provee:prov,
-    metros_tela:prov==='cliente'?0:(+($('m_tm').value||0)||0),
-    valor_tela:prov==='cliente'?0:(+($('m_tv').value||'').replace(/\D/g,'')||0)};
-  if(EFICHA){ await patch('zarrat_medidas','id=eq.'+EFICHA.id,b); EFICHA=null; }
-  else await post('zarrat_medidas',b,'return=minimal');
-  vMedidas();
-}
-function editFicha(id){
-  EFICHA=HIST.find(x=>x.id===id)||null;
-  vMedidas();
-  setTimeout(()=>{ camposPrenda(); window.scrollTo({top:0,behavior:'smooth'}); },60);
-}
-async function addPrenda(){
-  const n=$('np_n').value.trim(), c=$('np_c').value.split(',').map(x=>x.trim()).filter(Boolean);
-  if(!n||!c.length)return alert('Escribe el nombre y sus medidas.');
-  await post('zarrat_tipos_prenda',{nombre:n,campos:c},'return=minimal'); vMedidas();
+async function guardarCli(id){
+  const b={nombre:$('c_n').value.trim(),telefono:$('c_t').value.trim()||null,instagram:$('c_i').value.trim()||null,email:$('c_e').value.trim()||null,direccion:$('c_d').value.trim()||null,notas:$('c_no').value.trim()||null};
+  if(!b.nombre){ alert('Falta el nombre'); return; }
+  if(id){ await patch('zarrat_clientes','id=eq.'+id,b); Object.assign(CLI.find(x=>x.id===id),b); } else { const r=await post('zarrat_clientes',b); CLI.push(r[0]); }
+  $('fcl').innerHTML=''; toast('Cliente guardado'); pintarCli();
 }
 
-/* ═══════ 5 · CATÁLOGO (con color, SKU y código de barras) ═══════ */
-// SKU automático: ZR-{3 letras del nombre}-{color 2 letras}-{consecutivo 3 dígitos}
-function genSKU(nombre,color,n){
-  const cl=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z]/g,'');
-  const a=(cl(nombre)+'XXX').slice(0,3), b=(cl(color)+'XX').slice(0,2);
-  return `ZR-${a}-${b}-${String(n).padStart(3,'0')}`;
-}
-async function vCatalogo(){
-  CAT=await get('zarrat_catalogo?order=fecha_creacion.desc&limit=300');
-  $('main').innerHTML=`<h1>Catálogo</h1><div class="sub">${CAT.length} piezas · SKU y código de barras automáticos</div>
-  <div class="card">
-    <div class="g2"><div><label>Nombre de la pieza</label><input id="k_n" placeholder="Ej: Vestido Aurora" oninput="preSKU()"></div>
-      <div><label>Color</label><input id="k_c" placeholder="Ej: Negro" oninput="preSKU()"></div></div>
-    <div class="g3"><div><label>Valor</label><input id="k_v" inputmode="numeric" placeholder="0"></div>
-      <div><label>Talla</label><input id="k_t" placeholder="Ej: M / única"></div>
-      <div><label>Tela</label><input id="k_te" placeholder="Ej: Seda"></div></div>
-    <label>Descripción</label><input id="k_d" placeholder="Corte, ocasión, detalles…">
-    <label>Foto</label><input type="file" id="k_f" accept="image/*">
-    <div class="card" style="background:#faf7f1;margin:12px 0 0;padding:11px 13px">
-      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)">SKU QUE SE VA A GENERAR</div>
-      <div id="k_sku" style="font-family:Consolas,monospace;font-size:17px;font-weight:800;color:var(--acc);margin-top:3px">ZR-XXX-XX-001</div>
-      <div class="hint">Se arma solo con el nombre + el color + un consecutivo. El código de barras sale de este SKU.</div>
-    </div>
-    <button class="btn acc full" onclick="addPieza()">+ Agregar al catálogo</button>
-    <div class="hint" id="k_msg"></div>
-  </div>
-  <div class="grid">${CAT.map(p=>`<div class="pz">
-    <div class="img" style="${p.foto_url?`background-image:url('${p.foto_url}')`:''}"></div>
-    <div class="in"><div class="n">${esc(p.nombre)}</div>
-      ${p.color?`<div class="f">${esc(p.color)}${p.talla?' · T '+esc(p.talla):''}${p.tela?' · '+esc(p.tela):''}</div>`:''}
-      <div class="v">${$$(p.valor)}</div>
-      ${p.sku?`<div style="font-family:Consolas,monospace;font-size:10.5px;color:var(--ink2);margin-top:3px">${esc(p.sku)}</div>
-        <svg class="bc" data-sku="${esc(p.sku)}" style="width:100%;height:38px;margin-top:2px"></svg>`:''}
-      <div class="f">${esc(p.fecha_creacion||'')}</div>
-      <div style="display:flex;gap:4px;margin-top:6px">
-        ${p.sku?`<button class="btn sm gh" style="flex:1" onclick="etiqueta(${p.id})">🏷️</button>`:''}
-        <button class="btn sm gh" style="flex:1" onclick="delRow('zarrat_catalogo',${p.id},vCatalogo)">✕</button></div>
-    </div></div>`).join('')||'<div class="empty">Sube tu primera pieza.</div>'}</div>`;
-  pintaBarras();
-}
-function preSKU(){ const el=$('k_sku'); if(el) el.textContent=genSKU($('k_n').value,$('k_c').value,(CAT.length||0)+1); }
-async function addPieza(){
-  const n=$('k_n').value.trim(); if(!n)return alert('Ponle nombre a la pieza.');
-  const color=$('k_c').value.trim();
-  const f=$('k_f').files[0]; let url=null;
-  $('k_msg').textContent='Guardando…';
-  if(f){ const path='zarrat/cat_'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9.]/g,'');
-    const r=await fetch(SB+'/storage/v1/object/documentos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K},body:f});
-    if(r.ok) url=SB+'/storage/v1/object/public/documentos/'+path; }
-  // consecutivo real: cuántas piezas hay + 1 (y si el SKU choca, suma)
-  let n2=(CAT.length||0)+1, sku=genSKU(n,color,n2);
-  while(CAT.some(x=>x.sku===sku)){ n2++; sku=genSKU(n,color,n2); }
-  await post('zarrat_catalogo',{nombre:n,color:color||null,talla:$('k_t').value.trim()||null,tela:$('k_te').value.trim()||null,
-    descripcion:$('k_d').value.trim(),valor:+($('k_v').value||'').replace(/\D/g,'')||0,foto_url:url,sku},'return=minimal');
-  vCatalogo();
-}
-/* ---- Código de barras Code128 (dibujado a mano, sin librerías externas) ---- */
-const C128=["212222","222122","222221","121223","121322","131222","122213","122312","132212","221213","221312","231212","112232","122132","122231","113222","123122","123221","223211","221132","221231","213212","223112","312131","311222","321122","321221","312212","322112","322211","212123","212321","232121","111323","131123","131321","112313","132113","132311","211313","231113","231311","112133","112331","132131","113123","113321","133121","313121","211331","231131","213113","213311","213131","311123","311321","331121","312113","312311","332111","314111","221411","431111","111224","111422","121124","121421","141122","141221","112214","112412","122114","122411","142112","142211","241211","221114","413111","241112","134111","111242","121142","121241","114212","124112","124211","411212","421112","421211","212141","214121","412121","111143","111341","131141","114113","114311","411113","411311","113141","114131","311141","411131","211412","211214","211232","2331112"];
-function code128B(txt){
-  let cs=104, bars=C128[104], w=104;   // start B
-  for(let i=0;i<txt.length;i++){ const v=txt.charCodeAt(i)-32; bars+=C128[v]; cs+=v*(i+1); }
-  bars+=C128[cs%103]+C128[106];        // checksum + stop
-  return bars;
-}
-function pintaBarras(){
-  document.querySelectorAll('svg.bc').forEach(svg=>{
-    const pat=code128B(svg.dataset.sku); let x=0, out='';
-    for(let i=0;i<pat.length;i++){ const w=+pat[i]; if(i%2===0) out+=`<rect x="${x}" y="0" width="${w}" height="100" fill="#17150f"/>`; x+=w; }
-    svg.setAttribute('viewBox',`0 0 ${x} 100`); svg.setAttribute('preserveAspectRatio','none'); svg.innerHTML=out;
-  });
-}
-function etiqueta(id){
-  const p=CAT.find(x=>x.id===id); if(!p) return;
-  const pat=code128B(p.sku); let x=0,out='';
-  for(let i=0;i<pat.length;i++){ const w=+pat[i]; if(i%2===0) out+=`<rect x="${x}" y="0" width="${w}" height="100" fill="#000"/>`; x+=w; }
-  const w=window.open('','_blank','width=420,height=560');
-  w.document.write(`<title>${p.sku}</title><style>body{font-family:Georgia,serif;text-align:center;padding:26px}
-    .b{font-size:20px;letter-spacing:.3em;margin-bottom:2px}.t{font-size:9px;letter-spacing:.2em;color:#8a6a3d;margin-bottom:14px}
-    .n{font-size:15px;font-weight:700;font-family:Segoe UI,sans-serif}.c{font-size:12px;color:#555;font-family:Segoe UI,sans-serif}
-    .v{font-size:17px;font-weight:800;margin:6px 0;font-family:Segoe UI,sans-serif}
-    svg{width:230px;height:56px;margin-top:8px}.s{font-family:Consolas,monospace;font-size:12px;letter-spacing:.08em;margin-top:2px}</style>
-    <div class="b">ZARRAT</div><div class="t">MAESTROS DEL ESTILO</div>
-    <div class="n">${p.nombre}</div><div class="c">${[p.color,p.talla?'T '+p.talla:'',p.tela].filter(Boolean).join(' · ')}</div>
-    <div class="v">$${Math.round(p.valor||0).toLocaleString('es-CO')}</div>
-    <svg viewBox="0 0 ${x} 100" preserveAspectRatio="none">${out}</svg>
-    <div class="s">${p.sku}</div><script>window.print()<\/script>`);
-  w.document.close();
-}
-
-/* ═══════ 6 · COTIZACIONES (con costos y margen de contribución) ═══════ */
-let ITEMS=[], COSTOS=[], FICHAS=[], BASE_COSTOS=[];
-async function vCotiz(){
-  const [c,cl,ct,fi,cb]=await Promise.all([get('zarrat_cotizaciones?order=creado_en.desc&limit=100'),get('zarrat_clientes?order=nombre.asc&limit=500'),get('zarrat_catalogo?activo=eq.true&order=nombre.asc'),get('zarrat_medidas?order=creado_en.desc&limit=300'),get('zarrat_costos_base?activo=eq.true&order=orden.asc')]);
-  CLI=cl; CAT=ct; FICHAS=fi;
-  BASE_COSTOS=cb.map(x=>({n:x.concepto,v:+x.valor||0}));   // la plantilla guardada
-  $('main').innerHTML=`<h1>Cotizaciones</h1><div class="sub">Tela + mano de obra = lo que cobras · los costos internos definen tu margen</div>
-  <div class="card">
-    <div class="g2"><div><label>Cliente</label><select id="q_c" onchange="cargaFicha()"><option value="">— elige —</option>${CLI.map(x=>`<option value="${x.id}">${esc(x.nombre)}</option>`).join('')}</select></div>
-      <div><label>Tipo</label><select id="q_t"><option value="medida" selected>Hecho a la medida</option><option value="catalogo">Del catálogo</option></select></div></div>
-    <div id="q_ficha"></div>
-    <label>Prenda</label>
-    <input id="q_pn" placeholder="Ej: Pantalón a la medida">
-    <select id="q_p" onchange="delCat()" style="margin-top:8px"><option value="">…o tráela del catálogo</option>${CAT.map(p=>`<option value="${p.id}" data-v="${p.valor}" data-n="${esc(p.nombre)}">${esc(p.nombre)} · ${$$(p.valor)}</option>`).join('')}</select>
-
-    <div class="card" style="background:#faf7f1;margin:14px 0 0;padding:13px 15px">
-      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:4px">① LA TELA</div>
-      <div class="g2">
-        <div><label>¿Quién la provee?</label><select id="q_tprov" onchange="telaCot()">
-          <option value="nosotros">La ponemos nosotros</option><option value="cliente">La trae el cliente</option></select></div>
-        <div id="q_telabox"><label>Valor de la tela ($)</label><input id="q_tela" inputmode="numeric" placeholder="0" oninput="calcMargen()"></div>
-      </div>
-      <div class="hint" id="q_telah">Si la ponemos nosotros, se la cobramos al cliente y también nos cuesta.</div>
-
-      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin:14px 0 0">② MANO DE OBRA</div>
-      <label>¿Cuánto cobras por hacer la prenda?</label>
-      <input id="q_mo" inputmode="numeric" placeholder="0" oninput="calcMargen()">
-
-      <div id="q_precio" style="background:var(--card);border:1px solid var(--acc);border-radius:10px;padding:11px 13px;margin-top:12px"></div>
-    </div>
-
-    <div class="card" style="background:#faf7f1;margin:10px 0 0;padding:13px 15px">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)">③ CENTRO DE COSTOS INTERNOS</div>
-        <button class="btn sm gh" onclick="guardarPlantilla()" title="Guarda esta lista para que salga sola la próxima vez">💾 Plantilla</button>
-      </div>
-      <div id="q_costos" style="margin-top:6px"></div>
-      <div class="g3" style="margin-top:8px"><input id="q_cn" placeholder="Concepto"><input id="q_cv" inputmode="numeric" placeholder="Valor">
-        <button class="btn gh" onclick="addCosto()">+ Agregar</button></div>
-    </div>
-
-    <div class="card" id="q_res" style="background:var(--ink);color:var(--paper);border-color:var(--ink);margin-top:10px;padding:14px 16px"></div>
-    <label>Notas</label><textarea id="q_n" placeholder="Entrega, ajustes…"></textarea>
-    <button class="btn acc full" onclick="saveCotiz()">💾 Guardar cotización</button>
-  </div>
-  <h1 style="font-size:18px">Cotizaciones · ${c.length}</h1>
-  ${c.length?c.map(x=>{const mc=+x.margen_contrib||0, pct=x.total?Math.round(mc/x.total*100):0;
-    return `<div class="item"><div><div class="nm">${esc(x.cliente_nombre||'—')} <span class="tag ${x.estado==='vendida'?'a':''}">${esc(x.estado)}</span></div>
-    <div class="mt">${esc(x.folio)} · ${esc(x.tipo)} · 📅 ${(x.creado_en||'').slice(0,10)}</div>
-    <div class="mt">${(x.items||[]).map(i=>esc(i.n)+' '+$$(i.v)).join(' · ')}</div>
-    <div class="mt">🧵 ${$$(x.costo_tela)} · ✂️ ${$$(x.costo_mo)} · 🏭 ${$$(x.costo_interno)} → <b style="color:var(--ok)">margen ${$$(mc)} (${pct}%)</b></div></div>
-    <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.total)}</div>
-      ${x.estado!=='vendida'?`<button class="btn sm acc" style="margin-top:5px" onclick="aVenta(${x.id})">→ Venta</button>`:''}
-      <button class="btn sm gh" style="margin-top:5px" onclick="aPedido(${x.id})">→ Pedido</button>
-      <button class="btn sm gh" style="margin-top:5px" onclick="delRow('zarrat_cotizaciones',${x.id},vCotiz)">✕</button></div></div>`;}).join('')
-    :'<div class="empty">Sin cotizaciones.</div>'}`;
-  ITEMS=[]; COSTOS=BASE_COSTOS.map(x=>({...x}));   // ✦ salen solos con la plantilla guardada
-  pintaItems(); pintaCostos(); calcMargen();
-}
-function cargaFicha(){
-  const ci=+$('q_c').value; const f=FICHAS.filter(x=>x.cliente_id===ci)[0];
-  const box=$('q_ficha');
-  if(!f){ box.innerHTML=''; return; }
-  const cliente=f.tela_provee==='cliente';
-  box.innerHTML=`<div class="card" style="background:#faf7f1;padding:10px 13px;margin:8px 0 0">
-    <div style="font-size:12.5px">📐 Ficha: <b>${esc(f.tipo_prenda)}</b>${f.tipo_tela?` · 🧵 ${esc(f.tipo_tela)}`:''}
-    ${cliente?' · <b style="color:var(--ok)">tela del cliente</b>':(f.valor_tela?` · tela <b>${$$(f.valor_tela)}</b>`:'')}</div></div>`;
-  if(!$('q_pn').value) $('q_pn').value=f.tipo_prenda+' a la medida';
-  $('q_tprov').value = cliente?'cliente':'nosotros';
-  $('q_tela').value = cliente?'':(+f.valor_tela||'');
-  telaCot();
-}
-function telaCot(){
-  const cl=$('q_tprov').value==='cliente';
-  $('q_telabox').style.display=cl?'none':'block';
-  $('q_telah').innerHTML=cl?'✦ La trae el cliente → <b>no se le cobra y no cuesta</b>.':'Si la ponemos nosotros, se la cobramos al cliente y también nos cuesta.';
-  if(cl) $('q_tela').value='';
-  calcMargen();
-}
-function delCat(){
-  const s=$('q_p'), o=s.options[s.selectedIndex];
-  if(!s.value) return;
-  $('q_pn').value=o.dataset.n||''; $('q_mo').value=o.dataset.v||'';
-  $('q_t').value='catalogo'; s.value=''; calcMargen();
-}
-function pintaItems(){}   // (ya no hay lista de piezas: es una prenda por cotización)
-function addCosto(){
-  const n=$('q_cn').value.trim(), v=+($('q_cv').value||'').replace(/\D/g,'')||0;
-  if(!n||!v)return alert('Escribe el concepto y el valor.');
-  COSTOS.push({n,v}); $('q_cn').value=''; $('q_cv').value=''; pintaCostos(); calcMargen();
-}
-function pintaCostos(){
-  const t=COSTOS.reduce((s,c)=>s+c.v,0);
-  $('q_costos').innerHTML=COSTOS.length?COSTOS.map((c,k)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13.5px;border-bottom:1px solid var(--line2)">
-    <span style="flex:1">${esc(c.n)}</span>
-    <input value="${c.v}" inputmode="numeric" onchange="editCosto(${k},this.value)" style="width:110px;text-align:right;padding:6px 8px;font-weight:700;font-size:13.5px">
-    <button class="btn sm gh" onclick="COSTOS.splice(${k},1);pintaCostos();calcMargen()">✕</button></div>`).join('')
-    +`<div style="display:flex;justify-content:space-between;padding:8px 0 0;font-weight:800;font-size:13.5px"><span>Total costos internos</span><span style="color:var(--acc)">${$$(t)}</span></div>`
-    :'<div class="hint">Sin costos internos. Agrégalos abajo o guárdalos como plantilla.</div>';
-}
-function editCosto(k,v){ COSTOS[k].v=+String(v).replace(/\D/g,'')||0; pintaCostos(); calcMargen(); }
-async function guardarPlantilla(){
-  if(!COSTOS.length) return alert('No hay costos que guardar.');
-  if(!confirm('¿Guardar estos '+COSTOS.length+' costos como plantilla?\n\nLa próxima vez que cotices salen solos con estos valores.')) return;
-  await del('zarrat_costos_base','id=gt.0');
-  await post('zarrat_costos_base',COSTOS.map((c,i)=>({concepto:c.n,valor:c.v,orden:i+1})),'return=minimal');
-  alert('✦ Plantilla guardada. La próxima cotización ya sale con estos costos.');
-}
-function calcMargen(){
-  const cl=$('q_tprov')?.value==='cliente';
-  const tela=cl?0:(+($('q_tela')?.value||'').toString().replace(/\D/g,'')||0);
-  const mo=+($('q_mo')?.value||'').toString().replace(/\D/g,'')||0;
-  const ci=COSTOS.reduce((s,c)=>s+c.v,0);
-  const pv=tela+mo;                       // ✦ LO QUE SE COBRA = tela + mano de obra
-  const mc=pv-tela-ci;                    // margen = mano de obra − costos internos
-  const pct=pv?Math.round(mc/pv*100):0;
-  const p=$('q_precio');
-  if(p) p.innerHTML=`<div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut)">LO QUE LE COBRAS AL CLIENTE</div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink2);margin-top:4px"><span>🧵 Tela</span><span>${$$(tela)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--ink2)"><span>✂️ Mano de obra</span><span>${$$(mo)}</span></div>
-    <div style="border-top:1px solid var(--line);margin-top:5px;padding-top:5px;display:flex;justify-content:space-between;align-items:baseline">
-      <b style="font-size:13px">PRECIO TOTAL</b><b style="font-family:Georgia,serif;font-size:23px;color:var(--acc)">${$$(pv)}</b></div>`;
-  const r=$('q_res'); if(!r) return;
-  r.innerHTML=`<div style="font-size:10.5px;letter-spacing:.08em;color:#a49a86">④ RESULTADO DE LA PRENDA</div>
-    <div style="display:flex;justify-content:space-between;font-size:13.5px;margin-top:6px"><span>Precio cobrado</span><b>${$$(pv)}</b></div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;color:#c9c0ae"><span>− Tela (lo que te cuesta)</span><span>${$$(tela)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:13px;color:#c9c0ae"><span>− Costos internos</span><span>${$$(ci)}</span></div>
-    <div style="border-top:1px solid #3a352a;margin-top:7px;padding-top:7px;display:flex;justify-content:space-between;align-items:baseline">
-      <span style="font-size:12px;letter-spacing:.06em">MARGEN DE CONTRIBUCIÓN</span>
-      <b style="font-family:Georgia,serif;font-size:24px;color:${mc>0?'var(--acc2)':'#e07a6a'}">${$$(mc)} <span style="font-size:14px">(${pct}%)</span></b></div>
-    <div style="font-size:11px;color:#a49a86;margin-top:4px">${mc>0?'✦ Esto APORTA a cubrir tus gastos fijos. (Mano de obra − costos internos)':'⚠ No aporta nada: los costos internos se comen la mano de obra.'}</div>`;
-}
-async function saveCotiz(){
-  const ci=$('q_c').value; if(!ci)return alert('Elige el cliente.');
-  const prenda=$('q_pn').value.trim(); if(!prenda)return alert('Escribe qué prenda es.');
-  const cl=$('q_tprov').value==='cliente';
-  const tela=cl?0:(+($('q_tela').value||'').replace(/\D/g,'')||0);
-  const mo=+($('q_mo').value||'').replace(/\D/g,'')||0;
-  if(!mo)return alert('Escribe cuánto cobras de mano de obra.');
-  const cin=COSTOS.reduce((s,x)=>s+x.v,0);
-  const pv=tela+mo, mc=pv-tela-cin;
-  const c=CLI.find(x=>x.id==ci)||{};
-  const folio='ZR-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+String(Date.now()).slice(-4);
-  await post('zarrat_cotizaciones',{folio,cliente_id:+ci,cliente_nombre:c.nombre,tipo:$('q_t').value,prenda,
-    items:[{n:prenda,v:pv}],subtotal:pv,total:pv,costo_tela:tela,costo_mo:mo,costo_interno:cin,costos_detalle:COSTOS,
-    margen_contrib:mc,notas:$('q_n').value.trim()},'return=minimal');
-  vCotiz();
-}
-async function aVenta(id){
-  const c=(await get('zarrat_cotizaciones?id=eq.'+id))[0]; if(!c)return;
-  if(!confirm('✓ APROBAR y pasar a VENTA\n\n'+c.cliente_nombre+' · '+$$(c.total)+'\nAporta a gastos fijos: '+$$(c.margen_contrib)+'\n\nEn Ventas registras la forma de pago.'))return;
-  await post('zarrat_ventas',{folio:c.folio,cliente_id:c.cliente_id,cliente_nombre:c.cliente_nombre,total:c.total,
-    margen_contrib:c.margen_contrib||0, costo_total:(+c.costo_tela||0)+(+c.costo_interno||0)},'return=minimal');
-  await patch('zarrat_cotizaciones','id=eq.'+id,{estado:'aprobada'});
-  go('ventas');
-}
-
-/* ═══════ 7 · VENTAS ═══════ */
-const MPAGO={'Nequi':'📲','Consignación':'🏦','Efectivo':'💵','Tarjeta de crédito':'💳'};
-let PAGOS=[];
-function vch(id){ const t=$('pm_'+id).value==='Tarjeta de crédito'; $('pn_'+id).style.display=t?'block':'none'; }
-async function addPago(id){
-  const met=$('pm_'+id).value, val=+($('pv_'+id).value||'').replace(/\D/g,'')||0;
-  const vou=($('pn_'+id).value||'').trim();
-  if(!val) return alert('Escribe el valor del pago.');
-  if(met==='Tarjeta de crédito' && !vou) return alert('La tarjeta necesita el N° de voucher.');
-  await post('zarrat_pagos',{venta_id:id,metodo:met,valor:val,voucher:vou||null},'return=minimal');
-  const pg=await get('zarrat_pagos?venta_id=eq.'+id);
-  const vt=(await get('zarrat_ventas?id=eq.'+id))[0]||{};
-  const pagado=pg.reduce((s,p)=>s+(+p.valor||0),0);
-  await patch('zarrat_ventas','id=eq.'+id,{pagado, estado_pago: pagado>=(+vt.total||0)?'pagado':'parcial'});
-  vVentas();
-}
-async function vVentas(){
-  const [v,pg]=await Promise.all([get('zarrat_ventas?order=fecha.desc&limit=200'),get('zarrat_pagos?limit=500')]);
-  PAGOS=pg;
-  const m=mesAct();
-  const mes=v.filter(x=>(x.fecha||'').startsWith(m));
-  const tm=mes.reduce((s,x)=>s+(+x.total||0),0), ta=v.reduce((s,x)=>s+(+x.total||0),0);
-  const g=await get('zarrat_gastos?mes=eq.'+m);
-  const fijos=g.filter(x=>x.tipo==='fijo').reduce((s,x)=>s+(+x.valor||0),0);
-  const aportes=mes.reduce((s,x)=>s+(+x.margen_contrib||0),0);   // lo que las piezas aportan a gastos fijos
-  const utilidad=aportes-fijos;
-  const falta=Math.max(0,fijos-aportes);
-  const pct=fijos?Math.min(100,Math.round(aportes/fijos*100)):0;
-  $('main').innerHTML=`<h1>Ventas y utilidad</h1><div class="sub">${m} · los márgenes de cada pieza cubriendo los gastos fijos</div>
-  <div class="kpis">
-    <div class="kpi"><b>${$$(tm)}</b><span>VENDIDO ESTE MES</span></div>
-    <div class="kpi"><b style="color:var(--ok)">${$$(aportes)}</b><span>APORTE A GASTOS FIJOS (margen)</span></div>
-    <div class="kpi eq"><b style="color:${utilidad>=0?'var(--acc2)':'#e07a6a'}">${utilidad>=0?$$(utilidad):'−'+$$(-utilidad)}</b>
-      <span>${utilidad>=0?'✦ UTILIDAD DEL MES (ya cubriste los gastos fijos)':`AÚN EN PÉRDIDA · faltan ${$$(falta)} de aporte para cubrir los ${$$(fijos)} de gastos fijos`}</span></div>
-  </div>
-  <div class="card" style="padding:12px 15px">
-    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--mut);margin-bottom:5px">
-      <span>APORTES ${$$(aportes)}</span><span>GASTOS FIJOS ${$$(fijos)}</span></div>
-    <div style="height:14px;background:var(--line2);border-radius:7px;overflow:hidden">
-      <div style="height:100%;width:${pct}%;background:${utilidad>=0?'var(--ok)':'var(--acc)'};transition:width .4s"></div></div>
-    <div class="hint">${pct}% de tus gastos fijos cubiertos con el margen de las piezas vendidas este mes.</div>
-    ${tm>0?`<div style="border-top:1px solid var(--line2);margin-top:9px;padding-top:9px;display:flex;justify-content:space-between;align-items:baseline">
-      <span style="font-size:12px;color:var(--mut);letter-spacing:.05em">MARGEN REAL DEL MES</span>
-      <b style="font-family:Georgia,serif;font-size:22px;color:var(--ok)">${(aportes/tm*100).toFixed(1)}%</b></div>
-      <div class="hint">Sale de las ventas de este mes: aportaron ${$$(aportes)} sobre ${$$(tm)} vendidos.</div>`:''}
-  </div>
-  ${v.length?v.map(x=>{const mc=+x.margen_contrib||0; const pg=PAGOS.filter(p=>p.venta_id===x.id);
-    const pagado=pg.reduce((s,p)=>s+(+p.valor||0),0); const saldo=(+x.total||0)-pagado;
-    return `<div class="item" style="display:block">
-    <div style="display:flex;justify-content:space-between;gap:10px">
-      <div><div class="nm">${esc(x.cliente_nombre||'—')}</div>
-      <div class="mt">${esc(x.folio||'')} · 📅 ${esc(x.fecha||'')}</div>
-      <div class="mt">Costo ${$$(x.costo_total)} → <b style="color:var(--ok)">aporta ${$$(mc)}</b></div></div>
-      <div style="text-align:right"><div class="nm" style="color:var(--acc)">${$$(x.total)}</div>
-        <span class="tag ${saldo<=0?'a':''}">${saldo<=0?'✓ pagada':'saldo '+$$(saldo)}</span></div>
-    </div>
-    ${pg.length?`<div style="margin-top:8px;border-top:1px solid var(--line2);padding-top:7px">
-      ${pg.map(p=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0">
-        <span>${MPAGO[p.metodo]||''} ${esc(p.metodo)}${p.voucher?` · voucher ${esc(p.voucher)}`:''}</span>
-        <span><b>${$$(p.valor)}</b> <button class="btn sm gh" onclick="delRow('zarrat_pagos',${p.id},vVentas)">✕</button></span></div>`).join('')}
-    </div>`:''}
-    ${saldo>0?`<div style="margin-top:8px;background:#faf7f1;border-radius:9px;padding:9px 11px">
-      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:5px">REGISTRAR PAGO</div>
-      <div class="g3">
-        <select id="pm_${x.id}" onchange="vch(${x.id})">${Object.keys(MPAGO).map(k=>`<option value="${k}">${MPAGO[k]} ${k}</option>`).join('')}</select>
-        <input id="pv_${x.id}" inputmode="numeric" placeholder="Valor" value="${saldo}">
-        <button class="btn acc" onclick="addPago(${x.id})">+ Pago</button>
-      </div>
-      <input id="pn_${x.id}" placeholder="N° de voucher" style="margin-top:7px;display:none">
-    </div>`:''}
-    </div>`;}).join('')
-    :'<div class="empty">Sin ventas aún.</div>'}`;
-}
-const pagada=id=>patch('zarrat_ventas','id=eq.'+id,{estado_pago:'pagado'}).then(vVentas);
-
-/* ═══════ 8 · CRM (por canal de origen) ═══════ */
-const ETAPAS=['contacto','interesado','medidas','cotizado','cliente'];
-const CANALES=[
-  ['instagram','📷 Instagram','Los que escriben por Instagram · <b>se alimenta solo</b> (automatizable)'],
-  ['digital','💬 Digital','Los que responden a la <b>pauta</b> · <b>se alimenta solo</b> (como Feroz y Smart)'],
-  ['referido','⭐ Referidos','Los que llegaron <b>recomendados</b> · se registran aquí'],
-  ['local','🏠 Local','Los que llegaron <b>por su cuenta</b> al local · se registran aquí'],
-];
-let FCAN='local';
-async function vCrm(){
-  const [cl,cr]=await Promise.all([get('zarrat_clientes?order=creado_en.desc&limit=500'),get('zarrat_crm?limit=500')]);
-  const map={}; cr.forEach(x=>map[x.cliente_id]=x.etapa);
-  const n=k=>cl.filter(c=>(c.canal||'local')===k).length;
-  const arr=cl.filter(c=>(c.canal||'local')===FCAN);
-  const auto=(FCAN==='digital'||FCAN==='instagram');
-  const info=(CANALES.find(x=>x[0]===FCAN)||[])[2]||'';
-  $('main').innerHTML=`<h1>CRM</h1><div class="sub">Por canal de origen · Contacto → Interesado → Medidas → Cotizado → Cliente</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-    ${CANALES.map(([k,nm])=>`<button class="btn ${k===FCAN?'acc':'gh'}" style="flex:1;min-width:120px;padding:13px 8px;font-size:12.5px" onclick="FCAN='${k}';vCrm()">
-      ${nm}<div style="font-family:Georgia,serif;font-size:19px;margin-top:2px">${n(k)}</div></button>`).join('')}
-  </div>
-  <div class="card" style="border-left:4px solid ${auto?'var(--ok)':'var(--acc)'};padding:10px 13px">
-    <div style="font-size:12.5px;color:var(--ink2)">${auto?'⚙️':'✎'} ${info}</div>
-  </div>
-  ${auto?`<div class="card" style="background:#faf7f1;padding:12px 14px">
-      <div style="font-size:12.5px;color:var(--mut)">Este cajón <b>se llena automáticamente</b> cuando conectemos ${FCAN==='digital'?'la pauta (Meta Ads → WhatsApp)':'Instagram'}.
-      Igual que en Feroz y Smart, cada persona que llegue por ahí <b>entra sola</b> con su origen marcado.</div></div>`
-    :`<div class="card">
-      <div style="font-size:10.5px;font-weight:700;letter-spacing:.08em;color:var(--mut);margin-bottom:2px">REGISTRAR ${FCAN==='referido'?'REFERIDO':'CLIENTE DEL LOCAL'}</div>
-      <div class="g2"><div><label>Nombre *</label><input id="r_n" placeholder="Nombre completo"></div>
-        <div><label>Teléfono / WhatsApp</label><input id="r_t" inputmode="tel"></div></div>
-      <div class="g2"><div><label>Instagram</label><input id="r_i" placeholder="@usuario"></div>
-        <div><label>${FCAN==='referido'?'¿Quién lo refirió?':'Cómo nos conoció'}</label><input id="r_r" placeholder="${FCAN==='referido'?'Nombre de quien lo recomendó':'Vitrina, voz a voz…'}"></div></div>
-      <label>Qué busca / notas</label><textarea id="r_no" placeholder="Prenda, ocasión, fecha…"></textarea>
-      <button class="btn acc full" onclick="addLead()">+ Registrar en ${FCAN==='referido'?'Referidos':'Local'}</button>
-      <div class="hint">Queda también en <b>Clientes</b>, listo para tomarle medidas y cotizar.</div>
-    </div>`}
-  <h1 style="font-size:18px">${(CANALES.find(x=>x[0]===FCAN)||[])[1]} · ${arr.length}</h1>
-  ${arr.length?arr.map(c=>{const et=map[c.id]||'contacto';
-    return `<div class="item" style="display:block"><div class="nm">${esc(c.nombre)}</div>
-      <div class="mt">${c.telefono?'📱 '+esc(c.telefono):''}${c.instagram?' · 📷 '+esc(c.instagram):''}${c.referido_por?' · ⭐ por '+esc(c.referido_por):''}</div>
-      ${c.notas?`<div class="mt">📝 ${esc(c.notas)}</div>`:''}
-      <div class="etapas">${ETAPAS.map(e=>`<span class="et ${e===et?'on':''}" onclick="setEtapa(${c.id},'${e}')">${e}</span>`).join('')}</div></div>`;}).join('')
-    :`<div class="empty">Sin personas en este canal aún.</div>`}`;
-}
-async function addLead(){
-  const n=$('r_n').value.trim(); if(!n)return alert('El nombre es obligatorio.');
-  const c=await post('zarrat_clientes',{nombre:n,telefono:$('r_t').value.trim(),whatsapp:$('r_t').value.trim(),
-    instagram:$('r_i').value.trim(),referido_por:$('r_r').value.trim()||null,notas:$('r_no').value.trim(),canal:FCAN});
-  if(c&&c[0]) await post('zarrat_crm?on_conflict=cliente_id',{cliente_id:c[0].id,etapa:'contacto'},'resolution=merge-duplicates,return=minimal');
-  vCrm();
-}
-async function setEtapa(id,e){await post('zarrat_crm?on_conflict=cliente_id',{cliente_id:id,etapa:e},'resolution=merge-duplicates,return=minimal');vCrm();}
-
-go('pend');
+/* arranque */
+(async()=>{ try{ await cargar(); window.LISTO=true; go('prod'); }catch(e){ $('main').innerHTML='<div class="card">No se pudo conectar con la base. Revisa la señal y recarga.</div>'; } })();
 </script>
 
-<!-- Bloc de notas y Horas. Zarrat no tiene login, asi que se desbloquean una sola
-     vez entrando con ?notas=1 y quedan guardados en ese navegador. -->
+<!-- Gastos (libro propio), bloc de notas y horas. Zarrat no tiene login: Notas y
+     Horas se desbloquean una sola vez entrando con ?notas=1 y quedan en el navegador. -->
+<script src="../assets/gastos.js?v=20260902-mes"></script>
 <script src="../assets/notas.js?v=20260902-equipo"></script>
 <script src="../assets/horas.js"></script>
-<script>try{Notas.montar('zarrat',Notas.soyJose());Horas.montar('zarrat','Zarrat Atelier',Horas.soyJose());}catch(e){}</script>
+<script>try{ Gastos.montar('zarrat_gastos_libro','Zarrat',true); Notas.montar('zarrat',Notas.soyJose()); Horas.montar('zarrat','Zarrat',Horas.soyJose()); }catch(e){ console.warn(e); }</script>
+</body>
+</html>

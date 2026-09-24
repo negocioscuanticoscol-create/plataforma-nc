@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ZARRAT · Catálogo</title>
+<!-- La vitrina pública. Muestra SOLO los productos que en la app tienen
+     "Publicar en la web" prendido, con su foto, descripción y precio al público.
+     Cuando se compre el dominio, esta misma página (o su contenido) es lo que
+     se pone detrás: lo que se cambia en la app aparece aquí solo. -->
+<style>
+  :root{--paper:#f5f2ec;--card:#fffdf9;--ink:#17150f;--mut:#918a7a;--line:#e2dbcd;--acc:#8a6a3d;--acc2:#b08c56}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:"Segoe UI",system-ui,sans-serif;line-height:1.5}
+  header{background:var(--ink);color:var(--paper);padding:28px 16px;text-align:center}
+  .brand{font-family:Georgia,serif;font-size:32px;letter-spacing:.34em;text-indent:.34em}
+  .brand small{display:block;font-family:"Segoe UI",sans-serif;font-size:10px;letter-spacing:.28em;color:var(--acc2);margin-top:4px}
+  .wrap{max-width:1000px;margin:0 auto;padding:22px 16px 60px}
+  .filtros{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:18px}
+  .filtros button{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--mut);font-family:inherit}
+  .filtros button.on{color:var(--ink);border-color:var(--acc);font-weight:600}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}
+  .p{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 10px 30px -18px rgba(30,24,10,.25)}
+  .p .img{aspect-ratio:1;background:#eee8dc center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:44px;color:var(--line)}
+  .p .b{padding:12px 14px}
+  .p .cat{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--acc)}
+  .p .n{font-family:Georgia,serif;font-size:17px;margin:2px 0}
+  .p .d{font-size:12.5px;color:var(--mut);min-height:1.5em}
+  .p .pr{font-weight:700;font-size:16px;margin-top:8px}
+  .vacio{text-align:center;color:var(--mut);padding:40px}
+  footer{text-align:center;color:var(--mut);font-size:12px;padding:20px}
+</style>
+</head>
+<body>
+<header><div class="brand">ZARRAT<small>MARROQUINERÍA · MALETAS Y CARTERAS</small></div></header>
+<div class="wrap">
+  <div class="filtros" id="filtros"></div>
+  <div class="grid" id="grid"><div class="vacio">Cargando…</div></div>
+</div>
+<footer>ZARRAT · catálogo v20260924</footer>
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K};
+const esc=s=>String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const $$=n=>'$'+Math.round(+n||0).toLocaleString('es-CO');
+let P=[], CAT='';
+async function cargar(){
+  const r=await fetch(SB+'/rest/v1/zarrat_producto?select=id,sku,nombre,categoria,descripcion,foto_url,precio_venta&publicar_web=is.true&activo=is.true&order=categoria,nombre&limit=1000',{headers:H});
+  P=r.ok?await r.json():[];
+  const cats=[...new Set(P.map(p=>p.categoria).filter(Boolean))];
+  document.getElementById('filtros').innerHTML=[['','Todo'],...cats.map(c=>[c,c])].map(([v,n])=>`<button class="${v===CAT?'on':''}" onclick="CAT='${esc(v)}';pintar();cargarFiltros()">${esc(n)}</button>`).join('');
+  pintar();
+}
+function cargarFiltros(){ document.querySelectorAll('#filtros button').forEach(b=>b.className=(b.textContent==='Todo'?CAT==='':b.textContent===CAT)?'on':''); }
+function pintar(){
+  const l=P.filter(p=>!CAT||p.categoria===CAT);
+  document.getElementById('grid').innerHTML=l.length?l.map(p=>`<div class="p">
+    <div class="img" style="${p.foto_url?`background-image:url('${esc(p.foto_url)}')`:''}">${p.foto_url?'':'👜'}</div>
+    <div class="b"><div class="cat">${esc(p.categoria||'')}</div><div class="n">${esc(p.nombre)}</div>
+    <div class="d">${esc(p.descripcion||'')}</div><div class="pr">${p.precio_venta?$$(p.precio_venta):'Precio a consultar'}</div></div></div>`).join('')
+    :'<div class="vacio">Todavía no hay productos publicados. En la app, prende "Publicar en la web" en cada producto.</div>';
+}
+cargar();
+</script>
+</body>
+</html>
