@@ -71,6 +71,16 @@ select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea)
 .modal{position:relative}
 .buscador{width:100%;padding:9px 12px;border:1px solid var(--linea);border-radius:8px;margin-bottom:10px;font-size:13px}
 .loading{padding:60px;text-align:center;color:var(--suave)}
+.card{position:relative}
+.card .chk{position:absolute;top:9px;right:9px;width:17px;height:17px;accent-color:var(--naranja);z-index:2}
+.card .fila1{padding-right:20px}
+.barra-seleccion{position:sticky;bottom:0;left:0;right:0;background:var(--naranja-d);color:#fff;padding:11px 16px;border-radius:12px;display:flex;align-items:center;gap:12px;margin-top:14px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.barra-seleccion b{font-size:14px}
+.barra-seleccion button{padding:7px 14px;border-radius:8px;border:none;font-weight:700;cursor:pointer;font-size:12.5px}
+.btn-enviar{background:#fff;color:var(--naranja-d)}
+.btn-vaciar{background:rgba(255,255,255,.18);color:#fff}
+.btn-actualizar{background:transparent;border:1px solid var(--linea);color:var(--gris);font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;font-weight:700}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:11px 18px;border-radius:10px;font-size:13px;z-index:60;max-width:90vw}
 @media(max-width:820px){.layout{flex-direction:column}.panel-arbol{width:100%;max-width:none;height:auto;max-height:280px;border-right:none;border-bottom:1px solid var(--linea)}}
 </style>
 </head>
@@ -81,8 +91,9 @@ select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea)
   <select id="clienteNc" onchange="App.cambiarCliente(this.value)">
     <option value="smart">Smart Envases</option>
   </select>
+  <button class="btn-actualizar" onclick="App.actualizarDesdeLupe()">🔄 Actualizar desde Lupe</button>
 </header>
-<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v1</div>
+<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v2-lupe</div>
 <div class="layout">
   <div class="panel-arbol" id="arbol"><div class="loading">Cargando el mapa…</div></div>
   <div class="panel-central" id="central"></div>
@@ -116,6 +127,8 @@ const App={
   visibles:60,
   abiertos:new Set(),
   buscar:'',
+  seleccionados:new Set(),
+  enviando:false,
 
   async init(){
     await this.cargar();
@@ -125,7 +138,7 @@ const App={
     $('arbol').innerHTML='<div class="loading">Cargando el mapa…</div>';
     $('central').innerHTML='';
     // PostgREST corta en 1.000 filas por página aunque se pida limit=10000: hay que paginar con Range.
-    const COLS='id,depto,municipio,localidad,barrio,nombre,razon_social,nit,celular,telefono,email,web,instagram,producto,categoria,envase,tamano,etapa,etapa_motivo,etapa_canal,etapa_fecha,total_comprado,ultima_compra,cliente_desde,calidad,notas,no_tocable';
+    const COLS='id,depto,municipio,localidad,barrio,direccion,nombre,razon_social,nit,celular,telefono,email,web,instagram,producto,categoria,envase,tamano,etapa,etapa_motivo,etapa_canal,etapa_fecha,etapa_quien,total_comprado,ultima_compra,cliente_desde,calidad,notas,no_tocable,lupe_base_id';
     const url=SB+'/rest/v1/nc_mercado?cliente_nc=eq.'+encodeURIComponent(this.clienteNc)+'&select='+COLS+'&order=id.asc';
     let todo=[], desde=0;
     while(true){
@@ -261,10 +274,22 @@ const App={
     if(!filas.length){
       html='<div class="vacio">No hay negocios con estos filtros.</div>';
     }else{
-      html=`<div class="lista">${mostrar.map(f=>this.cardHtml(f)).join('')}</div>`;
+      const seleccionablesAqui=filas.filter(f=>this.puedeEnviarse(f));
+      html=`<div style="margin-bottom:8px">
+        <a href="#" onclick="App.seleccionarFiltrados();return false" style="font-size:12px;color:var(--naranja);font-weight:700">
+          ☑️ Seleccionar los ${filas.length.toLocaleString('es-CO')} de este filtro${seleccionablesAqui.length<filas.length?` (${seleccionablesAqui.length} se pueden mandar a Lupe)`:''}</a>
+      </div>
+      <div class="lista">${mostrar.map(f=>this.cardHtml(f)).join('')}</div>`;
       if(filas.length>mostrar.length) html+=`<button class="mas" onclick="App.masVisibles()">Ver más (${filas.length-mostrar.length} restantes)</button>`;
     }
+    html+=this.barraSeleccionHtml();
     $('listaWrap').innerHTML=html;
+  },
+
+  // Solo se manda a Lupe lo que aun no esta en trabajo, no es cliente y no es no_tocable,
+  // y tiene con que llamar. Si ya esta en_trabajo es porque ya se mando (o vino de pauta/visita).
+  puedeEnviarse(f){
+    return !f.no_tocable && !['cliente','en_trabajo','no_tocable'].includes(f.etapa) && (f.celular||f.telefono);
   },
 
   cardHtml(f){
@@ -274,7 +299,10 @@ const App={
     if(f.categoria) meta.push('🏷️ '+esc(f.categoria));
     if(f.tamano) meta.push(esc(f.tamano));
     if(f.municipio && !this.seleccion.municipio) meta.push('📍 '+esc(f.municipio));
+    const marcado=this.seleccionados.has(f.id);
+    const puede=this.puedeEnviarse(f);
     return `<div class="card" onclick="App.abrirFicha('${f.id}')">
+      ${puede?`<input type="checkbox" class="chk" ${marcado?'checked':''} onclick="event.stopPropagation();App.toggleSeleccion('${f.id}')">`:''}
       <div class="fila1">
         <div class="nombre">${esc(f.nombre)}</div>
         <span class="badge" style="background:${color}">${NOMBRE_ETAPA[f.etapa]||f.etapa}</span>
@@ -283,6 +311,79 @@ const App={
         <span title="calidad del dato: ${f.calidad||0}">calidad<span class="calidad"><i style="width:${f.calidad||0}%"></i></span></span>
       </div>
     </div>`;
+  },
+
+  toggleSeleccion(id){ if(this.seleccionados.has(id)) this.seleccionados.delete(id); else this.seleccionados.add(id); this.renderListaSolo(); },
+  seleccionarFiltrados(){
+    const filas=this.filasFiltradas().filter(f=>this.puedeEnviarse(f));
+    filas.forEach(f=>this.seleccionados.add(f.id));
+    this.renderListaSolo();
+  },
+  vaciarSeleccion(){ this.seleccionados.clear(); this.renderListaSolo(); },
+
+  barraSeleccionHtml(){
+    const n=this.seleccionados.size;
+    if(!n) return '';
+    return `<div class="barra-seleccion">
+      <b>${n} seleccionado${n===1?'':'s'}</b>
+      <button class="btn-enviar" onclick="App.enviarALupe()" ${this.enviando?'disabled':''}>${this.enviando?'Enviando…':'📤 Enviar a Lupe'}</button>
+      <button class="btn-vaciar" onclick="App.vaciarSeleccion()">Vaciar selección</button>
+    </div>`;
+  },
+
+  // ---------- ENVIAR A LUPE ----------
+  async enviarALupe(){
+    if(this.enviando||!this.seleccionados.size) return;
+    const filas=this.datos.filter(f=>this.seleccionados.has(f.id));
+    const nombreSugerido=(this.seleccion.municipio||this.seleccion.depto||'Mapamundi')+' · '+new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'short'});
+    const nombreBase=prompt('¿Con qué nombre queda esta base en Lupe?',nombreSugerido);
+    if(!nombreBase) return;
+    this.enviando=true; this.renderListaSolo();
+    try{
+      const deptos=[...new Set(filas.map(f=>f.depto).filter(Boolean))];
+      const rBase=await fetch(SB+'/rest/v1/mkr_bases',{method:'POST',headers:{...H,Prefer:'return=representation'},
+        body:JSON.stringify([{nombre:nombreBase, descripcion:'Enviada desde Mapamundi · '+filas.length+' negocios', origen:'Mapamundi',
+          depto:deptos.length===1?deptos[0]:null, nivel:'todos', activa:true, cliente:this.clienteNc, rubro:'envases'}])});
+      const base=(await rBase.json())[0];
+      if(!base||!base.id) throw new Error('no se pudo crear la base en Lupe');
+      const filasEmpresa=filas.map(f=>({
+        base_id:base.id, nc_mercado_id:f.id, razon_social:f.razon_social||f.nombre, nit:f.nit||null,
+        municipio:f.municipio||null, depto:f.depto||null, direccion:f.direccion||null,
+        telefono:f.telefono||null, celular:f.celular||null,
+        tel_marcar:f.celular||f.telefono||null, tipo_tel:f.celular?'celular':(f.telefono?'fijo':null),
+        email:f.email||null, web:f.web||null, sector:f.categoria||null, estado:'nuevo'}));
+      // en tandas de 300 para no mandar un body gigante
+      for(let i=0;i<filasEmpresa.length;i+=300){
+        const r=await fetch(SB+'/rest/v1/mkr_empresas',{method:'POST',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify(filasEmpresa.slice(i,i+300))});
+        if(!r.ok) throw new Error('error cargando empresas a Lupe: '+await r.text());
+      }
+      const ids=filas.map(f=>'"'+f.id+'"').join(',');
+      await fetch(SB+'/rest/v1/nc_mercado?id=in.('+ids+')',{method:'PATCH',headers:{...H,Prefer:'return=minimal'},
+        body:JSON.stringify({etapa:'en_trabajo', etapa_motivo:null, etapa_canal:'llamada', etapa_quien:'mapamundi', etapa_fecha:new Date().toISOString(), lupe_base_id:base.id})});
+      filas.forEach(f=>{ f.etapa='en_trabajo'; f.etapa_motivo=null; f.etapa_canal='llamada'; f.lupe_base_id=base.id; });
+      this.seleccionados.clear();
+      this.toast('✅ '+filasEmpresa.length+' negocios enviados a Lupe, en la base «'+nombreBase+'».');
+    }catch(e){
+      this.toast('❌ '+e.message);
+    }
+    this.enviando=false;
+    this.renderArbol(); this.renderCentral();
+  },
+
+  async actualizarDesdeLupe(){
+    this.toast('Consultando lo que ha pasado en Lupe…');
+    try{
+      const r=await fetch(SB+'/rest/v1/rpc/nc_mercado_sync_lupe',{method:'POST',headers:H,body:JSON.stringify({p_cliente_nc:this.clienteNc})});
+      const cambios=await r.json();
+      if(!r.ok) throw new Error((cambios&&cambios.message)||'no se pudo actualizar');
+      await this.cargar();
+      this.toast(Array.isArray(cambios)&&cambios.length ? '🔄 '+cambios.length+' negocios cambiaron de estado por resultados de Lupe.' : 'Sin novedades: nada cambió desde la última vez.');
+    }catch(e){ this.toast('❌ '+e.message); }
+  },
+
+  toast(msg){
+    const el=document.createElement('div'); el.className='toast'; el.textContent=msg;
+    document.body.appendChild(el); setTimeout(()=>el.remove(),4500);
   },
 
   // ---------- FICHA ----------
@@ -297,6 +398,7 @@ const App={
         <div class="grupo-titulo">Estado</div>
         <div class="etapas-botones">${ETAPAS.map(e=>`<div class="eb ${f.etapa===e.v?'on':''}" style="${f.etapa===e.v?`background:${e.color}`:''}" onclick="App.cambiarEtapa('${f.id}','${e.v}')">${e.t}</div>`).join('')}</div>
         ${f.etapa_motivo?`<div class="campo" style="margin-top:8px"><label>Motivo</label><div class="val">${esc(f.etapa_motivo)}</div></div>`:''}
+        ${f.etapa==='en_trabajo' && f.lupe_base_id?`<div class="campo" style="margin-top:4px"><label>En Lupe</label><div class="val">Enviado a una base de llamadas · <a href="#" onclick="App.actualizarDesdeLupe();return false" style="color:var(--naranja)">actualizar resultado</a></div></div>`:''}
         <div class="grupo-titulo">Localización</div>
         <div class="filagrid">${campo('Departamento',f.depto)}${campo('Municipio',f.municipio)}</div>
         ${f.localidad||f.barrio?`<div class="filagrid">${campo('Localidad',f.localidad)}${campo('Barrio',f.barrio)}</div>`:''}
