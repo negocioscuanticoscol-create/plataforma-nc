@@ -767,8 +767,12 @@ function updateBadge(id,color){
   const stock=getStock(id,color);
   const prod=allProds().find(p=>p.id===id);
   if(stock===0){
-    el.className='sbadge s-out'; el.textContent='Agotado';
-    if(inp){ inp.disabled=true; inp.value=''; inp.style.opacity='.35'; inp.placeholder='—'; }
+    /* 25-sep-2026: Jose pidio poder cotizar igual cuando no hay en planta -se
+       lo piden aunque no haya stock-. Ya no se bloquea el campo: se deja
+       escribir la cantidad para sacar el precio, pero el rojo de "Agotado"
+       avisa que hoy no hay para despachar. */
+    el.className='sbadge s-out'; el.textContent='Agotado · sin disponibilidad en planta';
+    if(inp){ inp.disabled=false; inp.style.opacity='1'; inp.removeAttribute('max'); inp.placeholder='0'; }
   } else if(stock===-1){
     el.className='sbadge s-ok'; el.textContent='Disponible';
     if(inp){ inp.disabled=false; inp.style.opacity='1'; inp.removeAttribute('max'); inp.placeholder='0'; }
@@ -789,8 +793,9 @@ function buildGridSorted(){
   let prods=[]; Object.keys(CAT).forEach(g=>CAT[g].forEach(p=>prods.push(Object.assign({},p,{_label:LBL[g]}))));
   prods.sort((a,b)=>_ml(a.v)-_ml(b.v));   // menor a mayor tamaño
   c.innerHTML=prods.map(prod=>{
-    const colorsDisp=prod.col.filter(color=>getStock(prod.id,color)!==0);   // ocultar agotados
-    if(!colorsDisp.length) return '';   // sin stock en ningún color → no se muestra
+    // 25-sep-2026: ya NO se ocultan los agotados -Jose necesita poder cotizarlos
+    // igual, aunque hoy no haya en planta-. El badge rojo "Agotado" es el aviso.
+    const colorsDisp=prod.col;
     const colorRows=colorsDisp.map(color=>{
       const cid=prod.id+'_'+color;
       const dot='<div class="cdot-'+(COLDOT[color]||'t')+'"></div>';
