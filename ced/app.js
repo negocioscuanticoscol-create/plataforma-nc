@@ -650,8 +650,11 @@ const App = {
        uno queda con su fecha para ver cuanto lleva quieto. */
     /* Los definio Jose el 03/09/2026: Contactado es la llamada de Lupe y
        llega con su fecha; la segunda es del vendedor; y no se mandan
-       muestras, se cotiza. Los mismos que usa Nido. */
-    if(canal==='marcador') return ['👋 Contactado','🔔 2ª llamada','📄 Cotización','🛒 Primer pedido'];
+       muestras, se cotiza. Los mismos que usa Nido.
+       25-sep-2026: Jose agrego "Muestra" entre Cotizacion y Primer pedido -si
+       aplica para el negocio, algunos si mandan muestra fisica-. Marcarla
+       avisa a Mapamundi (ver crmPaso) para pintar esa zona como cubierta. */
+    if(canal==='marcador') return ['👋 Contactado','🔔 2ª llamada','📄 Cotización','🎁 Muestra','🛒 Primer pedido'];
     if(canal==='digital')  return (window.NC_EMPRESA==='feroz')?['💡 Interesado','🎁 Muestra','✅ Calificado']:['💡 Interesado','📦 Kit','✅ Calificado'];
     if(canal==='organico') return ['🤔 Curioso','💡 Interesado','📦 Kit'];
     return ['👋 Contactado','💡 Interesado','📦 Kit','🛒 1ª Compra'];
@@ -823,6 +826,7 @@ const App = {
   async crmPaso(key,i){
     const info=(this._crmLeadInfo||{})[key]||{};
     const fs=Object.assign({},(this._crmFechas||{})[key]||{});
+    const prendiendo=!fs[i];   // hace falta saberlo ANTES de tocar fs, para avisar a Mapamundi solo al prender
     if(fs[i]) delete fs[i]; else fs[i]=new Date().toISOString().slice(0,10);
     (this._crmFechas=this._crmFechas||{})[key]=fs;
     /* 'etapa' se queda como el paso mas adelantado que este marcado: es lo que
@@ -831,7 +835,31 @@ const App = {
     const etapa=ks.length?Math.max.apply(null,ks):-1;
     (this._crmEmb=this._crmEmb||{})[key]=etapa;
     try{ await fetch(this._SBU()+'/rest/v1/nc_crm_embudo?on_conflict=empresa,lead_key',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa:window.NC_EMPRESA||'smart',lead_key:key,nombre:info.nombre||'',telefono:info.telefono||'',canal:info.canal||'',etapa,fechas:fs})}); }catch(e){}
+    /* 25-sep-2026, Jose: "si pone muestra ya se devolveria a Mapamundi e
+       indicaria que ya es cliente". Se marca 'aplica' (no 'cliente': esa
+       etiqueta solo sale de una venta real o del archivo del contratante -
+       ver 18-mapamundi.md, regla 1), que es lo que pinta la zona como
+       cubierta. Solo al PRENDER el paso, no al apagarlo. */
+    if(prendiendo){
+      const stg=this._embStages(info.canal||'marcador');
+      if(String(stg[i]||'').toLowerCase().includes('muestra')) this._avisarMapamundiMuestra(info.telefono);
+    }
     (window.NC_EMPRESA==='feroz' && this.vCrm)?this.vCrm():this.vCrmSmart();
+  },
+  /* Le avisa a Mapamundi que este negocio ya llego a "Muestra" en el CRM, para
+     que lo pinte como cubierto en el mapa (RPC nc_mercado_marcar_muestra). Si
+     el telefono no esta mapeado todavia, el RPC no hace nada -no es un error,
+     Feroz aun no tiene su mapa cargado en Mapamundi-. */
+  async _avisarMapamundiMuestra(telefono){
+    const tel=(telefono||'').replace(/\D/g,'');
+    if(!tel) return;
+    try{
+      const H={apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json'};
+      const r=await fetch(this._SBU()+'/rest/v1/rpc/nc_mercado_marcar_muestra',{method:'POST',headers:H,
+        body:JSON.stringify({p_telefono:tel,p_cliente_nc:window.NC_EMPRESA||'feroz'})});
+      const j=await r.json();
+      if(Array.isArray(j)&&j.length&&j[0].etapa_despues==='aplica'&&this._toast) this._toast('🗺️ Actualizado en Mapamundi');
+    }catch(e){}
   },
   /* '2026-09-02' -> '02/09/26'. Solo para mostrar; lo guardado sigue siendo ISO. */
   _fCorta(f){ const t=String(f||'').slice(0,10).split('-'); return t.length===3?(t[2]+'/'+t[1]+'/'+t[0].slice(2)):String(f||''); },
