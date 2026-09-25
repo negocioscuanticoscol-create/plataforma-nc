@@ -145,6 +145,7 @@ main{flex:1;padding:13px 15px 0}
 .res button[disabled]{opacity:.5}
 .b-Interesado{background:var(--ok);color:#03291D}
 .b-Competencia{background:#8B5CF6}
+.b-NotieneWhatsApp{background:#0891B2}
 .b-Nointeresado{background:#475C7A}
 .b-Nocontesta{background:#5A6E8C}
 .b-Equivocado{background:#6B7A94}
@@ -304,7 +305,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260924-copiar-correo';
+const VER='20260925-no-tiene-whatsapp';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -387,8 +388,13 @@ const SEG=['marca','canal','sector','subsector','departamento','ciudad','barrio'
    cambio de base. Sigue en ICONO y en TARIFA_DEF a proposito, porque hay
    llamadas viejas guardadas con ese resultado y el tablero tiene que poder
    pintarlas. */
-const RESULTADOS=['Interesado','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente'];
-const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50,'Info WhatsApp':350};
+/* 'No tiene WhatsApp' (25-sep-2026): hay contactos reales, con celular que contesta,
+   pero sin WhatsApp -no hay como mandarles la ficha ni el material-. Antes se
+   quedaban mal metidos en 'No interesado' o 'Equivocado', que no es lo mismo: el
+   dato SI sirve, solo que por otro canal (llamada, correo). Va al lado de
+   Interesado/Competencia/No contactar porque son los que Jose mira primero. */
+const RESULTADOS=['Interesado','Competencia','No tiene WhatsApp','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente'];
+const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No tiene WhatsApp':300,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50,'Info WhatsApp':350};
 /* LO QUE PAGA CADA QUIEN depende de su CATEGORIA, no de la base. Hay cuatro
    -interna, principiante, telemercaderista, asesora- porque no es lo mismo
    una empleada de la empresa, que tiene sueldo aparte, que una asesora que
@@ -405,7 +411,7 @@ async function cargarMiTarifa(){
     const t={}; f.forEach(x=>t[x.resultado]=+x.valor||0); MI_TARIFA=t;
   }
 }
-const ICONO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
+const ICONO={'Interesado':'🔥','Competencia':'🏭','No tiene WhatsApp':'📵','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
 
 /* TODOS es la base completa; leads es lo que se esta viendo. Se separan porque
    al filtrar por ciudad hay que poder volver a "todas" sin recargar, y porque al
