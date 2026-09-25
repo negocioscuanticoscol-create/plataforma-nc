@@ -1,0 +1,36 @@
+name: sofia-resumen
+# Resumen de las conversaciones de Sofía (bot de WhatsApp de Feroz) a Telegram,
+# tres veces al día: 11:00, 2:00 p. m. y 5:00 p. m. de Bogotá. Solo las que
+# avanzaron hacia la compra van en detalle; las demás se cuentan.
+#
+# Jose, 24-sep-2026: "no en cada conversación, sino cuando completa, tres veces
+# al día en diferente horario: 11, 2 y 5". El aviso por conversación que salía
+# de n8n quedó solo para pagos.
+#
+# Corre aquí y no en n8n por lo mismo que la pauta y los empleos: no depende de
+# que un computador esté prendido ni de la cola de Railway.
+#
+# Secretos (los mismos del agente de empleos): TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.
+on:
+  schedule:
+    - cron: '0 16 * * *'   # 11:00 Bogotá
+    - cron: '0 19 * * *'   # 14:00 Bogotá
+    - cron: '0 22 * * *'   # 17:00 Bogotá
+  workflow_dispatch:       # botón para probarlo a mano desde la pestaña Actions
+concurrency:
+  group: sofia-resumen
+  cancel-in-progress: false
+jobs:
+  resumir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Armar y mandar el resumen
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python .github/scripts/sofia_resumen.py
