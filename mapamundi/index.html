@@ -93,9 +93,12 @@ select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea)
     <option value="smart">Smart Envases</option>
   </select>
   <button class="btn-actualizar" onclick="App.actualizarDesdeLupe()">🔄 Actualizar desde Lupe</button>
-  <button class="btn-actualizar" onclick="App.actualizarDesdePauta()">📣 Actualizar desde la pauta (bot)</button>
+  <!-- 25-sep-2026: Jose pidio NO traer datos de los bots en bloque -"nos podemos
+       llenar de mugre"-. El boton de traer TODO se quito. Lo que entra al mapa desde
+       Sofia/Valentina sera lo que se elija a mano, con un boton "Mandar a Mapamundi"
+       en la propia pantalla del bot -pendiente de construir, ver 18-mapamundi.md-. -->
 </header>
-<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v5-tamano-pauta</div>
+<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v6-sin-import-bot</div>
 <div class="layout">
   <div class="panel-arbol" id="arbol"><div class="loading">Cargando el mapa…</div></div>
   <div class="panel-central" id="central"></div>
