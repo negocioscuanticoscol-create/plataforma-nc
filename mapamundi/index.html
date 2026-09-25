@@ -13,7 +13,7 @@
 }
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--fondo);color:var(--texto);font-size:14px}
-header{background:#fff;border-bottom:1px solid var(--linea);padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
+header{background:#fff;border-bottom:1px solid var(--linea);padding:10px 16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;position:sticky;top:0;z-index:20}
 header h1{font-size:17px;margin:0;color:var(--naranja-d)}
 header .sub{font-size:11px;color:var(--suave)}
 select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea);border-radius:8px;font-weight:700}
@@ -93,8 +93,9 @@ select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea)
     <option value="smart">Smart Envases</option>
   </select>
   <button class="btn-actualizar" onclick="App.actualizarDesdeLupe()">🔄 Actualizar desde Lupe</button>
+  <button class="btn-actualizar" onclick="App.actualizarDesdePauta()">📣 Actualizar desde la pauta (bot)</button>
 </header>
-<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v4-todas-ciudades</div>
+<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v5-tamano-pauta</div>
 <div class="layout">
   <div class="panel-arbol" id="arbol"><div class="loading">Cargando el mapa…</div></div>
   <div class="panel-central" id="central"></div>
@@ -118,6 +119,21 @@ const ETAPAS=[
 ];
 const COLOR=Object.fromEntries(ETAPAS.map(e=>[e.v,e.color]));
 const NOMBRE_ETAPA=Object.fromEntries(ETAPAS.map(e=>[e.v,e.t]));
+
+// El tamaño decide por qué canal se trabaja cada negocio (18-mapamundi.md, sección 6):
+// chico -> lo llama Lupe; grande -> lo visita el gerente; el resto llega solo, por pauta.
+const TAMANOS=[
+  {v:'micro',   t:'Micro',   canal:'📱 Lupe llama'},
+  {v:'pequena', t:'Pequeña', canal:'📱 Lupe llama'},
+  {v:'mediana', t:'Mediana', canal:'📱 Lupe llama'},
+  {v:'grande',  t:'Grande',  canal:'🚗 Visita el gerente'},
+];
+const CANALES=[
+  {v:'llamada', t:'📱 Llamada (Lupe)'},
+  {v:'pauta',   t:'📣 Pauta (bot)'},
+  {v:'visita',  t:'🚗 Visita'},
+  {v:'venta',   t:'💰 Venta'},
+];
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const $=id=>document.getElementById(id);
 const normDepto=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
@@ -133,7 +149,7 @@ const App={
   datos:[],           // todas las filas de nc_mercado del cliente_nc activo
   clienteNc:'smart',
   seleccion:{depto:null, municipio:null},
-  filtros:{etapas:new Set(), celular:false, categoria:false, calidadMin:0},
+  filtros:{etapas:new Set(), celular:false, categoria:false, calidadMin:0, tamanos:new Set(), canales:new Set()},
   visibles:60,
   abiertos:new Set(),
   buscar:'',
@@ -235,6 +251,8 @@ const App={
     if(this.filtros.etapas.size) f=f.filter(x=>this.filtros.etapas.has(x.etapa));
     if(this.filtros.celular) f=f.filter(x=>x.celular);
     if(this.filtros.categoria) f=f.filter(x=>x.categoria);
+    if(this.filtros.tamanos.size) f=f.filter(x=>this.filtros.tamanos.has(x.tamano)||(!x.tamano&&this.filtros.tamanos.has('__sin__')));
+    if(this.filtros.canales.size) f=f.filter(x=>this.filtros.canales.has(x.etapa_canal));
     if(this.filtros.calidadMin) f=f.filter(x=>(x.calidad||0)>=this.filtros.calidadMin);
     if(this.buscar.trim()){
       const b=this.buscar.trim().toLowerCase();
@@ -245,6 +263,8 @@ const App={
 
   toggleEtapa(v){ if(this.filtros.etapas.has(v)) this.filtros.etapas.delete(v); else this.filtros.etapas.add(v); this.visibles=60; this.renderCentral(); },
   toggleFiltro(k){ this.filtros[k]=!this.filtros[k]; this.visibles=60; this.renderCentral(); },
+  toggleTamano(v){ if(this.filtros.tamanos.has(v)) this.filtros.tamanos.delete(v); else this.filtros.tamanos.add(v); this.visibles=60; this.renderCentral(); },
+  toggleCanal(v){ if(this.filtros.canales.has(v)) this.filtros.canales.delete(v); else this.filtros.canales.add(v); this.visibles=60; this.renderCentral(); },
   onBuscar(v){ this.buscar=v; this.visibles=60; this.renderListaSolo(); },
   masVisibles(){ this.visibles+=60; this.renderListaSolo(); },
 
@@ -275,6 +295,18 @@ const App={
     </div>
     <div class="grupo-titulo">Filtrar por estado</div>
     <div class="chips">${ETAPAS.map(e=>`<div class="chip ${this.filtros.etapas.has(e.v)?'on':''}" style="${this.filtros.etapas.has(e.v)?`background:${e.color};border-color:${e.color}`:''}" onclick="App.toggleEtapa('${e.v}')">${e.t} <span class="pt">${por[e.v]||0}</span></div>`).join('')}</div>
+    <div class="grupo-titulo">Tamaño <span style="font-weight:400;text-transform:none;color:var(--suave)">— decide quién lo trabaja</span></div>
+    <div class="chips">${TAMANOS.map(t=>{
+      const n=filas.filter(x=>x.tamano===t.v).length;
+      return `<div class="chip ${this.filtros.tamanos.has(t.v)?'on':''}" onclick="App.toggleTamano('${t.v}')" title="${t.canal}">${t.t} <span class="pt">${n}</span></div>`;
+    }).join('')}
+      <div class="chip ${this.filtros.tamanos.has('__sin__')?'on':''}" onclick="App.toggleTamano('__sin__')" title="Sin clasificar todavía">Sin tamaño <span class="pt">${filas.filter(x=>!x.tamano).length}</span></div>
+    </div>
+    <div class="grupo-titulo">Cómo llegó / por dónde se trabaja</div>
+    <div class="chips">${CANALES.map(c=>{
+      const n=filas.filter(x=>x.etapa_canal===c.v).length;
+      return `<div class="chip ${this.filtros.canales.has(c.v)?'on':''}" onclick="App.toggleCanal('${c.v}')">${c.t} <span class="pt">${n}</span></div>`;
+    }).join('')}</div>
     <div class="grupo-titulo">Otras variables</div>
     <div class="chips">
       <div class="chip ${this.filtros.celular?'on':''}" onclick="App.toggleFiltro('celular')">📱 Con celular</div>
@@ -448,6 +480,22 @@ const App={
       if(!r.ok) throw new Error((cambios&&cambios.message)||'no se pudo actualizar');
       await this.cargar();
       this.toast(Array.isArray(cambios)&&cambios.length ? '🔄 '+cambios.length+' negocios cambiaron de estado por resultados de Lupe.' : 'Sin novedades: nada cambió desde la última vez.');
+    }catch(e){ this.toast('❌ '+e.message); }
+  },
+
+  // Trae lo que hablaron con Sofia/Valentina (el bot de la pauta): crea el negocio si
+  // no existia (canal de descubrimiento, no de llamada) y avanza su estado segun la
+  // etiqueta del bot. Nunca toca un 'cliente' ni un 'no_tocable'.
+  async actualizarDesdePauta(){
+    this.toast('Revisando las conversaciones de la pauta…');
+    try{
+      const r=await fetch(SB+'/rest/v1/rpc/nc_mercado_sync_bot',{method:'POST',headers:H,body:JSON.stringify({p_cliente_nc:this.clienteNc})});
+      const cambios=await r.json();
+      if(!r.ok) throw new Error((cambios&&cambios.message)||'no se pudo actualizar');
+      await this.cargar();
+      const nuevos=Array.isArray(cambios)?cambios.filter(c=>c.accion==='creado').length:0;
+      const actualizados=Array.isArray(cambios)?cambios.length-nuevos:0;
+      this.toast(cambios.length ? `📣 ${nuevos} negocios nuevos por la pauta, ${actualizados} actualizados.` : 'Sin novedades: nada nuevo desde la última vez.');
     }catch(e){ this.toast('❌ '+e.message); }
   },
 
