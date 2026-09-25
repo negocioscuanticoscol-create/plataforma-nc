@@ -5787,6 +5787,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     ['cartera','💳 Cartera'],['comisiones','🧾 Comisiones'],['precios','🏷️ Precios'],
     ['proveedores','🚚 Proveedores'],['pendientes','✅ Pendientes'],
     ['panel','📈 Panel'],['planta','🏭 Planta'],['clientes','👥 Clientes'],
+    ['sofia','🤖 Sofía'],   // 25-sep-2026: la pestaña existía pero no salia en Permisos, asi que ningun cargo de la red podia recibirla
     ['datos','🗄️ Datos'],['admin','👤 Usuarios'],['permisos','🔐 Permisos']],
 
   /* ================= PROVEEDORES =================
