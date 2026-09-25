@@ -324,6 +324,7 @@ const App = {
     // cliente final / construccion
     '120247983096150570': {cajon:'final', campana:'Construcción empresas · Bogotá'},
     '120247621224870570': {cajon:'final', campana:'Feroz BOG · construcción 30km'},
+    '120248100053870570': {cajon:'final', campana:'Av 68 · video $49.990'},   // la campaña de la sede Av 68 (sep-2026)
     // distribuidores y aliados
     '120247907725810570': {cajon:'distri', campana:'Búsqueda distribuidores sept'},
     '120247907569730570': {cajon:'distri', campana:'Aliado dotación sept'},
@@ -405,7 +406,7 @@ const App = {
         🔄 <b>Para entrenarla:</b> el botón <b>Reiniciar</b> de cada chat le borra a Sofía lo que
         recuerda de ese número, así puedes probar el guion desde el saludo las veces que quieras.
         </div>
-      ${cajon('final','🏗️','Cliente final','Compran para usar. Guion: nombre, ciudad, ficha Fortia, cantidad, $49.900 y bodega Bogotá. Incluye a los que escriben directo.','#2563eb')}
+      ${cajon('final','🏗️','Cliente final','Compran para usar. Guion: nombre, ciudad, ficha Fortia, cantidad, $49.990 más IVA y la Av 68. Incluye a los que escriben directo.','#2563eb')}
       ${cajon('distri','🏭','Oferta distribuidores','Buscan revender. Guion: escala por volumen y precio mayorista','#a16207')}
 `);
   },
