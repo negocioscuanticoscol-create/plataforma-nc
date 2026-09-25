@@ -27,6 +27,7 @@ select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea)
 .nodo-caret{width:14px;text-align:center;color:var(--suave);font-size:10px;flex:none}
 .nodo-nombre{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nodo-n{font-size:11px;color:var(--suave);flex:none}
+.nodo-peso{color:var(--naranja);font-weight:800}
 .barra{height:5px;border-radius:3px;overflow:hidden;display:flex;margin:2px 8px 6px 22px;background:#f1f5f9}
 .barra span{height:100%}
 .hijos{margin-left:14px;display:none}
@@ -93,7 +94,7 @@ select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea)
   </select>
   <button class="btn-actualizar" onclick="App.actualizarDesdeLupe()">🔄 Actualizar desde Lupe</button>
 </header>
-<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v2-lupe</div>
+<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v3-ciudades</div>
 <div class="layout">
   <div class="panel-arbol" id="arbol"><div class="loading">Cargando el mapa…</div></div>
   <div class="panel-central" id="central"></div>
@@ -180,11 +181,14 @@ const App={
     }).join('')}</div>`;
   },
 
+  pct(n,total){ return total?(n*100/total).toFixed(1).replace('.',','):'0'; },
+
   renderArbol(){
     const arbol=this.construirArbol();
+    const total=this.datos.length;
     const deptos=Object.entries(arbol).sort((a,b)=>b[1].n-a[1].n);
     let html=`<div style="padding:4px 6px 10px;font-size:11px;color:var(--suave);font-weight:700;text-transform:uppercase">
-      ${this.datos.length.toLocaleString('es-CO')} negocios mapeados</div>`;
+      ${total.toLocaleString('es-CO')} negocios mapeados</div>`;
     for(const [depto,d] of deptos){
       const abierto=this.abiertos.has(depto);
       const activo=this.seleccion.depto===depto && !this.seleccion.municipio;
@@ -192,7 +196,7 @@ const App={
         <div class="nodo-fila ${activo?'activo':''}" onclick="App.toggleDepto('${esc(depto).replace(/'/g,"\\'")}')">
           <span class="nodo-caret" onclick="event.stopPropagation();App.toggleAbierto('${esc(depto).replace(/'/g,"\\'")}')">${abierto?'▾':'▸'}</span>
           <span class="nodo-nombre">${esc(depto)}</span>
-          <span class="nodo-n">${d.n}</span>
+          <span class="nodo-n">${d.n} <span class="nodo-peso">${this.pct(d.n,total)}%</span></span>
         </div>
         ${this.barraHtml(d.por,d.n)}
         <div class="hijos ${abierto?'abierto':''}">
@@ -201,7 +205,7 @@ const App={
             return `<div class="nodo-fila ${act2?'activo':''}" onclick="event.stopPropagation();App.elegirMunicipio('${esc(depto).replace(/'/g,"\\'")}','${esc(mun).replace(/'/g,"\\'")}')">
               <span class="nodo-caret"></span>
               <span class="nodo-nombre">${esc(mun)}</span>
-              <span class="nodo-n">${m.n}</span>
+              <span class="nodo-n">${m.n} <span class="nodo-peso">${this.pct(m.n,d.n)}%</span></span>
             </div>${this.barraHtml(m.por,m.n)}`;
           }).join('')}
         </div>
@@ -240,14 +244,20 @@ const App={
   },
 
   renderCentral(){
+    // Con un departamento elegido y SIN ciudad todavía: primero se escoge la ciudad.
+    if(this.seleccion.depto && !this.seleccion.municipio){ this.renderElegirCiudad(); return; }
+
     const filas=this.filasFiltradas();
     const por=this.contarPorEtapa(filas);
     const ruta=[this.seleccion.depto,this.seleccion.municipio].filter(Boolean).join(' › ')||'Todo el país';
+    const enlaces=[];
+    if(this.seleccion.municipio) enlaces.push(`<a href="#" onclick="App.toggleDepto('${esc(this.seleccion.depto).replace(/'/g,"\\'")}');return false" style="color:var(--naranja)">‹ elegir otra ciudad</a>`);
+    if(this.seleccion.depto) enlaces.push(`<a href="#" onclick="App.limpiarSeleccion();return false" style="color:var(--naranja)">ver todo el país</a>`);
     let html=`<div class="barra-cabecera">
       <div class="fila1" style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <div class="titulo">${esc(ruta)}</div>
-          <div class="ruta">${filas.length.toLocaleString('es-CO')} negocios ${this.seleccion.depto?'· <a href="#" onclick="App.limpiarSeleccion();return false" style="color:var(--naranja)">ver todo el país</a>':''}</div>
+          <div class="ruta">${filas.length.toLocaleString('es-CO')} negocios${enlaces.length?' · '+enlaces.join(' · '):''}</div>
         </div>
       </div>
       <div class="stats">
@@ -266,6 +276,34 @@ const App={
     $('central').innerHTML=html;
     this.renderListaSolo();
   },
+
+  // ---------- ELEGIR CIUDAD (paso intermedio al entrar a un departamento) ----------
+  renderElegirCiudad(){
+    const depto=this.seleccion.depto;
+    const arbol=this.construirArbol();
+    const d=arbol[depto]||{n:0,por:{},hijos:{}};
+    const total=this.datos.length;
+    let ciudades=Object.entries(d.hijos).sort((a,b)=>b[1].n-a[1].n);
+    const buscarCiudad=(this._buscarCiudad||'').trim().toLowerCase();
+    if(buscarCiudad) ciudades=ciudades.filter(([mun])=>mun.toLowerCase().includes(buscarCiudad));
+    let html=`<div class="barra-cabecera">
+      <div class="titulo">${esc(depto)}</div>
+      <div class="ruta">${d.n.toLocaleString('es-CO')} negocios · ${this.pct(d.n,total)}% de todo el mapa ·
+        <a href="#" onclick="App.limpiarSeleccion();return false" style="color:var(--naranja)">ver todo el país</a></div>
+      <div class="stats">${ETAPAS.map(e=>`<div class="stat"><b style="color:${e.color}">${d.por[e.v]||0}</b><span>${e.t}</span></div>`).join('')}</div>
+    </div>
+    <div class="grupo-titulo">Elige la ciudad de ${esc(depto)}</div>
+    ${Object.keys(d.hijos).length>8?`<input class="buscador" placeholder="Buscar ciudad…" oninput="App.onBuscarCiudad(this.value)" value="${esc(this._buscarCiudad||'')}">`:''}
+    <div class="lista">${ciudades.map(([mun,m])=>`
+      <div class="card" onclick="App.elegirMunicipio('${esc(depto).replace(/'/g,"\\'")}','${esc(mun).replace(/'/g,"\\'")}')">
+        <div class="fila1"><div class="nombre">📍 ${esc(mun)}</div><span class="badge" style="background:var(--naranja)">${m.n}</span></div>
+        <div class="meta"><span>${this.pct(m.n,d.n)}% de ${esc(depto)}</span></div>
+        ${this.barraHtml(m.por,m.n)}
+      </div>`).join('')}</div>
+    ${!ciudades.length?'<div class="vacio">Ninguna ciudad coincide con la búsqueda.</div>':''}`;
+    $('central').innerHTML=html;
+  },
+  onBuscarCiudad(v){ this._buscarCiudad=v; this.renderElegirCiudad(); },
 
   renderListaSolo(){
     const filas=this.filasFiltradas();
