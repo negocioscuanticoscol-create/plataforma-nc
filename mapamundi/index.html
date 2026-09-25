@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Mapamundi — el mapa del mercado</title>
+<style>
+:root{
+  --naranja:#ea580c; --naranja-d:#c2410c; --azul:#2563eb; --verde:#16a34a; --rojo:#dc2626;
+  --gris:#64748b; --linea:#e2e8f0; --fondo:#f8fafc; --texto:#1e293b; --suave:#94a3b8;
+  --e-existe:#94a3b8; --e-no_tocable:#7c3aed; --e-sin_trabajar:#64748b; --e-en_trabajo:#2563eb;
+  --e-aplica:#16a34a; --e-no_aplica:#dc2626; --e-cliente:#f59e0b;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--fondo);color:var(--texto);font-size:14px}
+header{background:#fff;border-bottom:1px solid var(--linea);padding:10px 16px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}
+header h1{font-size:17px;margin:0;color:var(--naranja-d)}
+header .sub{font-size:11px;color:var(--suave)}
+select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea);border-radius:8px;font-weight:700}
+.layout{display:flex;gap:0;align-items:flex-start}
+.panel-arbol{width:340px;min-width:280px;max-width:420px;background:#fff;border-right:1px solid var(--linea);height:calc(100vh - 49px);overflow:auto;padding:10px}
+.panel-central{flex:1;padding:14px;min-width:0}
+.nodo{border-radius:8px;margin-bottom:2px}
+.nodo-fila{display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:8px}
+.nodo-fila:hover{background:#f1f5f9}
+.nodo-fila.activo{background:#fff7ed;outline:1px solid var(--naranja)}
+.nodo-caret{width:14px;text-align:center;color:var(--suave);font-size:10px;flex:none}
+.nodo-nombre{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nodo-n{font-size:11px;color:var(--suave);flex:none}
+.barra{height:5px;border-radius:3px;overflow:hidden;display:flex;margin:2px 8px 6px 22px;background:#f1f5f9}
+.barra span{height:100%}
+.hijos{margin-left:14px;display:none}
+.hijos.abierto{display:block}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chip{padding:5px 11px;border-radius:16px;border:1px solid var(--linea);background:#fff;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--gris);user-select:none}
+.chip.on{background:var(--naranja);border-color:var(--naranja);color:#fff}
+.chip .pt{opacity:.75;font-weight:400}
+.barra-cabecera{background:#fff;border:1px solid var(--linea);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.barra-cabecera .titulo{font-weight:800;font-size:16px;margin-bottom:2px}
+.barra-cabecera .ruta{font-size:12px;color:var(--suave)}
+.stats{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
+.stat{min-width:70px}
+.stat b{display:block;font-size:19px}
+.stat span{font-size:11px;color:var(--suave)}
+.grupo-titulo{font-size:11px;font-weight:800;color:var(--suave);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 6px}
+.lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px}
+.card{background:#fff;border:1px solid var(--linea);border-radius:10px;padding:10px 12px;cursor:pointer}
+.card:hover{border-color:var(--naranja)}
+.card .fila1{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.card .nombre{font-weight:700;font-size:13.5px;line-height:1.25}
+.badge{font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;color:#fff;white-space:nowrap}
+.card .meta{font-size:11.5px;color:var(--gris);margin-top:5px;display:flex;flex-wrap:wrap;gap:8px}
+.card .meta span{white-space:nowrap}
+.calidad{display:inline-block;width:26px;height:5px;border-radius:3px;background:#e2e8f0;position:relative;overflow:hidden;vertical-align:middle;margin-left:4px}
+.calidad i{position:absolute;left:0;top:0;bottom:0;background:var(--verde)}
+.vacio{color:var(--suave);text-align:center;padding:40px 0}
+.mas{display:block;margin:14px auto;padding:8px 18px;border-radius:8px;border:1px solid var(--linea);background:#fff;cursor:pointer;font-weight:700}
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;z-index:50;overflow:auto}
+.modal{background:#fff;border-radius:14px;max-width:560px;width:100%;padding:20px}
+.modal h2{margin:0 0 2px;font-size:17px}
+.modal .sub{font-size:12px;color:var(--suave);margin-bottom:14px}
+.campo{margin-bottom:10px}
+.campo label{display:block;font-size:11px;color:var(--suave);font-weight:700;text-transform:uppercase;margin-bottom:2px}
+.campo .val{font-size:14px}
+.campo .val.vacio-campo{color:var(--suave);font-style:italic}
+.filagrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.etapas-botones{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.eb{padding:6px 10px;border-radius:8px;border:1px solid var(--linea);background:#fff;font-size:12px;font-weight:700;cursor:pointer}
+.eb.on{color:#fff;border-color:transparent}
+.cerrar{position:absolute;top:14px;right:16px;cursor:pointer;font-size:20px;color:var(--suave);background:none;border:none}
+.modal{position:relative}
+.buscador{width:100%;padding:9px 12px;border:1px solid var(--linea);border-radius:8px;margin-bottom:10px;font-size:13px}
+.loading{padding:60px;text-align:center;color:var(--suave)}
+@media(max-width:820px){.layout{flex-direction:column}.panel-arbol{width:100%;max-width:none;height:auto;max-height:280px;border-right:none;border-bottom:1px solid var(--linea)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🗺️ Mapamundi</h1>
+  <div class="sub">el mapa del mercado, departamento por departamento</div>
+  <select id="clienteNc" onchange="App.cambiarCliente(this.value)">
+    <option value="smart">Smart Envases</option>
+  </select>
+</header>
+<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v1</div>
+<div class="layout">
+  <div class="panel-arbol" id="arbol"><div class="loading">Cargando el mapa…</div></div>
+  <div class="panel-central" id="central"></div>
+</div>
+<div id="modalRoot"></div>
+
+<script>
+const SB='https://fnayedgvamxktxfvywwl.supabase.co';
+const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+
+const ETAPAS=[
+  {v:'existe',      t:'Existe',        color:'var(--e-existe)'},
+  {v:'sin_trabajar',t:'Sin trabajar',  color:'var(--e-sin_trabajar)'},
+  {v:'en_trabajo',  t:'En trabajo',    color:'var(--e-en_trabajo)'},
+  {v:'aplica',      t:'Aplica',        color:'var(--e-aplica)'},
+  {v:'no_aplica',   t:'No aplica',     color:'var(--e-no_aplica)'},
+  {v:'cliente',     t:'Cliente',       color:'var(--e-cliente)'},
+  {v:'no_tocable',  t:'No tocable',    color:'var(--e-no_tocable)'},
+];
+const COLOR=Object.fromEntries(ETAPAS.map(e=>[e.v,e.color]));
+const NOMBRE_ETAPA=Object.fromEntries(ETAPAS.map(e=>[e.v,e.t]));
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const $=id=>document.getElementById(id);
+
+const App={
+  datos:[],           // todas las filas de nc_mercado del cliente_nc activo
+  clienteNc:'smart',
+  seleccion:{depto:null, municipio:null},
+  filtros:{etapas:new Set(), celular:false, categoria:false, calidadMin:0},
+  visibles:60,
+  abiertos:new Set(),
+  buscar:'',
+
+  async init(){
+    await this.cargar();
+  },
+
+  async cargar(){
+    $('arbol').innerHTML='<div class="loading">Cargando el mapa…</div>';
+    $('central').innerHTML='';
+    // PostgREST corta en 1.000 filas por página aunque se pida limit=10000: hay que paginar con Range.
+    const COLS='id,depto,municipio,localidad,barrio,nombre,razon_social,nit,celular,telefono,email,web,instagram,producto,categoria,envase,tamano,etapa,etapa_motivo,etapa_canal,etapa_fecha,total_comprado,ultima_compra,cliente_desde,calidad,notas,no_tocable';
+    const url=SB+'/rest/v1/nc_mercado?cliente_nc=eq.'+encodeURIComponent(this.clienteNc)+'&select='+COLS+'&order=id.asc';
+    let todo=[], desde=0;
+    while(true){
+      const r=await fetch(url,{headers:{...H,Range:desde+'-'+(desde+999)}});
+      const pag=await r.json();
+      if(!Array.isArray(pag)||!pag.length) break;
+      todo=todo.concat(pag);
+      if(pag.length<1000) break;
+      desde+=1000;
+    }
+    this.datos=todo;
+    this.seleccion={depto:null,municipio:null};
+    this.visibles=60;
+    this.renderArbol();
+    this.renderCentral();
+  },
+
+  cambiarCliente(v){ this.clienteNc=v; this.cargar(); },
+
+  // ---------- ARBOL ----------
+  construirArbol(){
+    const raiz={};
+    for(const f of this.datos){
+      const d=f.depto||'(sin departamento)', m=f.municipio||'(sin municipio)';
+      raiz[d]=raiz[d]||{n:0,por:{}, hijos:{}};
+      raiz[d].n++; raiz[d].por[f.etapa]=(raiz[d].por[f.etapa]||0)+1;
+      raiz[d].hijos[m]=raiz[d].hijos[m]||{n:0,por:{}};
+      raiz[d].hijos[m].n++; raiz[d].hijos[m].por[f.etapa]=(raiz[d].hijos[m].por[f.etapa]||0)+1;
+    }
+    return raiz;
+  },
+
+  barraHtml(por,total){
+    if(!total) return '';
+    return `<div class="barra">${ETAPAS.map(e=>{
+      const n=por[e.v]||0; if(!n) return '';
+      const pct=(n*100/total).toFixed(1);
+      return `<span style="width:${pct}%;background:${e.color}" title="${e.t}: ${n}"></span>`;
+    }).join('')}</div>`;
+  },
+
+  renderArbol(){
+    const arbol=this.construirArbol();
+    const deptos=Object.entries(arbol).sort((a,b)=>b[1].n-a[1].n);
+    let html=`<div style="padding:4px 6px 10px;font-size:11px;color:var(--suave);font-weight:700;text-transform:uppercase">
+      ${this.datos.length.toLocaleString('es-CO')} negocios mapeados</div>`;
+    for(const [depto,d] of deptos){
+      const abierto=this.abiertos.has(depto);
+      const activo=this.seleccion.depto===depto && !this.seleccion.municipio;
+      html+=`<div class="nodo">
+        <div class="nodo-fila ${activo?'activo':''}" onclick="App.toggleDepto('${esc(depto).replace(/'/g,"\\'")}')">
+          <span class="nodo-caret" onclick="event.stopPropagation();App.toggleAbierto('${esc(depto).replace(/'/g,"\\'")}')">${abierto?'▾':'▸'}</span>
+          <span class="nodo-nombre">${esc(depto)}</span>
+          <span class="nodo-n">${d.n}</span>
+        </div>
+        ${this.barraHtml(d.por,d.n)}
+        <div class="hijos ${abierto?'abierto':''}">
+          ${Object.entries(d.hijos).sort((a,b)=>b[1].n-a[1].n).map(([mun,m])=>{
+            const act2=this.seleccion.depto===depto && this.seleccion.municipio===mun;
+            return `<div class="nodo-fila ${act2?'activo':''}" onclick="event.stopPropagation();App.elegirMunicipio('${esc(depto).replace(/'/g,"\\'")}','${esc(mun).replace(/'/g,"\\'")}')">
+              <span class="nodo-caret"></span>
+              <span class="nodo-nombre">${esc(mun)}</span>
+              <span class="nodo-n">${m.n}</span>
+            </div>${this.barraHtml(m.por,m.n)}`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
+    $('arbol').innerHTML=html;
+  },
+  toggleAbierto(depto){ if(this.abiertos.has(depto)) this.abiertos.delete(depto); else this.abiertos.add(depto); this.renderArbol(); },
+  toggleDepto(depto){ this.seleccion={depto,municipio:null}; this.abiertos.add(depto); this.visibles=60; this.renderArbol(); this.renderCentral(); },
+  elegirMunicipio(depto,mun){ this.seleccion={depto,municipio:mun}; this.visibles=60; this.renderArbol(); this.renderCentral(); },
+  limpiarSeleccion(){ this.seleccion={depto:null,municipio:null}; this.visibles=60; this.renderArbol(); this.renderCentral(); },
+
+  // ---------- FILTRO + LISTA ----------
+  filasFiltradas(){
+    let f=this.datos;
+    if(this.seleccion.depto) f=f.filter(x=>(x.depto||'(sin departamento)')===this.seleccion.depto);
+    if(this.seleccion.municipio) f=f.filter(x=>(x.municipio||'(sin municipio)')===this.seleccion.municipio);
+    if(this.filtros.etapas.size) f=f.filter(x=>this.filtros.etapas.has(x.etapa));
+    if(this.filtros.celular) f=f.filter(x=>x.celular);
+    if(this.filtros.categoria) f=f.filter(x=>x.categoria);
+    if(this.filtros.calidadMin) f=f.filter(x=>(x.calidad||0)>=this.filtros.calidadMin);
+    if(this.buscar.trim()){
+      const b=this.buscar.trim().toLowerCase();
+      f=f.filter(x=>(x.nombre||'').toLowerCase().includes(b)||(x.razon_social||'').toLowerCase().includes(b)||(x.nit||'').includes(b)||(x.celular||'').includes(b));
+    }
+    return f;
+  },
+
+  toggleEtapa(v){ if(this.filtros.etapas.has(v)) this.filtros.etapas.delete(v); else this.filtros.etapas.add(v); this.visibles=60; this.renderCentral(); },
+  toggleFiltro(k){ this.filtros[k]=!this.filtros[k]; this.visibles=60; this.renderCentral(); },
+  onBuscar(v){ this.buscar=v; this.visibles=60; this.renderListaSolo(); },
+  masVisibles(){ this.visibles+=60; this.renderListaSolo(); },
+
+  contarPorEtapa(filas){
+    const c={}; for(const f of filas) c[f.etapa]=(c[f.etapa]||0)+1; return c;
+  },
+
+  renderCentral(){
+    const filas=this.filasFiltradas();
+    const por=this.contarPorEtapa(filas);
+    const ruta=[this.seleccion.depto,this.seleccion.municipio].filter(Boolean).join(' › ')||'Todo el país';
+    let html=`<div class="barra-cabecera">
+      <div class="fila1" style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div>
+          <div class="titulo">${esc(ruta)}</div>
+          <div class="ruta">${filas.length.toLocaleString('es-CO')} negocios ${this.seleccion.depto?'· <a href="#" onclick="App.limpiarSeleccion();return false" style="color:var(--naranja)">ver todo el país</a>':''}</div>
+        </div>
+      </div>
+      <div class="stats">
+        ${ETAPAS.map(e=>`<div class="stat"><b style="color:${e.color}">${por[e.v]||0}</b><span>${e.t}</span></div>`).join('')}
+      </div>
+    </div>
+    <div class="grupo-titulo">Filtrar por estado</div>
+    <div class="chips">${ETAPAS.map(e=>`<div class="chip ${this.filtros.etapas.has(e.v)?'on':''}" style="${this.filtros.etapas.has(e.v)?`background:${e.color};border-color:${e.color}`:''}" onclick="App.toggleEtapa('${e.v}')">${e.t} <span class="pt">${por[e.v]||0}</span></div>`).join('')}</div>
+    <div class="grupo-titulo">Otras variables</div>
+    <div class="chips">
+      <div class="chip ${this.filtros.celular?'on':''}" onclick="App.toggleFiltro('celular')">📱 Con celular</div>
+      <div class="chip ${this.filtros.categoria?'on':''}" onclick="App.toggleFiltro('categoria')">🏷️ Con categoría</div>
+    </div>
+    <input class="buscador" placeholder="Buscar por nombre, NIT o celular…" oninput="App.onBuscar(this.value)" value="${esc(this.buscar)}">
+    <div id="listaWrap"></div>`;
+    $('central').innerHTML=html;
+    this.renderListaSolo();
+  },
+
+  renderListaSolo(){
+    const filas=this.filasFiltradas();
+    const mostrar=filas.slice(0,this.visibles);
+    let html;
+    if(!filas.length){
+      html='<div class="vacio">No hay negocios con estos filtros.</div>';
+    }else{
+      html=`<div class="lista">${mostrar.map(f=>this.cardHtml(f)).join('')}</div>`;
+      if(filas.length>mostrar.length) html+=`<button class="mas" onclick="App.masVisibles()">Ver más (${filas.length-mostrar.length} restantes)</button>`;
+    }
+    $('listaWrap').innerHTML=html;
+  },
+
+  cardHtml(f){
+    const color=COLOR[f.etapa]||'var(--gris)';
+    const meta=[];
+    if(f.celular) meta.push('📱 '+esc(f.celular));
+    if(f.categoria) meta.push('🏷️ '+esc(f.categoria));
+    if(f.tamano) meta.push(esc(f.tamano));
+    if(f.municipio && !this.seleccion.municipio) meta.push('📍 '+esc(f.municipio));
+    return `<div class="card" onclick="App.abrirFicha('${f.id}')">
+      <div class="fila1">
+        <div class="nombre">${esc(f.nombre)}</div>
+        <span class="badge" style="background:${color}">${NOMBRE_ETAPA[f.etapa]||f.etapa}</span>
+      </div>
+      <div class="meta">${meta.map(m=>`<span>${m}</span>`).join('')}
+        <span title="calidad del dato: ${f.calidad||0}">calidad<span class="calidad"><i style="width:${f.calidad||0}%"></i></span></span>
+      </div>
+    </div>`;
+  },
+
+  // ---------- FICHA ----------
+  abrirFicha(id){
+    const f=this.datos.find(x=>x.id===id); if(!f) return;
+    const campo=(label,val,vacioTxt)=>`<div class="campo"><label>${label}</label><div class="val ${val?'':'vacio-campo'}">${val?esc(val):(vacioTxt||'sin dato')}</div></div>`;
+    const html=`<div class="overlay" onclick="if(event.target===this) App.cerrarFicha()">
+      <div class="modal">
+        <button class="cerrar" onclick="App.cerrarFicha()">×</button>
+        <h2>${esc(f.nombre)}</h2>
+        <div class="sub">${esc([f.municipio,f.depto].filter(Boolean).join(', ')||'sin ubicación')}</div>
+        <div class="grupo-titulo">Estado</div>
+        <div class="etapas-botones">${ETAPAS.map(e=>`<div class="eb ${f.etapa===e.v?'on':''}" style="${f.etapa===e.v?`background:${e.color}`:''}" onclick="App.cambiarEtapa('${f.id}','${e.v}')">${e.t}</div>`).join('')}</div>
+        ${f.etapa_motivo?`<div class="campo" style="margin-top:8px"><label>Motivo</label><div class="val">${esc(f.etapa_motivo)}</div></div>`:''}
+        <div class="grupo-titulo">Localización</div>
+        <div class="filagrid">${campo('Departamento',f.depto)}${campo('Municipio',f.municipio)}</div>
+        ${f.localidad||f.barrio?`<div class="filagrid">${campo('Localidad',f.localidad)}${campo('Barrio',f.barrio)}</div>`:''}
+        <div class="grupo-titulo">Cliente</div>
+        <div class="filagrid">${campo('NIT',f.nit)}${campo('Razón social',f.razon_social)}</div>
+        <div class="filagrid">${campo('Celular',f.celular)}${campo('Teléfono',f.telefono)}</div>
+        <div class="filagrid">${campo('Email',f.email)}${campo('Web',f.web)}</div>
+        <div class="grupo-titulo">Qué envasa</div>
+        <div class="filagrid">${campo('Producto',f.producto)}${campo('Categoría',f.categoria)}</div>
+        <div class="filagrid">${campo('Envase',f.envase)}${campo('Tamaño',f.tamano)}</div>
+        ${f.etapa==='cliente'?`<div class="grupo-titulo">Compras</div><div class="filagrid">${campo('Cliente desde',f.cliente_desde)}${campo('Última compra',f.ultima_compra)}</div>${campo('Total comprado',f.total_comprado?('$'+Number(f.total_comprado).toLocaleString('es-CO')):null)}`:''}
+        ${f.notas?`<div class="grupo-titulo">Notas</div><div class="campo"><div class="val">${esc(f.notas)}</div></div>`:''}
+      </div>
+    </div>`;
+    $('modalRoot').innerHTML=html;
+  },
+  cerrarFicha(){ $('modalRoot').innerHTML=''; },
+
+  async cambiarEtapa(id,etapa){
+    const f=this.datos.find(x=>x.id===id); if(!f) return;
+    let motivo=null;
+    if(etapa==='no_aplica'){ motivo=prompt('¿Por qué no aplica? (ej: ya tiene proveedor, cerró, no usa tarrina)')||''; if(motivo===null) return; }
+    await fetch(SB+'/rest/v1/nc_mercado?id=eq.'+id,{method:'PATCH',headers:{...H,Prefer:'return=minimal'},
+      body:JSON.stringify({etapa, etapa_motivo:motivo, etapa_canal:'mapamundi', etapa_fecha:new Date().toISOString()})});
+    f.etapa=etapa; f.etapa_motivo=motivo;
+    this.renderArbol(); this.renderCentral(); this.abrirFicha(id);
+  },
+};
+App.init();
+</script>
+</body>
+</html>
