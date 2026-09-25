@@ -1,0 +1,31 @@
+name: sofia-vigia
+# Vigía de Sofía (bot de WhatsApp de Feroz): cada hora comprueba que n8n en
+# Railway está arriba, que el flujo de Sofía está activo y que contesta rápido.
+# Si algo falla avisa UNA vez por Telegram; si todo va bien, silencio.
+#
+# Jose, 24-sep-2026: "apenas empecemos debe funcionar perfecto y aquí no
+# estamos garantizando eso". Esa noche n8n se cayó dos veces sin que nadie
+# se enterara. Este vigía es la garantía: no depende de n8n ni de Railway.
+#
+# Secretos (los mismos del resumen y de empleos): TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.
+on:
+  schedule:
+    - cron: '7 * * * *'      # cada hora, al minuto 7 (GitHub encola en punto)
+  workflow_dispatch:         # botón para probarlo a mano desde la pestaña Actions
+concurrency:
+  group: sofia-vigia
+  cancel-in-progress: true
+jobs:
+  vigilar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Sondear n8n y el flujo de Sofía
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python .github/scripts/sofia_vigia.py
