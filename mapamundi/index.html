@@ -94,13 +94,14 @@ select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea)
   </select>
   <button class="btn-actualizar" onclick="App.actualizarDesdeLupe()">🔄 Actualizar desde Lupe</button>
 </header>
-<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v3-ciudades</div>
+<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v4-todas-ciudades</div>
 <div class="layout">
   <div class="panel-arbol" id="arbol"><div class="loading">Cargando el mapa…</div></div>
   <div class="panel-central" id="central"></div>
 </div>
 <div id="modalRoot"></div>
 
+<script src="municipios-colombia.js"></script>
 <script>
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
@@ -119,6 +120,14 @@ const COLOR=Object.fromEntries(ETAPAS.map(e=>[e.v,e.color]));
 const NOMBRE_ETAPA=Object.fromEntries(ETAPAS.map(e=>[e.v,e.t]));
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const $=id=>document.getElementById(id);
+const normDepto=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]/g,'');
+// Universo OFICIAL de los 1.104 municipios de Colombia (municipios-colombia.js), para que
+// ningun municipio quede sin investigar aunque todavia no tenga ni un negocio mapeado.
+const MUNICIPIOS_POR_DEPTO={};
+(MUNICIPIOS_COLOMBIA||[]).forEach(([nombre,depto,poblacion])=>{
+  const k=normDepto(depto); (MUNICIPIOS_POR_DEPTO[k]=MUNICIPIOS_POR_DEPTO[k]||[]).push({nombre,poblacion});
+});
+const fmtPob=n=>n?n.toLocaleString('es-CO')+' hab':null;
 
 const App={
   datos:[],           // todas las filas de nc_mercado del cliente_nc activo
@@ -278,28 +287,51 @@ const App={
   },
 
   // ---------- ELEGIR CIUDAD (paso intermedio al entrar a un departamento) ----------
+  // Aparecen TODAS las ciudades oficiales del departamento -aunque no tengan ni un
+  // negocio mapeado todavia-, para que ninguna quede sin investigar. Ordenadas de
+  // mayor a menor poblacion; las que no tienen dato de poblacion quedan al final.
   renderElegirCiudad(){
     const depto=this.seleccion.depto;
     const arbol=this.construirArbol();
     const d=arbol[depto]||{n:0,por:{},hijos:{}};
     const total=this.datos.length;
-    let ciudades=Object.entries(d.hijos).sort((a,b)=>b[1].n-a[1].n);
+    const oficiales=MUNICIPIOS_POR_DEPTO[normDepto(depto)]||[];
+    // union: las oficiales del depto + cualquier municipio que aparezca en los datos
+    // pero no en el listado oficial (nombre raro, error de tipeo, etc. - no se pierde).
+    // "Ubaté" (como lo escriben las camaras de comercio) y "Villa de San Diego de
+    // Ubaté" (nombre oficial largo de Wikipedia) son la MISMA ciudad: si no hay
+    // coincidencia exacta se busca una parcial antes de darla por no mapeada.
+    const hijosUsados=new Set(); let ciudades=[];
+    oficiales.forEach(o=>{
+      const no=normDepto(o.nombre);
+      let clave=Object.keys(d.hijos).find(mun=>normDepto(mun)===no);
+      if(!clave) clave=Object.keys(d.hijos).find(mun=>{ const nm=normDepto(mun); return nm.length>3 && no.length>3 && (nm.includes(no)||no.includes(nm)); });
+      if(clave) hijosUsados.add(clave);
+      ciudades.push({nombre:o.nombre, poblacion:o.poblacion, m:clave?d.hijos[clave]:null});
+    });
+    Object.entries(d.hijos).forEach(([mun,m])=>{ if(!hijosUsados.has(mun)) ciudades.push({nombre:mun, poblacion:null, m}); });
     const buscarCiudad=(this._buscarCiudad||'').trim().toLowerCase();
-    if(buscarCiudad) ciudades=ciudades.filter(([mun])=>mun.toLowerCase().includes(buscarCiudad));
+    if(buscarCiudad) ciudades=ciudades.filter(c=>c.nombre.toLowerCase().includes(buscarCiudad));
+    ciudades.sort((a,b)=> (b.poblacion||-1)-(a.poblacion||-1) || a.nombre.localeCompare(b.nombre,'es'));
+    const sinMapear=ciudades.filter(c=>!c.m).length;
     let html=`<div class="barra-cabecera">
       <div class="titulo">${esc(depto)}</div>
-      <div class="ruta">${d.n.toLocaleString('es-CO')} negocios · ${this.pct(d.n,total)}% de todo el mapa ·
+      <div class="ruta">${d.n.toLocaleString('es-CO')} negocios mapeados · ${this.pct(d.n,total)}% de todo el mapa
+        ${sinMapear?` · <b style="color:var(--rojo)">${sinMapear} ciudades sin ningún negocio mapeado todavía</b>`:''} ·
         <a href="#" onclick="App.limpiarSeleccion();return false" style="color:var(--naranja)">ver todo el país</a></div>
       <div class="stats">${ETAPAS.map(e=>`<div class="stat"><b style="color:${e.color}">${d.por[e.v]||0}</b><span>${e.t}</span></div>`).join('')}</div>
     </div>
-    <div class="grupo-titulo">Elige la ciudad de ${esc(depto)}</div>
-    ${Object.keys(d.hijos).length>8?`<input class="buscador" placeholder="Buscar ciudad…" oninput="App.onBuscarCiudad(this.value)" value="${esc(this._buscarCiudad||'')}">`:''}
-    <div class="lista">${ciudades.map(([mun,m])=>`
-      <div class="card" onclick="App.elegirMunicipio('${esc(depto).replace(/'/g,"\\'")}','${esc(mun).replace(/'/g,"\\'")}')">
-        <div class="fila1"><div class="nombre">📍 ${esc(mun)}</div><span class="badge" style="background:var(--naranja)">${m.n}</span></div>
-        <div class="meta"><span>${this.pct(m.n,d.n)}% de ${esc(depto)}</span></div>
-        ${this.barraHtml(m.por,m.n)}
-      </div>`).join('')}</div>
+    <div class="grupo-titulo">Elige la ciudad de ${esc(depto)} <span style="font-weight:400;text-transform:none;color:var(--suave)">(${ciudades.length} en total, de mayor a menor población)</span></div>
+    <input class="buscador" placeholder="Buscar ciudad…" oninput="App.onBuscarCiudad(this.value)" value="${esc(this._buscarCiudad||'')}">
+    <div class="lista">${ciudades.map(c=>{
+      const m=c.m; const n=m?m.n:0; const pob=fmtPob(c.poblacion);
+      return `<div class="card" onclick="App.elegirMunicipio('${esc(depto).replace(/'/g,"\\'")}','${esc(c.nombre).replace(/'/g,"\\'")}')">
+        <div class="fila1"><div class="nombre">📍 ${esc(c.nombre)}${pob?` <span style="color:var(--suave);font-weight:400">(${pob})</span>`:''}</div>
+          <span class="badge" style="background:${n?'var(--naranja)':'var(--suave)'}">${n}</span></div>
+        <div class="meta">${n?`<span>${this.pct(n,d.n)}% de los negocios de ${esc(depto)}</span>`:'<span style="color:var(--rojo)">sin negocios mapeados — oportunidad sin explorar</span>'}</div>
+        ${n?this.barraHtml(m.por,n):''}
+      </div>`;
+    }).join('')}</div>
     ${!ciudades.length?'<div class="vacio">Ninguna ciudad coincide con la búsqueda.</div>':''}`;
     $('central').innerHTML=html;
   },
