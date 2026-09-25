@@ -1071,13 +1071,15 @@ _cssReclas.textContent = `
   border-radius:11px 11px 0 0;border-bottom:none;font-size:13.5px}
 .qnegcab b{letter-spacing:.01em}
 .qnegcab span{font-size:11.5px;color:var(--dim);white-space:nowrap}
-.ibx{display:flex;gap:6px;margin-top:7px}
+.ibx{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.ibx .ix{min-width:90px}
 .ix{flex:1;border:1px solid var(--line);background:transparent;color:var(--dim);
   border-radius:9px;padding:7px 6px;font-size:11.5px;font-weight:600;cursor:pointer;
   font-family:inherit;line-height:1.25}
 .ix:hover{border-color:var(--dim);color:#fff}
 .ix.comp:hover{border-color:#e0a13a;color:#e0a13a}
 .ix.nono:hover{border-color:#e05a5a;color:#e05a5a}
+.ix.nowa:hover{border-color:#0891B2;color:#0891B2}
 .ix:disabled{opacity:.4;cursor:default}`;
 document.head.appendChild(_cssReclas);
 
@@ -1112,6 +1114,8 @@ async function reclasificar(id, que){
 
   const texto = que === 'competidor'
     ? '¿' + nom + ' es un COMPETIDOR?\n\nSale de la base que están llamando y pasa a la de competidores. Nadie lo vuelve a marcar.'
+    : que === 'sinwhatsapp'
+    ? '¿' + nom + ' NO tiene WhatsApp?\n\nSe guarda como "No tiene WhatsApp" en vez de Interesado, y sale de esta lista. La empresa sigue disponible para llamarla por otro medio, no se bloquea.'
     : '¿NO volver a contactar a ' + nom + '?\n\nEste teléfono queda bloqueado en TODAS las bases, incluso si mañana se vuelve a cargar el dato.';
   if (!confirm(texto)) return;
 
@@ -1137,6 +1141,11 @@ async function reclasificar(id, que){
           body: JSON.stringify(cuerpo) });
       if (!r.ok) throw new Error(r.status);
       toast('🏭 ' + nom + ' pasó a competidores');
+    } else if (que === 'sinwhatsapp') {
+      /* No se bloquea el telefono ni se descarta la empresa: el dato SI sirve,
+         solo que no por WhatsApp. Se corrige el resultado de ESA llamada (asi
+         la paga tambien queda correcta) y sale de la lista de interesados. */
+      toast('📵 ' + nom + ' queda como "No tiene WhatsApp"');
     } else {
       /* La lista de no llamar es por TELEFONO, no por empresa: el mismo numero
          puede estar cargado en cuatro bases con cuatro nombres distintos. */
@@ -1160,9 +1169,11 @@ async function reclasificar(id, que){
        Lo que NO se hace es mandarlo al embudo del CRM como sí hace 'enviado':
        un competidor o un bloqueado no es un prospecto y no tiene nada que
        hacer en el CRM. */
+    const cuerpoLlamada = { trabajado: true };
+    if (que === 'sinwhatsapp') { cuerpoLlamada.resultado = 'No tiene WhatsApp'; cuerpoLlamada.valor = tarifas()['No tiene WhatsApp'] ?? 300; }
     const r2 = await fetch(SB + '/rest/v1/mkr_llamadas?id=eq.' + encodeURIComponent(x.id),
       { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ trabajado: true }) });
+        body: JSON.stringify(cuerpoLlamada) });
     if (!r2.ok) throw new Error(r2.status);
   } catch (e) {
     INTER = antes; pintarInteresados();       // vuelve a la lista
@@ -1213,6 +1224,8 @@ function filaInteresado(x, equipo, verBase){
     <div class="ibx">
       <button class="ix comp" onclick="reclasificar('${esc(x.id)}','competidor')"
         title="Sale de la base que están llamando y se va con los competidores">🏭 Es competidor</button>
+      <button class="ix nowa" onclick="reclasificar('${esc(x.id)}','sinwhatsapp')"
+        title="Se guarda como 'No tiene WhatsApp' en vez de Interesado. Sigue disponible para llamarlo por otro medio.">📵 No tiene WhatsApp</button>
       <button class="ix nono" onclick="reclasificar('${esc(x.id)}','nollamar')"
         title="Este teléfono no vuelve a salir en ninguna base">🚫 No contactar</button>
     </div>
