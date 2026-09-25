@@ -98,13 +98,21 @@ select#clienteNc{margin-left:auto;padding:6px 10px;border:1px solid var(--linea)
   <select id="clienteNc" onchange="App.cambiarCliente(this.value)">
     <option value="smart">Smart Envases</option>
   </select>
-  <button class="btn-actualizar" onclick="App.actualizarDesdeLupe()">🔄 Actualizar desde Lupe</button>
   <!-- 25-sep-2026: Jose pidio NO traer datos de los bots en bloque -"nos podemos
        llenar de mugre"-. El boton de traer TODO se quito. Lo que entra al mapa desde
        Sofia/Valentina sera lo que se elija a mano, con un boton "Mandar a Mapamundi"
-       en la propia pantalla del bot -pendiente de construir, ver 18-mapamundi.md-. -->
+       en la propia pantalla del bot -pendiente de construir, ver 18-mapamundi.md-.
+
+       25-sep-2026, mas tarde: se quita tambien "Actualizar desde Lupe" de aqui.
+       El proceso real tiene un paso de mas en el medio -Mapamundi -> Lupe (llamada
+       en frio) -> CRM (seguimiento: muestras) -> de vuelta a Mapamundi-. Traer
+       el resultado crudo de Lupe (solo "Interesado") sin pasar por el CRM es
+       adelantarse: lo que de verdad debe pintar la zona es que ya tiene muestra
+       o ya es cliente, que se sabe en el CRM, no en Lupe. La funcion
+       actualizarDesdeLupe() y el RPC nc_mercado_sync_lupe siguen ahi, listos
+       para cuando el CRM tenga sus botones y se conecte esa punta. -->
 </header>
-<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v6-sin-import-bot</div>
+<div style="text-align:center;font-size:10px;color:#cbd5e1;padding-top:2px">VER 20260925-v7-logo-sin-lupe-directo</div>
 <div class="layout">
   <div class="panel-arbol" id="arbol"><div class="loading">Cargando el mapa…</div></div>
   <div class="panel-central" id="central"></div>
@@ -525,7 +533,7 @@ const App={
         <div class="grupo-titulo">Estado</div>
         <div class="etapas-botones">${ETAPAS.map(e=>`<div class="eb ${f.etapa===e.v?'on':''}" style="${f.etapa===e.v?`background:${e.color}`:''}" onclick="App.cambiarEtapa('${f.id}','${e.v}')">${e.t}</div>`).join('')}</div>
         ${f.etapa_motivo?`<div class="campo" style="margin-top:8px"><label>Motivo</label><div class="val">${esc(f.etapa_motivo)}</div></div>`:''}
-        ${f.etapa==='en_trabajo' && f.lupe_base_id?`<div class="campo" style="margin-top:4px"><label>En Lupe</label><div class="val">Enviado a una base de llamadas · <a href="#" onclick="App.actualizarDesdeLupe();return false" style="color:var(--naranja)">actualizar resultado</a></div></div>`:''}
+        ${f.etapa==='en_trabajo' && f.lupe_base_id?`<div class="campo" style="margin-top:4px"><label>En Lupe</label><div class="val">Enviado a una base de llamadas</div></div>`:''}
         <div class="grupo-titulo">Localización</div>
         <div class="filagrid">${campo('Departamento',f.depto)}${campo('Municipio',f.municipio)}</div>
         ${f.localidad||f.barrio?`<div class="filagrid">${campo('Localidad',f.localidad)}${campo('Barrio',f.barrio)}</div>`:''}
