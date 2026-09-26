@@ -31,10 +31,42 @@ textarea{min-height:58px;resize:vertical}
 .toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%);background:#0c3a26;color:#9ff0c8;padding:11px 16px;border-radius:10px;font-size:13px;z-index:99;max-width:90%;display:none}
 /* 26-sep-2026: se quito la pantalla de "Entrar". Jose: "tan solo con abrir el
    app ya pueda" -sin tocar nada antes de ver el formulario-. El permiso de
-   GPS se pide solo, apenas carga la pagina (ver el script, mas abajo). */
+   GPS se pide solo, apenas carga la pagina (ver el script, mas abajo).
+
+   26-sep-2026, mas tarde: Jose pidio DE VUELTA un paso antes del formulario,
+   pero no una clave -una foto-. Es la foto de la cuadra donde arranca el
+   recorrido de hoy: con esa foto se guarda la primera ubicacion, que sirve
+   despues para saber que barrio se trabajo. Hasta que esa foto no sube, el
+   formulario de negocios (main) sigue oculto. */
+#zona,#quien{padding:22px 18px;text-align:center}
+#zona .wm,#quien .wm{font-size:22px;font-weight:800;margin:6px 0 4px}
+#zona .sl,#quien .sl{font-size:13.5px;color:#8ea3b5;margin-bottom:16px;line-height:1.5}
+#zona input[type=text]{margin-bottom:14px}
+.quien{display:flex;gap:10px}
+.quien button{flex:1;padding:22px 10px;border:none;border-radius:14px;font-weight:800;font-size:17px;cursor:pointer;background:#18222e;color:#eaf1f8;border:1.5px solid #2b3a4a}
+.quien button:active{background:#22303f}
+#quien_actual{font-size:11px;color:#7fd0a3;text-decoration:underline;cursor:pointer;display:inline-block;margin-left:8px}
 </style></head><body>
-<header><b>🐕 SABUESO</b><div id="gps" class="bad">📍 Obteniendo ubicación…</div></header>
-<main>
+<header><b>🐕 SABUESO</b><span id="quien_actual" style="display:none" onclick="cambiarQuien()"></span><div id="gps" class="bad">📍 Obteniendo ubicación…</div></header>
+<!-- 26-sep-2026: Jose pidio identificar QUIEN hace el recorrido -Gloria o Jose,
+     dos celulares distintos-. Se pregunta una sola vez y queda guardado en
+     este celular (localStorage); para cambiarlo, tocar el nombre en el
+     encabezado. -->
+<div id="quien">
+  <div class="wm">👋 ¿Quién eres?</div>
+  <div class="sl">Para saber quién hizo cada visita de campo.</div>
+  <div class="quien">
+    <button onclick="elegirQuien('Gloria')">Gloria</button>
+    <button onclick="elegirQuien('José')">José</button>
+  </div>
+</div>
+<div id="zona" style="display:none">
+  <div class="wm">📍 Cuadra donde arrancas</div>
+  <div class="sl">Antes de empezar, toma una foto de la cuadra o el punto donde vas a comenzar el recorrido de hoy. Con eso queda guardada la ubicación de inicio, para saber después qué barrio se trabajó.</div>
+  <input type="text" id="zona_nombre" placeholder="Barrio o zona (opcional)">
+  <div class="fotos"><div class="foto big" onclick="pick('zona')"><div class="ico">🧭</div><div class="txt">Tomar foto de la cuadra donde arrancas</div><span class="chk">✓</span><span class="up" style="display:none"></span><input type="file" accept="image/*" capture="environment" id="in_zona" onchange="capZona(this)"></div></div>
+</div>
+<main style="display:none">
   <div class="cnt" id="cnt">Hoy: 0 negocios</div>
 
   <label>1️⃣ Foto de la FACHADA del negocio</label>
@@ -59,11 +91,31 @@ textarea{min-height:58px;resize:vertical}
   <label>¿Le interesó? (le dejaste el volante)</label>
   <div class="int"><button type="button" id="i_si" onclick="setInt('si')">🔥 Interesado</button><button type="button" id="i_no" onclick="setInt('no')">❌ No interesado</button></div>
 </main>
-<button id="save" onclick="guardar()">💾 Guardar negocio</button>
+<button id="save" onclick="guardar()" style="display:none">💾 Guardar negocio</button>
 <div class="toast" id="toast"></div>
 <script>
 const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 let pos={lat:null,lng:null}, urls={fachada:null,comp1:null,comp2:null,tarjeta:null}, interes='';
+let VENDEDOR=null, zonaUrl=null;
+/* 26-sep-2026: Gloria y José son los dos que salen a campo, cada uno con su
+   celular. Se pregunta UNA vez y queda guardado en ESTE celular; para
+   cambiarlo (si algún día comparten equipo) se toca el nombre en el
+   encabezado. */
+function pintarQuien(){ const q=document.getElementById('quien_actual'); if(!q) return; if(VENDEDOR){ q.style.display='inline-block'; q.textContent=VENDEDOR; } else q.style.display='none'; }
+function elegirQuien(nombre){
+  VENDEDOR=nombre; localStorage.setItem('barrido_quien',nombre); pintarQuien();
+  document.getElementById('quien').style.display='none';
+  document.getElementById('zona').style.display=zonaUrl?'none':'block';
+  if(zonaUrl){ document.querySelector('main').style.display='block'; document.getElementById('save').style.display='block'; }
+}
+function cambiarQuien(){
+  document.getElementById('quien').style.display='block';
+  document.getElementById('zona').style.display='none';
+}
+(function initQuien(){
+  const q=localStorage.getItem('barrido_quien');
+  if(q){ VENDEDOR=q; pintarQuien(); document.getElementById('quien').style.display='none'; document.getElementById('zona').style.display='block'; }
+})();
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',3500);}
 function gps(){navigator.geolocation.getCurrentPosition(p=>{pos.lat=p.coords.latitude;pos.lng=p.coords.longitude;const g=document.getElementById('gps');g.className='';g.textContent='📍 Ubicación lista ('+pos.lat.toFixed(5)+', '+pos.lng.toFixed(5)+')';},e=>{const g=document.getElementById('gps');g.className='bad';g.textContent='📍 Activa el permiso de ubicación y recarga';},{enableHighAccuracy:true,timeout:15000});}
 /* 26-sep-2026: sin pantalla de entrada, el permiso de GPS se pide de una vez
@@ -93,6 +145,32 @@ async function cap(k,input){
     box.classList.add('ok'); up.textContent='✓ subida';
   }catch(e){ up.textContent='error, reintenta'; toast('No subió la foto: '+e.message); }
 }
+/* La foto de la cuadra donde arranca el recorrido. Sube la foto, pide GPS
+   fresco en ese mismo instante, guarda un registro aparte en nc_barrido_zona
+   (no en nc_barrido_presencial, que es de negocios uno por uno) y con eso
+   ya se puede abrir el formulario de negocios. */
+async function capZona(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  const box=input.parentElement;
+  const url=URL.createObjectURL(f); let img=box.querySelector('img'); if(!img){img=document.createElement('img');box.appendChild(img);} img.src=url;
+  const up=box.querySelector('.up'); up.style.display='block'; up.textContent='subiendo…';
+  try{ gps(); }catch(e){}
+  try{
+    const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+    const path='barrido/'+Date.now()+'-zona.'+ext;
+    const r=await fetch(SB+'/storage/v1/object/documentos/'+path,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K},body:f});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    zonaUrl=SB+'/storage/v1/object/public/documentos/'+path;
+    box.classList.add('ok'); up.textContent='✓ subida';
+    await new Promise(res=>setTimeout(res,600));   // le da un respiro al GPS para que alcance a resolver
+    const rec={empresa:'feroz',vendedor:VENDEDOR,barrio:document.getElementById('zona_nombre').value.trim()||null,lat:pos.lat,lng:pos.lng,foto_url:zonaUrl};
+    try{ await fetch(SB+'/rest/v1/nc_barrido_zona',{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rec)}); }catch(e){}
+    document.getElementById('zona').style.display='none';
+    document.querySelector('main').style.display='block';
+    document.getElementById('save').style.display='block';
+    window.scrollTo(0,0);
+  }catch(e){ up.textContent='error, reintenta'; toast('No subió la foto: '+e.message); }
+}
 function setInt(v){interes=v;['si','no'].forEach(x=>document.getElementById('i_'+x).className='');document.getElementById('i_'+v).className='on-'+v;}
 function hoyCount(){return +(localStorage.getItem('barrido_hoy_'+new Date().toDateString())||0);}
 function setCnt(){document.getElementById('cnt').textContent='Hoy: '+hoyCount()+' negocios';}
@@ -105,7 +183,7 @@ async function guardar(){
     vende:val('vende')||null,compra_a:val('compra')||null,interesado:interes||null,
     telefono:val('tel').replace(/[^0-9+]/g,'')||null,
     foto_negocio:urls.fachada,foto_ref1:urls.comp1,foto_ref2:urls.comp2,foto_tarjeta:urls.tarjeta,
-    notas:val('notas')||null,vendedor:'Jose'};
+    notas:val('notas')||null,vendedor:VENDEDOR};
   try{
     const r=await fetch(SB+'/rest/v1/nc_barrido_presencial',{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rec)});
     if(!r.ok) throw new Error('HTTP '+r.status);
