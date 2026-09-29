@@ -305,7 +305,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260929-ya-es-cliente';
+const VER='20260929-ya-es-cliente-fix-leadid';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -969,7 +969,7 @@ async function cargarInteresados(){
      entraron por el marcador viejo, que no mandaba esa columna—: 19 interesados
      invisibles, nadie les mando nada. 'not.is.true' es lo que se queria decir:
      todo lo que todavia no esta trabajado, sea false o este vacio. */
-  const base='mkr_llamadas?select=id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
+  const base='mkr_llamadas?select=id,lead_id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
     +'whatsapp2,correo,creado_en,validado,estado_venta,agente,agente_id,base_id'
     +'&resultado=eq.Interesado&trabajado=not.is.true&base_id=not.is.null&order=creado_en.desc';
   /* El administrador ve los de TODA la red: el segundo paso —mandar la info por
