@@ -305,7 +305,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20260925-no-tiene-whatsapp';
+const VER='20260929-ya-es-cliente';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1080,6 +1080,7 @@ _cssReclas.textContent = `
 .ix.comp:hover{border-color:#e0a13a;color:#e0a13a}
 .ix.nono:hover{border-color:#e05a5a;color:#e05a5a}
 .ix.nowa:hover{border-color:#0891B2;color:#0891B2}
+.ix.yacli:hover{border-color:#25D366;color:#25D366}
 .ix:disabled{opacity:.4;cursor:default}`;
 document.head.appendChild(_cssReclas);
 
@@ -1116,6 +1117,8 @@ async function reclasificar(id, que){
     ? '¿' + nom + ' es un COMPETIDOR?\n\nSale de la base que están llamando y pasa a la de competidores. Nadie lo vuelve a marcar.'
     : que === 'sinwhatsapp'
     ? '¿' + nom + ' NO tiene WhatsApp?\n\nSe guarda como "No tiene WhatsApp" en vez de Interesado, y sale de esta lista. La empresa sigue disponible para llamarla por otro medio, no se bloquea.'
+    : que === 'yacliente'
+    ? '¿' + nom + ' YA ES CLIENTE?\n\nSe marca como cliente activo: sale de esta lista y de la base para que nadie la vuelva a llamar.'
     : '¿NO volver a contactar a ' + nom + '?\n\nEste teléfono queda bloqueado en TODAS las bases, incluso si mañana se vuelve a cargar el dato.';
   if (!confirm(texto)) return;
 
@@ -1146,6 +1149,18 @@ async function reclasificar(id, que){
          solo que no por WhatsApp. Se corrige el resultado de ESA llamada (asi
          la paga tambien queda correcta) y sale de la lista de interesados. */
       toast('📵 ' + nom + ' queda como "No tiene WhatsApp"');
+    } else if (que === 'yacliente') {
+      /* Mismo mecanismo que protege a los clientes activos de Feroz
+         (estado='competencia' en mkr_empresas, ver _PLAYBOOK/proteger_clientes_feroz.py):
+         asi la aplica de mkr_leads lo esconde igual que a un competidor, sin
+         moverlo de base. Nace de un caso real (26-sep-2026): "La Gran Dotación"
+         salio Interesado siendo ya cliente, porque nadie lo habia marcado asi. */
+      const r = await fetch(SB + '/rest/v1/mkr_empresas?id=eq.' + encodeURIComponent(x.lead_id),
+        { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+          body: JSON.stringify({ estado: 'competencia',
+            notas: 'Marcado "ya es cliente" desde Lupe · ' + new Date().toISOString().slice(0,10) }) });
+      if (!r.ok) throw new Error(r.status);
+      toast('🤝 ' + nom + ' queda marcado como cliente');
     } else {
       /* La lista de no llamar es por TELEFONO, no por empresa: el mismo numero
          puede estar cargado en cuatro bases con cuatro nombres distintos. */
@@ -1171,6 +1186,7 @@ async function reclasificar(id, que){
        hacer en el CRM. */
     const cuerpoLlamada = { trabajado: true };
     if (que === 'sinwhatsapp') { cuerpoLlamada.resultado = 'No tiene WhatsApp'; cuerpoLlamada.valor = tarifas()['No tiene WhatsApp'] ?? 300; }
+    if (que === 'yacliente') { cuerpoLlamada.resultado = 'Ya es cliente'; cuerpoLlamada.valor = tarifas()['Ya es cliente'] ?? 50; }
     const r2 = await fetch(SB + '/rest/v1/mkr_llamadas?id=eq.' + encodeURIComponent(x.id),
       { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
         body: JSON.stringify(cuerpoLlamada) });
@@ -1228,6 +1244,8 @@ function filaInteresado(x, equipo, verBase){
         title="Se guarda como 'No tiene WhatsApp' en vez de Interesado. Sigue disponible para llamarlo por otro medio.">📵 No tiene WhatsApp</button>
       <button class="ix nono" onclick="reclasificar('${esc(x.id)}','nollamar')"
         title="Este teléfono no vuelve a salir en ninguna base">🚫 No contactar</button>
+      <button class="ix yacli" onclick="reclasificar('${esc(x.id)}','yacliente')"
+        title="Ya compra con nosotros: se marca como cliente y no lo vuelve a llamar nadie">🤝 Ya es cliente</button>
     </div>
     ${nuevo && marcado && nuevo!==marcado
       ? '<div class="iaviso">📲 Manda la info al verde: es el que dieron en la llamada</div>' : ''}
