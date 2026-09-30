@@ -2375,6 +2375,27 @@ const App = {
   _geoDeptoZona(){ if(this.__gdz) return this.__gdz; const m={}; (window.GEO_CO?window.GEO_CO.zonas:[]).forEach(z=>(z.deptos||[]).forEach(d=>{ m[this._na(d.nombre)]=z.nombre; })); this.__gdz=m; return m; },
   _cityDeptoExtra(){ return {'cajica':'Cundinamarca','choconta':'Cundinamarca','madrid':'Cundinamarca','tenjo':'Cundinamarca','ubate':'Cundinamarca','zipaquira':'Cundinamarca','sopo':'Cundinamarca','chia':'Cundinamarca','funza':'Cundinamarca','mosquera':'Cundinamarca','caucasia':'Antioquia','girardota':'Antioquia','la estrella':'Antioquia','apartado':'Antioquia','rionegro':'Antioquia','chinacota':'Norte de Santander','los patios':'Norte de Santander','ocana':'Norte de Santander','pamplona':'Norte de Santander','cumaral':'Meta','acacias':'Meta','el espino':'Boyaca','sogamoso':'Boyaca','duitama':'Boyaca','la cumbre':'Valle del Cauca','la cruz':'Narino','pitalito':'Huila','san gil':'Santander','velez':'Santander','barrancas':'La Guajira'}; },
   _geoCiudadesOptions(){ const s=new Set(); (window.GEO_CO?window.GEO_CO.zonas:[]).forEach(z=>(z.deptos||[]).forEach(d=>(d.ciudades||[]).forEach(c=>s.add(c.nombre)))); return [...s].sort().map(c=>`<option value="${c}">`).join(''); },
+  /* 30-sep-2026: en Av 68 y Tolima, "Localidad" pasa de texto libre a una
+     lista cerrada (20 localidades de Bogota / 47 municipios del Tolima), para
+     que el mapa nuevo de cada CED pueda ubicar los clientes de verdad. En
+     cualquier otro CED se queda exactamente como estaba -texto libre-, sin
+     tocarle nada a Feroz. */
+  _campoLocalidadCliente(valorActual){
+    const sede=this.miSede();
+    let opciones=null;
+    if(sede==='Av 68'){
+      const bog=(window.GEO_CO?window.GEO_CO.zonas:[]).flatMap(z=>z.deptos||[]).flatMap(d=>d.ciudades||[]).find(c=>c.nombre==='Bogotá');
+      opciones=(bog&&bog.localidades)||null;
+    } else if(sede==='Tolima'){
+      opciones=this.TOLIMA_MUN;
+    }
+    if(!opciones) return `<label>Localidad / Comuna (para cobertura)</label><input class="field" id="cl_localidad" value="${esc(valorActual||'')}">`;
+    const etiqueta=sede==='Av 68'?'Localidad (Bogotá) · para el mapa':'Municipio (Tolima) · para el mapa';
+    return `<label>${etiqueta}</label><select class="field" id="cl_localidad">`
+      + `<option value="">— Elegir —</option>`
+      + opciones.map(o=>`<option value="${esc(o)}" ${valorActual===o?'selected':''}>${esc(o)}</option>`).join('')
+      + `</select>`;
+  },
   autoGeoRegistro(){ const ci=$('rc_ciudad')?this._na($('rc_ciudad').value):''; let g=this._geoMap()[ci]; if(!g){ const ex=this._cityDeptoExtra()[ci]; if(ex){ const zn=this._geoDeptoZona()[this._na(ex)]; if(zn) g={depto:ex,zona:zn}; } } const hub={}; (window.GEO_CO?window.GEO_CO.zonas:[]).forEach(z=>hub[z.nombre]=z.hub); if(g){ if($('rc_depto'))$('rc_depto').value=g.depto; if($('rc_zona'))$('rc_zona').value=g.zona; const n=$('rc_geo_note'); if(n) n.textContent='📍 '+($('rc_ciudad').value)+' → '+g.depto+' → Zona '+g.zona+(hub[g.zona]?' (hub '+hub[g.zona]+')':''); } else { const n=$('rc_geo_note'); if(n) n.textContent=''; } },
   async _telemercsOpts(){ try{ const r=await fetch(this._SBU()+'/rest/v1/nc_marcador_operadoras?activo=eq.true&select=nombre&order=nombre.asc',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); const j=await r.json(); return (Array.isArray(j)?j:[]).map(t=>`<option value="${t.nombre}">${t.nombre}</option>`).join(''); }catch(e){ return ''; } },
   async vRegistroForm(){
@@ -2838,7 +2859,7 @@ const App = {
       <datalist id="cl_ciu_dl">${this._geoCiudadesOptions()}</datalist>
       <div class="row2"><div><label>Barrio</label><input class="field" id="cl_barrio" value="${v(e.barrio)}"></div>
         <div><label>Dirección</label><input class="field" id="cl_dir" value="${v(e.direccion)}"></div></div>
-      <label>Localidad / Comuna (para cobertura)</label><input class="field" id="cl_localidad" value="${v(e.localidad)}">
+      ${this._campoLocalidadCliente(e.localidad)}
       <label>Correo</label><input class="field" id="cl_correo" inputmode="email" value="${v(e.correo)}">
       <div style="font-size:12px;font-weight:700;color:var(--naranja);margin-top:12px">👥 CONTACTOS DE OFICINA (hasta 2)</div>
       <div class="row2">
@@ -5821,6 +5842,17 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
 
   /* ---------- PERMISOS (qué ve cada rol) ---------- */
   /* pestañas que se pueden repartir · la llave es la misma que usa el nav */
+  /* 30-sep-2026: las 47 municipios del Tolima, para el selector de "Localidad"
+     cuando el CED es Tolima (igual que BOG_LOC de geo-co.js para Av 68). Nombres
+     con tilde correcta — la fuente publica que se uso para el mapa (gist de
+     john-guerra) trae varios nombres con el encoding danado. */
+  TOLIMA_MUN:['Ibagué','Alpujarra','Alvarado','Ambalema','Anzoátegui','Ataco','Armero','Cajamarca',
+    'Carmen de Apicalá','Casabianca','Chaparral','Coello','Coyaima','Cunday','Dolores','El Espinal',
+    'Falan','Flandes','Fresno','Guamo','Herveo','Honda','Icononzo','Lérida','Líbano','Mariquita',
+    'Melgar','Murillo','Natagaima','Ortega','Palocabildo','Piedras','Planadas','Prado','Purificación',
+    'Rioblanco','Roncesvalles','Rovira','Saldaña','San Antonio','San Luis','Santa Isabel','Suárez',
+    'Valle de San Juan','Venadillo','Villahermosa','Villarrica'],
+
   /* Tiene que traer TODOS los modulos del menu (ROW1+ROW2+ROW3). Si a esta
      lista le falta uno, ese modulo no se puede marcar — y como el menu ahora se
      rige por ced_permisos, lo que no este aca queda invisible para todo cargo.
