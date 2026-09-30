@@ -132,8 +132,23 @@ const App = {
     const email = dicho.includes('@') ? dicho : this.usCorreo(dicho);
     this.msg('Entrando…', true);
     const { data, error } = await this.sb.auth.signInWithPassword({ email, password:pass });
-    if(error){ this.msg(error.message.includes('Invalid')?'Usuario o clave incorrectos.':error.message); return; }
+    if(error){ this._registrarAcceso(dicho, false); this.msg(error.message.includes('Invalid')?'Usuario o clave incorrectos.':error.message); return; }
     this.user = data.user; await this.afterLogin();
+    this._registrarAcceso(dicho, true);
+  },
+
+  /* Jose pidio (30-sep-2026) poder ver quien entra a la plataforma sin
+     publicar nada nuevo: solo que quede registrado en Supabase. No se
+     bloquea el login si esto falla -es solo bitacora, no seguridad-. */
+  async _registrarAcceso(usuarioEscrito, exitoso){
+    try{
+      await this.sb.from('ced_accesos').insert({
+        usuario: usuarioEscrito || '(vacío)',
+        ced: (this.cedUser && this.cedUser.ced) || null,
+        cargo: (this.cedUser && this.cedUser.cargo) || null,
+        exitoso
+      });
+    }catch(e){}
   },
 
   async signup(){
