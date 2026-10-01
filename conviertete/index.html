@@ -828,6 +828,74 @@ function Sheet({
   }, "✕")), children));
 }
 
+function PlanDeHoy() {
+  const [planes] = usePersist("plan", {});
+  const HORAS = Array.from({ length: 13 }, (_, i) => String(5 + i).padStart(2, "0") + ":00");
+  const p = planes[hoy()] || {};
+  const items = HORAS.filter(h => (p[h]?.t || "").trim());
+  if (!items.length) return null;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: { marginTop: 12 }
+  }, /*#__PURE__*/React.createElement("b", null, "🗓️ Plan de hoy"),
+    items.map(h => /*#__PURE__*/React.createElement("div", {
+      key: h,
+      className: "sub",
+      style: { textDecoration: p[h].ok ? "line-through" : "none" }
+    }, h, " · ", p[h].t))
+  );
+}
+function RespaldoDatos() {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "card",
+    style: { marginTop: 18 }
+  }, /*#__PURE__*/React.createElement("b", null, "🔒 Respaldo de mis datos"), /*#__PURE__*/React.createElement("div", {
+    className: "sub",
+    style: { marginBottom: 8 }
+  }, "Todo se guarda en este celular. Haz un respaldo cada domingo y guárdalo en Notas o WhatsApp."), /*#__PURE__*/React.createElement("div", {
+    className: "grid2"
+  }, /*#__PURE__*/React.createElement("button", {
+    className: "btn",
+    onClick: async () => {
+      const o = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k.startsWith("cv:")) o[k] = localStorage.getItem(k);
+      }
+      const txt = "CONVIERTETE-BACKUP:" + btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+      try {
+        if (navigator.share) {
+          await navigator.share({ title: "Respaldo Conviértete " + hoy(), text: txt });
+        } else {
+          await navigator.clipboard.writeText(txt);
+          alert("Respaldo copiado. Pégalo en Notas.");
+        }
+      } catch (e) {
+        try {
+          await navigator.clipboard.writeText(txt);
+          alert("Respaldo copiado. Pégalo en Notas.");
+        } catch {
+          prompt("Copia este texto:", txt);
+        }
+      }
+    }
+  }, "Exportar"), /*#__PURE__*/React.createElement("button", {
+    className: "btn sec",
+    onClick: () => {
+      const t = prompt("Pega aquí el respaldo:");
+      if (!t) return;
+      try {
+        const o = JSON.parse(decodeURIComponent(escape(atob(t.replace("CONVIERTETE-BACKUP:", "").trim()))));
+        Object.entries(o).forEach(([k, v]) => localStorage.setItem(k, v));
+        alert("Datos restaurados.");
+        location.reload();
+      } catch {
+        alert("Ese texto no es un respaldo válido.");
+      }
+    }
+  }, "Restaurar")));
+}
+
 /* ---------- APP ---------- */
 function App() {
   const [tab, setTab] = useState("hoy");
@@ -936,10 +1004,7 @@ function App() {
     });
     setAbierto(null);
   };
-  const [mas, setMas] = useState(false);
-  const PRIN = [["hoy", "Hoy"], ["manana", "Mañana"], ["progreso", "Progreso"], ["pend", "Por cumplir"]];
-  const EXTRA = [["plan", "🗓️", "Plan"], ["tareas", "✅", "Pendientes"]];
-  const enExtra = EXTRA.some(e => e[0] === tab);
+  const PRIN = [["hoy", "Hoy"], ["plan", "Plan del día"], ["tareas", "Pendientes"], ["progreso", "Progreso"]];
   return /*#__PURE__*/React.createElement("div", {
     className: "wrap"
   }, /*#__PURE__*/React.createElement("div", {
@@ -952,31 +1017,13 @@ function App() {
   }, PRIN.map(([k, l]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     className: tab === k ? "on" : "",
-    onClick: () => {
-      setTab(k);
-      setMas(false);
-    }
-  }, l)), /*#__PURE__*/React.createElement("button", {
-    className: enExtra || mas ? "on" : "",
-    onClick: () => setMas(!mas)
-  }, "Más ", mas ? "▴" : "▾")), mas && /*#__PURE__*/React.createElement("div", {
-    className: "tabs extra"
-  }, EXTRA.map(([k, i, l]) => /*#__PURE__*/React.createElement("button", {
-    key: k,
-    className: tab === k ? "on" : "",
-    onClick: () => {
-      setTab(k);
-      setMas(false);
-    }
-  }, /*#__PURE__*/React.createElement("span", null, i), " ", l))), /*#__PURE__*/React.createElement("div", {
+    onClick: () => setTab(k)
+  }, l))), /*#__PURE__*/React.createElement("div", {
     className: "scrollx"
   }, LINEA_NAV.map(([k, icono, nombre]) => /*#__PURE__*/React.createElement("button", {
     key: k,
     className: "chip" + (tab === k ? " on" : ""),
-    onClick: () => {
-      setTab(k);
-      setMas(false);
-    }
+    onClick: () => setTab(k)
   }, icono, " ", nombre))), tab === "hoy" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "row",
     style: {
@@ -1221,137 +1268,7 @@ function App() {
       },
       onClick: () => listo(r.id)
     }, "Listo ✓")));
-  })), tab === "manana" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      textTransform: "capitalize"
-    }
-  }, fmt(addDias(fecha, 1)), " · Día ", (idx + 1) % 15 + 1, " de 15"), /*#__PURE__*/React.createElement("div", {
-    className: "h2",
-    style: {
-      marginBottom: 12
-    }
-  }, "Para dejar listo esta noche"), [["🍳", "Desayuno", mMan.d, C.mus], ["🥩", "Almuerzo", mMan.a, C.green], ["🥒", "Jugo 3 pm", JUGO[mMan.j], C.grey], ["🐟", "Cena", mMan.c, C.blue]].map(([i, t, x, col]) => /*#__PURE__*/React.createElement("div", {
-    key: t,
-    className: "card",
-    style: {
-      borderLeft: `5px solid ${col}`
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      fontWeight: 700,
-      color: col
-    }
-  }, i, " ", t), /*#__PURE__*/React.createElement("div", null, x))), /*#__PURE__*/React.createElement("div", {
-    className: "card",
-    style: {
-      background: "var(--ink)",
-      color: "var(--paper)",
-      border: 0
-    }
-  }, /*#__PURE__*/React.createElement("b", null, "Checklist de la noche"), [["chk1", "Bolsa de carne y de pescado del congelador a la nevera"], ["chk2", "Kit del detox y del jugo de las 3 en la nevera"], ["chk3", "Tarrina del carbohidrato y de la verdura al frente"]].map(([k, t]) => {
-    const ok = !!dia.done[k];
-    return /*#__PURE__*/React.createElement("button", {
-      key: k,
-      onClick: () => setDia({
-        ...dia,
-        done: {
-          ...dia.done,
-          [k]: !ok
-        }
-      }),
-      style: {
-        display: "flex",
-        gap: 10,
-        alignItems: "center",
-        width: "100%",
-        background: "transparent",
-        border: 0,
-        color: "var(--paper)",
-        padding: "8px 0",
-        textAlign: "left",
-        opacity: ok ? .55 : 1
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "ck" + (ok ? " on" : ""),
-      style: {
-        width: 26,
-        height: 26
-      }
-    }, ok ? "✓" : ""), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 14,
-        textDecoration: ok ? "line-through" : "none"
-      }
-    }, t));
-  })), /*#__PURE__*/React.createElement("button", {
-    className: "btn sec",
-    style: {
-      width: "100%",
-      marginTop: 8
-    },
-    onClick: () => {
-      if (confirm("¿Reiniciar el ciclo de comidas? Hoy pasa a ser el Día 1.")) setCfg({
-        ...cfg,
-        inicio: fecha
-      });
-    }
-  }, "Reiniciar ciclo: hoy es Día 1"), /*#__PURE__*/React.createElement("div", {
-    className: "card",
-    style: {
-      marginTop: 18
-    }
-  }, /*#__PURE__*/React.createElement("b", null, "🔒 Respaldo de mis datos"), /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      marginBottom: 8
-    }
-  }, "Todo se guarda en este celular. Haz un respaldo cada domingo y guárdalo en Notas o WhatsApp."), /*#__PURE__*/React.createElement("div", {
-    className: "grid2"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "btn",
-    onClick: async () => {
-      const o = {};
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k.startsWith("cv:")) o[k] = localStorage.getItem(k);
-      }
-      const txt = "CONVIERTETE-BACKUP:" + btoa(unescape(encodeURIComponent(JSON.stringify(o))));
-      try {
-        if (navigator.share) {
-          await navigator.share({
-            title: "Respaldo Conviértete " + fecha,
-            text: txt
-          });
-        } else {
-          await navigator.clipboard.writeText(txt);
-          alert("Respaldo copiado. Pégalo en Notas.");
-        }
-      } catch (e) {
-        try {
-          await navigator.clipboard.writeText(txt);
-          alert("Respaldo copiado. Pégalo en Notas.");
-        } catch {
-          prompt("Copia este texto:", txt);
-        }
-      }
-    }
-  }, "Exportar"), /*#__PURE__*/React.createElement("button", {
-    className: "btn sec",
-    onClick: () => {
-      const t = prompt("Pega aquí el respaldo:");
-      if (!t) return;
-      try {
-        const o = JSON.parse(decodeURIComponent(escape(atob(t.replace("CONVIERTETE-BACKUP:", "").trim()))));
-        Object.entries(o).forEach(([k, v]) => localStorage.setItem(k, v));
-        alert("Datos restaurados.");
-        location.reload();
-      } catch {
-        alert("Ese texto no es un respaldo válido.");
-      }
-    }
-  }, "Restaurar")))), tab === "progreso" && (() => {
+  })), tab === "hoy" && /*#__PURE__*/React.createElement(PlanDeHoy, null), tab === "hoy" && /*#__PURE__*/React.createElement(RespaldoDatos, null), tab === "progreso" && (() => {
     const pcts = hist.map(h => {
       const L = rutinaDe(h.f);
       return Math.round(L.filter(r => h.done?.[r.id]).length / L.length * 100);
@@ -1815,352 +1732,7 @@ function App() {
         }
       }, x.o, "% · ", x.p || "–", " lpm")
     })));
-  })(), tab === "pend" && /*#__PURE__*/React.createElement(Pendientes, null), tab === "plan" && /*#__PURE__*/React.createElement(Plan, null), tab === "tareas" && /*#__PURE__*/React.createElement(Tareas, null), LINEA_NAV.some(l => l[0] === tab) && /*#__PURE__*/React.createElement(Linea, { key: tab, k: tab }));
-}
-
-/* ===== POR CUMPLIR ===== */
-function Pendientes() {
-  const [items, setItems] = usePersist("pendientes", []);
-  const [area, setArea] = useState("Todas");
-  const [mes, setMes] = useState(mesDe(hoy()));
-  const [f, setF] = useState(null);
-  const [mover, setMover] = useState(null);
-  const mesActual = mesDe(hoy());
-  const MESES_N = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-  const nombreMes = m => m === "Todos" ? "Todos" : MESES_N[+m.slice(5, 7) - 1] + " " + m.slice(2, 4);
-  const nombreLargo = m => m === "Todos" ? "Todos los meses" : new Date(m + "-15T12:00:00").toLocaleDateString("es-CO", {
-    month: "long",
-    year: "numeric"
-  });
-  const sumaMes = (m, n) => {
-    const d = new Date(m + "-15T12:00:00");
-    d.setMonth(d.getMonth() + n);
-    return mesDe(d.toISOString());
-  };
-  const mesItem = x => x.mes || mesDe(x.f);
-  const futuros = Array.from({
-    length: 12
-  }, (_, i) => sumaMes(mesActual, i));
-  const pasados = [...new Set(items.map(mesItem).filter(m => m < mesActual))].sort().reverse();
-  const guardar = () => {
-    if (!f.t.trim()) return;
-    if (f.id) setItems(items.map(x => x.id === f.id ? f : x));else setItems([{
-      ...f,
-      id: Date.now(),
-      f: hoy(),
-      ok: false,
-      hist: []
-    }, ...items]);
-    setF(null);
-  };
-  const del = id => {
-    if (confirm("¿Borrar?")) setItems(items.filter(x => x.id !== id));
-  };
-  const aplazar = (ids, nuevoMes) => {
-    setItems(items.map(x => ids.includes(x.id) ? {
-      ...x,
-      mes: nuevoMes,
-      hist: [...(x.hist || []), {
-        de: mesItem(x),
-        a: nuevoMes,
-        f: hoy()
-      }]
-    } : x));
-    setMover(null);
-  };
-  const vencidos = items.filter(x => !x.ok && mesItem(x) < mesActual);
-  const L = items.filter(x => (area === "Todas" || x.area === area) && (mes === "Todos" || mesItem(x) === mes));
-  const totalEst = L.filter(x => !x.ok).reduce((a, x) => a + (+x.est || 0), 0);
-  const logrados = L.filter(x => x.ok).length;
-  const esPasado = mes !== "Todos" && mes < mesActual;
-  const Chip = ({
-    m
-  }) => /*#__PURE__*/React.createElement("button", {
-    className: "chip" + (mes === m ? " on" : ""),
-    onClick: () => setMes(m),
-    style: {
-      textTransform: "capitalize",
-      opacity: m < mesActual && mes !== m ? .7 : 1
-    }
-  }, nombreMes(m), items.filter(x => mesItem(x) === m && !x.ok).length > 0 ? ` (${items.filter(x => mesItem(x) === m && !x.ok).length})` : "");
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "h2"
-  }, "Por cumplir"), /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      marginBottom: 8
-    }
-  }, "Lo que quiero adquirir o lograr, por mes y por área."), vencidos.length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "card",
-    style: {
-      background: "var(--ms)",
-      border: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "row",
-    style: {
-      justifyContent: "space-between"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("b", null, "⏰ ", vencidos.length, " sin cumplir de meses pasados"), /*#__PURE__*/React.createElement("div", {
-    className: "sub"
-  }, "Pásalos a otro mes; queda registrado el aplazo.")), /*#__PURE__*/React.createElement("button", {
-    className: "btn small",
-    onClick: () => setMover({
-      ids: vencidos.map(x => x.id),
-      n: vencidos.length
-    })
-  }, "Mover"))), /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: 1
-    }
-  }, "PRÓXIMOS"), /*#__PURE__*/React.createElement("div", {
-    className: "scrollx"
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "chip" + (mes === "Todos" ? " on" : ""),
-    onClick: () => setMes("Todos")
-  }, "Todos"), futuros.map(m => /*#__PURE__*/React.createElement(Chip, {
-    key: m,
-    m: m
-  }))), pasados.length > 0 && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: 1
-    }
-  }, "PASADOS"), /*#__PURE__*/React.createElement("div", {
-    className: "scrollx"
-  }, pasados.map(m => /*#__PURE__*/React.createElement(Chip, {
-    key: m,
-    m: m
-  })))), /*#__PURE__*/React.createElement("div", {
-    className: "scrollx"
-  }, ["Todas", ...AREAS].map(a => /*#__PURE__*/React.createElement("button", {
-    key: a,
-    className: "chip" + (area === a ? " on" : ""),
-    onClick: () => setArea(a)
-  }, a, items.filter(x => x.area === a && !x.ok).length > 0 ? ` (${items.filter(x => x.area === a && !x.ok).length})` : ""))), /*#__PURE__*/React.createElement("div", {
-    className: "card",
-    style: {
-      background: "var(--ink)",
-      color: "var(--paper)",
-      border: 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "row",
-    style: {
-      justifyContent: "space-between"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      color: "var(--mus)",
-      textTransform: "capitalize"
-    }
-  }, nombreLargo(mes)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 22,
-      fontWeight: 800
-    }
-  }, cop(totalEst)), /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      color: "var(--paper)",
-      opacity: .7
-    }
-  }, "por adquirir")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "right"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 22,
-      fontWeight: 800
-    }
-  }, logrados, "/", L.length), /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      color: "var(--paper)",
-      opacity: .7
-    }
-  }, "logrados")))), esPasado && L.filter(x => !x.ok).length > 0 && /*#__PURE__*/React.createElement("button", {
-    className: "btn sec",
-    style: {
-      width: "100%",
-      marginBottom: 8
-    },
-    onClick: () => setMover({
-      ids: L.filter(x => !x.ok).map(x => x.id),
-      n: L.filter(x => !x.ok).length
-    })
-  }, "⏭ Mover los ", L.filter(x => !x.ok).length, " sin cumplir a otro mes"), /*#__PURE__*/React.createElement("button", {
-    className: "btn",
-    style: {
-      width: "100%",
-      marginBottom: 10
-    },
-    onClick: () => setF({
-      t: "",
-      est: "",
-      real: "",
-      nota: "",
-      area: area === "Todas" ? AREAS[0] : area,
-      mes: mes === "Todos" || esPasado ? mesActual : mes
-    })
-  }, "+ Agregar"), L.length === 0 && /*#__PURE__*/React.createElement("div", {
-    className: "card sub",
-    style: {
-      textAlign: "center"
-    }
-  }, "Nada para ", nombreLargo(mes), area !== "Todas" ? ` en ${area}` : "", "."), L.map(x => /*#__PURE__*/React.createElement("div", {
-    key: x.id,
-    className: "card row",
-    style: {
-      alignItems: "flex-start",
-      opacity: x.ok ? .55 : 1
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    className: "ck" + (x.ok ? " on" : ""),
-    onClick: () => setItems(items.map(y => y.id === x.id ? {
-      ...y,
-      ok: !y.ok,
-      fc: !y.ok ? hoy() : y.fc
-    } : y))
-  }, x.ok ? "✓" : ""), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    },
-    onClick: () => setF({
-      ...x,
-      mes: mesItem(x)
-    })
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 600,
-      textDecoration: x.ok ? "line-through" : "none"
-    }
-  }, x.t), /*#__PURE__*/React.createElement("div", {
-    className: "sub"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "pill",
-    style: {
-      background: "var(--gs)",
-      color: "var(--green)",
-      padding: "1px 7px"
-    }
-  }, x.area), " Estimado ", cop(x.est), x.real ? ` · Costó ${cop(x.real)}` : "", x.fc ? ` · ✓ ${x.fc.slice(5)}` : ""), (x.hist || []).length > 0 && /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      fontSize: 11,
-      color: "var(--tom)"
-    }
-  }, "⏭ Aplazado ", x.hist.length, " ", x.hist.length === 1 ? "vez" : "veces", ": ", x.hist.map(h => nombreMes(h.de)).join(" → "), " → ", nombreMes(mesItem(x))), x.nota && /*#__PURE__*/React.createElement("div", {
-    className: "sub"
-  }, x.nota)), !x.ok && /*#__PURE__*/React.createElement("button", {
-    className: "x",
-    title: "Mover de mes",
-    onClick: () => setMover({
-      ids: [x.id],
-      n: 1
-    })
-  }, "⏭"), /*#__PURE__*/React.createElement("button", {
-    className: "x",
-    onClick: () => del(x.id)
-  }, "×"))), f && /*#__PURE__*/React.createElement(Sheet, {
-    title: f.id ? "Editar" : "Nuevo por cumplir",
-    onClose: () => setF(null)
-  }, /*#__PURE__*/React.createElement("input", {
-    placeholder: "Qué quiero adquirir o lograr",
-    value: f.t,
-    onChange: e => setF({
-      ...f,
-      t: e.target.value
-    }),
-    style: {
-      marginBottom: 8
-    }
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "grid2",
-    style: {
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("select", {
-    value: f.area,
-    onChange: e => setF({
-      ...f,
-      area: e.target.value
-    })
-  }, AREAS.map(a => /*#__PURE__*/React.createElement("option", {
-    key: a
-  }, a))), /*#__PURE__*/React.createElement("input", {
-    type: "month",
-    value: f.mes,
-    onChange: e => setF({
-      ...f,
-      mes: e.target.value
-    })
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "grid2",
-    style: {
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "number",
-    inputMode: "numeric",
-    placeholder: "Precio estimado",
-    value: f.est,
-    onChange: e => setF({
-      ...f,
-      est: e.target.value
-    })
-  }), /*#__PURE__*/React.createElement("input", {
-    type: "number",
-    inputMode: "numeric",
-    placeholder: "Costó (cuando compres)",
-    value: f.real,
-    onChange: e => setF({
-      ...f,
-      real: e.target.value
-    })
-  })), /*#__PURE__*/React.createElement("textarea", {
-    rows: 2,
-    placeholder: "Nota (dónde, marca, para qué)",
-    value: f.nota,
-    onChange: e => setF({
-      ...f,
-      nota: e.target.value
-    }),
-    style: {
-      marginBottom: 10
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    className: "btn",
-    style: {
-      width: "100%"
-    },
-    onClick: guardar
-  }, "Guardar")), mover && /*#__PURE__*/React.createElement(Sheet, {
-    title: "Mover " + mover.n + (mover.n === 1 ? " pendiente" : " pendientes") + " a…",
-    onClose: () => setMover(null)
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "sub",
-    style: {
-      marginBottom: 10
-    }
-  }, "Queda registrado de qué mes venía y cuántas veces se aplazó."), futuros.map(m => /*#__PURE__*/React.createElement("button", {
-    key: m,
-    className: "btn sec",
-    style: {
-      width: "100%",
-      marginBottom: 6,
-      textTransform: "capitalize",
-      textAlign: "left"
-    },
-    onClick: () => aplazar(mover.ids, m)
-  }, nombreLargo(m), m === mesActual ? " · este mes" : ""))));
+  })(), tab === "plan" && /*#__PURE__*/React.createElement(Plan, null), tab === "tareas" && /*#__PURE__*/React.createElement(Tareas, null), LINEA_NAV.some(l => l[0] === tab) && /*#__PURE__*/React.createElement(Linea, { key: tab, k: tab }));
 }
 
 /* ===== PLAN DEL DÍA (correrías, rutina fuera de oficina) ===== */
@@ -3537,7 +3109,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
    este aviso, el teléfono podría quedarse meses con una versión vieja.
    Chequea cada 5 minutos y al volver a la app, comparando esta constante contra
    la del archivo en el servidor. */
-const VER='20260930-tres-lineas';
+const VER='20260930-nav-plan-pendientes';
 let _ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-_ultimoChequeo < 300000) return;
