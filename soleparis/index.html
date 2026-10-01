@@ -1078,6 +1078,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
                 <div class="ct">Creado ${new Date(p.creado_en).toLocaleDateString('es-CO')}${p.entregado_en?' · Entregado '+new Date(p.entregado_en).toLocaleDateString('es-CO'):''}</div>
               </div>
             </div>
+            <button class="btn-sm btn-line" onclick="App.pendEditar('${p.id}')">✎</button>
             ${admin?`<button class="btn-sm" style="background:#fbece9;color:#b3564b" onclick="App.pendBorrar('${p.id}')">🗑</button>`:''}
           </div>
         </div>`).join('')}`);
@@ -1092,6 +1093,14 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const p=(this._pend||[]).find(x=>x.id===id); if(!p) return;
     const hecho=!p.hecho;
     await this._patch('soleparis_pendientes?id=eq.'+encodeURIComponent(id), {hecho, entregado_en: hecho?new Date().toISOString():null});
+    this.vPendientes();
+  },
+  async pendEditar(id){
+    const p=(this._pend||[]).find(x=>x.id===id); if(!p) return;
+    const t=prompt('Editar pendiente', p.texto);
+    if(t===null) return;
+    const nuevo=t.trim(); if(!nuevo) return;
+    await this._patch('soleparis_pendientes?id=eq.'+encodeURIComponent(id), {texto:nuevo});
     this.vPendientes();
   },
   async pendBorrar(id){
