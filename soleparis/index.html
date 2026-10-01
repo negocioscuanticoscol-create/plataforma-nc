@@ -238,6 +238,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   entrarPublico(){ this.rol='publico'; sessionStorage.setItem('sole_rol','publico'); this._start(); },
   login(){
     const p=(document.getElementById('lg').value||'').trim();
+    if(!p){ this.entrarPublico(); return; }   // Entrar sin escribir clave = acceso público (solo Pendientes)
     const rol=this.PASS[p];
     if(!rol){ document.getElementById('lgerr').style.display='block'; return; }
     this.rol=rol; sessionStorage.setItem('sole_rol',rol); this._start();
