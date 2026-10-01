@@ -830,7 +830,13 @@ function Sheet({
 
 function PlanDeHoy() {
   const [planes] = usePersist("plan", {});
-  const HORAS = Array.from({ length: 13 }, (_, i) => String(5 + i).padStart(2, "0") + ":00");
+  const HORAS = Array.from({ length: 18 }, (_, i) => String(5 + i).padStart(2, "0") + ":00");
+  const horaLabel = h => {
+    const n = +h.slice(0, 2);
+    const ampm = n < 12 ? "am" : "pm";
+    const n12 = n % 12 === 0 ? 12 : n % 12;
+    return n12 + " " + ampm;
+  };
   const p = planes[hoy()] || {};
   const items = HORAS.filter(h => (p[h]?.t || "").trim());
   if (!items.length) return null;
@@ -842,7 +848,7 @@ function PlanDeHoy() {
       key: h,
       className: "sub",
       style: { textDecoration: p[h].ok ? "line-through" : "none" }
-    }, h, " · ", p[h].t))
+    }, horaLabel(h), " · ", p[h].t))
   );
 }
 function RespaldoDatos() {
@@ -1740,8 +1746,14 @@ function Plan() {
   const [planes, setPlanes] = usePersist("plan", {});
   const [f, setFecha] = useState(hoy());
   const HORAS = Array.from({
-    length: 13
+    length: 18
   }, (_, i) => String(5 + i).padStart(2, "0") + ":00");
+  const horaLabel = h => {
+    const n = +h.slice(0, 2);
+    const ampm = n < 12 ? "am" : "pm";
+    const n12 = n % 12 === 0 ? 12 : n % 12;
+    return n12 + " " + ampm;
+  };
   const p = planes[f] || {};
   const set = (h, k, v) => setPlanes({
     ...planes,
@@ -1756,7 +1768,7 @@ function Plan() {
   const llenas = HORAS.filter(h => (p[h]?.t || "").trim()).length,
     hechas = HORAS.filter(h => p[h]?.ok).length;
   const enviar = async () => {
-    const txt = `*Plan ${fmt(f)}*\n\n` + HORAS.filter(h => (p[h]?.t || "").trim()).map(h => `${h} · ${p[h].t}`).join("\n");
+    const txt = `*Plan ${fmt(f)}*\n\n` + HORAS.filter(h => (p[h]?.t || "").trim()).map(h => `${horaLabel(h)} · ${p[h].t}`).join("\n");
     try {
       if (navigator.share) await navigator.share({
         text: txt
@@ -1838,7 +1850,7 @@ function Plan() {
         fontSize: 13,
         color: "var(--grey)"
       }
-    }, h), /*#__PURE__*/React.createElement("input", {
+    }, horaLabel(h)), /*#__PURE__*/React.createElement("input", {
       placeholder: "Qué voy a hacer…",
       value: x.t || "",
       onChange: e => set(h, "t", e.target.value),
@@ -3069,6 +3081,35 @@ function Anhelos() {
     )
   );
 }
+/* ===== FAVORITOS (ingredientes que le gustan, misma lista de Mercado) ===== */
+function Favoritos() {
+  const [favs, setFavs] = usePersist("favoritos", []);
+  const cats = Object.keys(MERCADO_BASE);
+  const [cat, setCat] = useState("Todo");
+  const toggle = item => setFavs(favs.includes(item) ? favs.filter(x => x !== item) : [...favs, item]);
+  return /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("div", { className: "h2" }, "Favoritos"),
+    /*#__PURE__*/React.createElement("div", { className: "sub", style: { marginBottom: 8 } }, "Marca lo que te gusta. De aquí van a salir las recetas sugeridas."),
+    /*#__PURE__*/React.createElement("div", { className: "scrollx" },
+      ["Todo", ...cats].map(c => /*#__PURE__*/React.createElement("button", {
+        key: c, className: "chip" + (cat === c ? " on" : ""), onClick: () => setCat(c)
+      }, c))
+    ),
+    cats.filter(c => cat === "Todo" || c === cat).map(c =>
+      /*#__PURE__*/React.createElement("div", { key: c },
+        /*#__PURE__*/React.createElement("div", { style: { fontSize: 12, fontWeight: 700, color: "var(--green)", margin: "10px 0 4px", textTransform: "uppercase", letterSpacing: 1 } }, c),
+        /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } },
+          MERCADO_BASE[c].map(item => /*#__PURE__*/React.createElement("button", {
+            key: item,
+            className: "chip" + (favs.includes(item) ? " on" : ""),
+            onClick: () => toggle(item)
+          }, favs.includes(item) ? "✓ " : "", item))
+        )
+      )
+    ),
+    /*#__PURE__*/React.createElement("div", { className: "sub", style: { marginTop: 12 } }, favs.length, " favoritos marcados")
+  );
+}
 /* ===== LAS 3 LÍNEAS ===== */
 const LINEA_NAV = [["alimentacion", "🍎", "Alimentación"], ["salud", "🩺", "Salud"], ["libertad", "💰", "Libertad financiera"]];
 const LINEAS = {
@@ -3085,6 +3126,7 @@ function Linea({ k }) {
   const cfg = LINEAS[k];
   const [cajon, setCajon] = useState(cfg.cajones[0][0]);
   const vistas = {
+    favoritos: Favoritos,
     mercado: Mercado,
     gastos: Gastos,
     labs: Labs,
@@ -3109,7 +3151,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
    este aviso, el teléfono podría quedarse meses con una versión vieja.
    Chequea cada 5 minutos y al volver a la app, comparando esta constante contra
    la del archivo en el servidor. */
-const VER='20260930-nav-plan-pendientes';
+const VER='20260930-plan-horas-favoritos';
 let _ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-_ultimoChequeo < 300000) return;
