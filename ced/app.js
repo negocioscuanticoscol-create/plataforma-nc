@@ -480,6 +480,7 @@ const App = {
     const ROW1=[
       {v:'consulta', ic:'🔎', t:'Consulta'},
       {v:'crm', ic:'📇', t:'CRM'},
+      {v:'clientes', ic:'👥', t:'Clientes'},
       {v:'cotizaciones', ic:'📝', t:'Cotizar'},
       {v:'pedidos', ic:'📦', t:'Pedidos'},
       {v:'despachos', ic:'🚚', t:'Despachos'},
@@ -559,7 +560,7 @@ const App = {
      sacan de acá y se suben a ROW1/2/3. */
   _GRUPOS:{
     panel:[['panel','📈','Panel'],['dashboard','📊','Resultados']],
-    crm:[['crm','📇','CRM'],['clientes','👥','Clientes'],['cobertura','🗺️','Cobertura'],['territorio','🧭','Territorio'],['ventas','💰','Ventas'],['autopedido','🛒','Autopedido']],
+    crm:[['crm','📇','CRM'],['cobertura','🗺️','Cobertura'],['territorio','🧭','Territorio'],['ventas','💰','Ventas'],['autopedido','🛒','Autopedido']],
   },
   _grupoDe(view){ for(const g in this._GRUPOS){ if(this._GRUPOS[g].some(i=>i[0]===view)) return g; } return null; },
 
@@ -2533,35 +2534,37 @@ const App = {
 
   // Dashboard de Smart: lee SUS datos reales (leads del bot Valentina)
   /* 📋 Cuadro mensual — cada métrica en fila, meses en columna, Total */
-  _tablaMeses(meses, MM){
+  _tablaMeses(meses, MM, filas, nota){
     if(!meses||!meses.length) return '';
     const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     const nm=n=>Math.round(n||0).toLocaleString('es-CO');
+    const FMT={money:cl, num:nm};
     const NOM={ene:'Ene',feb:'Feb',mar:'Mar',abr:'Abr',may:'May',jun:'Jun',jul:'Jul',ago:'Ago',sep:'Sep',oct:'Oct',nov:'Nov',dic:'Dic'};
     const lbl=m=>{const q=String(m).split('-'); return (NOM[q[0]]||q[0]);};
-    const filas=[
-      {k:'kits', t:'🎟️ Kits', fmt:nm, tot:'sum'},
-      {k:'nuevos', t:'👥 Clientes nuevos', fmt:nm, tot:'sum'},
-      {k:'registrados', t:'📇 Clientes registrados', fmt:nm, tot:'last'},
-      {k:'recur', t:'🔁 Recurrentes', fmt:nm, tot:'sum'},
-      {k:'envases', t:'📦 Envases vendidos', fmt:nm, tot:'sum'},
-      {k:'ventas', t:'💰 Ventas del mes', fmt:cl, tot:'sum'},
-      {k:'ventasAcum', t:'📈 Ventas acumuladas', fmt:cl, tot:'last'},
-      {k:'mas300', t:'🎯 Clientes +$300k', fmt:nm, tot:'sum'},
+    filas = filas || [
+      {k:'kits', t:'🎟️ Kits', fmt:'num', tot:'sum'},
+      {k:'nuevos', t:'👥 Clientes nuevos', fmt:'num', tot:'sum'},
+      {k:'registrados', t:'📇 Clientes registrados', fmt:'num', tot:'last'},
+      {k:'recur', t:'🔁 Recurrentes', fmt:'num', tot:'sum'},
+      {k:'envases', t:'📦 Envases vendidos', fmt:'num', tot:'sum'},
+      {k:'ventas', t:'💰 Ventas del mes', fmt:'money', tot:'sum'},
+      {k:'ventasAcum', t:'📈 Ventas acumuladas', fmt:'money', tot:'last'},
+      {k:'mas300', t:'🎯 Clientes +$300k', fmt:'num', tot:'sum'},
     ];
     const cel='padding:7px 9px;border-bottom:1px solid var(--linea);font-size:12.5px;text-align:right;white-space:nowrap';
     const th='padding:8px 9px;border-bottom:2px solid var(--linea);font-size:11px;color:var(--suave);text-transform:uppercase;letter-spacing:.04em;text-align:right;white-space:nowrap';
     const head=`<th style="${th};text-align:left;position:sticky;left:0;background:#fff">Métrica</th>`+meses.map(m=>`<th style="${th}">${lbl(m)}</th>`).join('')+`<th style="${th};color:var(--naranja)">Total</th><th style="${th};color:var(--suave)">Prom</th>`;
     const body=filas.map(f=>{
+      const fmt=FMT[f.fmt]||nm;
       const tot = f.tot==='last' ? (+MM[meses[meses.length-1]][f.k]||0) : meses.reduce((a,m)=>a+(+MM[m][f.k]||0),0);
       const prom = meses.length ? meses.reduce((a,m)=>a+(+MM[m][f.k]||0),0)/meses.length : 0;
       return `<tr><td style="${cel};text-align:left;font-weight:700;position:sticky;left:0;background:#fff">${f.t}</td>`+
-        meses.map(m=>`<td style="${cel}">${f.fmt(MM[m][f.k])}</td>`).join('')+
-        `<td style="${cel};font-weight:800;color:var(--naranja)">${f.fmt(tot)}</td><td style="${cel};color:var(--suave)">${f.fmt(prom)}</td></tr>`;
+        meses.map(m=>`<td style="${cel}">${fmt(MM[m][f.k])}</td>`).join('')+
+        `<td style="${cel};font-weight:800;color:var(--naranja)">${fmt(tot)}</td><td style="${cel};color:var(--suave)">${fmt(prom)}</td></tr>`;
     }).join('');
     return `<div class="card" style="overflow-x:auto"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px"><h2 style="font-size:15px">📋 Cuadro mensual</h2><button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="window.print()">🖨️ Imprimir</button></div>
       <table style="border-collapse:collapse;min-width:100%">${''}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
-      <div style="font-size:11px;color:var(--suave);margin-top:6px">Ene y feb: kits del Sheet Envios · lo demás automático por la app. “+$300k” y recurrentes: desde marzo (detalle en la base).</div></div>`;
+      <div style="font-size:11px;color:var(--suave);margin-top:6px">${nota||'Ene y feb: kits del Sheet Envios · lo demás automático por la app. “+$300k” y recurrentes: desde marzo (detalle en la base).'}</div></div>`;
   },
   /* 📊 gráfica de barras mensual (dibujada a mano, sin librerías) */
   _chartMeses(titulo, emoji, series, color){
@@ -2650,9 +2653,42 @@ const App = {
     this.loading();
     const { data:cli=[] } = await this.sb.from('clientes').select('*').order('creado_en',{ascending:false});
     this._cliCache = cli;
-    // pedidos por cliente (para la línea de embudo + bolitas por mes)
-    let peds=[]; try{ const r=await this.sb.from('pedidos').select('cliente_id,creado_en,estado,es_muestra'); peds=r.data||[]; }catch(e){}
-    const byCli={}; peds.forEach(p=>{ if(!p.cliente_id||p.estado==='anulado'||p.es_muestra) return; const mes=(p.creado_en||'').slice(0,7); (byCli[p.cliente_id]=byCli[p.cliente_id]||{m:new Set(),n:0}); byCli[p.cliente_id].m.add(mes); byCli[p.cliente_id].n++; });
+    // pedidos por cliente (para la línea de embudo + bolitas por mes) y para el cuadro mensual
+    let peds=[]; try{ const r=await this.sb.from('pedidos').select('cliente_id,creado_en,estado,es_muestra,total,pares'); peds=r.data||[]; }catch(e){}
+    const byCli={};
+    const _M3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const _mNum=m=>{const q=String(m).split('-');const i=_M3.indexOf(q[0]);return i<0?0:(+q[1]||0)*12+i;};
+    const _first={}, _pedBy={}, _ventBy={}, _paresBy={};
+    peds.forEach(p=>{
+      if(!p.cliente_id||p.estado==='anulado'||p.es_muestra) return;
+      const mes=(p.creado_en||'').slice(0,7); (byCli[p.cliente_id]=byCli[p.cliente_id]||{m:new Set(),n:0}); byCli[p.cliente_id].m.add(mes); byCli[p.cliente_id].n++;
+      const dt=new Date(p.creado_en); if(isNaN(dt)) return;
+      const mk=_M3[dt.getMonth()]+'-'+dt.getFullYear(), o=_mNum(mk);
+      if(!_first[p.cliente_id]||o<_first[p.cliente_id].o) _first[p.cliente_id]={o,mes:mk};
+      _pedBy[mk]=(_pedBy[mk]||0)+1; _ventBy[mk]=(_ventBy[mk]||0)+(+p.total||0); _paresBy[mk]=(_paresBy[mk]||0)+(+p.pares||0);
+    });
+    const _recurSet={};
+    peds.forEach(p=>{
+      if(!p.cliente_id||p.estado==='anulado'||p.es_muestra) return;
+      const dt=new Date(p.creado_en); if(isNaN(dt)) return;
+      const mk=_M3[dt.getMonth()]+'-'+dt.getFullYear(), o=_mNum(mk), f=_first[p.cliente_id];
+      if(f && f.o<o) (_recurSet[mk]=_recurSet[mk]||new Set()).add(p.cliente_id);
+    });
+    const _nuevoBy={}; Object.values(_first).forEach(f=>{ _nuevoBy[f.mes]=(_nuevoBy[f.mes]||0)+1; });
+    const _meses=[...new Set([...Object.keys(_pedBy),...Object.keys(_nuevoBy)])].sort((a,b)=>_mNum(a)-_mNum(b));
+    const _MM={}; let _regAcc=0, _ventAcc=0;
+    _meses.forEach(m=>{ _regAcc+=(_nuevoBy[m]||0); _ventAcc+=(_ventBy[m]||0);
+      _MM[m]={ pedidos:_pedBy[m]||0, nuevos:_nuevoBy[m]||0, registrados:_regAcc, recur:(_recurSet[m]&&_recurSet[m].size)||0, pares:_paresBy[m]||0, ventas:_ventBy[m]||0, ventasAcum:_ventAcc };
+    });
+    const _cedFilas=[
+      {k:'pedidos', t:'📦 Pedidos del mes', fmt:'num', tot:'sum'},
+      {k:'nuevos', t:'👥 Clientes nuevos', fmt:'num', tot:'sum'},
+      {k:'registrados', t:'📇 Clientes registrados', fmt:'num', tot:'last'},
+      {k:'recur', t:'🔁 Recurrentes', fmt:'num', tot:'sum'},
+      {k:'pares', t:'👟 Pares vendidos', fmt:'num', tot:'sum'},
+      {k:'ventas', t:'💰 Ventas del mes', fmt:'money', tot:'sum'},
+      {k:'ventasAcum', t:'📈 Ventas acumuladas', fmt:'money', tot:'last'},
+    ];
     this._pedsByCliFeroz=byCli;
     const fmt=n=>n!=null?('$'+(+n).toLocaleString('es-CO')):'';
     const tab=this._cliTab||'nc'; this._cliTab=tab;
@@ -2661,6 +2697,7 @@ const App = {
     const grupo=reales.filter(c=> tab==='gpjr' ? (!!c.recomendado&&!c.especial) : tab==='esp' ? !!c.especial : (!c.recomendado&&!c.especial));
     this.set(`
       <h1>Clientes</h1><div class="sub"><b>${reales.length}</b> clientes (ya compraron) · los <b>prospectos</b> están en CRM → 🎯 Prospectos</div>
+      ${this._tablaMeses(_meses,_MM,_cedFilas,'Solo pedidos reales (sin muestras) · pedidos, nuevos, recurrentes y $ calculados en vivo desde la base.')}
       <button class="btn-sm" style="background:#fff;border:1.5px solid var(--naranja);color:var(--naranja);margin-bottom:10px;width:100%;padding:10px" onclick="App.modalComisiones()">💰 Tabla de comisiones (referencia × lista)</button>
       <div style="display:flex;gap:6px;margin-bottom:10px">
         <button class="btn-sm" style="flex:1;padding:11px;font-weight:700;background:${tab==='nc'?'var(--naranja);color:#fff':'#e5e7eb'}" onclick="App.cliTab('nc')">👤 NC (${nNC})</button>
