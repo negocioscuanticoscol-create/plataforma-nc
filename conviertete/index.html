@@ -428,22 +428,22 @@ const usePersist = (k, d) => {
 const MENU = [{
   d: "Huevos revueltos con tocino + ½ aguacate",
   a: "Bolsa 12 · Pechuga a la plancha con ajo + orzo + brócoli",
-  c: "Atún en lata con limón, cebolla morada y cilantro",
+  c: "Atún en lata con limón, cebolla morada y cilantro sobre lechuga",
   j: "A"
 }, {
-  d: "Tortilla de huevo con jamón serrano + piña",
+  d: "Tortilla de huevo con jamón serrano + piña en cubos",
   a: "Bolsa 1 · Punta de anca + yuca + tomate, aguacate y cebolla morada",
-  c: "Salmón a la plancha con limón + espinaca",
+  c: "Salmón a la plancha con limón y pimienta + espinaca salteada",
   j: "B"
 }, {
-  d: "Aguacate relleno de huevo revuelto con tocino",
+  d: "Aguacate relleno de huevo revuelto con tocino picadito",
   a: "Bolsa 7 · Lomo de cerdo al horno + quinua + habichuela con zanahoria",
   c: "Mero al horno con limón, ajo y romero + tomate asado",
   j: "A"
 }, {
   d: "Yogur natural con piña + 1 huevo cocido",
   a: "Bolsa 3 · Morrillo sudado con hogao + plátano maduro + arveja",
-  c: "Salmón al vapor con limón y eneldo + pepino",
+  c: "Salmón al vapor con limón y eneldo + pepino en rodajas",
   j: "B"
 }, {
   d: "Huevo frito con 2 tiras de tocino + piña asada",
@@ -451,34 +451,34 @@ const MENU = [{
   c: "Mero a la plancha con limón + brócoli al vapor",
   j: "A"
 }, {
-  d: "Tortilla rellena de jamón serrano y aguacate",
+  d: "Tortilla rellena de jamón serrano y aguacate, tipo taco",
   a: "Bolsa 9 · Pierna de cerdo asada + orzo + pimentón y cebolla asados",
-  c: "Atún fresco sellado con limón y sal gruesa",
+  c: "Atún fresco sellado vuelta y vuelta con limón y sal gruesa",
   j: "B"
 }, {
   d: "Huevos revueltos con aguacate + yogur con piña",
   a: "Bolsa 11 · Costilla al horno + yuca al horno + brócoli con queso",
-  c: "Atún en lata con limón, cebolla morada y cilantro",
+  c: "Atún en lata con limón, cebolla morada y cilantro sobre lechuga",
   j: "A"
 }, {
   d: "Huevos revueltos con tocino + ½ aguacate",
   a: "Bolsa 13 · Pechuga a la plancha + quinua + habichuela con zanahoria",
-  c: "Atún en lata con limón, cebolla morada y cilantro",
+  c: "Atún en lata con limón, cebolla morada y cilantro sobre lechuga",
   j: "B"
 }, {
-  d: "Tortilla de huevo con jamón serrano + piña",
+  d: "Tortilla de huevo con jamón serrano + piña en cubos",
   a: "Bolsa 4 · Morrillo sudado con hogao + yuca + tomate y cebolla morada",
-  c: "Salmón a la plancha con limón + espinaca",
+  c: "Salmón a la plancha con limón y pimienta + espinaca salteada",
   j: "A"
 }, {
-  d: "Aguacate relleno de huevo revuelto con tocino",
+  d: "Aguacate relleno de huevo revuelto con tocino picadito",
   a: "Bolsa 14 · Pechuga al horno con ajo + plátano maduro + brócoli",
   c: "Mero al horno con limón, ajo y romero + tomate asado",
   j: "B"
 }, {
   d: "Yogur natural con piña + 1 huevo cocido",
   a: "Bolsa 6 · Ternera a la plancha + orzo + pimentón y cebolla asados",
-  c: "Salmón al vapor con limón y eneldo + pepino",
+  c: "Salmón al vapor con limón y eneldo + pepino en rodajas",
   j: "A"
 }, {
   d: "Huevo frito con 2 tiras de tocino + piña asada",
@@ -486,19 +486,19 @@ const MENU = [{
   c: "Mero a la plancha con limón + brócoli al vapor",
   j: "B"
 }, {
-  d: "Tortilla rellena de jamón serrano y aguacate",
+  d: "Tortilla rellena de jamón serrano y aguacate, tipo taco",
   a: "Bolsa 2 · Punta de anca + yuca al horno + arveja con zanahoria",
-  c: "Atún fresco sellado con limón y sal gruesa",
+  c: "Atún fresco sellado vuelta y vuelta con limón y sal gruesa",
   j: "A"
 }, {
   d: "Huevos revueltos con aguacate + yogur con piña",
   a: "Bolsa 10 · Pierna de cerdo asada + orzo + brócoli con queso",
-  c: "Atún en lata con limón, cebolla morada y cilantro",
+  c: "Atún en lata con limón, cebolla morada y cilantro sobre lechuga",
   j: "B"
 }, {
   d: "Huevos revueltos con tocino + ½ aguacate",
   a: "Bolsa 15 · Pechuga a la plancha + lentejas + tomate y aguacate",
-  c: "Atún en lata con limón, cebolla morada y cilantro",
+  c: "Atún en lata con limón, cebolla morada y cilantro sobre lechuga",
   j: "A"
 }];
 const JUGO = {
@@ -548,13 +548,6 @@ const RUTINA = [{
   h: "6:00",
   ico: "💬",
   t: "Mensaje a mis hijas"
-}, {
-  id: "llamada",
-  h: "6:30",
-  ico: "📱",
-  t: "Llamada a mis hijas",
-  sub: "jueves",
-  dias: [4]
 }, {
   id: "desayuno",
   h: "6:45",
@@ -615,6 +608,13 @@ const RUTINA = [{
   ico: "🤖",
   t: "Estructura IA clientes + redes",
   sub: "5 – 7"
+}, {
+  id: "llamada",
+  h: "17:30",
+  ico: "📱",
+  t: "Llamada a mis hijas",
+  sub: "martes y jueves",
+  dias: [2, 4]
 }, {
   id: "cena",
   h: "19:00",
@@ -1904,7 +1904,13 @@ function Plan() {
 /* ===== PENDIENTES (tareas, por persona) ===== */
 function Tareas() {
   const [t, setT] = usePersist("tareas", []);
-  const [pers, setPers] = usePersist("tareas_personas", ["Yo", "Empleada"]);
+  const [pers, setPers] = usePersist("tareas_personas", ["Yo", "Negocios Cuánticos", "Empleada"]);
+  useEffect(() => {
+    if (!pers.includes("Negocios Cuánticos")) {
+      const i = pers.indexOf("Yo");
+      setPers(i === -1 ? [...pers, "Negocios Cuánticos"] : [...pers.slice(0, i + 1), "Negocios Cuánticos", ...pers.slice(i + 1)]);
+    }
+  }, []);
   const [q, setQ] = useState("Yo");
   const [nuevo, setNuevo] = useState("");
   const ahora = () => {
@@ -3139,6 +3145,30 @@ function Favoritos() {
     /*#__PURE__*/React.createElement("div", { className: "sub", style: { marginTop: 12 } }, favs.length, " favoritos marcados")
   );
 }
+/* ===== RECETAS (rotación real de desayunos y cenas) ===== */
+function Recetas() {
+  const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+  const desayunos = MENU.slice(0, 7).map(m => m.d);
+  const cenas = MENU.slice(0, 7).map(m => m.c);
+  const Fila = (dia, texto) => /*#__PURE__*/React.createElement("div", {
+    key: dia, className: "card row", style: { padding: "8px 12px", marginBottom: 6 }
+  }, /*#__PURE__*/React.createElement("div", { style: { width: 72, fontWeight: 700, fontSize: 13, color: "var(--grey)" } }, dia),
+    /*#__PURE__*/React.createElement("div", { style: { flex: 1 } }, texto));
+  return /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("div", { className: "h2" }, "Recetas"),
+    /*#__PURE__*/React.createElement("div", { className: "sub", style: { marginBottom: 8 } }, "Tu rotación de la semana. Hoy te la muestra el día que toca."),
+    /*#__PURE__*/React.createElement("div", { className: "card", style: { marginBottom: 8 } },
+      /*#__PURE__*/React.createElement("b", null, "🌅 Desayunos"),
+      /*#__PURE__*/React.createElement("div", { className: "sub" }, "Medio aguacate, 2 tiras de tocino o 3 lonchas de serrano — nunca los dos el mismo día. Se repiten cada semana.")
+    ),
+    DIAS.map((dia, i) => Fila(dia, desayunos[i])),
+    /*#__PURE__*/React.createElement("div", { className: "card", style: { margin: "14px 0 8px" } },
+      /*#__PURE__*/React.createElement("b", null, "🌙 Cenas"),
+      /*#__PURE__*/React.createElement("div", { className: "sub" }, "Solo pescado, 200 g y limón. Nada frito, nada cremoso, mínimo 3 horas antes de dormir.")
+    ),
+    DIAS.map((dia, i) => Fila(dia, cenas[i]))
+  );
+}
 /* ===== LAS 3 LÍNEAS ===== */
 const LINEA_NAV = [["alimentacion", "🍎", "Alimentación"], ["salud", "🩺", "Salud"], ["libertad", "💰", "Libertad financiera"]];
 const LINEAS = {
@@ -3156,6 +3186,7 @@ function Linea({ k }) {
   const [cajon, setCajon] = useState(cfg.cajones[0][0]);
   const vistas = {
     favoritos: Favoritos,
+    recetas: Recetas,
     mercado: Mercado,
     gastos: Gastos,
     labs: Labs,
@@ -3180,7 +3211,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
    este aviso, el teléfono podría quedarse meses con una versión vieja.
    Chequea cada 5 minutos y al volver a la app, comparando esta constante contra
    la del archivo en el servidor. */
-const VER='20260930-plan-fijo-carnes';
+const VER='20260930-recetas-llamada-nc';
 let _ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-_ultimoChequeo < 300000) return;
