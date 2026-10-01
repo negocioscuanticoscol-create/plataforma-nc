@@ -108,6 +108,7 @@
     <input id="lg" type="password" placeholder="Clave" onkeydown="if(event.key==='Enter')App.login()">
     <button class="btn btn-main" onclick="App.login()">Entrar</button>
     <div class="err" id="lgerr">Clave incorrecta</div>
+    <div style="margin-top:16px"><a href="javascript:void(0)" onclick="App.entrarPublico()" style="font-size:12.5px;color:var(--muted)">Ver pendientes, sin clave →</a></div>
   </div>
 </div>
 
@@ -126,9 +127,14 @@
 
 <script>
 const App = {
-  // 1 admin (ve todo) + 5 claves de cliente (solo Starting Point)
+  // NC (admin/gerencia) ve todo + 5 claves de cliente (solo Starting Point).
   /* 'ncdemo2026' es la clave de PRESENTACIÓN: la misma en todas las apps de NC,
      para mostrarle la plataforma a un cliente sin repartir las claves reales. */
+  /* 30-sep-2026, Jose: roles reservados para el equipo — gerente, doctora,
+     mercadeo, ventas, administracion — TODAVÍA sin clave asignada, por eso
+     no están en PASS: hoy no tienen forma de entrar. Cuando se definan,
+     se agregan aquí como 'suclave':'nombre_rol' y se les da acceso en
+     pintarNav()/go() como se hizo con 'publico'. */
   PASS:{ 'soleadmin2026':'admin', 'solegerencia2026':'gerencia', 'ncdemo2026':'gerencia', 'soleparis1':'cliente','soleparis2':'cliente','soleparis3':'cliente','soleparis4':'cliente','soleparis5':'cliente' },
   CATS:['Facial','Capilar','Corporal','Ojos','Labios','Kit','Tarjeta'],
   rol:'', view:'inicio', _cat:'', _editId:null,
@@ -227,6 +233,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   },
 
   /* ---------- acceso ---------- */
+  /* 30-sep-2026: "público" entra sin clave y solo ve Pendientes — para el
+     equipo que todavía no tiene un rol/clave asignado. */
+  entrarPublico(){ this.rol='publico'; sessionStorage.setItem('sole_rol','publico'); this._start(); },
   login(){
     const p=(document.getElementById('lg').value||'').trim();
     const rol=this.PASS[p];
@@ -246,22 +255,25 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   },
 
   pintarNav(){
-    // Cliente: SOLO Starting Point. Admin: toda la botonería.
+    // Cliente: SOLO Starting Point. Público: SOLO Pendientes. Admin (NC): toda la botonería.
     const TABS = this.esAdmin()
-      ? [['resultados','📊','Resultados'],['panel','📈','Panel'],['productos','🧴','Productos'],['catalogo','📋','Catálogo'],['stock','🏬','Stock'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['pedidos','📦','Pedidos'],['despachos','🚚','Despachos'],['cartera','💳','Cartera'],['crm','📇','CRM'],['capacitacion','🎓','Capacitación'],['casos','⭐','Casos de éxito'],['fidelizacion','💛','Fidelización']]
+      ? [['resultados','📊','Dashboard'],['panel','📈','Panel'],['catalogo','📋','Catálogo'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['ventas','💹','Ventas'],['crm','📇','CRM'],['capacitacion','🎓','Capacitación'],['casos','⭐','Casos de éxito'],['fidelizacion','💛','Fidelización'],['pendientes','📋','Pendientes']]
+      : this.rol==='publico' ? [['pendientes','📋','Pendientes']]
       : [['inicio','✦','Starting Point']];
     document.getElementById('nav').innerHTML = TABS.map(([v,ic,t])=>
       `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
   },
   go(view){
-    if(!this.esAdmin() && view!=='inicio') view='inicio';
-    if(this.esAdmin() && view==='inicio') view='resultados';   // admin ya no usa Starting
+    if(this.rol==='publico') view='pendientes';
+    else if(!this.esAdmin() && view!=='inicio') view='inicio';
+    else if(this.esAdmin() && view==='inicio') view='resultados';   // admin ya no usa Starting
     this.view=view;
     document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active', b.dataset.v===view));
     window.scrollTo(0,0);
     ({inicio:this.vInicio, resultados:this.vResultados, panel:this.vPanel, productos:this.vProductos, catalogo:this.vCatalogo,
-      stock:this.vStock, clientes:this.vClientes, cotizar:this.vCotizar, pedidos:this.vPedidos, despachos:this.vDespachos,
-      cartera:this.vCartera, crm:this.vCrm, capacitacion:this.vCapacitacion, casos:this.vCasos, fidelizacion:this.vFidelizacion}[view]||this.vInicio).call(this);
+      stock:this.vStock, clientes:this.vClientes, cotizar:this.vCotizar, ventas:this.vVentas,
+      crm:this.vCrm, capacitacion:this.vCapacitacion, casos:this.vCasos, fidelizacion:this.vFidelizacion,
+      pendientes:this.vPendientes}[view]||this.vInicio).call(this);
   },
   set(html){ document.getElementById('main').innerHTML = html; },
   fmt(n){ return '$'+Math.round(+n||0).toLocaleString('es-CO'); },
@@ -1008,10 +1020,76 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   async casoDel(id){ if(!confirm('¿Quitar este caso?'))return;
     await this._delq('soleparis_casos?id=eq.'+id); this.vCasos(); },
 
-  vPedidos(){ this._soon('📦','Pedidos','Aquí verás los pedidos confirmados de cada cliente.'); },
-  vDespachos(){ this._soon('🚚','Despachos','Seguimiento de envíos y entregas.'); },
-  vCartera(){ this._soon('💳','Cartera','Estado de pagos y cartera por cliente.'); },
-  vCrm(){ this._soon('📇','CRM','Seguimiento comercial y recompra.'); },
+  _crmCaj:'piedra',
+  crmCaj(c){ this._crmCaj=c; this.vCrm(); },
+  vCrm(){
+    const CAJ=[['piedra','🪨','Piedra angular'],['casos','⭐','Casos de éxito'],['vendedores','🧑‍💼','Vendedores de catálogo'],['superficies','🏬','Grandes superficies'],['nichos','🎯','Nichos'],['especialistas','🩺','Especialistas']];
+    const actual=CAJ.find(([k])=>k===this._crmCaj)||CAJ[0];
+    this.set(`<h1>CRM</h1>
+      <div class="sub">Seguimiento comercial por frente. A cada cajón le falta definir su fuente de datos.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        ${CAJ.map(([k,ic,t])=>`<button class="btn gh2" onclick="App.crmCaj('${k}')"
+          style="padding:8px 14px;font-size:13px${this._crmCaj===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${ic} ${t}</button>`).join('')}
+      </div>
+      <div class="card" style="text-align:center;padding:30px;color:var(--faint)">🚧 ${actual[2]} — por definir de dónde sale la información y cómo se alimenta.</div>`);
+  },
+  _ventasCaj:'landing',
+  ventasCaj(c){ this._ventasCaj=c; this.vVentas(); },
+  vVentas(){
+    const CAJ=[['landing','🖥️','Por landing page'],['mayor','📦','Al por mayor']];
+    const actual=CAJ.find(([k])=>k===this._ventasCaj)||CAJ[0];
+    this.set(`<h1>Ventas</h1>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+        ${CAJ.map(([k,ic,t])=>`<button class="btn gh2" onclick="App.ventasCaj('${k}')"
+          style="padding:8px 14px;font-size:13px${this._ventasCaj===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${ic} ${t}</button>`).join('')}
+      </div>
+      <div class="card" style="text-align:center;padding:30px;color:var(--faint)">🚧 ${actual[2]} — por armar.</div>`);
+  },
+
+  /* ---------- PENDIENTES (lo único que ve "público", sin clave) ---------- */
+  async vPendientes(){
+    const items=await this._get('soleparis_pendientes?order=creado_en.desc');
+    this._pend=items;
+    const admin=this.esAdmin();
+    this.set(`<h1>Pendientes</h1>
+      <div class="sub">${items.filter(p=>!p.hecho).length} por hacer · ${items.filter(p=>p.hecho).length} entregados</div>
+      <div class="card">
+        <div style="display:flex;gap:8px">
+          <input id="pend_txt" class="field" placeholder="Nuevo pendiente…" style="flex:1" onkeydown="if(event.key==='Enter')App.pendAgregar()">
+          <button class="btn-sm btn-ink" onclick="App.pendAgregar()">＋</button>
+        </div>
+      </div>
+      ${!items.length?'<div class="empty">Sin pendientes todavía.</div>':items.map(p=>`
+        <div class="prod" style="opacity:${p.hecho?.55:1}">
+          <div class="top" style="align-items:flex-start">
+            <div style="display:flex;gap:10px;align-items:flex-start;flex:1">
+              <input type="checkbox" ${p.hecho?'checked':''} onchange="App.pendToggle('${p.id}')" style="margin-top:3px;width:18px;height:18px">
+              <div>
+                <div class="nm" style="text-decoration:${p.hecho?'line-through':'none'}">${this.esc(p.texto)}</div>
+                <div class="ct">Creado ${new Date(p.creado_en).toLocaleDateString('es-CO')}${p.entregado_en?' · Entregado '+new Date(p.entregado_en).toLocaleDateString('es-CO'):''}</div>
+              </div>
+            </div>
+            ${admin?`<button class="btn-sm" style="background:#fbece9;color:#b3564b" onclick="App.pendBorrar('${p.id}')">🗑</button>`:''}
+          </div>
+        </div>`).join('')}`);
+  },
+  async pendAgregar(){
+    const el=document.getElementById('pend_txt'); const t=(el.value||'').trim();
+    if(!t) return;
+    await this._post('soleparis_pendientes',{id:'pd'+Date.now(), texto:t, hecho:false, creado_en:new Date().toISOString()});
+    this.vPendientes();
+  },
+  async pendToggle(id){
+    const p=(this._pend||[]).find(x=>x.id===id); if(!p) return;
+    const hecho=!p.hecho;
+    await this._patch('soleparis_pendientes?id=eq.'+encodeURIComponent(id), {hecho, entregado_en: hecho?new Date().toISOString():null});
+    this.vPendientes();
+  },
+  async pendBorrar(id){
+    if(!confirm('¿Borrar este pendiente?'))return;
+    await this._delq('soleparis_pendientes?id=eq.'+encodeURIComponent(id));
+    this.vPendientes();
+  },
 
   /* ---------- STARTING POINT ---------- */
   vInicio(){
@@ -1118,19 +1196,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
 
   /* ---------- RESULTADOS (solo admin) ---------- */
   vResultados(){
-    const arr=this._diag||[];
-    this.set(`<h1>Resultados</h1><div class="sub">${arr.length} diagnóstico${arr.length===1?'':'s'} · visible solo para admin</div>
-      ${arr.length? arr.map(d=>`<div class="prod">
-        <div class="top"><div><div class="nm">${this.esc(d.nombre)}</div><div class="ct">${this.esc(d.cargo||'')}${d.area?' · '+this.esc(d.area):''}</div></div>
-        <div class="pv" style="font-size:13px"><span class="pchip" style="background:var(--accent-soft);color:var(--accent2)">IA ${this.esc(d.perfil)} · ${d.puntaje_ia}/18</span></div></div>
-        <div class="meta"><span class="pchip ${d.madurez==='Datos ordenados'?'stock':'cost'}">${this.esc(d.madurez)} · ${d.puntaje_datos}/12</span>${d.esceptico?'<span class="pchip cost">⚠ Escéptico</span>':''}</div>
-        <div style="font-size:13px;color:var(--ink);margin-top:10px;line-height:1.55;background:var(--accent-soft);border-radius:8px;padding:11px 13px"><b>Cómo abordarlo:</b> ${this.esc(d.clave_lectura||'')}</div>
-        ${d.funciones?`<div style="font-size:12.5px;color:var(--faint);margin-top:7px">Funciones: ${this.esc(d.funciones)}</div>`:''}
-        ${d.software?`<div style="font-size:12.5px;color:var(--faint);margin-top:4px">Software hoy: 📦 ${this.esc(d.software.inventarios||'—')} · 🧾 ${this.esc(d.software.pedidos||'—')} · 📤 ${this.esc(d.software.picking||'—')} · 🚚 ${this.esc(d.software.delivery||'—')} · 🧮 ${this.esc(d.software.cotizaciones||'—')} · 📇 ${this.esc(d.software.leads||'—')}</div>`:''}
-        ${d.canales?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Ventas x canal: 🏪 ${this.esc(d.canales.pdv||'—')} · 🌐 ${this.esc(d.canales.web||'—')} · 💬 ${this.esc(d.canales.whatsapp||'—')} · 📸 ${this.esc(d.canales.redes||'—')} · 🛒 ${this.esc(d.canales.marketplaces||'—')} · 🤝 ${this.esc(d.canales.distribuidores||'—')} · 🏭 ${this.esc(d.canales.maquilas||'—')} · 🏢 ${this.esc(d.canales.fabrica||'—')}</div>`:''}
-        ${d.ventas_mes?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Ventas mes: 📅 actual ${this.esc(d.ventas_mes.actual||'—')} · anterior ${this.esc(d.ventas_mes.anterior||'—')} · hace 2 ${this.esc(d.ventas_mes.hace2||'—')}</div>`:''}
-        ${d.preocupacion?`<div style="font-size:12.5px;color:var(--faint);margin-top:3px">Le preocupa: ${this.esc(d.preocupacion)}</div>`:''}
-      </div>`).join('') : '<div class="empty">Aún nadie ha llenado el diagnóstico. Cuando los invitados entren con su clave y lo completen, aparecen aquí.</div>'}`);
+    this.set(`<h1>Dashboard</h1><div class="sub">Por armar.</div>`);
   },
 
   /* ---------- PANEL ---------- */
@@ -1327,7 +1393,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     this.toast('Todo borrado'); this.go('inicio');
   }
 };
-(function(){ const r=sessionStorage.getItem('sole_rol'); if(r&&Object.values(App.PASS).includes(r)){ App.rol=r; App._start(); } else { setTimeout(()=>{const e=document.getElementById('lg');if(e)e.focus();},80); } })();
+(function(){ const r=sessionStorage.getItem('sole_rol'); if(r&&(r==='publico'||Object.values(App.PASS).includes(r))){ App.rol=r; App._start(); } else { setTimeout(()=>{const e=document.getElementById('lg');if(e)e.focus();},80); } })();
 </script>
 
 <!-- Bloc de notas y Horas de Sole Paris. Al migrar la clienta a su propia cuenta,
