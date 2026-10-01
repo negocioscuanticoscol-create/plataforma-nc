@@ -1901,6 +1901,26 @@ function Plan() {
   }));
 }
 
+const NC_PENDIENTES_SEED = [
+  "Tecnomecánica",
+  "Revisar SOAT carros",
+  "Impuestos FES",
+  "Revisar impuestos carros",
+  "Cuentas y bancos: cuadrar FES",
+  "Lista de precios cliente final · calzado",
+  "Cierre de Smart, Feroz, FES y Colchones",
+  "Entregar set de Avenida 68 y Tolima",
+  "Entregar Lupe a distribuidores que nos compraron",
+  "Legalización de giros · pendiente 196659",
+  "Aplicaciones Negocios Cuánticos: Búho, Lupe, Sabueso, Pulpo y Elefante",
+  "Base de datos nuevas",
+  "Listado de pendientes de Solé",
+  "Modificaciones de cotización",
+  "Enviar tarjeta débito a Ibagué",
+  "Organizar app Solé",
+  "Instalar multitoma",
+  "Organizar búsqueda de cotización en las apps"
+];
 /* ===== PENDIENTES (tareas, por persona) ===== */
 function Tareas() {
   const [t, setT] = usePersist("tareas", []);
@@ -1911,12 +1931,20 @@ function Tareas() {
       setPers(i === -1 ? [...pers, "Negocios Cuánticos"] : [...pers.slice(0, i + 1), "Negocios Cuánticos", ...pers.slice(i + 1)]);
     }
   }, []);
-  const [q, setQ] = useState("Yo");
-  const [nuevo, setNuevo] = useState("");
   const ahora = () => {
     const d = new Date();
     return d.toISOString().slice(0, 10) + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
   };
+  useEffect(() => {
+    const yaEstan = new Set(t.filter(x => (x.q || "Yo") === "Negocios Cuánticos").map(x => x.t));
+    const faltan = NC_PENDIENTES_SEED.filter(x => !yaEstan.has(x));
+    if (faltan.length) {
+      const base = Date.now();
+      setT([...faltan.map((x, i) => ({ id: base + i, t: x, q: "Negocios Cuánticos", creada: ahora(), ok: false, cumplida: null })), ...t]);
+    }
+  }, []);
+  const [q, setQ] = useState("Yo");
+  const [nuevo, setNuevo] = useState("");
   const agregar = () => {
     const x = nuevo.trim();
     if (!x) return;
@@ -3150,9 +3178,10 @@ function Recetas() {
   const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
   const desayunos = MENU.slice(0, 7).map(m => m.d);
   const cenas = MENU.slice(0, 7).map(m => m.c);
-  const Fila = (dia, texto) => /*#__PURE__*/React.createElement("div", {
-    key: dia, className: "card row", style: { padding: "8px 12px", marginBottom: 6 }
-  }, /*#__PURE__*/React.createElement("div", { style: { width: 72, fontWeight: 700, fontSize: 13, color: "var(--grey)" } }, dia),
+  const almuerzos = [...new Set(MENU.map(m => m.a))].sort((a, b) => (+a.match(/Bolsa (\d+)/)[1]) - (+b.match(/Bolsa (\d+)/)[1]));
+  const Fila = (etiqueta, texto) => /*#__PURE__*/React.createElement("div", {
+    key: etiqueta, className: "card row", style: { padding: "8px 12px", marginBottom: 6 }
+  }, /*#__PURE__*/React.createElement("div", { style: { width: 72, fontWeight: 700, fontSize: 13, color: "var(--grey)" } }, etiqueta),
     /*#__PURE__*/React.createElement("div", { style: { flex: 1 } }, texto));
   return /*#__PURE__*/React.createElement("div", null,
     /*#__PURE__*/React.createElement("div", { className: "h2" }, "Recetas"),
@@ -3162,6 +3191,11 @@ function Recetas() {
       /*#__PURE__*/React.createElement("div", { className: "sub" }, "Medio aguacate, 2 tiras de tocino o 3 lonchas de serrano — nunca los dos el mismo día. Se repiten cada semana.")
     ),
     DIAS.map((dia, i) => Fila(dia, desayunos[i])),
+    /*#__PURE__*/React.createElement("div", { className: "card", style: { margin: "14px 0 8px" } },
+      /*#__PURE__*/React.createElement("b", null, "🍽️ Almuerzos"),
+      /*#__PURE__*/React.createElement("div", { className: "sub" }, "250 g de proteína por bolsa. Rotan en orden, sin importar el día de la semana.")
+    ),
+    almuerzos.map((a, i) => Fila("Bolsa " + (i + 1), a.replace(/^Bolsa \d+ · /, ""))),
     /*#__PURE__*/React.createElement("div", { className: "card", style: { margin: "14px 0 8px" } },
       /*#__PURE__*/React.createElement("b", null, "🌙 Cenas"),
       /*#__PURE__*/React.createElement("div", { className: "sub" }, "Solo pescado, 200 g y limón. Nada frito, nada cremoso, mínimo 3 horas antes de dormir.")
@@ -3211,7 +3245,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(/*#__PURE__*/React.c
    este aviso, el teléfono podría quedarse meses con una versión vieja.
    Chequea cada 5 minutos y al volver a la app, comparando esta constante contra
    la del archivo en el servidor. */
-const VER='20260930-recetas-llamada-nc';
+const VER='20260930-pendientes-nc-almuerzos';
 let _ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-_ultimoChequeo < 300000) return;
