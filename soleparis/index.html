@@ -1048,11 +1048,19 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   },
 
   /* ---------- PENDIENTES (lo único que ve "público", sin clave) ---------- */
+  _pendCaj:'grupo',
+  pendCaj(c){ this._pendCaj=c; this.vPendientes(); },
   async vPendientes(){
-    const items=await this._get('soleparis_pendientes?order=creado_en.desc');
-    this._pend=items;
+    const todos=await this._get('soleparis_pendientes?order=creado_en.desc');
+    this._pend=todos;
+    const CAJ=[['grupo','👥','Pendientes grupo'],['plan','📈','Plan de negocio']];
+    const items=todos.filter(p=>(p.grupo||'grupo')===this._pendCaj);
     const admin=this.esAdmin();
     this.set(`<h1>Pendientes</h1>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        ${CAJ.map(([k,ic,t])=>`<button class="btn gh2" onclick="App.pendCaj('${k}')"
+          style="padding:8px 14px;font-size:13px${this._pendCaj===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${ic} ${t}</button>`).join('')}
+      </div>
       <div class="sub">${items.filter(p=>!p.hecho).length} por hacer · ${items.filter(p=>p.hecho).length} entregados</div>
       <div class="card">
         <div style="display:flex;gap:8px">
@@ -1077,7 +1085,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   async pendAgregar(){
     const el=document.getElementById('pend_txt'); const t=(el.value||'').trim();
     if(!t) return;
-    await this._post('soleparis_pendientes',{id:'pd'+Date.now(), texto:t, hecho:false, creado_en:new Date().toISOString()});
+    await this._post('soleparis_pendientes',{id:'pd'+Date.now(), texto:t, hecho:false, grupo:this._pendCaj, creado_en:new Date().toISOString()});
     this.vPendientes();
   },
   async pendToggle(id){
