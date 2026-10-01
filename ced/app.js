@@ -2691,19 +2691,12 @@ const App = {
     ];
     this._pedsByCliFeroz=byCli;
     const fmt=n=>n!=null?('$'+(+n).toLocaleString('es-CO')):'';
-    const tab=this._cliTab||'nc'; this._cliTab=tab;
     const reales=cli.filter(c=>c.embudo==='cliente');   // CLIENTES = ya compraron (1er pedido). Los demás son PROSPECTOS (en CRM).
-    const nNC=reales.filter(c=>!c.recomendado&&!c.especial).length, nG=reales.filter(c=>!!c.recomendado&&!c.especial).length, nEsp=reales.filter(c=>!!c.especial).length;
-    const grupo=reales.filter(c=> tab==='gpjr' ? (!!c.recomendado&&!c.especial) : tab==='esp' ? !!c.especial : (!c.recomendado&&!c.especial));
+    const grupo=reales;
     this.set(`
       <h1>Clientes</h1><div class="sub"><b>${reales.length}</b> clientes (ya compraron) · los <b>prospectos</b> están en CRM → 🎯 Prospectos</div>
       ${this._tablaMeses(_meses,_MM,_cedFilas,'Solo pedidos reales (sin muestras) · pedidos, nuevos, recurrentes y $ calculados en vivo desde la base.')}
       <button class="btn-sm" style="background:#fff;border:1.5px solid var(--naranja);color:var(--naranja);margin-bottom:10px;width:100%;padding:10px" onclick="App.modalComisiones()">💰 Tabla de comisiones (referencia × lista)</button>
-      <div style="display:flex;gap:6px;margin-bottom:10px">
-        <button class="btn-sm" style="flex:1;padding:11px;font-weight:700;background:${tab==='nc'?'var(--naranja);color:#fff':'#e5e7eb'}" onclick="App.cliTab('nc')">👤 NC (${nNC})</button>
-        <button class="btn-sm" style="flex:1;padding:11px;font-weight:700;background:${tab==='gpjr'?'#b8860b;color:#fff':'#e5e7eb'}" onclick="App.cliTab('gpjr')">⭐ GPJR (${nG})</button>
-        <button class="btn-sm" style="flex:1;padding:11px;font-weight:700;background:${tab==='esp'?'#b8860b;color:#fff':'#e5e7eb'}" onclick="App.cliTab('esp')">⭐⭐ Especiales (${nEsp})</button>
-      </div>
       <input id="cliq" placeholder="🔍 Buscar por nombre o celular…" style="width:100%;padding:12px;border:1.5px solid var(--linea);border-radius:10px;margin-bottom:6px;box-sizing:border-box" oninput="App._filtrarCliFeroz()">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span id="clicount" style="font-size:12px;color:var(--suave)">${grupo.length} coinciden (clientes creados)</span>
@@ -2717,11 +2710,10 @@ const App = {
           <div class="nom">${esc(c.nombre)} ${c.especial?'<span style="color:#b8860b;font-weight:700">⭐⭐</span>':c.recomendado?'<span style="color:#b8860b">⭐</span>':''} <span style="font-size:12px;color:var(--suave)">✏️</span></div>
           <div class="meta">NIT ${esc(c.nit||'—')} · 📱 ${esc(c.tel||'')}<br>${esc([c.barrio,c.ciudad,c.depto].filter(Boolean).join(', '))}${(c.referencia||c.valor_par_nc!=null)?`<br>💰 ${esc(c.referencia||'')}${c.lista_precio?' · '+esc(c.lista_precio):''}${c.valor_par_nc!=null?' · NC '+fmt(c.valor_par_nc):''}${(c.recomendado&&c.valor_par_gpjr!=null)?' · GPJR '+fmt(c.valor_par_gpjr):''}`:''}</div>
         </div><span class="badge ${c.recomendado?'b-cotizada':(c.tipo_pago==='credito'?'b-autorizado':'b-aceptada')}">${c.recomendado?'⭐ Recomendado':(c.tipo_pago||'contado')}</span></div>${this._cliEmbudo(c)}</div>
-      `).join(''):`<div class="empty">${tab==='gpjr'?'Aún no hay clientes recomendados por GPJR. Marca "Recomendado" al crear/editar un cliente.':'Aún no hay clientes NC. Crea el primero.'}</div>`}
+      `).join(''):`<div class="empty">Aún no hay clientes. Crea el primero.</div>`}
       </div>
     `);
   },
-  cliTab(t){ this._cliTab=t; this.vClientes(); },
   _cliEmbudo(c){
     const info=(this._pedsByCliFeroz||{})[c.id]||{m:new Set(),n:0};
     const n=info.n, set=info.m;
