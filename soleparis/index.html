@@ -1049,13 +1049,56 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
 
   /* ---------- PENDIENTES (lo único que ve "público", sin clave) ---------- */
   _pendCaj:'grupo',
-  pendCaj(c){ this._pendCaj=c; this.vPendientes(); },
+  _pendSub:'',
+  /* 30-sep-2026: en "Plan de negocio" los pendientes se agrupan por quién
+     los destraba (Jose: "prefiero este sistema de grupos"). Si aparece un
+     quinto frente, se agrega aquí y ya queda disponible en el selector. */
+  PLAN_SUBGRUPOS:[
+    "Decisiones de los dueños de Solé (agenda de la reunión)",
+    "Entregas de Solé para publicar la landing",
+    "Entregas de Negocios Cuánticos",
+    "Cabos sueltos entre los tres documentos"
+  ],
+  pendCaj(c){ if(c==='plan' && !this.esAdmin()) return; this._pendCaj=c; this.vPendientes(); },
+  pendSub(s){ this._pendSub=s; },
   async vPendientes(){
+    const admin=this.esAdmin();
+    if(!admin && this._pendCaj==='plan') this._pendCaj='grupo';   // "Plan de negocio" es solo de NC, no de público
     const todos=await this._get('soleparis_pendientes?order=creado_en.desc');
     this._pend=todos;
-    const CAJ=[['grupo','👥','Pendientes grupo'],['plan','📈','Plan de negocio']];
+    const CAJ=admin?[['grupo','👥','Pendientes grupo'],['plan','📈','Plan de negocio']]:[['grupo','👥','Pendientes grupo']];
+    const esPlan=this._pendCaj==='plan';
     const items=todos.filter(p=>(p.grupo||'grupo')===this._pendCaj);
-    const admin=this.esAdmin();
+    if(esPlan && !this._pendSub) this._pendSub=this.PLAN_SUBGRUPOS[0];
+
+    const fila=p=>`<div class="prod" style="opacity:${p.hecho?.55:1}">
+        <div class="top" style="align-items:flex-start">
+          <div style="display:flex;gap:10px;align-items:flex-start;flex:1">
+            <input type="checkbox" ${p.hecho?'checked':''} onchange="App.pendToggle('${p.id}')" style="margin-top:3px;width:18px;height:18px">
+            <div>
+              <div class="nm" style="text-decoration:${p.hecho?'line-through':'none'}">${this.esc(p.texto)}</div>
+              <div class="ct">Creado ${new Date(p.creado_en).toLocaleDateString('es-CO')}${p.entregado_en?' · Entregado '+new Date(p.entregado_en).toLocaleDateString('es-CO'):''}</div>
+            </div>
+          </div>
+          <button class="btn-sm btn-line" onclick="App.pendEditar('${p.id}')">✎</button>
+          ${admin?`<button class="btn-sm" style="background:#fbece9;color:#b3564b" onclick="App.pendBorrar('${p.id}')">🗑</button>`:''}
+        </div>
+      </div>`;
+
+    let listado;
+    if(!items.length){ listado='<div class="empty">Sin pendientes todavía.</div>'; }
+    else if(!esPlan){ listado=items.map(fila).join(''); }
+    else{
+      const SIN_CAT='Sin categoría (pendientes de antes de los cajones)';
+      const grupos=[...this.PLAN_SUBGRUPOS, ...new Set(items.map(p=>p.subgrupo).filter(s=>s&&!this.PLAN_SUBGRUPOS.includes(s))), SIN_CAT];
+      listado=grupos.map(sg=>{
+        const deEste=items.filter(p=>(p.subgrupo||SIN_CAT)===sg)
+          .sort((a,b)=>String(a.creado_en).localeCompare(String(b.creado_en)));
+        if(!deEste.length) return '';
+        return `<div style="font-size:12px;font-weight:700;color:var(--accent2);margin:16px 0 6px">${this.esc(sg)} · ${deEste.filter(p=>!p.hecho).length} de ${deEste.length}</div>${deEste.map(fila).join('')}`;
+      }).join('');
+    }
+
     this.set(`<h1>Pendientes</h1>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
         ${CAJ.map(([k,ic,t])=>`<button class="btn gh2" onclick="App.pendCaj('${k}')"
@@ -1063,30 +1106,22 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       </div>
       <div class="sub">${items.filter(p=>!p.hecho).length} por hacer · ${items.filter(p=>p.hecho).length} entregados</div>
       <div class="card">
+        ${esPlan?`<select id="pend_sub" class="field" style="margin-bottom:8px" onchange="App.pendSub(this.value)">
+          ${this.PLAN_SUBGRUPOS.map(sg=>`<option ${this._pendSub===sg?'selected':''}>${this.esc(sg)}</option>`).join('')}
+        </select>`:''}
         <div style="display:flex;gap:8px">
           <input id="pend_txt" class="field" placeholder="Nuevo pendiente…" style="flex:1" onkeydown="if(event.key==='Enter')App.pendAgregar()">
           <button class="btn-sm btn-ink" onclick="App.pendAgregar()">＋</button>
         </div>
       </div>
-      ${!items.length?'<div class="empty">Sin pendientes todavía.</div>':items.map(p=>`
-        <div class="prod" style="opacity:${p.hecho?.55:1}">
-          <div class="top" style="align-items:flex-start">
-            <div style="display:flex;gap:10px;align-items:flex-start;flex:1">
-              <input type="checkbox" ${p.hecho?'checked':''} onchange="App.pendToggle('${p.id}')" style="margin-top:3px;width:18px;height:18px">
-              <div>
-                <div class="nm" style="text-decoration:${p.hecho?'line-through':'none'}">${this.esc(p.texto)}</div>
-                <div class="ct">Creado ${new Date(p.creado_en).toLocaleDateString('es-CO')}${p.entregado_en?' · Entregado '+new Date(p.entregado_en).toLocaleDateString('es-CO'):''}</div>
-              </div>
-            </div>
-            <button class="btn-sm btn-line" onclick="App.pendEditar('${p.id}')">✎</button>
-            ${admin?`<button class="btn-sm" style="background:#fbece9;color:#b3564b" onclick="App.pendBorrar('${p.id}')">🗑</button>`:''}
-          </div>
-        </div>`).join('')}`);
+      ${listado}`);
   },
   async pendAgregar(){
     const el=document.getElementById('pend_txt'); const t=(el.value||'').trim();
     if(!t) return;
-    await this._post('soleparis_pendientes',{id:'pd'+Date.now(), texto:t, hecho:false, grupo:this._pendCaj, creado_en:new Date().toISOString()});
+    const row={id:'pd'+Date.now(), texto:t, hecho:false, grupo:this._pendCaj, creado_en:new Date().toISOString()};
+    if(this._pendCaj==='plan') row.subgrupo=this._pendSub;
+    await this._post('soleparis_pendientes',row);
     this.vPendientes();
   },
   async pendToggle(id){
