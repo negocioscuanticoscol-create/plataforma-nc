@@ -395,9 +395,15 @@ const App = {
          this._cedPerm={}; (pm||[]).forEach(p=>this._cedPerm[p.cargo]=p.tabs||[]); }catch(e){ this._cedPerm=null; }
     this.pintarNav();
     let inicio = {facturacion:'cotizaciones', bodega:'despachos', planta:'planta'}[this.perfil.rol] || (window.NC_EMPRESA==='smart'?'panel':'dashboard');
-    /* Si esa pestaña no está entre las suyas, cae en la primera que SÍ tenga.
-       Antes el consultador aterrizaba en un dashboard que no le corresponde. */
-    if(!(this._permitidos||[]).includes(inicio)) inicio=(this._permitidos||[])[0]||'consulta';
+    /* Si esa pestaña no está entre las suyas, antes de caer a la primera que
+       tenga (que podía ser Consulta, la de plantas, nada que ver con un
+       resumen) se prueba 'panel': para CED/Feroz cae en el mismo tablero-
+       resumen de ventas que 'dashboard' (no tiene vista propia, ver go()).
+       Así un gerente como Ruby, que tiene 'panel' pero no 'dashboard' en
+       ced_permisos, aterriza en el resumen y no en la consulta de plantas. */
+    if(!(this._permitidos||[]).includes(inicio)){
+      inicio = (this._permitidos||[]).includes('panel') ? 'panel' : ((this._permitidos||[])[0]||'consulta');
+    }
     this.go(inicio);
   },
 
