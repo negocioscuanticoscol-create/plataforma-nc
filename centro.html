@@ -241,6 +241,48 @@ table.mx .it i{font-style:normal;color:var(--sub);font-size:11px;display:block;m
 <script>
 const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+
+/* ===== RECUPERAR CLAVE =====================================================
+   El correo "Reset your password" de Supabase cae aquí (es el Site URL
+   configurado en el proyecto) con el token en el hash de la URL
+   (#access_token=...&type=recovery). Centro de Mando no tiene login, así
+   que ese token se perdía en silencio y la persona veía el tablero normal
+   sin ningún formulario para poner la clave nueva. Esto lo detecta y pide
+   la clave ANTES de que cargue el resto de la página. */
+(function(){
+  const hp=new URLSearchParams(location.hash.replace(/^#/,''));
+  if(hp.get('type')!=='recovery' || !hp.get('access_token')) return;
+  const tok=hp.get('access_token');
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:#0d1017;z-index:999;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML=`<div style="background:#1b2230;border:1px solid #26303f;border-radius:16px;padding:28px 24px;max-width:360px;width:100%">
+    <div style="font-size:18px;font-weight:800;color:#eaf0f8;margin-bottom:4px">Nueva clave</div>
+    <div style="font-size:13px;color:#93a2b5;margin-bottom:18px">Para tu cuenta de administrador</div>
+    <input id="rc_p1" type="password" placeholder="Clave nueva (mínimo 6 caracteres)" autocomplete="new-password"
+      style="width:100%;padding:12px;border-radius:9px;border:1px solid #26303f;background:#0f141d;color:#eaf0f8;font-size:15px;margin-bottom:10px;box-sizing:border-box">
+    <input id="rc_p2" type="password" placeholder="Repite la clave" autocomplete="new-password"
+      style="width:100%;padding:12px;border-radius:9px;border:1px solid #26303f;background:#0f141d;color:#eaf0f8;font-size:15px;margin-bottom:14px;box-sizing:border-box">
+    <button id="rc_btn" style="width:100%;padding:13px;border:none;border-radius:9px;background:#f2792a;color:#fff;font-weight:700;font-size:15px;cursor:pointer">Guardar clave nueva</button>
+    <div id="rc_msg" style="margin-top:12px;font-size:13px;text-align:center"></div>
+  </div>`;
+  document.body.appendChild(ov);
+  const msg=(t,bien)=>{ const m=ov.querySelector('#rc_msg'); m.textContent=t; m.style.color=bien?'#3fbf7f':'#ec5b8f'; };
+  ov.querySelector('#rc_btn').onclick=async()=>{
+    const p1=ov.querySelector('#rc_p1').value, p2=ov.querySelector('#rc_p2').value;
+    if(p1.length<6){ msg('La clave debe tener al menos 6 caracteres.'); return; }
+    if(p1!==p2){ msg('Las dos claves no coinciden.'); return; }
+    msg('Guardando…', true);
+    try{
+      const r=await fetch(SB+'/auth/v1/user',{method:'PUT',
+        headers:{apikey:K,Authorization:'Bearer '+tok,'Content-Type':'application/json'},
+        body:JSON.stringify({password:p1})});
+      if(!r.ok){ const j=await r.json().catch(()=>({})); msg(j.msg||j.error_description||'No se pudo guardar. Pide un correo nuevo e inténtalo de nuevo.'); return; }
+      msg('✅ Clave actualizada. Ya puedes cerrar esto y entrar con tu correo y la clave nueva.', true);
+      ov.querySelector('#rc_btn').disabled=true; ov.querySelector('#rc_btn').style.opacity=.5;
+      history.replaceState(null,'',location.pathname+location.search);   // borra el token de la URL
+    }catch(e){ msg('No se pudo guardar. Revisa la conexión e inténtalo de nuevo.'); }
+  };
+})();
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const nm=n=>Math.round(+n||0).toLocaleString('es-CO');
