@@ -106,10 +106,113 @@ const App = {
   },
 
   async init(){
-    this.sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_KEY);
+    /* La sesión vive en sessionStorage, no en localStorage: localStorage es
+       UN SOLO cajón por dominio, compartido entre pestañas -- entrar como
+       otra sede en una pestaña nueva pisaba la sesión de la que ya estaba
+       abierta, y tocaba usar incógnito para tener dos sedes a la vez.
+       sessionStorage es propio de cada pestaña, así que dos pestañas normales
+       ya se quedan cada una con su usuario. El costo: cerrar la pestaña
+       cierra la sesión (no se recuerda para la próxima vez), lo cual está
+       bien para alguien que entra a trabajar su turno. */
+    this.sb = supabase.createClient(C.SUPABASE_URL, C.SUPABASE_KEY,
+      { auth:{ storage:window.sessionStorage, persistSession:true, autoRefreshToken:true } });
     const { data:{ session } } = await this.sb.auth.getSession();
     if(session){ this.user = session.user; await this.afterLogin(); }
-    else { $('view-login').classList.remove('hide'); $('app').classList.add('hide'); }
+    else {
+      $('view-login').classList.remove('hide'); $('app').classList.add('hide');
+      this._arbolInit();
+    }
+  },
+
+  /* ---------- ÁRBOL Empresa → Sede → Usuario → Clave ---------- */
+  _arbol:{empresa:'',empresas_color:{},sedes:[],sede:'',usuarios:[],usuario:'',nombre:''},
+  _arbolInit(){
+    // si vino por ?u= (enlaces directos de abrir_apps.ps1), el script del
+    // propio index.html ya se encarga de abrir el formulario simple -- acá
+    // no hay que hacer nada más.
+  },
+  async _arbolRPC(fn, params){
+    try{
+      const r=await fetch(this._SBU()+'/rest/v1/rpc/'+fn,{method:'POST',
+        headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json'},
+        body:JSON.stringify(params||{})});
+      const j=await r.json();
+      return Array.isArray(j)?j:[];
+    }catch(e){ return []; }
+  },
+  /* Colores por empresa. Grupo Pérez ya es el rojo de siempre de CED
+     (--naranja venía puesto en ese rojo desde antes); Timothy entra en azul
+     con amarillo de acento. Lo que no reconoce se queda con el amarillo de
+     la fachada de Integra Supply. */
+  _arbolTema(empresa){
+    const k=String(empresa||'').trim().toLowerCase();
+    const s=document.documentElement.style;
+    if(k==='grupo perez'||k==='grupo pérez'){ s.setProperty('--naranja','#D81F26'); s.setProperty('--naranja2','#f0353c'); }
+    else if(k==='timothy'){ s.setProperty('--naranja','#1D4ED8'); s.setProperty('--naranja2','#F5B700'); }
+    else { s.setProperty('--naranja','#E8620C'); s.setProperty('--naranja2','#ff7a1a'); }
+  },
+  async arbolEmpresa(){
+    const v=($('ab_empresa').value||'').trim();
+    const m=$('ab_msg_empresa');
+    if(!v){ m.className='msg err'; m.textContent='Escribe el nombre de tu empresa.'; return; }
+    m.className='msg'; m.textContent='';
+    const sedes=await this._arbolRPC('ced_arbol_sedes',{p_empresa:v});
+    if(!sedes.length){ m.className='msg err'; m.textContent='No encontramos esa empresa. Verifica el nombre.'; return; }
+    this._arbol.empresa=v; this._arbol.sedes=sedes;
+    this._arbolTema(v);
+    if(sedes.length===1){ await this.arbolSede(sedes[0].nombre, sedes[0].nombre_comercial); return; }
+    $('ab_sedes').innerHTML=sedes.map(s=>
+      `<button class="arbol-op" onclick="App.arbolSede('${esc(s.nombre)}','${esc(s.nombre_comercial||s.nombre)}')">
+         <span>${esc(s.nombre_comercial||s.nombre)}</span><span class="ir">›</span></button>`).join('');
+    $('paso_empresa').classList.add('hide'); $('paso_sede').classList.remove('hide');
+    this._arbolMiga();
+  },
+  async arbolSede(nombre, nombreComercial){
+    const usuarios=await this._arbolRPC('ced_arbol_usuarios',{p_sede:nombre});
+    this._arbol.sede=nombre; this._arbol.sedeComercial=nombreComercial||nombre; this._arbol.usuarios=usuarios;
+    if(!usuarios.length){
+      $('ab_sedes').insertAdjacentHTML('beforeend','<div class="msg err" style="display:block">Esta sede todavía no tiene usuarios creados.</div>');
+      return;
+    }
+    $('ab_usuarios').innerHTML=usuarios.map(u=>
+      `<button class="arbol-op" onclick="App.arbolUsuario('${esc(u.usuario)}','${esc(u.nombre)}')">
+         <span>${esc(u.nombre)}<small>${esc(u.cargo||'')}</small></span><span class="ir">›</span></button>`).join('');
+    $('paso_sede').classList.add('hide'); $('paso_usuario').classList.remove('hide');
+    this._arbolMiga();
+  },
+  arbolUsuario(usuario, nombre){
+    this._arbol.usuario=usuario; this._arbol.nombre=nombre;
+    $('ab_clave_tit').textContent='Clave de '+nombre;
+    $('paso_usuario').classList.add('hide'); $('paso_clave').classList.remove('hide');
+    this._arbolMiga();
+    setTimeout(()=>{ const k=$('ab_pass'); k.removeAttribute('readonly'); k.focus(); },80);
+  },
+  arbolAtras(aDonde){
+    ['empresa','sede','usuario','clave'].forEach(p=>$('paso_'+p).classList.add('hide'));
+    $('paso_'+aDonde).classList.remove('hide');
+    if(aDonde==='empresa'){ this._arbol={empresa:'',sedes:[],sede:'',usuarios:[],usuario:'',nombre:''}; $('ab_msg_empresa').textContent=''; }
+    this._arbolMiga();
+  },
+  _arbolMiga(){
+    const b=$('ab_miga'), a=this._arbol;
+    const partes=[a.empresa, a.sedeComercial, a.nombre].filter(Boolean);
+    if(!partes.length){ b.classList.add('hide'); return; }
+    b.classList.remove('hide');
+    b.innerHTML=partes.map(p=>'<b>'+esc(p)+'</b>').join(' › ');
+  },
+  async arbolEntrar(){
+    const pass=$('ab_pass').value;
+    const m=$('ab_msg_clave');
+    if(!pass){ m.className='msg err'; m.textContent='Escribe tu clave.'; return; }
+    m.className='msg ok'; m.textContent='Entrando…';
+    await this._doLogin(this._arbol.usuario, pass, m);
+  },
+  /* El formulario de siempre (correo + clave), para administradores y para
+     los enlaces directos ?u= de abrir_apps.ps1. */
+  modoAdmin(on){
+    $('arbol').classList.toggle('hide', on);
+    $('login-form').classList.toggle('hide', !on);
+    if(on){ this._arbolTema(''); setTimeout(()=>$('lg_email').focus(),80); }
   },
 
   /* ---------- AUTH ---------- */
@@ -128,11 +231,20 @@ const App = {
   async login(){
     const dicho=$('lg_email').value.trim(), pass=$('lg_pass').value;
     if(!dicho||!pass){ this.msg('Escribe tu usuario y tu clave.'); return; }
+    await this._doLogin(dicho, pass, $('lg_msg'));
+  },
+  /* Compartida entre el formulario simple (login, arriba) y el árbol
+     (arbolEntrar, en _arbolRPC): las dos terminan en el mismo
+     signInWithPassword, solo cambia de dónde sale el "dicho" (usuario). */
+  async _doLogin(dicho, pass, msgEl){
     // los de la red entran con usuario suelto; los correos de siempre siguen sirviendo
     const email = dicho.includes('@') ? dicho : this.usCorreo(dicho);
-    this.msg('Entrando…', true);
     const { data, error } = await this.sb.auth.signInWithPassword({ email, password:pass });
-    if(error){ this._registrarAcceso(dicho, false); this.msg(error.message.includes('Invalid')?'Usuario o clave incorrectos.':error.message); return; }
+    if(error){
+      this._registrarAcceso(dicho, false);
+      if(msgEl){ msgEl.className='msg err'; msgEl.textContent=error.message.includes('Invalid')?'Usuario o clave incorrectos.':error.message; }
+      return;
+    }
     this.user = data.user; await this.afterLogin();
     this._registrarAcceso(dicho, true);
   },
@@ -1990,8 +2102,7 @@ const App = {
     // Herramientas: es un gasto de la PRINCIPAL (plataforma, licencias, agentes).
     // Las agencias — Tolima y Av 68 — no lo pagan, asi que cargarselo les hundia
     // la utilidad neta con una plata que nunca salio de su bolsillo.
-    const _miCed=(this.cedUser&&this.cedUser.ced)||'Feroz';
-    const HERR=(_miCed==='Feroz')?4000000:0;
+    const HERR=this._esPrincipal?4000000:0;
     const HERR_DESDE=7;   // en la Principal el gasto de herramientas empezó en JULIO (antes no hubo)
     const M={}, firstMes={};
     peds.forEach(p=>{ const m=new Date(p.creado_en).getMonth()+1; (M[m]=M[m]||{ventas:0,pares:0,cNC:0,cG:0,cli:new Set()});
@@ -3197,14 +3308,18 @@ const App = {
        propio RUT y las tres tienen que aparecer en la lista. La dirección y el
        teléfono se necesitan para la foto que va en la proforma. */
     try{ const r=await this.sb.from('ced').select('*').eq('activo',true); this._ceds=r.data||[]; }catch(e){}
-    sede=(this._ceds||[]).find(c=>c.nombre===(this.miSede()||'Feroz'))||null;
+    /* Si no tengo sede propia (admin/plataforma), cae a la PRINCIPAL -la que
+       tenga el flag en la base-, nunca a un nombre quemado: el nombre cambia
+       (Feroz -> Integra) y un texto fijo se habría quedado buscando algo que
+       ya no existe. */
+    sede=(this._ceds||[]).find(c=>c.nombre===this.miSede()) || (this._ceds||[]).find(c=>c.principal) || null;
     this._facts=facts; this._sedeCot=sede;
     /* Las referencias que se pueden cotizar salen del INVENTARIO: son las que
        alguien cargó al ingresar una curva. Los precios por lista y la
        descripción viven en ced_prov_referencias, así que se cruzan por
        referencia+color. La base ya filtra por sede: cada CED ve las suyas. */
     const refsCot=await this._cotRefs();
-    const nomCed=(sede&&(sede.nombre_comercial||sede.nombre))||'Feroz';
+    const nomCed=(sede&&(sede.nombre_comercial||sede.nombre))||'CED';
     this.set(`
       <h1>${editId?'✏️ Editar':'Nueva'} cotización</h1>
       <div class="sub">${esc(nomCed)} · Bota Ref. 701 · ${money(C.PRECIO_PAR)}/par + IVA</div>

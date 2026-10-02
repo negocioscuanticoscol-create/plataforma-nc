@@ -9,18 +9,22 @@
   :root{
     --naranja:#E8620C; --naranja2:#ff7a1a; --negro:#15171c; --gris:#f4f5f7;
     --verde:#2e9e4f; --rojo:#d22; --azul:#2f6fed; --linea:#e3e5ea; --texto:#1d1f24; --suave:#6b7280;
+    /* Fachada de Integra Supply (antes de elegir empresa). Cada empresa, al
+       entrar, pinta --naranja/--naranja2 con SU color (Grupo Pérez = rojo de
+       Alpaca, Timothy = azul) — ver arbolEmpresa() en app.js. */
+    --is-amarillo:#F5B700; --is-negro:#15171c;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   body{font-family:'IBM Plex Sans',-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--gris);color:var(--texto);font-feature-settings:'zero' 1;font-variant-numeric:slashed-zero}
   input,select,textarea,button{font-family:inherit;font-size:16px}
   .hide{display:none!important}
 
-  /* ===== LOGIN ===== */
+  /* ===== LOGIN · fachada Integra Supply ===== */
   #view-login{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:20px;background:linear-gradient(160deg,#1b1d22,#2a2d34)}
+    padding:20px;background:radial-gradient(circle at 50% -10%,#FFD54A,var(--is-amarillo) 60%)}
   #view-login .card{background:#fff;border-radius:20px;padding:34px 30px;width:100%;max-width:440px;
-    box-shadow:0 12px 40px rgba(0,0,0,.3)}
-  #view-login img{height:54px;display:block;margin:0 auto 6px}
+    box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  #view-login img{height:72px;display:block;margin:0 auto 10px;border-radius:14px}
   #view-login .tit{text-align:center;color:var(--suave);font-size:12px;letter-spacing:1.6px;
     text-transform:uppercase;margin-bottom:24px}
   #view-login label{font-size:15px;font-weight:700;display:block;margin:18px 0 7px}
@@ -35,6 +39,20 @@
     #view-login .btn{padding:17px;font-size:16px}
   }
   #view-login input:focus{outline:none;border-color:var(--naranja)}
+
+  /* árbol Empresa → Sede → Usuario → Clave */
+  .arbol-paso{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+  .arbol-op{width:100%;text-align:left;padding:15px 16px;border:1.5px solid var(--linea);border-radius:12px;
+    background:#fff;font-size:15px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;
+    align-items:center;gap:10px}
+  .arbol-op:active{background:var(--gris)}
+  .arbol-op small{display:block;font-weight:500;color:var(--suave);font-size:12px;margin-top:2px}
+  .arbol-op .ir{color:var(--naranja);font-weight:800}
+  .arbol-atras{text-align:center;margin-top:16px;font-size:13px;color:var(--suave);cursor:pointer}
+  .arbol-miga{text-align:center;font-size:12px;color:var(--suave);margin-bottom:16px;letter-spacing:.02em}
+  .arbol-miga b{color:var(--texto)}
+  .arbol-admin{text-align:center;margin-top:22px;padding-top:16px;border-top:1px solid var(--linea);
+    font-size:12px;color:#9aa1ac;cursor:pointer}
   .btn{width:100%;padding:15px;border:none;border-radius:11px;font-weight:700;cursor:pointer;margin-top:14px}
   .btn-main{background:var(--naranja);color:#fff}
   .btn-main:active{background:#cf550a}
@@ -178,9 +196,49 @@
 <!-- ===== LOGIN ===== -->
 <div id="view-login">
   <div class="card">
-    <img src="../assets/logo.png" alt="Feroz">
-    <div class="tit">Centro Empresarial de Dotaciones</div>
-    <div id="login-form">
+    <img id="lg_logo" src="../assets/logo-integra-supply.jpg" alt="Integra Supply">
+    <div class="tit" id="lg_tit">Integra Supply</div>
+
+    <!-- ===== Árbol Empresa → Sede → Usuario → Clave ===== -->
+    <div id="arbol">
+      <div class="arbol-miga hide" id="ab_miga"></div>
+
+      <div id="paso_empresa">
+        <label>Empresa</label>
+        <input id="ab_empresa" type="text" class="field" placeholder="Escribe el nombre de tu empresa"
+               autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();App.arbolEmpresa();}">
+        <button class="btn btn-main" onclick="App.arbolEmpresa()">Continuar</button>
+        <div class="msg" id="ab_msg_empresa"></div>
+      </div>
+
+      <div id="paso_sede" class="hide">
+        <label>Sede</label>
+        <div class="arbol-paso" id="ab_sedes"></div>
+        <div class="arbol-atras" onclick="App.arbolAtras('empresa')">‹ Cambiar de empresa</div>
+      </div>
+
+      <div id="paso_usuario" class="hide">
+        <label>Usuario</label>
+        <div class="arbol-paso" id="ab_usuarios"></div>
+        <div class="arbol-atras" onclick="App.arbolAtras('sede')">‹ Cambiar de sede</div>
+      </div>
+
+      <div id="paso_clave" class="hide">
+        <label id="ab_clave_tit">Clave</label>
+        <input id="ab_pass" type="password" placeholder="escribe tu clave"
+               autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();App.arbolEntrar();}">
+        <button class="btn btn-main" onclick="App.arbolEntrar()">Entrar</button>
+        <div class="arbol-atras" onclick="App.arbolAtras('usuario')">‹ Cambiar de usuario</div>
+        <div class="msg" id="ab_msg_clave"></div>
+      </div>
+
+      <div class="arbol-admin" onclick="App.modoAdmin(true)">¿Sos administrador de la plataforma? Entra con tu correo</div>
+    </div>
+
+    <!-- ===== Login simple (respaldo admin, correo + clave de Supabase Auth) ===== -->
+    <div id="login-form" class="hide">
       <label>Usuario</label>
       <input id="lg_email" type="text" name="ced_u" placeholder="tu usuario"
              autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
@@ -193,8 +251,9 @@
              autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')">
       <button class="btn btn-main" id="btn_login" onclick="App.login()">Entrar</button>
       <button class="btn btn-ghost hide" id="btn_signup" onclick="App.signup()">Crear cuenta</button>
-      <div class="hint" style="text-align:center;margin-top:12px">Las cuentas las crea el administrador desde <b>Usuarios</b>.</div>
+      <div class="hint" style="text-align:center;margin-top:12px">Las cuentas de sede las crea el administrador desde <b>Usuarios</b>.</div>
       <div class="switch hide" id="sw_login" onclick="App.modoSignup(false)">Ya tengo cuenta · Entrar</div>
+      <div class="arbol-atras" id="ab_volver_arbol" onclick="App.modoAdmin(false)">‹ Volver</div>
       <div class="msg" id="lg_msg"></div>
     </div>
     <script>
@@ -237,25 +296,27 @@
         var m=document.getElementById('lg_msg');
         if(m){ m.className='msg ok';
                m.textContent='Entrando como '+quiere+' · falta la clave'; }
+        // ?u= es un enlace directo (los de abrir_apps.ps1): salta el árbol
+        // completo y cae de una vez en el formulario simple, ya con el
+        // usuario puesto -- igual que siempre. app.js (con App) todavía no
+        // cargó a esta altura del documento, así que se espera a que el
+        // DOM esté listo -- para entonces ya está, porque document.write
+        // bloquea el parser hasta que cada script termina.
+        document.addEventListener('DOMContentLoaded',function(){ App.modoAdmin(true); });
+      }
+      // El campo de clave del ÁRBOL (paso 4) es nuevo: misma limpieza,
+      // sin el prellenado por ?u= porque a ese paso se llega haciendo clic,
+      // nunca por URL.
+      var ak=document.getElementById('ab_pass');
+      if(ak){
+        var ak_tecleo=false;
+        ak.addEventListener('input',function(){ ak_tecleo=true; });
+        function limpiarAb(){ if(ak_tecleo) return; if(document.activeElement!==ak) ak.value=''; }
+        [60,300,900].forEach(function(ms){ setTimeout(limpiarAb, ms); });
+        window.addEventListener('pageshow', function(){ setTimeout(limpiarAb,0); });
       }
     })();
     </script>
-    <!-- marcas que representa la red · son logos, no botones -->
-    <div class="marcas">
-      <div class="mtit">Marcas que representamos</div>
-      <!-- alt distinto de "Feroz" a propósito: si no, el script de arriba
-           lo reemplaza por la marca CED y el logo desaparece -->
-      <div class="mlogos">
-        <img src="../assets/logo.png" alt="Feroz Safety Wear">
-        <img src="../assets/logo-alpaca.png" alt="Calzado Alpaca"
-             onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'wm',textContent:'CALZADO ALPACA'}))">
-        <!-- Fortia todavia no tiene el archivo del logo en assets/. Mientras no
-             este, cae al texto igual que Alpaca: asi la marca se ve desde hoy y
-             cuando se suba logo-fortia.png aparece sola, sin tocar nada. -->
-        <img src="../assets/logo-fortia.png" alt="Fortia Safety Wear"
-             onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'wm',textContent:'FORTIA SAFETY WEAR'}))">
-      </div>
-    </div>
   </div>
 </div>
 
@@ -284,7 +345,7 @@
 <script>
   // Versión fija → el navegador CACHEA los archivos (carga 1 vez y luego instantáneo).
   // Cuando se cambie el código, subir este número (NCVER) y el usuario hace Ctrl+Shift+R una vez.
-  var NCVER='20261001-quita-filtro-nc-gpjr';
+  var NCVER='20261001-portada-sin-marcas';
   ['config.js','geo-co.js','app.js'].forEach(function(s){
     document.write('<scr'+'ipt src="'+s+'?v='+NCVER+'"><\/scr'+'ipt>');
   });
