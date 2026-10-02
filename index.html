@@ -17,7 +17,11 @@
 (function(){
   var emp=(new URLSearchParams(location.search).get('empresa')||'').toLowerCase();
   var destino = emp==='smart' ? 'smart/' : 'centro.html';
-  location.replace(destino + location.hash);
+  /* El Site URL de Supabase Auth apunta aqui. El correo de "recuperar clave"
+     manda el token por querystring (?token_hash=...&type=recovery) en las
+     versiones nuevas de Supabase -- antes solo se arrastraba el #hash, asi
+     que ese token se perdia en este salto y centro.html nunca lo veia. */
+  location.replace(destino + location.search + location.hash);
 })();
 </script>
 <style>
