@@ -1,0 +1,28 @@
+name: trm-dolar
+# Avisa por Telegram cuando la TRM (dólar oficial) está en $3.370 o por
+# debajo. Se revisa UNA vez cada mañana (12:00 UTC = 7:00 a.m. Bogotá).
+#
+# Secretos (los mismos de sofia-vigia y el resumen): TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+    inputs:
+      umbral:
+        description: 'Umbral en pesos (opcional, default 3370)'
+        required: false
+jobs:
+  revisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Revisar la TRM de hoy
+        env:
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          UMBRAL: ${{ github.event.inputs.umbral || '3370' }}
+        run: python .github/scripts/trm_dolar.py
