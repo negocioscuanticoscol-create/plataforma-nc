@@ -244,15 +244,28 @@ const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
 
 /* ===== RECUPERAR CLAVE =====================================================
    El correo "Reset your password" de Supabase cae aquí (es el Site URL
-   configurado en el proyecto) con el token en el hash de la URL
-   (#access_token=...&type=recovery). Centro de Mando no tiene login, así
-   que ese token se perdía en silencio y la persona veía el tablero normal
-   sin ningún formulario para poner la clave nueva. Esto lo detecta y pide
-   la clave ANTES de que cargue el resto de la página. */
-(function(){
+   configurado en el proyecto). Centro de Mando no tiene login, así que el
+   token se perdía en silencio y la persona veía el tablero normal sin
+   ningún formulario para la clave nueva. Esto lo detecta y la pide ANTES
+   de que cargue el resto de la página.
+   Dos formatos posibles, según la version de Supabase que mande el correo:
+     1) hash:  #access_token=...&type=recovery      (ya trae sesión)
+     2) query: ?token_hash=...&type=recovery         (hay que canjearlo primero) */
+(async function(){
   const hp=new URLSearchParams(location.hash.replace(/^#/,''));
-  if(hp.get('type')!=='recovery' || !hp.get('access_token')) return;
-  const tok=hp.get('access_token');
+  const qp=new URLSearchParams(location.search);
+  let tok=null;
+  if(hp.get('type')==='recovery' && hp.get('access_token')){
+    tok=hp.get('access_token');
+  } else if(qp.get('type')==='recovery' && qp.get('token_hash')){
+    try{
+      const r=await fetch(SB+'/auth/v1/verify',{method:'POST',headers:{apikey:K,'Content-Type':'application/json'},
+        body:JSON.stringify({type:'recovery',token_hash:qp.get('token_hash')})});
+      const j=await r.json();
+      if(r.ok && j.access_token) tok=j.access_token;
+    }catch(e){}
+  }
+  if(!tok) return;
   const ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;background:#0d1017;z-index:999;display:flex;align-items:center;justify-content:center;padding:20px';
   ov.innerHTML=`<div style="background:#1b2230;border:1px solid #26303f;border-radius:16px;padding:28px 24px;max-width:360px;width:100%">
