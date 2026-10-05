@@ -1156,11 +1156,24 @@ async function reclasificar(id, que){
       const destino = (Array.isArray(bs) && bs[0]) ? bs[0].id : null;
       if (!destino) { INTER = antes; pintarInteresados();
         toast('⚠️ No existe la base de competidores', true); return; }
+      /* Sin lead_id no hay a quien moverle la base. Pasa en las llamadas viejas:
+         la columna se agrego el 25-ago-2026 (_PLAYBOOK/mkr_llamadas-columnas.sql),
+         asi que todo lo marcado antes la tiene vacia. Hay que cortar ACA, porque
+         un PATCH con id=eq.null no falla: no encuentra nada y responde 204. */
+      if (!x.lead_id) { INTER = antes; pintarInteresados();
+        toast('⚠️ ' + nom + ' no está enlazado a su empresa, no se puede mover de base', true); return; }
       const cuerpo = { estado: 'competencia', base_id: destino };
       const r = await fetch(SB + '/rest/v1/mkr_empresas?id=eq.' + encodeURIComponent(x.lead_id),
-        { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=representation' },
           body: JSON.stringify(cuerpo) });
       if (!r.ok) throw new Error(r.status);
+      /* return=representation para PODER CONTAR lo que cambio. Con return=minimal
+         un PATCH que no toca ninguna fila responde 204 y r.ok queda en true: salia
+         el aviso de exito, el dato desaparecia de la lista y nunca llegaba a la
+         base de competidores. Ese era el bug que reporto Jose (5-oct-2026). */
+      const movidas = await r.json().catch(() => []);
+      if (!Array.isArray(movidas) || !movidas.length) { INTER = antes; pintarInteresados();
+        toast('⚠️ No se encontró la empresa de ' + nom + '. No se movió nada.', true); return; }
       toast('🏭 ' + nom + ' pasó a competidores');
     } else if (que === 'sinwhatsapp') {
       /* No se bloquea el telefono ni se descarta la empresa: el dato SI sirve,
@@ -1173,11 +1186,16 @@ async function reclasificar(id, que){
          asi la aplica de mkr_leads lo esconde igual que a un competidor, sin
          moverlo de base. Nace de un caso real (26-sep-2026): "La Gran Dotación"
          salio Interesado siendo ya cliente, porque nadie lo habia marcado asi. */
+      if (!x.lead_id) { INTER = antes; pintarInteresados();
+        toast('⚠️ ' + nom + ' no está enlazado a su empresa, no se puede marcar', true); return; }
       const r = await fetch(SB + '/rest/v1/mkr_empresas?id=eq.' + encodeURIComponent(x.lead_id),
-        { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=representation' },
           body: JSON.stringify({ estado: 'competencia',
             notas: 'Marcado "ya es cliente" desde Lupe · ' + new Date().toISOString().slice(0,10) }) });
       if (!r.ok) throw new Error(r.status);
+      const marcadas = await r.json().catch(() => []);
+      if (!Array.isArray(marcadas) || !marcadas.length) { INTER = antes; pintarInteresados();
+        toast('⚠️ No se encontró la empresa de ' + nom + '. No se marcó nada.', true); return; }
       toast('🤝 ' + nom + ' queda marcado como cliente');
     } else {
       /* La lista de no llamar es por TELEFONO, no por empresa: el mismo numero
@@ -1192,9 +1210,14 @@ async function reclasificar(id, que){
             base_id: x.base_id || null,
             agente: YO.nombre || null }) });
       if (!r.ok && r.status !== 409) throw new Error(r.status);
-      await fetch(SB + '/rest/v1/mkr_empresas?id=eq.' + encodeURIComponent(x.lead_id),
-        { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ estado: 'descartado' }) });
+      /* Acá el bloqueo de verdad es mkr_no_llamar, que va por TELÉFONO y ya quedó
+         guardado arriba. Marcar la empresa es un extra, así que si no hay lead_id
+         no se aborta: se omite el PATCH que de todos modos no tocaría nada. */
+      if (x.lead_id) {
+        await fetch(SB + '/rest/v1/mkr_empresas?id=eq.' + encodeURIComponent(x.lead_id),
+          { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ estado: 'descartado' }) });
+      }
       toast('🚫 ' + tel.slice(-10) + ' no se vuelve a llamar');
     }
     /* Trabajado, igual que 'enviado', para que no vuelva a salir al recargar:
