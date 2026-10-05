@@ -2782,8 +2782,17 @@ const App = {
     });
     // el mes del primer pedido se reconstruye del orden: o = año*12 + indiceMes
     const nuevoBy={}; Object.values(first).forEach(o=>{ const k=M3[o%12]+'-'+Math.floor(o/12); nuevoBy[k]=(nuevoBy[k]||0)+1; });
-    const meses=[...new Set([...Object.keys(muBy),...Object.keys(ventBy),...Object.keys(nuevoBy)])]
-      .filter(Boolean).sort((a,b)=>mNum(a)-mNum(b));
+    /* El rango va CORRIDO: del primer mes con movimiento hasta el mes actual, sin
+       saltarse ninguno. Antes solo se listaban los meses que tenían algo, así que
+       un mes flojo desaparecía de la tabla en vez de salir en cero — y al mes en
+       curso le pasaba lo mismo mientras no hubiera cerrado una venta. */
+    const conDatos=[...new Set([...Object.keys(muBy),...Object.keys(ventBy),...Object.keys(nuevoBy)])]
+      .filter(Boolean).map(mNum).filter(o=>o>0);
+    const hoy=new Date(), oAct=hoy.getFullYear()*12+hoy.getMonth();
+    const oMin=conDatos.length?Math.min(...conDatos):oAct;
+    const oMax=conDatos.length?Math.max(oAct,...conDatos):oAct;
+    const meses=[];
+    for(let o=oMin;o<=oMax;o++) meses.push(M3[o%12]+'-'+Math.floor(o/12));
     const MM={}; let regAcc=0, ventAcc=0;
     meses.forEach(m=>{ regAcc+=(nuevoBy[m]||0); ventAcc+=(ventBy[m]||0);
       MM[m]={ muestras:muBy[m]||0, pares:paresBy[m]||0, nuevos:nuevoBy[m]||0,
