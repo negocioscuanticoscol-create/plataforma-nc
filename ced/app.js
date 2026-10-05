@@ -596,6 +596,7 @@ const App = {
     /* Tres hileras, en el orden que pidió José:
        1 · lo comercial del día  2 · plata y operación  3 · plataforma */
     const ROW1=[
+      {v:'tablero', ic:'📊', t:'Dashboard'},
       {v:'consulta', ic:'🔎', t:'Consulta'},
       {v:'crm', ic:'📇', t:'CRM'},
       {v:'clientes', ic:'👥', t:'Clientes'},
@@ -624,9 +625,9 @@ const App = {
     /* 'consulta' va en TODOS los roles a proposito: la consulta de plantas es de
        toda la organizacion, no de un area. Quien solo debe ver eso y nada mas
        lleva el cargo 'consultador', que en ced_permisos tiene unicamente consulta. */
-    const TODOS=['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','territorio','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','datos','admin','permisos','sofia'];
-    const DEF={admin:TODOS, gerente:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','territorio','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','sofia'],
-      director:['dashboard','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','territorio','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','sofia'],
+    const TODOS=['dashboard','tablero','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','territorio','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','datos','admin','permisos','sofia'];
+    const DEF={admin:TODOS, gerente:['dashboard','tablero','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','territorio','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','pendientes','sofia'],
+      director:['dashboard','tablero','consulta','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','territorio','planta','autopedido','comisiones','inventario','gastos','proveedores','precios','sofia'],
       vendedor:['dashboard','consulta','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido','inventario','precios','sofia'],
       facturacion:['panel','consulta','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','consulta','despachos','inventario'], planta:['dashboard','consulta','pedidos','planta','inventario']};
     /* De donde salen las pestañas, en orden:
@@ -709,7 +710,7 @@ const App = {
     if(view==='proveedores') return this.vProveedores();
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','territorio','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
-    ({dashboard:this.vDashboard, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
+    ({dashboard:this.vDashboard, tablero:this.vTablero, cotizaciones:this.vCotizaciones, cotizacionNueva:this.vCotizacionNueva,
       pedidos:this.vPedidos, cartera:this.vCartera, despachos:this.vDespachos, ventas:this.vVentas, clientes:this.vClientes, crm:this.vCrm, cobertura:this.vCobertura, territorio:this.vTerritorio, planta:this.vPlanta, autopedido:this.vAutoPedidos, admin:this.vAdmin, permisos:this.vPermisos, inventario:this.vInventario, precios:this.vPrecios, pendientes:this.vPendientes, sofia:this.vSofia}[view] || this.vDashboard).call(this);
   },
   set(html){ $('main').innerHTML = this._subnav() + html; },
@@ -2697,6 +2698,98 @@ const App = {
         <div style="font-size:14px;font-weight:700">${emoji} ${titulo}</div>
         <div style="font-size:12px;color:var(--suave)">total <b style="color:${color}">${total}</b></div></div>
       <div style="display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding:4px 2px 0;min-height:150px">${bars}</div></div>`;
+  },
+  /* ---------- 📊 DASHBOARD DEL CED ----------
+     Pedido por José (5-oct-2026): el resumen de "cómo vamos" con el mismo cuadro
+     mensual de Smart, pero con los datos de dotación. Va partido en dos porque la
+     Principal ve toda la red: arriba el CED en foco (por defecto Integra) y abajo
+     el CONSOLIDADO del resto. La separación sale de `pedidos.ced`, que ya se graba
+     al crear el pedido. Para una agencia el RLS ya recorta, así que solo ve lo suyo
+     y el bloque de la red ni se pinta.
+     OJO: esto NO reemplaza a 'consulta' (la de plantas, del cargo 'consultador')
+     ni a 'dashboard' (Resultados, el panel financiero). Es una pestaña aparte. */
+  async vTablero(){
+    this.loading();
+    let peds=[], sedes=[];
+    try{ const r=await this.sb.from('pedidos').select('ced,cliente_id,creado_en,estado,es_muestra,total,pares'); peds=r.data||[]; }catch(e){}
+    try{ const r=await this.sb.from('ced').select('nombre,principal').order('nombre'); sedes=r.data||[]; }catch(e){}
+    peds=Array.isArray(peds)?peds:[]; sedes=Array.isArray(sedes)?sedes:[];
+    const verRed = !this.miSede() || this._esPrincipal;
+    /* El CED en foco no se quema a mano: si el usuario es de una sede, es la suya;
+       si ve toda la red, se busca la que diga "integra" y si no, la principal. */
+    if(!this._tabSede){
+      const porNombre=(sedes.find(s=>/integra/i.test(s.nombre||''))||{}).nombre;
+      const princ=(sedes.find(s=>s.principal)||{}).nombre;
+      this._tabSede = this.miSede() || porNombre || princ || (sedes[0]||{}).nombre || '';
+    }
+    const foco=this._tabSede;
+    const esFoco=p=>String(p.ced||'').trim().toLowerCase()===String(foco||'').trim().toLowerCase();
+    const A=this._mmPedidos(peds.filter(esFoco));
+    const B=this._mmPedidos(peds.filter(p=>!esFoco(p)));
+    const FILAS=[
+      {k:'muestras',    t:'🧪 Muestras',             fmt:'num',   tot:'sum'},
+      {k:'pares',       t:'👟 Pares vendidos',       fmt:'num',   tot:'sum'},
+      {k:'nuevos',      t:'👥 Clientes nuevos',      fmt:'num',   tot:'sum'},
+      {k:'recur',       t:'🔁 Recurrentes',          fmt:'num',   tot:'sum'},
+      {k:'ventas',      t:'💰 Ventas del mes',       fmt:'money', tot:'sum'},
+      {k:'ventasAcum',  t:'📈 Ventas acumuladas',    fmt:'money', tot:'last'},
+      {k:'registrados', t:'📇 Clientes registrados', fmt:'num',   tot:'last'},
+    ];
+    const NOTA='Solo pedidos pagados (consignado en adelante) · las muestras van en su propia fila · calculado en vivo desde la base.';
+    const selector = (verRed && sedes.length>1)
+      ? `<div class="card" style="padding:12px">
+           <label style="font-size:12px;color:var(--suave)">CED en foco</label>
+           <select onchange="App._tabSede=this.value;App.vTablero()" style="width:100%;padding:11px;border:1.5px solid var(--linea);border-radius:10px;margin-top:5px;font-size:15px">
+             ${sedes.map(s=>`<option value="${esc(s.nombre)}"${s.nombre===foco?' selected':''}>${esc(s.nombre)}</option>`).join('')}
+           </select></div>` : '';
+    const bloqueResto = !verRed ? '' :
+      `<h2 style="font-size:15px;margin:18px 0 6px">🌐 Consolidado · resto de la red</h2>`+
+      (B.meses.length ? this._tablaMeses(B.meses,B.MM,FILAS,'Todos los demás CED sumados. '+NOTA)
+                      : '<div class="card"><div class="empty">Sin pedidos de otros CED todavía.</div></div>');
+    this.set(`
+      <h1>Dashboard</h1><div class="sub">Cómo vamos hoy${foco?' · '+esc(foco):''}</div>
+      ${selector}
+      <h2 style="font-size:15px;margin:14px 0 6px">🏢 ${esc(foco||'Sin CED')}</h2>
+      ${A.meses.length ? this._tablaMeses(A.meses,A.MM,FILAS,NOTA)
+                       : '<div class="card"><div class="empty">Este CED todavía no tiene pedidos.</div></div>'}
+      ${bloqueResto}
+    `);
+  },
+  /* Arma el cuadro mensual desde una lista de pedidos. Misma regla de negocio que
+     Resultados (vPanelFinanzasFeroz): cuenta como venta SOLO si ya pagó, y las
+     muestras no suman plata — se cuentan aparte. */
+  _mmPedidos(lista){
+    const M3=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const mNum=m=>{const q=String(m).split('-');const i=M3.indexOf(q[0]);return i<0?0:(+q[1]||0)*12+i;};
+    const PAGADO=['consignado','autorizado','despachado','entregado'];
+    const vale=p=>!p.es_muestra && p.estado!=='anulado' && PAGADO.includes(p.estado);
+    const mk=p=>{ const d=new Date(p.creado_en); return isNaN(d)?null:(M3[d.getMonth()]+'-'+d.getFullYear()); };
+    const muBy={}, ventBy={}, paresBy={}, first={}, recurSet={};
+    (lista||[]).forEach(p=>{
+      const m=mk(p); if(!m) return;
+      if(p.es_muestra){ muBy[m]=(muBy[m]||0)+1; return; }
+      if(!vale(p)) return;
+      ventBy[m]=(ventBy[m]||0)+(+p.total||0);
+      paresBy[m]=(paresBy[m]||0)+(+p.pares||0);
+      if(!p.cliente_id) return;
+      const o=mNum(m);
+      if(first[p.cliente_id]==null || o<first[p.cliente_id]) first[p.cliente_id]=o;
+    });
+    (lista||[]).forEach(p=>{
+      if(!p.cliente_id || !vale(p)) return;
+      const m=mk(p); if(!m) return;
+      if(first[p.cliente_id]!=null && first[p.cliente_id]<mNum(m)) (recurSet[m]=recurSet[m]||new Set()).add(p.cliente_id);
+    });
+    // el mes del primer pedido se reconstruye del orden: o = año*12 + indiceMes
+    const nuevoBy={}; Object.values(first).forEach(o=>{ const k=M3[o%12]+'-'+Math.floor(o/12); nuevoBy[k]=(nuevoBy[k]||0)+1; });
+    const meses=[...new Set([...Object.keys(muBy),...Object.keys(ventBy),...Object.keys(nuevoBy)])]
+      .filter(Boolean).sort((a,b)=>mNum(a)-mNum(b));
+    const MM={}; let regAcc=0, ventAcc=0;
+    meses.forEach(m=>{ regAcc+=(nuevoBy[m]||0); ventAcc+=(ventBy[m]||0);
+      MM[m]={ muestras:muBy[m]||0, pares:paresBy[m]||0, nuevos:nuevoBy[m]||0,
+              recur:(recurSet[m]&&recurSet[m].size)||0, ventas:ventBy[m]||0,
+              ventasAcum:ventAcc, registrados:regAcc }; });
+    return {meses, MM};
   },
   async vDashboardSmart(){
     this.loading();
