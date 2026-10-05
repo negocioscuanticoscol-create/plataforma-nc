@@ -2746,9 +2746,39 @@ const App = {
       `<h2 style="font-size:15px;margin:18px 0 6px">🌐 Consolidado · resto de la red</h2>`+
       (B.meses.length ? this._tablaMeses(B.meses,B.MM,FILAS,'Todos los demás CED sumados. '+NOTA)
                       : '<div class="card"><div class="empty">Sin pedidos de otros CED todavía.</div></div>');
+    /* Reparto por CED. Está a la vista a propósito: Ventas no separa por sede (el
+       RLS le entrega todo junto) y este cuadro sí, así que un pedido con el `ced`
+       vacío se vería en Ventas y desaparecería de acá. En vez de esconderlo, se
+       muestra dónde cayó cada pedido para que el descuadre salte a la vista. */
+    const PAG=['consignado','autorizado','despachado','entregado'];
+    const porCed={};
+    peds.forEach(p=>{ const k=(String(p.ced||'').trim())||'⚠️ sin CED';
+      (porCed[k]=porCed[k]||{n:0,v:0,mu:0});
+      if(p.es_muestra) porCed[k].mu++;
+      else if(PAG.includes(p.estado)){ porCed[k].n++; porCed[k].v+=+p.total||0; } });
+    const filasCed=Object.entries(porCed).sort((a,b)=>b[1].v-a[1].v).map(([k,d])=>
+      `<tr><td style="padding:6px 8px;border-bottom:1px solid var(--linea);font-size:12.5px">${esc(k)}</td>
+         <td style="padding:6px 8px;border-bottom:1px solid var(--linea);font-size:12.5px;text-align:right">${d.n}</td>
+         <td style="padding:6px 8px;border-bottom:1px solid var(--linea);font-size:12.5px;text-align:right">${d.mu}</td>
+         <td style="padding:6px 8px;border-bottom:1px solid var(--linea);font-size:12.5px;text-align:right;font-weight:700">${money(d.v)}</td></tr>`).join('');
+    const sinCed=porCed['⚠️ sin CED'];
+    const avisoSinCed = sinCed
+      ? `<div class="card" style="border-left:4px solid #dc2626;padding:10px 13px"><div style="font-size:12.5px;color:#8a1c1c">
+           <b>${sinCed.n} pedidos${sinCed.mu?' y '+sinCed.mu+' muestras':''} sin CED asignado</b> (${money(sinCed.v)}).
+           Aparecen en Ventas pero no entran en el cuadro de ningún CED. Hay que asignarles la sede.</div></div>` : '';
+    const repartoHTML = (verRed && filasCed)
+      ? `<div class="card" style="overflow-x:auto"><h2 style="font-size:15px;margin-bottom:6px">🧭 Reparto por CED</h2>
+           <table style="border-collapse:collapse;width:100%"><thead><tr>
+             <th style="padding:6px 8px;border-bottom:2px solid var(--linea);font-size:11px;color:var(--suave);text-align:left">CED</th>
+             <th style="padding:6px 8px;border-bottom:2px solid var(--linea);font-size:11px;color:var(--suave);text-align:right">Ventas</th>
+             <th style="padding:6px 8px;border-bottom:2px solid var(--linea);font-size:11px;color:var(--suave);text-align:right">Muestras</th>
+             <th style="padding:6px 8px;border-bottom:2px solid var(--linea);font-size:11px;color:var(--suave);text-align:right">$</th>
+           </tr></thead><tbody>${filasCed}</tbody></table></div>` : '';
     this.set(`
       <h1>Dashboard</h1><div class="sub">Cómo vamos hoy${foco?' · '+esc(foco):''}</div>
+      ${avisoSinCed}
       ${selector}
+      ${repartoHTML}
       <h2 style="font-size:15px;margin:14px 0 6px">🏢 ${esc(foco||'Sin CED')}</h2>
       ${A.meses.length ? this._tablaMeses(A.meses,A.MM,FILAS,NOTA)
                        : '<div class="card"><div class="empty">Este CED todavía no tiene pedidos.</div></div>'}
