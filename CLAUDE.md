@@ -1,5 +1,12 @@
 # plataforma-nc — Negocios Cuánticos
 
+## 📖 PRIMERO: leer el playbook
+**Antes de tocar nada, leé `_PLAYBOOK/LEEME-PRIMERO.md` y después el resto de `_PLAYBOOK/`
+en el orden que ese archivo indica.** Ahí está lo que este CLAUDE.md no alcanza a decir:
+el estado de cada app y cliente, las decisiones y sus porqués, los pendientes vivos, dónde
+vive lo que corre fuera de este repo, y las llaves. Es privado (gitignored), así que ahí sí
+hay NITs, precios y nombres. **No le pidas a José que te explique algo que ya está ahí.**
+
 ## Qué es esto
 Plataforma madre de la agencia Negocios Cuánticos (Bogotá, Colombia).
 NO es el proyecto de un solo cliente: aloja varios negocios que
