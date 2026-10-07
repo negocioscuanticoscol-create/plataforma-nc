@@ -3300,6 +3300,7 @@ const App = {
         <div class="item"><div class="top"><div>
           <div class="nom">${esc(cl.nombre||'Cliente')} ${c.es_muestra?'<span class="badge b-cotizada">MUESTRA</span>':''}${(verFiltro&&!sel&&c.ced)?`<span style="font-size:10.5px;font-weight:700;background:#eef1f5;color:#54636b;padding:2px 7px;border-radius:9px;margin-left:5px">${esc(c.ced)}</span>`:''}</div>
           <div class="meta">${esc(c.numero||'')}${(cl.tel||cl.cel2)?' · 📱 '+esc(cl.tel||cl.cel2):''} · ${c.es_muestra?esc(c.detalle||'muestra'):(c.pares+' pares ('+c.cajas+' cajas)')} · ${new Date(c.creado_en).toLocaleDateString('es-CO')}</div>
+          ${c.notas?`<div style="font-size:12px;margin-top:4px;background:#fff3a3;border-left:3px solid #f2b705;padding:4px 8px;border-radius:5px;color:#3d2e00;font-weight:600">⚠️ ${esc(c.notas)}</div>`:''}
         </div><div style="text-align:right"><div class="tot">${money(c.total)}</div>
           <span class="badge b-${c.estado}">${c.estado}</span></div></div>
         <div class="acciones-item" style="align-items:center;gap:8px;flex-wrap:wrap">
@@ -3384,7 +3385,9 @@ const App = {
       txt.push(`Ref. ${it.referencia||''}${it.color?' '+it.color:''} - ${it.pares||0} par(es) x ${money(it.precio_par||0)} = ${money(it.subtotal||0)}`));
     else txt.push(`${concepto} - ${pares} par(es)`);
     if(sub) txt.push(`Subtotal: ${money(sub)}`); if(iva) txt.push(`IVA: ${money(iva)}`);
-    txt.push(`Transporte: ${fl.lbl}`,`TOTAL: ${money(tot)}`,'',`Para confirmar consigna en:`,cuentaLinea);
+    txt.push(`Transporte: ${fl.lbl}`,`TOTAL: ${money(tot)}`);
+    if(c.notas) txt.push('', `⚠️ *NOTAS IMPORTANTES:* ${c.notas}`);
+    txt.push('',`Para confirmar consigna en:`,cuentaLinea);
     if(titularLinea) txt.push(`a nombre de ${titularLinea}`);
     if(sedeLinea) txt.push('', `${sede.nombre||''}: ${sedeLinea}`);
     const wa=(cl.tel?('https://wa.me/57'+String(cl.tel).replace(/\D/g,'')):'https://wa.me/')+'?text='+encodeURIComponent(txt.join('\n'));
@@ -3400,6 +3403,8 @@ const App = {
     .emisor b{color:#475569}
     .cuenta{margin-top:10px;background:#f0fff6;border:1.5px solid #16a34a;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.5}
     .cuenta.falta{background:#fdecec;border-color:#c62828;color:#8a1c1c;font-weight:700}
+    .notas{background:#fff3a3;border:2px solid #f2b705;border-radius:8px;padding:12px 14px;font-size:14px;line-height:1.5;margin:0 0 14px;color:#3d2e00;font-weight:600}
+    .notas b{color:#7a5a00;letter-spacing:.04em;font-size:12px}
     .acts{padding:0 26px 24px;display:flex;gap:10px}.acts a,.acts button{flex:1;text-align:center;padding:12px;border-radius:8px;border:none;font-weight:700;font-size:14px;cursor:pointer;text-decoration:none}
     .b1{background:#111;color:#fff}.b2{background:#25D366;color:#fff}@media print{body{background:#fff;padding:0}.acts{display:none}.pf{box-shadow:none}}</style></head><body>
       <div class="pf">
@@ -3409,6 +3414,7 @@ const App = {
           <div style="text-align:right"><div style="font-size:18px;font-weight:800">PROFORMA</div><div class="sub">${esc(c.numero||'')}</div><div class="sub">${fecha}</div></div></div>
         <div class="pf-body">
           <div class="box"><b>Cliente:</b> ${esc(cl.nombre||'—')}${cl.nit?` · NIT/CC ${esc(cl.nit)}`:''}${cl.tel?`<br><b>Tel:</b> ${esc(cl.tel)}`:''}${dir?`<br><b>Entrega:</b> ${esc(dir)}`:''}</div>
+          ${c.notas?`<div class="notas"><b>⚠️ NOTAS IMPORTANTES</b><br>${esc(c.notas).split('\n').join('<br>')}</div>`:''}
           <table><thead><tr><th>Concepto</th><th style="text-align:right">Pares</th><th style="text-align:right">Precio/par</th><th style="text-align:right">Subtotal</th></tr></thead>
             <tbody>${(Array.isArray(c.items)&&c.items.length>1)
               ? c.items.map(it=>`<tr><td>${esc((it.categoria&&it.categoria!=='Calzado'?it.categoria+' ':'')+'Ref. '+(it.referencia||''))}${it.color?' · '+esc(it.color):''}</td><td style="text-align:right">${it.pares||0}</td><td style="text-align:right">${money(it.precio_par||0)}</td><td style="text-align:right">${money(it.subtotal||0)}</td></tr>`).join('')
@@ -3627,6 +3633,12 @@ const App = {
           <div style="flex:1"><label style="font-size:12px;color:#667">Cantidad de nonos</label><input class="field" type="number" id="co_pie_cant" value="1" min="1" inputmode="numeric"></div>
         </div>
       </div>
+      <!-- Notas importantes (7-oct-2026, José): salen en AMARILLO en la proforma y
+           se copian al pedido. Para condiciones, cambios de talla, fechas, avisos. -->
+      <div class="card" style="background:#fff8c5;border:2px solid #f2b705">
+        <label style="margin:0;color:#7a5a00">⚠️ Notas importantes <span style="font-weight:500;color:#9a7b1a">(salen resaltadas en la proforma)</span></label>
+        <textarea class="field" id="co_notas" style="margin-top:7px;min-height:64px;background:#fffdf0;border-color:#f2b705" placeholder="Ej: entregar antes del 15 · el cliente cambia 2 pares talla 40 por 41 · recibe solo en la mañana"></textarea>
+      </div>
       <div class="card" style="border:1.5px solid var(--naranja)"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0"><input type="checkbox" id="co_iva" checked style="width:18px;height:18px;accent-color:var(--naranja)"> <b>Incluir IVA (19%)</b> en la cotización</label>
         <div class="hint">Si lo desmarcas, la cotización queda SIN IVA (solo el valor de los pares + flete).</div></div>
       <button class="btn btn-main" onclick="App.guardarCotizacion()">${editId?'💾 Guardar cambios':'Guardar cotización'}</button>
@@ -3647,6 +3659,7 @@ const App = {
         if(cd&&so&&so.dataset) cd.value=so.dataset.nit||'';
         const cc=$('co_contacto');     if(cc) cc.value=ec.contacto||'';
         const ct=$('co_contacto_tel'); if(ct) ct.value=ec.contacto_tel||'';
+        const cn=$('co_notas');        if(cn) cn.value=ec.notas||'';
         /* Una muestra a precio especial se guarda como muestra_tipo 'par' -para que
            el flete, el PDF y el CRM la traten igual-, asi que al reabrirla se
            distingue por el precio que quedo escrito, no por el tipo. */
@@ -3706,6 +3719,7 @@ const App = {
        igual en la cotización normal y en la de muestra */
     reg.contacto     = (($('co_contacto')||{}).value||'').trim() || null;
     reg.contacto_tel = (($('co_contacto_tel')||{}).value||'').trim() || null;
+    reg.notas        = (($('co_notas')||{}).value||'').trim() || null;
     if(this._editCotId){ const { error } = await this.sb.from('cotizaciones').update(reg).eq('id',this._editCotId); return error; }
     const { error } = await this.sb.from('cotizaciones').insert(reg); return error;
   },
@@ -4326,6 +4340,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       referencia:c.referencia||null, valor_par_nc:c.valor_par_nc||null, valor_par_gpjr:c.valor_par_gpjr||null,
       recomendado:!!c.recomendado, comision_nc:c.comision_nc||0, comision_gpjr:c.comision_gpjr||0,
       es_muestra:c.es_muestra||false, detalle:c.detalle||null, interno:c.interno||false, asesor:c.asesor||null,
+      notas:c.notas||null,
       abono:abono||0, abono_forma:abono?abForma:null, abono_nota:abono?abNota:null,
       abono_en:abono?new Date().toISOString():null
     }).select().single();
