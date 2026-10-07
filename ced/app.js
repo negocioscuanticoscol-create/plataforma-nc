@@ -5889,45 +5889,75 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     await this.sb.from('garantias').update({estado,actualizado_en:new Date().toISOString()}).eq('id',id);
     this.vPlanta();
   },
-  _garTxt(g){
-    const c=g.cliente_snap||{},cu=g.curva||{};
+  /* La sede que atiende la garantía: la del pedido original, o la del caso.
+     'Principal' es como queda escrito el CED principal en algunos registros. */
+  async _garSede(g){
+    if(!this._cedSedes){ try{ const r=await this.sb.from('ced').select('*'); this._cedSedes=r.data||[]; }catch(e){ this._cedSedes=[]; } }
+    const ped=(this._pedFull||[]).find(p=>String(p.id)===String(g.pedido_id))||{};
+    const nom=ped.ced||g.ced||this.miSede()||'';
+    const S=this._cedSedes;
+    return S.find(x=>x.nombre===nom) || (/^principal$/i.test(nom)?S.find(x=>x.principal):null) || S.find(x=>x.principal) || {nombre:nom};
+  },
+  _garEnvio(g){
+    const c=g.cliente_snap||{};
+    return [c.direccion,c.barrio,c.ciudad,c.depto].filter(Boolean).join(', ');
+  },
+  _garTxt(g,sede){
+    const c=g.cliente_snap||{},cu=g.curva||{}; sede=sede||{};
     const ped=(this._pedFull||[]).find(p=>String(p.id)===String(g.pedido_id))||{};
     const tallas=Object.entries(cu).sort((a,b)=>a[0]-b[0]).map(([t,q])=>'T'+t+':'+q).join(', ');
-    return `🥾 DEVOLUCIÓN A BODEGA — Feroz\nNº ${String(g.id).padStart(5,'0')} · ${new Date(g.creado_en).toLocaleDateString('es-CO')}\n`+
-      `Cliente: ${c.nombre||''} (NIT ${c.nit||'—'})\nPedido: ${ped.numero||('#'+g.pedido_id)}\nTipo: ${g.tipo}${g.falla?' — '+g.falla:''}\n`+
-      `Ref 701 — ${tallas} (${g.pares} pares)\nMotivo: ${g.motivo||'—'}\nEntregar en: ${g.entregar_en||'Bodega'}`+
+    const env=this._garEnvio(g);
+    return `🛡️ GARANTÍA · REPOSICIÓN — ${sede.nombre_comercial||sede.nombre||''}\nNº ${String(g.id).padStart(5,'0')} · ${new Date(g.creado_en).toLocaleDateString('es-CO')}\n`+
+      `Cliente: ${c.nombre||''}${c.nit?' (NIT '+c.nit+')':''}${c.tel?' · Tel '+c.tel:''}\nPedido original: ${ped.numero||('#'+g.pedido_id)}\n`+
+      (env?`📦 Enviar a: ${env}\n`:'')+
+      `Tipo: ${g.tipo}${g.falla?' — '+g.falla:''}\nRef 701 — ${tallas} (${g.pares} pares) · sin costo\nMotivo: ${g.motivo||'—'}`+
       (g.solucion?`\n✅ Solución: ${g.solucion}`:'')+
       (g.foto_url?`\n📷 Foto: ${g.foto_url}`:'');
   },
-  garWa(id,quien){
+  async garWa(id,quien){
     const g=(this._garantias||[]).find(x=>String(x.id)===String(id)); if(!g)return;
+    const sede=await this._garSede(g);
     const num=quien==='copia'?'573236375088':'573164824615';
-    window.open('https://wa.me/'+num+'?text='+encodeURIComponent(this._garTxt(g)),'_blank');
+    window.open('https://wa.me/'+num+'?text='+encodeURIComponent(this._garTxt(g,sede)),'_blank');
   },
-  garDoc(id){
+  /* El documento de garantía es una PROFORMA DE REPOSICIÓN (7-oct-2026, José): la
+     encabeza la sede que atiende (como la proforma normal, sin NIT), el envío va a
+     donde está el CLIENTE, y los pares van sin costo. Antes salía "Feroz Safety
+     Wear / Fueling Equipment", que es otra empresa, y "entregar en bodega". */
+  async garDoc(id){
     const g=(this._garantias||[]).find(x=>String(x.id)===String(id)); if(!g)return;
     const c=g.cliente_snap||{},cu=g.curva||{};
     const ped=(this._pedFull||[]).find(p=>String(p.id)===String(g.pedido_id))||{};
+    const sede=await this._garSede(g);
+    const AC=(sede.color&&/^#[0-9a-fA-F]{6}$/.test(sede.color))?sede.color:'#E8620C';
+    const sedeLinea=[sede.direccion,sede.ciudad,sede.telefono?'Tel '+sede.telefono:''].filter(Boolean).join(' · ');
+    const env=this._garEnvio(g);
     const fecha=new Date(g.creado_en).toLocaleDateString('es-CO');
-    const filas=Object.entries(cu).sort((a,b)=>a[0]-b[0]).map(([t,q])=>`<tr><td>Ref. 701 — Talla ${t}</td><td style="text-align:center">${q}</td></tr>`).join('');
+    const filas=Object.entries(cu).sort((a,b)=>a[0]-b[0]).map(([t,q])=>`<tr><td>Ref. ${esc(g.referencia||'701')}${g.color?' · '+esc(g.color):''} — Talla ${t}</td><td style="text-align:center">${q}</td><td style="text-align:right;color:#16a34a;font-weight:700">Sin costo</td></tr>`).join('');
     const tipoTxt={garantia:'GARANTÍA (defecto de fábrica)',devolucion:'DEVOLUCIÓN',cambio:'CAMBIO DE TALLA'}[g.tipo]||g.tipo;
-    const html=`<!doctype html><html><head><meta charset="utf-8"><title>Devolucion ${g.id}</title>
-      <style>body{font-family:Arial,sans-serif;color:#111;max-width:720px;margin:22px auto;padding:0 18px}
-      h1{font-size:20px;margin:0}.muted{color:#666;font-size:12px}table{width:100%;border-collapse:collapse;margin:12px 0}
-      th,td{border:1px solid #ccc;padding:7px;font-size:13px}th{background:#f3f4f6;text-align:left}
-      .box{border:1px solid #ddd;border-radius:8px;padding:12px;margin:10px 0}.firmas{display:flex;gap:40px;margin-top:46px}
-      .firma{flex:1;border-top:1px solid #111;padding-top:6px;font-size:12px;text-align:center}
-      .head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #e8551f;padding-bottom:10px}
-      .destaca{background:#fff4ed;border:1px solid #e8551f;color:#b23c10;font-weight:800;padding:8px;border-radius:8px;text-align:center;margin:10px 0}
-      img.ev{max-width:260px;border:1px solid #ccc;border-radius:8px;margin-top:8px}</style></head><body>
-      <div class="head"><div><h1>FEROZ SAFETY WEAR</h1><div class="muted">FUELING EQUIPMENT &amp; SUPPLIES SAS · NIT 902025524</div></div>
-        <div style="text-align:right"><div style="font-weight:800;color:#e8551f">DEVOLUCIÓN / GARANTÍA</div><div class="muted">Nº ${String(g.id).padStart(5,'0')} · ${fecha}</div></div></div>
-      <div class="destaca">📦 ENTREGAR EN BODEGA: ${esc(g.entregar_en||'Bodega')} — NO en planta</div>
-      <div class="box"><b>Tipo:</b> ${tipoTxt}${g.falla?' — <b>Falla:</b> '+esc(g.falla):''}<br><b>Cliente:</b> ${esc(c.nombre||'')} · NIT ${esc(c.nit||'—')} · Tel ${esc(c.tel||c.celular||'—')}<br><b>Pedido original:</b> ${esc(ped.numero||('#'+g.pedido_id))}</div>
-      <table><thead><tr><th>Ítem devuelto</th><th style="text-align:center">Pares</th></tr></thead><tbody>${filas}<tr style="font-weight:800"><td>TOTAL</td><td style="text-align:center">${g.pares}</td></tr></tbody></table>
+    const html=`<!doctype html><html><head><meta charset="utf-8"><title>Garantia ${g.id}</title>
+      <style>*{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}body{margin:0;padding:24px;color:#1a1a1a;background:#f3f4f6}
+      .pf{max-width:720px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)}
+      .hd{background:${AC};color:#fff;padding:20px 26px;display:flex;justify-content:space-between;align-items:flex-start}
+      .hd h1{margin:0;font-size:26px;letter-spacing:1px}.hd .sub{font-size:12px;opacity:.95;margin-top:3px}
+      .pf-body{padding:22px 26px}.box{font-size:13px;line-height:1.5;margin-bottom:12px}.box b{color:${AC}}
+      table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}th,td{padding:8px 10px;border-bottom:1px solid #eee;text-align:left}th{background:#faf7f4;font-size:12px}
+      .envio{background:#f5f7fa;border:1.5px solid #cbd5e1;border-radius:8px;padding:12px 14px;font-size:13px;line-height:1.5;margin-bottom:12px}.envio b{color:#475569}
+      .sol{background:#fff3a3;border:2px solid #f2b705;border-radius:8px;padding:12px 14px;font-size:14px;line-height:1.5;margin:12px 0;color:#3d2e00;font-weight:600}.sol b{color:#7a5a00;letter-spacing:.04em;font-size:12px}
+      .firmas{display:flex;gap:40px;margin-top:40px}.firma{flex:1;border-top:1px solid #111;padding-top:6px;font-size:12px;text-align:center}
+      img.ev{max-width:260px;border:1px solid #ccc;border-radius:8px;margin-top:8px;display:block}
+      @media print{body{background:#fff;padding:0}.pf{box-shadow:none}}</style></head><body>
+      <div class="pf">
+      <div class="hd"><div><h1>${esc(sede.nombre_comercial||sede.nombre||'CED')}</h1><div class="sub">Centro operativo que atiende esta garantía</div>${sedeLinea?`<div class="sub">${esc(sedeLinea)}</div>`:''}</div>
+        <div style="text-align:right"><div style="font-size:18px;font-weight:800">GARANTÍA · REPOSICIÓN</div><div class="sub">Nº ${String(g.id).padStart(5,'0')}</div><div class="sub">${fecha}</div></div></div>
+      <div class="pf-body">
+      <div class="box"><b>Cliente:</b> ${esc(c.nombre||'—')}${c.nit?` · NIT/CC ${esc(c.nit)}`:''}${(c.tel||c.celular)?`<br><b>Tel:</b> ${esc(c.tel||c.celular)}`:''}<br><b>Pedido original:</b> ${esc(ped.numero||('#'+g.pedido_id))}<br><b>Tipo:</b> ${tipoTxt}${g.falla?` · <b>Falla:</b> ${esc(g.falla)}`:''}</div>
+      <div class="envio"><b>📦 Enviar a:</b><br><span style="font-size:15px;font-weight:800">${esc(c.nombre||'')}</span><br>${esc(env||'— sin dirección registrada: completarla en la ficha del cliente —')}</div>
+      <table><thead><tr><th>Ítem a reponer</th><th style="text-align:center">Pares</th><th style="text-align:right">Valor</th></tr></thead><tbody>${filas}<tr style="font-weight:800"><td>TOTAL</td><td style="text-align:center">${g.pares}</td><td style="text-align:right;color:#16a34a">$0</td></tr></tbody></table>
       <div class="box"><b>Motivo:</b><br>${esc(g.motivo||'—')}${g.foto_url?`<br><b>Evidencia:</b><br><img class="ev" src="${g.foto_url}">`:''}</div>
-      ${g.solucion?`<div class="box" style="background:#fff3a3;border-color:#f2b705;color:#3d2e00;font-weight:600"><b style="color:#7a5a00">✅ SOLUCIÓN ACORDADA</b><br>${esc(g.solucion)}</div>`:''}
-      <div class="firmas"><div class="firma">Entrega (Feroz)</div><div class="firma">Recibe (Bodega)</div></div>
+      ${g.solucion?`<div class="sol"><b>✅ SOLUCIÓN ACORDADA</b><br>${esc(g.solucion)}</div>`:''}
+      <div class="firmas"><div class="firma">Entrega (${esc(sede.nombre_comercial||sede.nombre||'CED')})</div><div class="firma">Recibe (Cliente)</div></div>
+      </div></div>
       <script>window.onload=function(){setTimeout(function(){window.print();},450);}<\/script></body></html>`;
     const w=window.open('','_blank'); if(w){w.document.write(html);w.document.close();}
   },
