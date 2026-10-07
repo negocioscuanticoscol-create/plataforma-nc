@@ -418,6 +418,10 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
       <div id="sum-notas" style="display:none;padding:9px 15px;border-bottom:1px solid var(--bd);color:#d63031;font-size:13px;font-weight:700;line-height:1.45;white-space:pre-wrap"></div>
       <div style="padding:10px 15px;background:var(--bg)">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">Subtotal sin IVA</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-sub">-</span></div>
+        <div id="s-desc-box" style="display:none">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:#c2410c;font-weight:700" id="s-desc-lbl">Descuento</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:#c2410c" id="s-desc">-</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">Subtotal con descuento (base IVA)</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-neto">-</span></div>
+        </div>
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--t2)">IVA 19%</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500" id="s-iva">-</span></div>
         <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--t2)">Flete <span id="s-cajas" style="font-size:10px;color:var(--t3)"></span></span><span style="font-family:'IBM Plex Mono',monospace;font-weight:500;color:var(--acc)" id="s-flete">-</span></div>
       </div>
@@ -982,7 +986,8 @@ function buildResumen(){
   }).join('');
   if(pedidoMuestras) itemsHTML+=`<div class="srow"><div class="srl">🧪 Kit de Muestras<small>Muestrario completo · Transporte incluido</small></div><div class="srr" style="color:var(--acc)">${fmt(getKitPrecio())}</div></div>`;
   document.getElementById('sum-items').innerHTML=itemsHTML||'<div class="srow"><div class="srl" style="color:var(--t3)">Solo kit de muestras</div></div>';
-  const iva=Math.round(subBase*IVA);
+  const DSC=calcDescuento(subBase, sel); const subNeto=subBase-DSC.valor;
+  const iva=Math.round(subNeto*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
   const fleteDisplay = getFleteDisplay();
   const flete = fleteDisplay ? fleteDisplay.monto : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
@@ -990,8 +995,14 @@ function buildResumen(){
   const residuoUds=sel.reduce((a,s)=>a+(s.qty%s.prod.pk),0);
   const cajasResiduo=Math.ceil(residuoUds/200);
   const cajas=totalPacas>0?totalPacas:Math.ceil(totalUds/200);
-  const grand=subBase+iva+flete+(pedidoMuestras?getKitPrecio():0);
+  const grand=subNeto+iva+flete+(pedidoMuestras?getKitPrecio():0);
   document.getElementById('s-sub').textContent=fmt(subBase);
+  const dbox=document.getElementById('s-desc-box');
+  if(dbox){ dbox.style.display=DSC.valor>0?'block':'none';
+    document.getElementById('s-desc-lbl').textContent='Descuento '+String(DSC.pct).replace('.',',')+'%'+(descuentoMotivo?' · '+descuentoMotivo:'');
+    document.getElementById('s-desc').textContent='− '+fmt(DSC.valor);
+    document.getElementById('s-neto').textContent=fmt(subNeto);
+    if(DSC.recortado) alert('Ojo: el descuento de '+descuentoPct+'% ya no alcanza con esta lista o estas cantidades.\nSe dejó en '+DSC.pct+'% para no vender bajo el precio convenio.'); }
   document.getElementById('s-iva').textContent=fmt(iva);
   document.getElementById('s-flete').textContent= fleteDisplay ? (fleteDisplay.label) : fmt(flete);
   const cajasLabel=!fleteDisplay&&totalPacas>0?(totalPacas+` paca${totalPacas>1?'s':''}${cajasResiduo>0?' + '+cajasResiduo+' caja resid.':''}`):!fleteDisplay&&cajas?`(${cajas} caja${cajas>1?'s':''})`:'' ;
@@ -1044,19 +1055,21 @@ function notificarJose(estado){
   const folio=document.getElementById('folio-display').textContent;
   const IVA=0.19; let subBase=0;
   sel.forEach(s=>{ subBase+=s.qty*precioLinea(s); });
-  const iva=Math.round(subBase*IVA);
+  const DSC=calcDescuento(subBase, sel); const subNeto=subBase-DSC.valor;
+  const iva=Math.round(subNeto*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
   const fleteDisp = getFleteDisplay();
   const flete = fleteDisp ? fleteDisp.monto : (pedidoMuestras && sel.length===0 ? 0 : calcFlete(sel));
-  const grand=subBase+iva+flete+(pedidoMuestras?getKitPrecio():0);
+  const grand=subNeto+iva+flete+(pedidoMuestras?getKitPrecio():0);
   const fleteStr = fleteDisp ? fleteDisp.label : fmt(flete);
-  const comision=calcComision(sel);
+  const comision=Math.max(0, calcComision(sel)-DSC.valor);
   let msg=`${estado==='pedido'?'🎉 PEDIDO (cotización aceptada/pagada)':'📝 NUEVA COTIZACIÓN (en cola)'} · ${folio}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
   msg+=`Empresa: ${empresa}\nContacto: ${contacto} · ${tel}\n`;
   if(tipo==='nat') msg+=`Cédula: ${g('ced')}\n`; else msg+=`NIT: ${g('rut')}\n`;
   msg+=`Entrega: ${envio.dir}, ${envio.barrio?'Barrio: '+envio.barrio+', ':''}${envio.ciudad}\n\n`;
   sel.forEach(s=>{ const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; msg+=`▸ ${group} ${s.prod.v} (${s.color==='blanco'?'Blanco':'Transparente'}): ${fmtN(s.qty)} uds\n`; });
   if(pedidoMuestras) msg+=`▸ Kit de muestras · ${fmt(getKitPrecio())}\n`;
+  msg+=`\nSubtotal: ${fmt(subBase)}`+(DSC.valor>0?`\nDescuento ${DSC.pct}%: − ${fmt(DSC.valor)}${descuentoMotivo?' ('+descuentoMotivo+')':''}\nBase IVA: ${fmt(subNeto)}`:'')+`\nIVA 19%: ${fmt(iva)}`;
   msg+=`\nFlete: ${fleteStr}\nTOTAL: ${fmt(grand)}\nComisión estimada: ${fmt(comision)}\nTransporte: ${nombreTransporte()}${tipoTransporte==='smart'?'\n🚐 '+itinerarioTexto():''}\n\n✅ El cliente aceptó la cotización (queda en cola).\nEnvía las formas de pago — al pagar pasa a pedido.`;
   window.open('https://wa.me/'+WA+'?text='+encodeURIComponent(msg), '_blank');
 }
@@ -1071,6 +1084,19 @@ function precioLinea(s){
   if(esPetMulti1000(s)) return s.prod.t[2];                                  // pm1000 SIEMPRE mayorista
   if(listaActiva === L_EMPRESA) return s.prod.t[ esEgConv(s) ? L_CONVENIO : L_DISTRIB ];
   return s.prod.t[listaActiva];
+}
+/* 💸 DESCUENTO (José, 6-oct-2026). Se pone en la cola de la app (botón "Descuento", antes
+   de autorizar) y queda en datos.descuento_pct. Aquí solo se RESPETA y se MUESTRA:
+   va sobre el subtotal de productos, ANTES del IVA y del transporte, y sale en el detalle
+   como línea aparte. Sale de la comisión: si al modificar la cotización (otra lista, otras
+   cantidades) ya no alcanza, se recorta al máximo para no vender bajo el precio convenio. */
+let descuentoPct=0, descuentoMotivo='', descuentoPor='', descuentoFecha='';
+function calcDescuento(subBase, sel){
+  if(!descuentoPct || subBase<=0) return {pct:0, valor:0, recortado:false};
+  const comProd=Math.max(0, calcComision(sel)-(pedidoMuestras?getKitComision():0));
+  const max=Math.floor(comProd/subBase*1000)/10;
+  const pct=Math.min(descuentoPct, max);
+  return {pct, valor:Math.round(subBase*pct/100), recortado:pct<descuentoPct};
 }
 function calcComision(sel){
   let com;
@@ -1100,11 +1126,20 @@ function calcComision(sel){
 async function registrarEnSheets(estadoCot, irAPedidos){
   const sel=getSel(); const IVA=0.19; let subBase=0;
   const productos=sel.map(s=>{ const precio=precioLinea(s); const subtotal=s.qty*precio; subBase+=subtotal; const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; return { ref:group+' '+s.prod.v, color:COLNOM[s.color]||'Transparente', qty:s.qty, precio, subtotal }; });
-  const iva=Math.round(subBase*IVA);
+  const DSC=calcDescuento(subBase, sel); const subNeto=subBase-DSC.valor;
+  const iva=Math.round(subNeto*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
   const _fd = getFleteDisplay();
   const fleteCalc = _fd ? _fd.monto : (pedidoMuestras && totalUds===0 ? 0 : calcFlete(sel));
-  const grand=subBase+iva+fleteCalc+(pedidoMuestras?getKitPrecio():0);
+  const kitP=(pedidoMuestras?getKitPrecio():0);
+  const grand=subNeto+iva+fleteCalc+kitP;
+  const comBruta=Math.round(calcComision(sel));
+  const descDatos = DSC.valor>0 ? {
+    descuento_pct: DSC.pct, descuento_valor: DSC.valor, descuento_motivo: descuentoMotivo,
+    descuento_por: descuentoPor, descuento_fecha: descuentoFecha,
+    subtotal_antes_descuento: Math.round(subBase),
+    total_antes_descuento: Math.round(subBase+Math.round(subBase*IVA)+fleteCalc+kitP),
+    comision_antes_descuento: comBruta } : {};
   const envio=getEnvio();
   const folio=document.getElementById('folio-display').textContent;
   const now=new Date();
@@ -1124,7 +1159,7 @@ async function registrarEnSheets(estadoCot, irAPedidos){
     envio_diferente: envioDif?'SI':'NO',
     alimento: g('ali'), notas: g('notas'),
     productos: JSON.stringify(productos), total_uds: totalUds,
-    subtotal_sin_iva: Math.round(subBase),
+    subtotal_sin_iva: Math.round(subNeto),   // con descuento si lo hay: es la base del IVA y de la venta
     iva: Math.round(iva),
     flete: Math.round(fleteCalc),
     tarifa_flete: esFleteLegacy()?'legacy':'2026',   // con qué política se cotizó — para auditar y para no recalcular al reabrir
@@ -1133,7 +1168,8 @@ async function registrarEnSheets(estadoCot, irAPedidos){
     flete_manual: tipoTransporte==='smart' ? String(fleteSmart) : '',
     itinerario: tipoTransporte==='smart' ? itinerarioTexto() : '',
     total: Math.round(grand),
-    comision: Math.round(calcComision(sel)),
+    comision: Math.max(0, comBruta-DSC.valor),   // el descuento sale de la comisión
+    ...descDatos,
     lista_idx: listaActiva, lista_nombre: LISTA_NAMES[listaActiva],
     promo_code: promoOn?document.getElementById('pinp').value.trim().toUpperCase():'',
     kit_muestras: pedidoMuestras?'SI':'NO',
@@ -1257,6 +1293,8 @@ function autofillCot(){
     if(esJur){ sv('rut',d.cedula_nit); sv('rsoc',d.empresa); sv('rec',d.contacto||d.empresa); sv('telj',d.celular); sv('emlj',d.correo); sv('dirj',d.dir_factura); sv('barj',d.barrio_factura); sv('ciuj',d.ciudad_factura); sv('depj',d.dep_factura); }
     else { sv('ced',d.cedula_nit); sv('nom',d.empresa||d.contacto); sv('neg',d.empresa); sv('tel',d.celular); sv('eml',d.correo); sv('dir',d.dir_factura); sv('bar',d.barrio_factura); sv('ciu',d.ciudad_factura); sv('dep',d.dep_factura); }
     if(d.notas) setNotasCot(d.notas);   // antes las notas se perdian al reabrir la cotizacion
+    // el descuento puesto en la cola se conserva al reabrir/modificar (antes se perdía)
+    descuentoPct=+d.descuento_pct||0; descuentoMotivo=d.descuento_motivo||''; descuentoPor=d.descuento_por||''; descuentoFecha=d.descuento_fecha||'';
     // restaura la LISTA DE PRECIOS que tenía la cotización (antes se perdía y tocaba re-elegirla)
     if(d.lista_idx!=null && d.lista_idx!==''){ const li=parseInt(d.lista_idx); if(!isNaN(li)){ listaActiva=li; const ls=document.getElementById('lista-sel'); if(ls) ls.value=String(li); } }
     let prods=d.productos; if(typeof prods==='string'){ try{prods=JSON.parse(prods);}catch(e){prods=null;} }

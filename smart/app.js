@@ -1257,15 +1257,62 @@ const App = {
   _cotItemHTML(c){
     const f=(c.creado_en||'').slice(0,10),cel=c.celular||'';
     const ac=c.accion?`<span class="badge" style="background:#eef2ff;color:#3a48b3">${c.accion==='llamar'?'📞 en seguimiento':c.accion==='remarketing'?'📣 remarketing':esc(c.accion)}</span>`:'<span class="badge b-cotizada">en cola</span>';
-    return `<div class="item"><div class="top"><div><div class="nom">${esc(c.cliente||c.folio||'—')}</div><div class="meta">${c.folio?esc(c.folio)+' · ':''}$${(+c.total||0).toLocaleString('es-CO')} · 📅 ${f}${cel?' · 📱 '+esc(cel):''}</div></div>${ac}</div>
+    const dd=c.datos||{}, pctD=+dd.descuento_pct||0;
+    const descHTML=pctD?`<div style="font-size:12px;color:#7c2d12;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:5px 9px;margin-top:6px">💸 Descuento <b>${pctD}%</b> (−$${(+dd.descuento_valor||0).toLocaleString('es-CO')} antes de IVA) · antes $${(+dd.total_antes_descuento||0).toLocaleString('es-CO')} · <i>${esc(dd.descuento_motivo||'')}</i>${dd.descuento_por?' · '+esc(dd.descuento_por):''}</div>`:'';
+    return `<div class="item"><div class="top"><div><div class="nom">${esc(c.cliente||c.folio||'—')}</div><div class="meta">${c.folio?esc(c.folio)+' · ':''}$${(+c.total||0).toLocaleString('es-CO')} · 📅 ${f}${cel?' · 📱 '+esc(cel):''}</div>${descHTML}</div>${ac}</div>
       <div class="acciones-item" style="align-items:center;gap:8px;flex-wrap:wrap">
         <label style="font-size:12px;color:#b45309;display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:700" title="Si lo prendes, el pedido queda a crédito en Cartera (por cobrar)"><input type="checkbox" id="cotcred-${c.id}" style="accent-color:#d97706;width:15px;height:15px">💳 Crédito</label>
+        ${(window.NC_EMPRESA||'')==='smart'&&!this._esKitCot(dd)?`<button class="btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-weight:700" onclick="App.cotDescuento('${c.id}')">💸 Descuento${pctD?' ('+pctD+'%)':''}</button>`:''}
         <button class="btn-sm" style="background:#16a34a;color:#fff;font-weight:700" onclick="App.cotAutorizar('${c.id}')">✅ Autorizar → pedido</button>
         <button class="btn-sm" style="background:#6b7280;color:#fff" onclick="App.cotEditar('${c.id}')">✏️ Modificar</button>
         <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.cotAnular('${c.id}')">❌ Anular</button>
         <span style="font-size:12.5px;color:#667;margin-left:auto">¿Contactado?</span>
         <span onclick="App.cotContactoToggle('${c.id}')" id="ctc-${c.id}" title="Marca que ya lo contacté" style="cursor:pointer;display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid #16a34a;background:${c.contactado?'#16a34a':'#fff'}"></span>
       </div></div>`;
+  },
+  /* 💸 DESCUENTO antes de autorizar (José, 6-oct-2026).
+     Solo porcentaje, sobre el subtotal de PRODUCTOS sin IVA (no toca flete ni kit).
+     Sale de la COMISIÓN: el tope es la comisión de los productos, porque más allá se
+     vendería por debajo del precio convenio — eso se bloquea. Motivo obligatorio.
+     Reemplaza (no suma) un descuento anterior: siempre se calcula sobre los valores
+     de ANTES del primer descuento, que quedan guardados en datos.*_antes_descuento.
+     0% lo quita. El cotizador lo lee al reabrir ("Modificar") y lo muestra en el detalle
+     como línea aparte antes del IVA y del transporte; si con los cambios ya no alcanza la
+     comisión, el cotizador lo recorta al máximo. */
+  async cotDescuento(id){
+    const c=this._findCot(id); const d=Object.assign({}, c.datos||{});
+    if(!c.id){ alert('No encuentro la cotización.'); return; }
+    const sub0=+(d.subtotal_antes_descuento||d.subtotal_sin_iva||0);
+    const tot0=+(d.total_antes_descuento||c.total||d.total||0);
+    const com0=+(d.comision_antes_descuento!=null&&d.comision_antes_descuento!==''?d.comision_antes_descuento:(d.comision||0));
+    const comProd=Math.max(0, com0-(+d.kit_muestras_comision||0));   // la comisión del kit no se toca
+    if(sub0<=0){ alert('Esta cotización no tiene productos: no hay sobre qué aplicar descuento.'); return; }
+    const maxPct=Math.floor(comProd/sub0*1000)/10;                   // tope = hasta donde alcanza la comisión
+    if(maxPct<=0){ alert('Esta cotización ya está en precio convenio: no queda comisión para dar descuento.'); return; }
+    const r=prompt(`💸 Descuento para ${c.cliente||c.folio}\n\nSubtotal productos (sin IVA): $${sub0.toLocaleString('es-CO')}\nMáximo permitido: ${maxPct}% (hasta ahí alcanza la comisión; más abajo sería vender bajo el precio convenio)\n\n¿Qué porcentaje? (0 = quitar el descuento)`, String(+d.descuento_pct||''));
+    if(r===null) return;
+    const pct=+String(r).replace(',','.').replace(/[^\d.]/g,'');
+    if(isNaN(pct)||pct<0){ alert('Escribe un porcentaje, por ejemplo 5'); return; }
+    if(pct>maxPct){ alert(`❌ ${pct}% baja del precio convenio.\nEl máximo para esta cotización es ${maxPct}%.`); return; }
+    const iva=s=>Math.round(s*0.19);
+    if(pct===0){
+      if(!d.descuento_pct){ return; }
+      Object.assign(d,{subtotal_sin_iva:sub0, iva:iva(sub0), total:tot0, comision:com0});
+      ['descuento_pct','descuento_valor','descuento_motivo','descuento_por','descuento_fecha','subtotal_antes_descuento','total_antes_descuento','comision_antes_descuento'].forEach(k=>delete d[k]);
+      await this.cotUpd(id,{total:tot0, datos:d}); this._toast('Descuento quitado · vuelve a $'+tot0.toLocaleString('es-CO')); this.vCotLanding(); return;
+    }
+    const motivo=(prompt('¿Por qué se le da el descuento? (obligatorio, queda en la venta)', d.descuento_motivo||'')||'').trim();
+    if(!motivo){ alert('Sin motivo no se aplica el descuento.'); return; }
+    const val=Math.round(sub0*pct/100);
+    const sub1=sub0-val, tot1=tot0-val-(iva(sub0)-iva(sub1));      // flete y kit quedan igual
+    if(!confirm(`Aplicar ${pct}% a ${c.cliente||c.folio}\n\nDescuento: −$${val.toLocaleString('es-CO')} (antes de IVA)\nTotal: $${tot0.toLocaleString('es-CO')} → $${tot1.toLocaleString('es-CO')}\nComisión: $${com0.toLocaleString('es-CO')} → $${(com0-val).toLocaleString('es-CO')}\nMotivo: ${motivo}`)) return;
+    Object.assign(d,{subtotal_antes_descuento:sub0, total_antes_descuento:tot0, comision_antes_descuento:com0,
+      descuento_pct:pct, descuento_valor:val, descuento_motivo:motivo,
+      descuento_por:(this.perfil&&this.perfil.nombre)||'', descuento_fecha:new Date().toISOString().slice(0,10),
+      subtotal_sin_iva:sub1, iva:iva(sub1), total:tot1, comision:com0-val});
+    await this.cotUpd(id,{total:tot1, datos:d});
+    this._toast('💸 '+pct+'% aplicado · nuevo total $'+tot1.toLocaleString('es-CO'));
+    this.vCotLanding();
   },
   /* 🧪 Es KIT de muestras SOLO si NO lleva productos. Un pedido grande que ADEMÁS
      lleva un kit adjunto es un PEDIDO, no un kit. (Juan Dennis $8.3M salía en kits.) */
@@ -1294,7 +1341,8 @@ const App = {
     return { pct, umbral, conv, nivel:(pct<0?'rojo':'naranja'),
       msg:(pct<0 ? 'NEGATIVO: se vendió por DEBAJO del precio convenio ('+pct+'%)'
                  : 'Margen '+pct+'% — por debajo del '+umbral+'% esperado')
-          +(promo?' · descuento '+promo:'') }; },
+          +(promo?' · descuento '+promo:'')
+          +(+d.descuento_pct?' · descuento manual '+d.descuento_pct+'% ('+(d.descuento_motivo||'sin motivo')+')':'') }; },
   /* Banner del aviso: NO se va solo. Esto es plata, tiene que verse. */
   _avisar(a){
     if(!a) return;
@@ -1446,7 +1494,8 @@ const App = {
         const exceso=Math.max(0, (_cons||0) - (+(c.total||0)));   // lo que consignó de más → a comisión
         const cb=(+(d.comision||0))+exceso;
         await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},
-          body:JSON.stringify({empresa:'smart',mes,cliente:c.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:Math.max(0,Math.round(tv-cb)),comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:(d.kit_muestras==='SI'),folio:folio,notas:(exceso>0?('Consignó $'+(_cons).toLocaleString('es-CO')+' · excedente $'+exceso.toLocaleString('es-CO')+' a comisión'):'Generado en plataforma')})});
+          body:JSON.stringify({empresa:'smart',mes,cliente:c.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:Math.max(0,Math.round(tv-cb)),comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:(d.kit_muestras==='SI'),folio:folio,notas:[(exceso>0?('Consignó $'+(_cons).toLocaleString('es-CO')+' · excedente $'+exceso.toLocaleString('es-CO')+' a comisión'):'Generado en plataforma'),
+            (+d.descuento_pct?('Descuento '+d.descuento_pct+'% (−$'+(+d.descuento_valor||0).toLocaleString('es-CO')+' de la comisión) · '+(d.descuento_motivo||'')+(d.descuento_por?' · '+d.descuento_por:'')):'')].filter(Boolean).join(' · ')})});
         this._avisar(this._margenVenta(d,tv,cb));   // 🚨 avisa si el margen quedó por debajo de lo esperado
       }
     }catch(e){ console.log('nc_ventas insert',e); }
