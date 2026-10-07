@@ -310,7 +310,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261006-tarifa-base';
+const VER='20261007-pago-por-hora';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -412,6 +412,30 @@ let MI_TARIFA=null;
    Ej.: Alimentos y Lacteos paga Interesado $1.000 y todo lo demas $50. La base
    de datos fija el valor de todas formas; esto es para que la pantalla diga lo mismo. */
 let TARIFA_BASE=null;
+/* Bases de NICHO (mkr_bases.pago='hora'): se paga la hora validada + interesado
+   + bonos de cotizacion y venta (mkr_bonos). Ver _PLAYBOOK/mkr_pago_por_hora.sql. */
+function porHora(b){ b=b||BASE; return !!(b && b.pago==='hora'); }
+let BONOS={};   // llamada_id -> {cotizacion:true, venta:true}
+async function cargarBonos(filas){
+  const ids=(filas||[]).filter(x=>x.base_id && porHora(TODAS_BASES[String(x.base_id)])).map(x=>x.id);
+  for(let i=0;i<ids.length;i+=80){
+    const d=await GET('mkr_bonos?select=llamada_id,tipo&llamada_id=in.('+ids.slice(i,i+80).join(',')+')');
+    (Array.isArray(d)?d:[]).forEach(b=>{ (BONOS[b.llamada_id]=BONOS[b.llamada_id]||{})[b.tipo]=true; });
+  }
+}
+async function darBono(llamadaId, tipo){
+  if(tipo==='venta' && !esJefe()) return;
+  if(tipo==='venta' && !confirm('¿Ya llegó la consignación de este pedido? Se le abonan $5.000 a quien consiguió el interesado.')) return;
+  try{
+    const r=await fetch(SB+'/rest/v1/mkr_bonos',{method:'POST',headers:{...H,Prefer:'return=minimal'},
+      body:JSON.stringify({llamada_id:llamadaId, tipo:tipo})});
+    if(!r.ok && r.status!==409) throw new Error(r.status);
+    (BONOS[llamadaId]=BONOS[llamadaId]||{})[tipo]=true;
+    toast(tipo==='venta'?'💰 Venta registrada':'📄 Cotización registrada');
+    if(CAT_ABIERTA) verCategoria(CAT_ABIERTA,true);
+    if(typeof pintarInteresados==='function') pintarInteresados();
+  }catch(e){ toast('No se pudo guardar. Intenta otra vez.',true); }
+}
 function tarifas(){ return TARIFA_BASE ? Object.assign({}, MI_TARIFA || TARIFA_DEF, TARIFA_BASE) : (MI_TARIFA || TARIFA_DEF); }
 async function cargarTarifaBase(id){
   TARIFA_BASE=null;
@@ -791,7 +815,7 @@ async function abrirBase(b){
      (cliente, sector, ciudad…) no existen como columnas en mkr_bases —solo `ced`,
      y en todas dice 'todos'— asi que cualquier base cargaba los prospectos de
      TODAS. Se abria "Lacteos" y salia una ferreteria del Tolima. */
-  let q='mkr_leads?select=id,nombre,contacto,cel,extension,tipo_tel,ciudad,departamento,barrio,sector,direccion,email&aplica=is.true'
+  let q='mkr_leads?select=id,nombre,contacto,cel,extension,tipo_tel,ciudad,departamento,barrio,sector,direccion,email,geo_localidad&aplica=is.true'
         +'&base_id=eq.'+encodeURIComponent(b.id);
   SEG.forEach(k=>{ const v=b[k]; if(v&&v!=='todos') q+='&'+k+'=eq.'+encodeURIComponent(v); });
   /* Base de trabajo (modo entrega): solo la zona que se le entregó. */
@@ -827,7 +851,10 @@ async function abrirBase(b){
   const misCiu=MIS_CIUDADES[b.id];
   if(misCiu && misCiu.length){
     const set=new Set(misCiu.map(c=>c.toLowerCase()));
-    TODOS=TODOS.filter(l=>set.has(String(l.ciudad||'').trim().toLowerCase()));
+    /* Tambien por LOCALIDAD: "Bogotá / Kennedy" le da solo esa localidad (7-oct-2026),
+       para partir una ciudad grande entre dos sin que se crucen. */
+    TODOS=TODOS.filter(l=>{ const c=String(l.ciudad||'').trim().toLowerCase();
+      return set.has(c) || (l.geo_localidad && set.has(c+' / '+String(l.geo_localidad).trim().toLowerCase())); });
     PORQUE.ciudades=misCiu.length;
   }
   PORQUE.trasCiudad=TODOS.length;
@@ -886,7 +913,11 @@ function pintarTarifas(){
        <span>${CAT_ABIERTA===k?'▾':'▸'} ${ICONO[k]||''} ${esc(k)}</span>
        <b>${cop(t[k])}<span id="cnt_cat_${esc(k).replace(/\s/g,'_')}" style="color:var(--faint);font-weight:500"></span></b>
      </div>
-     <div id="cat_${esc(k).replace(/\s/g,'_')}"></div>`).join('');
+     <div id="cat_${esc(k).replace(/\s/g,'_')}"></div>`).join('')
+    + (porHora() ? `<div class="t" style="border-top:1px dashed var(--line);margin-top:4px;padding-top:7px"><span>⏱️ Hora trabajada</span><b>${cop(t['Hora'])}</b></div>
+       <div class="t"><span>📄 Pidió cotización</span><b>+${cop(t['Cotización'])}</b></div>
+       <div class="t"><span>💰 Venta pagada</span><b>+${cop(t['Venta'])}</b></div>
+       <div style="font-size:11px;color:var(--faint);margin-top:4px">La hora se cuenta sola con tus llamadas: si pasan más de 5 min entre una y otra (15 después de un interesado) ese rato no cuenta, y se pide un ritmo de 25 llamadas por hora.</div>` : '');
   if(CAT_ABIERTA) verCategoria(CAT_ABIERTA, true);
 }
 async function verCategoria(k, mantener){
@@ -901,9 +932,10 @@ async function verCategoria(k, mantener){
      nadie vea los interesados de otro. */
   const equipo = esJefe() && VER_EQUIPO;
   const d=await GETALL('mkr_llamadas?select=id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
-    +'whatsapp2,correo,creado_en,validado,trabajado,agente&resultado=eq.'+encodeURIComponent(k)
+    +'whatsapp2,correo,creado_en,validado,trabajado,agente,agente_id,base_id&resultado=eq.'+encodeURIComponent(k)
     +(equipo?'':'&agente_id=eq.'+YO.id)+'&order=creado_en.desc');
   const filas=Array.isArray(d)?d:[];
+  if(k==='Interesado') await cargarBonos(filas);
   const cnt=$('cnt_cat_'+k.replace(/\s/g,'_')); if(cnt) cnt.textContent=' · '+num(filas.length);
   const c3=$('cat_'+k.replace(/\s/g,'_')); if(!c3) return;
   /* El boton de "todo el equipo" solo se dibuja para el jefe. */
@@ -1054,6 +1086,7 @@ async function cargarInteresados(){
      WhatsApp— no siempre lo hace quien marco. Los demas ven los suyos. */
   const d=await GETALL(base + (esAdmin() ? '' : '&agente_id=eq.'+YO.id));
   INTER=Array.isArray(d)?d:[];
+  await cargarBonos(INTER);
   pintarInteresados();
 }
 function esAdmin(){ return !!(YO && YO.nivel==='asesor'); }
@@ -1368,7 +1401,20 @@ function filaInteresado(x, equipo, verBase){
     </div>
     ${nuevo && marcado && nuevo!==marcado
       ? '<div class="iaviso">📲 Manda la info al verde: es el que dieron en la llamada</div>' : ''}
+    ${filaBonos(x)}
   </div>`;
+}
+/* Nicho: cotizacion (la marca quien llamo, o el jefe) y venta (solo el jefe,
+   cuando llega la consignacion). Se paga a quien consiguio el interesado. */
+function filaBonos(x){
+  if(!x.base_id || !porHora(TODAS_BASES[String(x.base_id)])) return '';
+  const b=BONOS[x.id]||{};
+  const btn='style="font-size:12px;padding:6px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line);background:transparent;color:inherit;font-family:inherit;font-weight:700"';
+  const cot = b.cotizacion ? '<span style="color:#22c55e;font-size:12px;font-weight:700">📄 cotizó ✓</span>'
+    : `<button ${btn} onclick="darBono('${esc(x.id)}','cotizacion')">📄 Pidió cotización</button>`;
+  const ven = b.venta ? '<span style="color:#22c55e;font-size:12px;font-weight:700">💰 venta pagada ✓</span>'
+    : esJefe() ? `<button ${btn} onclick="darBono('${esc(x.id)}','venta')">💰 Pagó · +$5.000</button>` : '';
+  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px">${cot}${ven}</div>`;
 }
 async function trabajado(id){
   const antes=INTER.slice();
@@ -1616,6 +1662,8 @@ function abrirPanel(fila,l,tarifa){
     <input id="pW" inputmode="tel" placeholder="WhatsApp" value="${esc(soloNum(l.cel))}">
     <input id="pW2" inputmode="tel" placeholder="Otro celular (si dan uno distinto)">
     <input id="pM" inputmode="email" placeholder="Correo">
+    ${porHora() ? `<label style="display:flex;gap:9px;align-items:center;margin:4px 0 8px;font-size:13.5px;font-weight:700;cursor:pointer">
+      <input type="checkbox" id="pCot" style="width:20px;height:20px;accent-color:#22c55e"> 📄 Pidió cotización <small style="font-weight:500;opacity:.75">(+${cop(tarifas()['Cotización']||1000)})</small></label>` : ''}
     <!-- UN solo boton. Antes eran tres —Enviar info, Pendiente y Catalogo
          enviado— y en mitad de una llamada hay que decidir cual, sin que la
          diferencia entre ellos se vea en pantalla. Aqui solo se guarda lo que
@@ -1671,6 +1719,7 @@ async function guardarPanel(id,tarifa,catalogo){
               lead_nombre: l.nombre||null, lead_ciudad: l.ciudad||null },
              catalogo ? 2 : 1);
   }catch(e){ toast('Sin señal. Intenta otra vez.',true); return; }
+  if(($('pCot')||{}).checked){ await darBono(id,'cotizacion'); tarifa+=(+tarifas()['Cotización']||0); }
   pendientes=Math.max(0,pendientes-1);
   miPlata+=tarifa; pintarPlata(true);
   toast((catalogo?'📄 Catálogo enviado y guardado · siguiente · +':'✅ Contacto guardado · siguiente · +')+cop(tarifa));
@@ -1889,6 +1938,15 @@ async function sincronizar(){
     const a=real[k]=real[k]||{id:f.agente_id||null,agente:nombreDeHoy(f),llamadas:0,plata:0};
     a.llamadas++; if(f.validado) a.plata+=(+f.valor||0);
   });
+  /* Nicho: la hora validada y los bonos de hoy tambien son plata del dia. */
+  const hoyB=new Date(Date.now()-5*3600e3).toISOString().slice(0,10);
+  const [hh,bb]=await Promise.all([GET('mkr_horas_dia?select=agente_id,valor&dia=eq.'+hoyB),
+    GET('mkr_bonos?select=agente_id,valor&creado_en=gte.'+hoy.toISOString())]);
+  [].concat(Array.isArray(hh)?hh:[], Array.isArray(bb)?bb:[]).forEach(f=>{
+    if(!f.agente_id) return;
+    const a=real[f.agente_id]=real[f.agente_id]||{id:f.agente_id,agente:'',llamadas:0,plata:0};
+    a.plata+=(+f.valor||0);
+  });
   /* Y entran TODAS las habilitadas, aunque todavia no hayan marcado. Si solo
      aparece quien ya marco, el primero del dia no tiene contra quien competir. */
   if(!sincronizar.agentes){
@@ -1896,6 +1954,7 @@ async function sincronizar(){
   }
   sincronizar.agentes.forEach(g=>{
     if(!real[g.id]) real[g.id]={id:g.id, agente:g.nombre, llamadas:0, plata:0};
+    else if(!real[g.id].agente) real[g.id].agente=g.nombre;
   });
   const yoKey = YO.id||('n:'+YO.nombre);
   if(real[yoKey]){ miPlata=real[yoKey].plata; misLlamadas=real[yoKey].llamadas; }
@@ -1969,9 +2028,11 @@ async function verSemanas(id,nombre){
   cont.innerHTML='<div style="padding:14px;text-align:center;color:var(--dim)">cargando…</div>';
   const filtro = id ? 'agente_id=eq.'+encodeURIComponent(id)
                     : 'agente=eq.'+encodeURIComponent(nombre);
-  const [ll,pg]=await Promise.all([
+  const [ll,pg,hh,bb]=await Promise.all([
     GETALL('mkr_llamadas?select=valor,validado,creado_en&'+filtro+'&order=creado_en.desc&limit=20000'),
-    id ? GETALL('mkr_pagos?select=semana,valor,fecha_pago,medio&agente_id=eq.'+encodeURIComponent(id)) : []
+    id ? GETALL('mkr_pagos?select=semana,valor,fecha_pago,medio&agente_id=eq.'+encodeURIComponent(id)) : [],
+    id ? GETALL('mkr_horas_dia?select=semana,horas,valor&agente_id=eq.'+encodeURIComponent(id)) : [],
+    id ? GETALL('mkr_bonos?select=tipo,valor,creado_en&agente_id=eq.'+encodeURIComponent(id)) : []
   ]);
   if(!Array.isArray(ll)){ cont.innerHTML='<div class="foot">No se pudo leer el historial.</div>'; return; }
   const pagado={}; (Array.isArray(pg)?pg:[]).forEach(p=>{ pagado[p.semana]=(pagado[p.semana]||0)+(+p.valor||0); });
@@ -1981,6 +2042,9 @@ async function verSemanas(id,nombre){
     const s=sem[k]=sem[k]||{ll:0,plata:0};
     s.ll++; if(f.validado) s.plata+=(+f.valor||0);
   });
+  (Array.isArray(hh)?hh:[]).forEach(h=>{ const s=sem[h.semana]=sem[h.semana]||{ll:0,plata:0}; s.horas=(s.horas||0)+(+h.horas||0); s.plata+=(+h.valor||0); });
+  (Array.isArray(bb)?bb:[]).forEach(b=>{ const k=semanaISO(new Date(b.creado_en)); const s=sem[k]=sem[k]||{ll:0,plata:0};
+    s[b.tipo]=(s[b.tipo]||0)+1; s.plata+=(+b.valor||0); });
   Object.keys(pagado).forEach(k=>{ if(!sem[k]) sem[k]={ll:0,plata:0}; });   // semanas pagadas sin marcaciones
   const claves=Object.keys(sem).sort().reverse();
   if(!claves.length){ cont.innerHTML='<div class="foot">'+esc(nombre)+' todavía no tiene semanas registradas.</div>'; return; }
@@ -2002,7 +2066,9 @@ async function verSemanas(id,nombre){
     return `<div style="display:grid;grid-template-columns:${G};gap:8px;align-items:center;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.07)${esta?';background:rgba(255,255,255,.05)':''}">
       ${jefe?ck:''}
       <div style="font-weight:800">Semana ${nSem}${esta?' <small style="opacity:.7">· esta</small>':''}<br><small style="opacity:.55">${k.slice(0,4)}</small></div>
-      <div style="font-size:12px;opacity:.7">${num(s.ll)} llamada${s.ll===1?'':'s'}</div>
+      <div style="font-size:12px;opacity:.7">${num(s.ll)} llamada${s.ll===1?'':'s'}${
+        s.horas?' · ⏱️ '+String(Math.round(s.horas*100)/100).replace('.',',')+' h':''}${
+        s.cotizacion?' · 📄 '+s.cotizacion:''}${s.venta?' · 💰 '+s.venta:''}</div>
       <div class="mono" style="font-weight:800;text-align:right">${cop(s.plata)}</div>
       <div class="mono" style="text-align:right;font-size:12px;min-width:96px">${
         pa>=s.plata && s.plata>0 ? '<span style="color:#22c55e">✔ pagada</span>'
