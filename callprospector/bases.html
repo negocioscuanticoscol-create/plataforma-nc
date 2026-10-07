@@ -258,7 +258,7 @@ footer b{color:var(--dim)}
 /* Esta pantalla no avisaba cuando se publicaba una version nueva: tocaba
    acordarse de recargar a mano, y se miraban numeros viejos creyendo que eran
    los de ahora. El marcador ya tenia este aviso; ahora Control tambien. */
-const VER='20260919-cruces-entre-bases';
+const VER='20261006-biblioteca';
 let ultimoChequeo=0;
 async function mirarVersion(){
   if(Date.now()-ultimoChequeo < 300000) return;
@@ -387,7 +387,7 @@ const M={
 
   datos(){ return this.base ? this.filas.filter(f=>String(f.base_id)===String(this.base)) : this.filas; },
 
-  irA(v){ this.vista=v; $('filtroWrap').style.display=(v==='cajones')?'none':''; this.pintar(); },
+  irA(v){ this.vista=v; $('filtroWrap').style.display=(v==='cajones'||v==='entregas')?'none':''; this.pintar(); },
 
   /* mide a cada persona: ritmo, dudosas, conversión y plata que de verdad se paga */
   medir(){
@@ -432,12 +432,13 @@ const M={
     const tVal=ag.reduce((s,a)=>s+a.validado,0), tCru=ag.reduce((s,a)=>s+a.cruda,0);
     $('tVal').textContent=cop(tVal); $('tDud').textContent=cop(tCru-tVal);
 
-    $('nav').innerHTML=[['cajones','🗂️ Cajones'],['efectividad','📈 Efectividad'],['calidad','⚡ Calidad'],['cruces','🔁 Cruces'],['personas','👥 Personas'],['interesados','🔥 Interesados']]
+    $('nav').innerHTML=[['cajones','🗂️ Cajones'],['efectividad','📈 Efectividad'],['calidad','⚡ Calidad'],['cruces','🔁 Cruces'],['personas','👥 Personas'],['interesados','🔥 Interesados'],['entregas','🤝 Entregas']]
       .map(([v,t])=>`<button class="${v===this.vista?'on':''}" onclick="M.irA('${v}')">${t}</button>`).join('');
 
     /* Los cajones se pintan aunque nadie haya marcado: son para repartir el
        trabajo que todavia NO se ha hecho. El corte de abajo es solo para las
        pestañas que miden llamadas. */
+    if(this.vista==='entregas') return E.pintar();   // árbol de trabajo · ver entregas.js
     if(this.vista==='cajones') return this.vCajones();
     if(this.vista==='cruces')  return this.vCruces();
     if(!d.length){ $('main').innerHTML='<div class="vacio">Todavía nadie ha marcado en esta base.</div>'; return; }
@@ -1158,5 +1159,6 @@ const M={
 M.cargar(); setInterval(()=>M.cargar(),8000);
 mirarVersion(); setInterval(mirarVersion, 60000);
 </script>
+<script src="entregas.js?v=20261006b"></script>
 </body>
 </html>
