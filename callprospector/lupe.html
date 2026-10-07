@@ -311,7 +311,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261007-interesado-tarjeta';
+const VER='20261007-guion-smart';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1187,7 +1187,7 @@ function mensajeOferta(x){
   if(empresa && empresa.toLowerCase()!==persona.toLowerCase()) t+=' de '+empresa;
   const g=guionDe(x);
   if(g==='envases')
-    return t+', gracias por la atención. Como hablamos, te comparto el catálogo de envases de Smart Packaging (vasos, tarrinas y potes para yogurt, kumis y postres). ¿Qué referencias y cuántas unidades al mes manejas, para enviarte la cotización?';
+    return t+', gracias por atender nuestra llamada. Le compartimos nuestro catálogo de envases y la información de nuestro director comercial. Si sigue interesado y quiere hacer un pedido, no dude en contactarnos: puede hacerlo por este mismo WhatsApp o al WhatsApp de Smart Packaging 312 412 4034. Quedamos pendientes. ¡Muchas gracias!';
   if(g==='empresa')
     return t+', gracias por la atención. Como hablamos, te comparto la ficha de la bota de dotación Fortia 701 para tu personal. ¿Cuántos pares y qué tallas necesitan, para enviarte la cotización?';
   t+=', te comparto la lista de precios de la oferta que hablamos';
@@ -1421,16 +1421,17 @@ function filaInteresado(x, equipo, verBase){
     ${filaBonos(x)}
   </div>`;
 }
-/* Nicho: cotizacion (la marca quien llamo, o el jefe) y venta (solo el jefe,
-   cuando llega la consignacion). Se paga a quien consiguio el interesado. */
+/* Nicho: cotizacion (la marca quien llamo, o el jefe). Se paga a quien
+   consiguio el interesado. */
 function filaBonos(x){
   if(!x.base_id || !porHora(TODAS_BASES[String(x.base_id)])) return '';
   const b=BONOS[x.id]||{};
   const btn='style="font-size:12px;padding:6px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line);background:transparent;color:inherit;font-family:inherit;font-weight:700"';
   const cot = b.cotizacion ? '<span style="color:#22c55e;font-size:12px;font-weight:700">📄 cotizó ✓</span>'
     : `<button ${btn} onclick="darBono('${esc(x.id)}','cotizacion')">📄 Pidió cotización</button>`;
-  const ven = b.venta ? '<span style="color:#22c55e;font-size:12px;font-weight:700">💰 venta pagada ✓</span>'
-    : esJefe() ? `<button ${btn} onclick="darBono('${esc(x.id)}','venta')">💰 Pagó · +$5.000</button>` : '';
+  /* La venta ($5.000) NO se marca aqui: Jose la verifica por otro lado (la
+     consignacion) y se registra aparte en mkr_bonos. Aqui solo se muestra. */
+  const ven = b.venta ? '<span style="color:#22c55e;font-size:12px;font-weight:700">💰 venta pagada ✓</span>' : '';
   return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px">${cot}${ven}</div>`;
 }
 async function trabajado(id){
