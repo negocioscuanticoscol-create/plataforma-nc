@@ -235,7 +235,8 @@ main{flex:1;padding:13px 15px 0}
    ellipsis, asi que cortaba el nombre de la empresa y el boton de WhatsApp se le
    montaba encima. Aca el nombre manda y los botones bajan a su propia linea. */
 .iw{padding:10px 0;border-top:1px solid var(--line)}
-.iw .ie{font-size:13.5px;font-weight:600;color:var(--tx);line-height:1.3}
+.iw .ie{font-size:15.5px;font-weight:800;color:#fbbf24;line-height:1.3;letter-spacing:.01em}
+.iw .ia{font-size:12px;color:var(--dim);margin-top:3px;font-weight:600}
 .iw .id{font-size:11px;color:var(--faint);margin-top:2px;line-height:1.45}
 .iw .ib{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-top:8px}
 /* El celular va como TEXTO, no como boton de WhatsApp: se copia y se escribe
@@ -310,7 +311,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261007-pago-por-hora';
+const VER='20261007-interesado-tarjeta';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1168,12 +1169,27 @@ function abrirInteresados(n){ INTER_ABIERTO=(INTER_ABIERTO===n)?'':n; pintarInte
 
 /* El saludo con la oferta, armado por fila y listo para copiar directo desde
    la tarjeta de cada interesado (ver filaInteresado). */
+/* El mensaje cambia segun la base (7-oct-2026, José): a un distribuidor de
+   calzado se le habla de ser distribuidor; a una fabrica de alimentos, de
+   envases (Smart); a una empresa que dota a su gente (construccion, nicho), de
+   las botas para sus trabajadores. */
+function guionDe(x){
+  const b=TODAS_BASES[String(x.base_id||'')]||{};
+  if(b.cliente==='smart') return 'envases';
+  if(b.pago==='hora' || /usan dotaci/i.test(b.arbol_nicho||'')) return 'empresa';
+  return 'distribuidor';
+}
 function mensajeOferta(x){
   const persona=(x.contacto||x.lead_nombre||'').trim();
   const empresa=(x.lead_nombre||'').trim();
   const ciudad=(x.lead_ciudad||'').trim();
   let t='Hola '+persona;
   if(empresa && empresa.toLowerCase()!==persona.toLowerCase()) t+=' de '+empresa;
+  const g=guionDe(x);
+  if(g==='envases')
+    return t+', gracias por la atención. Como hablamos, te comparto el catálogo de envases de Smart Packaging (vasos, tarrinas y potes para yogurt, kumis y postres). ¿Qué referencias y cuántas unidades al mes manejas, para enviarte la cotización?';
+  if(g==='empresa')
+    return t+', gracias por la atención. Como hablamos, te comparto la ficha de la bota de dotación Fortia 701 para tu personal. ¿Cuántos pares y qué tallas necesitan, para enviarte la cotización?';
   t+=', te comparto la lista de precios de la oferta que hablamos';
   if(ciudad) t+='. Estamos buscando distribuidor en '+ciudad;
   return t+'.';
@@ -1367,16 +1383,17 @@ function filaInteresado(x, equipo, verBase){
      escribir, y estaba perdido entre la ciudad y el correo. */
   const quien = x.contacto ? `<div class="iq">👤 ${esc(x.contacto)}</div>`
                            : `<div class="iq falta">👤 sin nombre de contacto</div>`;
+  const tele = nombreDeHoy(x) || x.agente || '';
   const det=[x.lead_ciudad||'',
              verBase ? '📁 '+esc(baseDe(x)) : '',
-             (equipo && x.agente) ? '📞 '+esc(nombreDeHoy(x)) : '',
              x.correo ? '<span class="chipmail" data-txt="'+esc(x.correo)+'" onclick="copiarNum(this)" title="Toca para copiar el correo">✉️ '+esc(x.correo)+'</span>' : '',
              x.validado ? '' : '<span class="falta">sin datos · no ha pagado</span>',
              ya ? '<b style="color:#25D366">enviado</b>' : ''
             ].filter(Boolean).join(' · ');
   const msg=mensajeOferta(x);
   return `<div class="iw${ya?' hecho':''}">
-    <div class="ie">${esc(x.lead_nombre||'(sin nombre)')}</div>
+    <div class="ie">🏢 ${esc(x.lead_nombre||'(sin nombre)')}</div>
+    ${tele?`<div class="ia">📞 Lo consiguió: ${esc(tele)}</div>`:''}
     ${quien}
     ${det?`<div class="id">${det}</div>`:''}
     <div class="imsg">${esc(msg)}
