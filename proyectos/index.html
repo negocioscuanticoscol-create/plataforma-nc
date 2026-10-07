@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Proyecto · documento vivo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Documento de evaluación de proyecto que escribe el equipo por capítulos. Datos en Supabase
+   (pd_*). Sin cuentas: enlace + clave del proyecto. Nació como artefacto de claude.ai el 7-oct-2026. */
+:root{
+  --bg:#f2f3f0; --paper:#ffffff; --fg:#1b1f23; --dim:#5b6470; --line:#d9dcd6; --soft:#e9ebe6;
+  --accent:#0f6e6a; --accent-fg:#ffffff; --nuevo:#c41d1d; --nuevo-bg:#fdecec; --quitado:#8a8f99;
+  --ok:#1d7a3e; --ok-bg:#e4f3e9; --warn:#a85d00; --warn-bg:#fff2dc;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root{
+  --bg:#15181b; --paper:#1d2126; --fg:#e8eaec; --dim:#9aa3ad; --line:#30363d; --soft:#262b31;
+  --accent:#3fb3ad; --accent-fg:#0d1a19; --nuevo:#ff6b6b; --nuevo-bg:#3a1d1d; --quitado:#7c838c;
+  --ok:#5fd38a; --ok-bg:#1c3326; --warn:#f0b35c; --warn-bg:#3a2a12; color-scheme:dark } }
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;padding-top:env(safe-area-inset-top,0px)}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px;padding-block:18px 80px}
+h1{font-size:clamp(22px,4vw,30px);line-height:1.15;margin:0 0 4px;text-wrap:balance;letter-spacing:-.01em}
+.sub{color:var(--dim);font-size:14px;margin:0 0 14px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.yo{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.chip{border:1px solid var(--line);background:var(--paper);color:var(--fg);border-radius:999px;padding:6px 12px;font:inherit;font-size:13.5px;cursor:pointer}
+.chip:hover{border-color:var(--accent)} .chip.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600}
+.chip.add{border-style:dashed;color:var(--dim)}
+.btn{border:1px solid var(--line);background:var(--paper);color:var(--fg);border-radius:8px;padding:7px 12px;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.btn:hover{border-color:var(--accent)} .btn.p{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)} .btn.s{font-weight:500;color:var(--dim)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible,.chip:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tablero{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin:14px 0 18px;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+.tablero .fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pend{display:inline-flex;align-items:center;gap:6px;border-radius:8px;padding:5px 10px;font-size:13px;background:var(--nuevo-bg);color:var(--nuevo);border:1px solid color-mix(in srgb,var(--nuevo) 30%,transparent);text-decoration:none;font-weight:600}
+.pend small{font-weight:500;opacity:.8}
+.aldia{color:var(--ok);background:var(--ok-bg);border-radius:8px;padding:6px 10px;font-size:13px;font-weight:600;display:inline-block}
+.leyenda{font-size:12.5px;color:var(--dim);margin-top:8px}
+.leyenda .ej{color:var(--nuevo);background:var(--nuevo-bg);padding:0 4px;border-radius:3px}
+.cap{margin-top:14px;scroll-margin-top:170px}
+.cap.pend-yo{border-left:4px solid var(--nuevo)}
+.caphd{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.caphd h2{font-size:18px;margin:0;line-height:1.25;text-wrap:balance}
+.caphd .num{color:var(--accent);font-family:var(--mono);font-size:13px;font-weight:500;display:block;margin-bottom:2px}
+.meta{font-size:12px;color:var(--dim);font-family:var(--mono)}
+.acc{display:flex;gap:6px;flex-wrap:wrap}
+.txt{margin-top:10px;max-width:70ch}
+.txt p{margin:0 0 8px} .txt h4{margin:12px 0 4px;font-size:14.5px}
+.txt ul{margin:0 0 8px;padding-left:20px} .txt li{margin:2px 0}
+.txt .flecha{text-align:center;color:var(--dim);margin:0;line-height:1.3}
+.txt .tabla{overflow-x:auto;margin:6px 0 10px}
+.txt table{border-collapse:collapse;font-size:13.5px;min-width:360px} .txt td,.txt th{border:1px solid var(--line);padding:5px 8px;text-align:left;vertical-align:top}
+.txt th{background:var(--soft);font-weight:600}
+.txt .dec{background:var(--soft);border-radius:8px;padding:8px 12px;font-weight:600;margin:8px 0}
+ins{color:var(--nuevo);background:var(--nuevo-bg);text-decoration:none;border-radius:3px;padding:0 2px;font-weight:500}
+del{color:var(--quitado);text-decoration:line-through;opacity:.75}
+.lect{margin-top:12px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.lect .et{font-size:12px;color:var(--dim);margin-right:4px}
+.pers{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:4px 10px;font-size:12.5px;border:1px solid var(--line);background:var(--paper);font:inherit}
+.pers.ok{background:var(--ok-bg);color:var(--ok);border-color:transparent} .pers.no{color:var(--dim)}
+.pers.yo{cursor:pointer;border-color:var(--nuevo);color:var(--nuevo);font-weight:600} .pers.yo:hover{background:var(--nuevo-bg)}
+textarea,input[type=text],input[type=password]{width:100%;font:inherit;color:var(--fg);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px}
+textarea{min-height:320px;line-height:1.5;resize:vertical}
+.ed-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center}
+.aviso{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;font-size:13.5px;margin-top:8px}
+.ayuda{font-size:12.5px;color:var(--dim);margin-top:6px}
+.hist{margin-top:10px;font-size:13px}
+.hist .v{display:flex;gap:10px;padding:5px 0;border-top:1px solid var(--line);align-items:center;flex-wrap:wrap}
+.hist .v .btn{padding:3px 8px;font-size:12px}
+.vieja{margin-top:8px;background:var(--soft);border-radius:8px;padding:10px 12px;white-space:pre-wrap;font-size:13.5px;max-height:320px;overflow:auto}
+.vacio{color:var(--dim);text-align:center;padding:26px 10px}
+.nuevo-cap{margin-top:18px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.nuevo-cap input{flex:1;min-width:200px}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13.5px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;z-index:9}
+.toast.on{opacity:1}
+.gate{max-width:420px;margin:60px auto}
+.gate form{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.pie{margin-top:30px;font-size:11.5px;color:var(--dim);text-align:center}
+@media (prefers-reduced-motion: reduce){ .toast{transition:none} }
+@media (max-width:520px){ .caphd{flex-direction:column} }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="card gate" id="gate">
+    <div class="eyebrow">Proyecto de desarrollo de producto</div>
+    <h1 id="gTitulo">Documento vivo del equipo</h1>
+    <form onsubmit="entrar(event)">
+      <input type="password" id="gClave" placeholder="Clave del proyecto" autocomplete="current-password">
+      <button class="btn p" type="submit">Entrar</button>
+      <div class="ayuda" id="gMsg">La clave te la da José. Sirve en el celular y en el computador; no hace falta ninguna cuenta.</div>
+    </form>
+  </div>
+
+  <div id="doc" hidden>
+    <div class="eyebrow">Proyecto de desarrollo de producto</div>
+    <h1 id="titulo"></h1>
+    <p class="sub" id="subtitulo"></p>
+
+    <div class="card">
+      <div class="eyebrow">¿Quién eres?</div>
+      <div class="yo" id="yo"></div>
+      <div class="ayuda">Toca tu nombre una vez; este aparato lo recuerda. Lo que escribas y lo que marques como leído queda a tu nombre.</div>
+    </div>
+
+    <div class="card tablero" id="tablero"></div>
+    <div id="caps"><div class="vacio">Cargando el documento…</div></div>
+
+    <div class="nuevo-cap card" id="nuevoCap">
+      <div class="eyebrow" style="width:100%">Agregar un capítulo</div>
+      <input type="text" id="ncTitulo" placeholder="Título del capítulo nuevo">
+      <button class="btn p" id="ncBtn" onclick="crearCapitulo()">Agregar</button>
+    </div>
+    <div class="pie">Se actualiza solo cada pocos segundos · <span class="mono" id="ver"></span></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const VER='20261007-proyectos';
+const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
+const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const P=new URLSearchParams(location.search).get('p')||'tenis-dip';
+let PROY=null, YO=null, PERSONAS={}, CAPS={}, LECT={}, EDIT=null, VER_VIEJA={}, HIST_ABIERTA={}, timer=0;
+$('ver').textContent=VER;
+function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>e.classList.remove('on'),2600); }
+function fecha(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleString('es-CO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
+function nombre(id){ return (PERSONAS[id]&&PERSONAS[id].nombre)||'alguien'; }
+async function GET(r){ const x=await fetch(SB+'/rest/v1/'+r,{headers:H}); if(!x.ok) throw new Error(x.status); return x.json(); }
+async function POST(r,body,prefer){ const x=await fetch(SB+'/rest/v1/'+r,{method:'POST',headers:Object.assign({},H,{Prefer:prefer||'return=minimal'}),body:JSON.stringify(body)}); if(!x.ok) throw new Error(x.status); return x; }
+async function PATCH(r,body){ const x=await fetch(SB+'/rest/v1/'+r,{method:'PATCH',headers:Object.assign({},H,{Prefer:'return=representation'}),body:JSON.stringify(body)}); if(!x.ok) throw new Error(x.status); return x.json(); }
+
+/* ---------- puerta ---------- */
+async function entrar(ev){ if(ev) ev.preventDefault(); const c=($('gClave').value||'').trim(); if(!c){ $('gMsg').textContent='Escribe la clave.'; return; }
+  try{ const r=await fetch(SB+'/rest/v1/rpc/pd_entrar',{method:'POST',headers:H,body:JSON.stringify({p_proyecto:P,p_clave:c})}); const d=await r.json();
+    if(!Array.isArray(d)||!d.length){ $('gMsg').textContent='Esa clave no es. Pídesela a José.'; return; }
+    PROY=d[0]; try{ localStorage.setItem('pd_clave_'+P,c); }catch(e){} abrir(); }
+  catch(e){ $('gMsg').textContent='Sin señal. Intenta otra vez.'; } }
+function abrir(){ $('gate').hidden=true; $('doc').hidden=false; $('titulo').textContent=PROY.titulo; $('subtitulo').textContent=PROY.subtitulo||''; document.title=PROY.titulo;
+  try{ YO=localStorage.getItem('pd_yo_'+P)||null; }catch(e){}
+  cargar(); timer=setInterval(()=>{ if(!document.hidden) cargar(); },6000); }
+
+/* ---------- datos ---------- */
+let cargando=false;
+async function cargar(){ if(cargando) return; cargando=true;
+  try{ const [ps,cs,ls]=await Promise.all([
+      GET('pd_personas?select=id,nombre,orden&proyecto=eq.'+P+'&order=orden,nombre'),
+      GET('pd_capitulos?select=id,orden,titulo,texto,version,por,fecha,versiones&proyecto=eq.'+P+'&order=orden'),
+      GET('pd_lecturas?select=persona_id,capitulo_id,version&capitulo_id=like.'+encodeURIComponent(P+':')+'*') ]);
+    PERSONAS={}; ps.forEach(p=>{ PERSONAS[p.id]=p; }); CAPS={}; cs.forEach(c=>{ CAPS[c.id]=c; }); LECT={}; ls.forEach(l=>{ (LECT[l.persona_id]=LECT[l.persona_id]||{})[l.capitulo_id]=l.version; });
+    if(YO&&!PERSONAS[YO]) YO=null; render(); }
+  catch(e){ console.warn(e); } finally{ cargando=false; } }
+
+/* ---------- diff ---------- */
+function lcs(a,b){ const n=a.length,m=b.length; const L=Array.from({length:n+1},()=>new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--) L[i][j]=a[i]===b[j]?L[i+1][j+1]+1:Math.max(L[i+1][j],L[i][j+1]);
+  const out=[]; let i=0,j=0; while(i<n&&j<m){ if(a[i]===b[j]){out.push(['=',a[i]]);i++;j++;} else if(L[i+1][j]>=L[i][j+1]){out.push(['-',a[i]]);i++;} else {out.push(['+',b[j]]);j++;} }
+  while(i<n) out.push(['-',a[i++]]); while(j<m) out.push(['+',b[j++]]); return out; }
+function diffPalabras(a,b){ const ta=a.split(/(\s+)/).filter(x=>x!==''), tb=b.split(/(\s+)/).filter(x=>x!==''); if(ta.length*tb.length>400000) return '<ins>'+esc(b)+'</ins>';
+  return lcs(ta,tb).map(([o,t])=>o==='='?esc(t):o==='+'?'<ins>'+esc(t)+'</ins>':'<del>'+esc(t)+'</del>').join(''); }
+function diffLineas(base,nuevo){ const A=(base||'').split('\n'), B=(nuevo||'').split('\n');
+  if(base==null || base===nuevo) return B.map(l=>({t:l,html:esc(l),tipo:'='}));
+  const ops=lcs(A,B), out=[]; let i=0;
+  while(i<ops.length){ const [o,t]=ops[i];
+    if(o==='='){ out.push({t,html:esc(t),tipo:'='}); i++; continue; }
+    const rem=[],add=[]; while(i<ops.length&&ops[i][0]!=='='){ (ops[i][0]==='-'?rem:add).push(ops[i][1]); i++; }
+    const k=Math.min(rem.length,add.length);
+    for(let x=0;x<k;x++) out.push({t:add[x],html:diffPalabras(rem[x],add[x]),tipo:'~'});
+    for(let x=k;x<add.length;x++) out.push({t:add[x],html:'<ins>'+esc(add[x])+'</ins>',tipo:'+'});
+    for(let x=k;x<rem.length;x++) out.push({t:rem[x],html:'<del>'+esc(rem[x])+'</del>',tipo:'-'});
+  } return out; }
+function pintarTexto(lineas){ let h='', ul=false, tabla=null;
+  const cierra=()=>{ if(ul){h+='</ul>';ul=false;} if(tabla){ h+='<div class="tabla"><table>'+tabla.map((r,i)=>'<tr>'+r.map(c=>(i===0?'<th>':'<td>')+c+(i===0?'</th>':'</td>')).join('')+'</tr>').join('')+'</table></div>'; tabla=null; } };
+  for(const L of lineas){ const t=L.t.trim(), html=L.html.trim();
+    if(!t){ cierra(); continue; }
+    if(t.includes('|') && t.split('|').length>=3){ if(!tabla) tabla=[]; const celdas=t.split('|').map(c=>c.trim()); const marca=L.tipo==='+'?'<ins>':L.tipo==='-'?'<del>':''; const fin=L.tipo==='+'?'</ins>':L.tipo==='-'?'</del>':''; tabla.push(celdas.map(c=>marca+esc(c)+fin)); continue; }
+    if(tabla){ cierra(); }
+    if(/^##\s/.test(t)){ cierra(); h+='<h4>'+html.replace(/^##\s*/,'')+'</h4>'; continue; }
+    if(/^(-|•)\s/.test(t)){ if(!ul){h+='<ul>';ul=true;} h+='<li>'+html.replace(/^(<ins>|<del>)?(-|•)\s*/,'$1')+'</li>'; continue; }
+    if(ul){ h+='</ul>'; ul=false; }
+    if(/^[↓→]/.test(t)){ h+='<p class="flecha">'+html+'</p>'; continue; }
+    if(/^(DECISIÓN|DECISION|🟢|🟡|🔴|GO \/)/.test(t)){ h+='<div class="dec">'+html+'</div>'; continue; }
+    h+='<p>'+html+'</p>'; }
+  cierra(); return h; }
+
+/* ---------- estado ---------- */
+function leidoPor(pid,capId){ return (LECT[pid]&&LECT[pid][capId])||0; }
+function versionVieja(c,v){ return (c.versiones||[]).find(x=>x.v===v); }
+function baseParaMi(c){ if(!YO) return null; const v=leidoPor(YO,c.id); if(v>=c.version) return null;
+  if(!v) return c.version>1 ? (versionVieja(c,1)||{}).texto ?? null : null;
+  const old=versionVieja(c,v); return old?old.texto:((c.versiones||[])[0]||{}).texto ?? null; }
+function capsOrden(){ return Object.values(CAPS).sort((a,b)=>(a.orden-b.orden)||String(a.titulo).localeCompare(b.titulo,'es')); }
+
+/* ---------- render ---------- */
+let rafId=0; function render(){ cancelAnimationFrame(rafId); rafId=requestAnimationFrame(()=>{ renderYo(); renderTablero(); renderCaps(); }); }
+function renderYo(){ const ps=Object.values(PERSONAS).sort((a,b)=>(a.orden||99)-(b.orden||99)||a.nombre.localeCompare(b.nombre,'es'));
+  const caja=$('yo'); const abierto=!!caja.querySelector('#npInput'); const val=abierto?$('npInput').value:null;
+  caja.innerHTML=ps.map(p=>`<button class="chip${YO===p.id?' on':''}" onclick="serYo('${p.id}')">${esc(p.nombre)}</button>`).join('')
+    +`<button class="chip add" onclick="agregarPersona()">+ Agregar persona</button>`;
+  if(abierto){ caja.insertAdjacentHTML('beforeend',formPersona()); $('npInput').value=val; } }
+function formPersona(){ return `<input type="text" id="npInput" placeholder="Nombre y apellido" style="width:auto;flex:1;min-width:160px;padding:6px 10px" onkeydown="if(event.key==='Enter'){event.preventDefault();agregarPersona();}"><button class="btn p" onclick="agregarPersona()">Guardar</button>`; }
+function renderTablero(){ const caps=capsOrden(); const T=$('tablero'); const vTot=caps.reduce((s,c)=>s+(c.version||1),0);
+  if(!caps.length){ T.innerHTML='<div class="eyebrow">Cambios</div><div class="ayuda">Todavía no hay capítulos.</div>'; return; }
+  const ultimo=caps.slice().sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')))[0];
+  let h=`<div class="fila" style="justify-content:space-between"><div class="eyebrow">Cambios para ${YO?esc(nombre(YO)):'ti'}</div><div class="meta">${caps.length} capítulos · ${vTot} versiones · último cambio ${esc(fecha(ultimo.fecha))} por ${esc(nombre(ultimo.por))}</div></div>`;
+  if(!YO){ h+='<div class="ayuda" style="margin-top:6px">Escoge tu nombre arriba para ver qué cambió desde la última vez que leíste.</div>'; T.innerHTML=h; return; }
+  const pend=caps.filter(c=>leidoPor(YO,c.id)<c.version);
+  if(!pend.length) h+='<div style="margin-top:8px"><span class="aldia">✓ Estás al día: leíste y aceptaste la última versión de todos los capítulos.</span></div>';
+  else { h+=`<div class="fila" style="margin-top:8px">${pend.map(c=>`<a class="pend" href="#cap-${esc(c.id)}">${esc(c.titulo)}<small>v${c.version} · ${esc(nombre(c.por))}</small></a>`).join('')}</div>
+    <div class="fila" style="margin-top:8px"><button class="btn s" onclick="leerTodo()">Marcar los ${pend.length} como leídos y aceptados</button></div>`; }
+  const otros=Object.values(PERSONAS).filter(p=>p.id!==YO); const pendOtros=otros.map(p=>({p,n:caps.filter(c=>leidoPor(p.id,c.id)<c.version).length})).filter(x=>x.n);
+  if(pendOtros.length) h+=`<div class="leyenda">Les falta leer: ${pendOtros.map(x=>esc(x.p.nombre)+' ('+x.n+')').join(' · ')}</div>`;
+  h+='<div class="leyenda">Lo <span class="ej">rojo</span> es lo nuevo desde tu última lectura. Al pie de cada capítulo, toca tu nombre para dejar constancia de que lo leíste y estás de acuerdo.</div>';
+  T.innerHTML=h; }
+function renderCaps(){ const caps=capsOrden(); const C=$('caps');
+  if(!caps.length){ C.innerHTML='<div class="card vacio">El documento está vacío. Agrega el primer capítulo abajo.</div>'; return; }
+  C.innerHTML=caps.map(c=>{
+    const pendYo=YO&&leidoPor(YO,c.id)<c.version;
+    const ed=EDIT&&EDIT.capId===c.id;
+    let cuerpo;
+    if(ed){ cuerpo=`<div style="margin-top:10px"><input type="text" id="ed-tit-${esc(c.id)}" value="${esc(EDIT.titulo)}" oninput="EDIT.titulo=this.value">
+      <textarea id="ed-${esc(c.id)}" oninput="EDIT.draft=this.value" style="margin-top:8px">${esc(EDIT.draft)}</textarea>
+      ${EDIT.conflicto?`<div class="aviso">⚠ ${esc(nombre(EDIT.conflicto.por))} guardó la versión ${EDIT.conflicto.version} mientras editabas. Tu texto sigue aquí: revisa lo suyo (abajo) y vuelve a guardar.</div><div class="vieja">${esc(EDIT.conflicto.texto)}</div>`:''}
+      <div class="ed-acts"><button class="btn p" onclick="guardar('${esc(c.id)}')">Guardar como versión ${(EDIT.conflicto?EDIT.conflicto.version:c.version)+1}</button><button class="btn s" onclick="EDIT=null;render()">Cancelar</button>
+      <span class="ayuda">Viñetas con "- ", subtítulos con "## ", tablas con "|".</span></div></div>`; }
+    else { const base=baseParaMi(c); cuerpo=`<div class="txt">${pintarTexto(diffLineas(base,c.texto||''))}</div>`; }
+    const personas=Object.values(PERSONAS).sort((a,b)=>(a.orden||99)-(b.orden||99));
+    const lect=personas.map(p=>{ const ok=leidoPor(p.id,c.id)>=c.version; if(p.id===YO&&!ok) return `<button class="pers yo" onclick="leer('${esc(c.id)}')">${esc(p.nombre)} · leído y de acuerdo ✓</button>`;
+      return `<span class="pers ${ok?'ok':'no'}">${ok?'✓':'○'} ${esc(p.nombre)}</span>`; }).join('');
+    const hist=HIST_ABIERTA[c.id]?`<div class="hist">${(c.versiones||[]).slice().reverse().map(v=>`<div class="v"><span class="mono">v${v.v}</span><span>${esc(nombre(v.por))} · ${esc(fecha(v.fecha))}</span><button class="btn" onclick="verVieja('${esc(c.id)}',${v.v})">${VER_VIEJA[c.id]===v.v?'Ocultar':'Ver'}</button></div>`).join('')||'<div class="ayuda">Esta es la primera versión.</div>'}
+      ${VER_VIEJA[c.id]?`<div class="vieja">${esc((versionVieja(c,VER_VIEJA[c.id])||{}).texto||'')}</div>`:''}</div>`:'';
+    return `<section class="card cap${pendYo?' pend-yo':''}" id="cap-${esc(c.id)}">
+      <div class="caphd"><div><span class="num">Capítulo ${esc(c.orden)}</span><h2>${esc(c.titulo)}</h2>
+        <div class="meta">v${c.version} · ${esc(nombre(c.por))} · ${esc(fecha(c.fecha))}</div></div>
+        <div class="acc">${!ed?`<button class="btn" onclick="editar('${esc(c.id)}')">✎ Editar</button>`:''}<button class="btn s" onclick="HIST_ABIERTA['${esc(c.id)}']=!HIST_ABIERTA['${esc(c.id)}'];render()">Versiones</button></div></div>
+      ${cuerpo}${hist}
+      <div class="lect"><span class="et">Leído y de acuerdo:</span>${lect}</div>
+    </section>`; }).join(''); }
+
+/* ---------- acciones ---------- */
+function serYo(id){ YO=id; try{ localStorage.setItem('pd_yo_'+P,id); }catch(e){} render(); }
+async function agregarPersona(){ const caja=$('yo');
+  if(!caja.querySelector('#npInput')){ caja.insertAdjacentHTML('beforeend',formPersona()); $('npInput').focus(); return; }
+  const v=$('npInput').value.trim(); if(!v){ toast('Escribe el nombre'); return; }
+  const id=P+':'+v.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40);
+  if(PERSONAS[id]){ serYo(id); return; }
+  try{ await POST('pd_personas',{id, proyecto:P, nombre:v, orden:Object.keys(PERSONAS).length+1}); PERSONAS[id]={id,nombre:v,orden:Object.keys(PERSONAS).length+1}; serYo(id); toast('Listo, '+v); cargar(); }
+  catch(e){ toast('No se pudo guardar. Intenta otra vez.'); } }
+async function leer(capId){ if(!YO) return; const c=CAPS[capId]; if(!c) return;
+  try{ await POST('pd_lecturas',{persona_id:YO, capitulo_id:capId, version:c.version, fecha:new Date().toISOString()},'resolution=merge-duplicates,return=minimal');
+    (LECT[YO]=LECT[YO]||{})[capId]=c.version; render(); toast('✓ Quedó registrado que leíste "'+c.titulo+'"'); }
+  catch(e){ toast('No se pudo guardar. Intenta otra vez.'); } }
+async function leerTodo(){ if(!YO) return; const filas=capsOrden().map(c=>({persona_id:YO, capitulo_id:c.id, version:c.version, fecha:new Date().toISOString()}));
+  try{ await POST('pd_lecturas',filas,'resolution=merge-duplicates,return=minimal'); filas.forEach(f=>{ (LECT[YO]=LECT[YO]||{})[f.capitulo_id]=f.version; }); render(); toast('✓ Todo marcado como leído'); }
+  catch(e){ toast('No se pudo guardar. Intenta otra vez.'); } }
+function editar(capId){ if(!YO){ toast('Primero escoge tu nombre arriba'); return; } const c=CAPS[capId]; EDIT={capId, version:c.version, titulo:c.titulo, draft:c.texto||'', conflicto:null}; render(); setTimeout(()=>{ const t=$('ed-'+capId); if(t) t.focus(); },50); }
+async function guardar(capId){ if(!EDIT) return;
+  const cur=(await GET('pd_capitulos?select=*&id=eq.'+encodeURIComponent(capId)))[0]; if(!cur){ toast('El capítulo ya no existe'); return; }
+  if(cur.version!==EDIT.version && !(EDIT.conflicto&&EDIT.conflicto.version===cur.version)){ EDIT.conflicto=cur; EDIT.version=cur.version; render(); return; }
+  if(EDIT.draft===cur.texto && EDIT.titulo.trim()===cur.titulo){ toast('No cambiaste nada'); EDIT=null; render(); return; }
+  const nv=cur.version+1; const versiones=(cur.versiones||[]).concat([{v:cur.version,texto:cur.texto,titulo:cur.titulo,por:cur.por,fecha:cur.fecha}]).slice(-20);
+  try{ /* solo si nadie guardó en medio: la condición version=eq. es el candado */
+    const r=await PATCH('pd_capitulos?id=eq.'+encodeURIComponent(capId)+'&version=eq.'+cur.version,{titulo:EDIT.titulo.trim()||cur.titulo, texto:EDIT.draft, version:nv, por:YO, fecha:new Date().toISOString(), versiones});
+    if(!r.length){ toast('Alguien guardó justo ahora. Revisa y vuelve a guardar.'); await cargar(); return; }
+    CAPS[capId]=r[0]; EDIT=null; await leer(capId); toast('Guardado como versión '+nv); }
+  catch(e){ toast('No se pudo guardar. Intenta otra vez.'); } }
+function verVieja(capId,v){ VER_VIEJA[capId]=VER_VIEJA[capId]===v?0:v; render(); }
+async function crearCapitulo(){ if(!YO){ toast('Primero escoge tu nombre arriba'); return; } const t=$('ncTitulo').value.trim(); if(!t){ toast('Escribe el título'); return; }
+  const orden=capsOrden().reduce((m,c)=>Math.max(m,+c.orden||0),-1)+1; const id=P+':c'+String(orden).padStart(2,'0')+'_'+Date.now().toString(36).slice(-4);
+  try{ await POST('pd_capitulos',{id, proyecto:P, orden, titulo:t, texto:'(Escribe aquí el contenido con Editar)', version:1, por:YO}); $('ncTitulo').value=''; toast('Capítulo creado'); await cargar(); setTimeout(()=>{ const e=$('cap-'+id); if(e) e.scrollIntoView({behavior:'smooth'}); },200); }
+  catch(e){ toast('No se pudo crear. Intenta otra vez.'); } }
+
+/* ---------- arranque ---------- */
+(async()=>{ let c=null; try{ c=localStorage.getItem('pd_clave_'+P); }catch(e){}
+  if(c){ $('gClave').value=c; await entrar(); if(!PROY){ $('gClave').value=''; } } })();
+</script>
+</body>
+</html>
