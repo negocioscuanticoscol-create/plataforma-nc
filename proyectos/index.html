@@ -91,9 +91,9 @@ textarea{min-height:320px;line-height:1.5;resize:vertical}
     <div class="eyebrow">Proyecto de desarrollo de producto</div>
     <h1 id="gTitulo">Documento vivo del equipo</h1>
     <form onsubmit="entrar(event)">
-      <input type="password" id="gClave" placeholder="Clave del proyecto" autocomplete="current-password">
+      <input type="tel" id="gClave" placeholder="Tu número de celular" autocomplete="tel" inputmode="numeric">
       <button class="btn p" type="submit">Entrar</button>
-      <div class="ayuda" id="gMsg">La clave te la da José. Sirve en el celular y en el computador; no hace falta ninguna cuenta.</div>
+      <div class="ayuda" id="gMsg">Entra con tu celular: con eso el documento ya sabe quién eres. Sirve en el celular y en el computador; no hace falta ninguna cuenta.</div>
     </form>
   </div>
 
@@ -122,13 +122,13 @@ textarea{min-height:320px;line-height:1.5;resize:vertical}
 <div class="toast" id="toast"></div>
 
 <script>
-const VER='20261007-proyectos-b';
+const VER='20261007-proyectos-celular';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co', K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const P=new URLSearchParams(location.search).get('p')||'tenis-dip';
-let TAB_ABIERTO=false, PROY=null, YO=null, PERSONAS={}, CAPS={}, LECT={}, EDIT=null, VER_VIEJA={}, HIST_ABIERTA={}, timer=0;
+let TAB_ABIERTO=false, FIJO=false, PROY=null, YO=null, PERSONAS={}, CAPS={}, LECT={}, EDIT=null, VER_VIEJA={}, HIST_ABIERTA={}, timer=0;
 $('ver').textContent=VER;
 function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>e.classList.remove('on'),2600); }
 function fecha(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleString('es-CO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
@@ -140,11 +140,13 @@ async function PATCH(r,body){ const x=await fetch(SB+'/rest/v1/'+r,{method:'PATC
 /* ---------- puerta ---------- */
 async function entrar(ev){ if(ev) ev.preventDefault(); const c=($('gClave').value||'').trim(); if(!c){ $('gMsg').textContent='Escribe la clave.'; return; }
   try{ const r=await fetch(SB+'/rest/v1/rpc/pd_entrar',{method:'POST',headers:H,body:JSON.stringify({p_proyecto:P,p_clave:c})}); const d=await r.json();
-    if(!Array.isArray(d)||!d.length){ $('gMsg').textContent='Esa clave no es. Pídesela a José.'; return; }
+    if(!Array.isArray(d)||!d.length){ $('gMsg').textContent='Ese número no está en el proyecto. Pídele a José que te agregue.'; return; }
     PROY=d[0]; try{ localStorage.setItem('pd_clave_'+P,c); }catch(e){} abrir(); }
   catch(e){ $('gMsg').textContent='Sin señal. Intenta otra vez.'; } }
 function abrir(){ $('gate').hidden=true; $('doc').hidden=false; $('titulo').textContent=PROY.titulo; $('subtitulo').textContent=PROY.subtitulo||''; document.title=PROY.titulo;
   try{ YO=localStorage.getItem('pd_yo_'+P)||null; }catch(e){}
+  /* Entró con su celular: esa es la persona, y no se cambia de nombre. */
+  FIJO=!!PROY.persona_id; if(FIJO){ YO=PROY.persona_id; try{ localStorage.setItem('pd_yo_'+P,YO); }catch(e){} }
   cargar(); timer=setInterval(()=>{ if(!document.hidden) cargar(); },6000); }
 
 /* ---------- datos ---------- */
@@ -201,7 +203,8 @@ function capsOrden(){ return Object.values(CAPS).sort((a,b)=>(a.orden-b.orden)||
 /* ---------- render ---------- */
 let rafId=0; function render(){ cancelAnimationFrame(rafId); rafId=requestAnimationFrame(()=>{ renderYo(); renderTablero(); renderCaps(); }); }
 function renderYo(){ const ps=Object.values(PERSONAS).sort((a,b)=>(a.orden||99)-(b.orden||99)||a.nombre.localeCompare(b.nombre,'es'));
-  const caja=$('yo'); const abierto=!!caja.querySelector('#npInput'); const val=abierto?$('npInput').value:null;
+  const caja=$('yo');
+  if(FIJO){ caja.innerHTML=`<span class="chip on">${esc(nombre(YO))}</span><span class="ayuda" style="margin:0">Entraste con tu celular · <a href="#" onclick="salir();return false" style="color:inherit">salir</a></span>`; caja.previousElementSibling.textContent='Eres'; caja.nextElementSibling.hidden=true; return; } const abierto=!!caja.querySelector('#npInput'); const val=abierto?$('npInput').value:null;
   caja.innerHTML=ps.map(p=>`<button class="chip${YO===p.id?' on':''}" onclick="serYo('${p.id}')">${esc(p.nombre)}</button>`).join('')
     +`<button class="chip add" onclick="agregarPersona()">+ Agregar persona</button>`;
   if(abierto){ caja.insertAdjacentHTML('beforeend',formPersona()); $('npInput').value=val; } }
@@ -248,7 +251,8 @@ function renderCaps(){ const caps=capsOrden(); const C=$('caps');
     </section>`; }).join(''); }
 
 /* ---------- acciones ---------- */
-function serYo(id){ YO=id; try{ localStorage.setItem('pd_yo_'+P,id); }catch(e){} render(); }
+function salir(){ try{ localStorage.removeItem('pd_clave_'+P); localStorage.removeItem('pd_yo_'+P); }catch(e){} location.reload(); }
+function serYo(id){ if(FIJO) return; YO=id; try{ localStorage.setItem('pd_yo_'+P,id); }catch(e){} render(); }
 async function agregarPersona(){ const caja=$('yo');
   if(!caja.querySelector('#npInput')){ caja.insertAdjacentHTML('beforeend',formPersona()); $('npInput').focus(); return; }
   const v=$('npInput').value.trim(); if(!v){ toast('Escribe el nombre'); return; }
