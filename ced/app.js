@@ -3300,7 +3300,7 @@ const App = {
         <div class="item"><div class="top"><div>
           <div class="nom">${esc(cl.nombre||'Cliente')} ${c.es_muestra?'<span class="badge b-cotizada">MUESTRA</span>':''}${(verFiltro&&!sel&&c.ced)?`<span style="font-size:10.5px;font-weight:700;background:#eef1f5;color:#54636b;padding:2px 7px;border-radius:9px;margin-left:5px">${esc(c.ced)}</span>`:''}</div>
           <div class="meta">${esc(c.numero||'')}${(cl.tel||cl.cel2)?' · 📱 '+esc(cl.tel||cl.cel2):''} · ${c.es_muestra?esc(c.detalle||'muestra'):(c.pares+' pares ('+c.cajas+' cajas)')} · ${new Date(c.creado_en).toLocaleDateString('es-CO')}</div>
-          ${c.notas?`<div style="font-size:12px;margin-top:4px;background:#fff3a3;border-left:3px solid #f2b705;padding:4px 8px;border-radius:5px;color:#3d2e00;font-weight:600">⚠️ ${esc(c.notas)}</div>`:''}
+          ${(c.notas||c.solucion)?`<div style="font-size:12px;margin-top:4px;background:#fff3a3;border-left:3px solid #f2b705;padding:4px 8px;border-radius:5px;color:#3d2e00;font-weight:600">${c.notas?'⚠️ '+esc(c.notas):''}${c.solucion?(c.notas?'<br>':'')+'✅ '+esc(c.solucion):''}${c.foto_url?' 📷':''}</div>`:''}
         </div><div style="text-align:right"><div class="tot">${money(c.total)}</div>
           <span class="badge b-${c.estado}">${c.estado}</span></div></div>
         <div class="acciones-item" style="align-items:center;gap:8px;flex-wrap:wrap">
@@ -3387,6 +3387,8 @@ const App = {
     if(sub) txt.push(`Subtotal: ${money(sub)}`); if(iva) txt.push(`IVA: ${money(iva)}`);
     txt.push(`Transporte: ${fl.lbl}`,`TOTAL: ${money(tot)}`);
     if(c.notas) txt.push('', `⚠️ *NOTAS IMPORTANTES:* ${c.notas}`);
+    if(c.solucion) txt.push(`✅ *SOLUCIÓN:* ${c.solucion}`);
+    if(c.foto_url) txt.push(`📷 Foto: ${c.foto_url}`);
     txt.push('',`Para confirmar consigna en:`,cuentaLinea);
     if(titularLinea) txt.push(`a nombre de ${titularLinea}`);
     if(sedeLinea) txt.push('', `${sede.nombre||''}: ${sedeLinea}`);
@@ -3414,7 +3416,11 @@ const App = {
           <div style="text-align:right"><div style="font-size:18px;font-weight:800">PROFORMA</div><div class="sub">${esc(c.numero||'')}</div><div class="sub">${fecha}</div></div></div>
         <div class="pf-body">
           <div class="box"><b>Cliente:</b> ${esc(cl.nombre||'—')}${cl.nit?` · NIT/CC ${esc(cl.nit)}`:''}${cl.tel?`<br><b>Tel:</b> ${esc(cl.tel)}`:''}${dir?`<br><b>Entrega:</b> ${esc(dir)}`:''}</div>
-          ${c.notas?`<div class="notas"><b>⚠️ NOTAS IMPORTANTES</b><br>${esc(c.notas).split('\n').join('<br>')}</div>`:''}
+          ${(c.notas||c.solucion||c.foto_url)?`<div class="notas">
+            ${c.notas?`<b>⚠️ NOTAS IMPORTANTES</b><br>${esc(c.notas).split('\n').join('<br>')}`:''}
+            ${c.solucion?`<div style="margin-top:${c.notas?'10px':'0'};padding-top:${c.notas?'8px':'0'};${c.notas?'border-top:1px dashed #d9a400':''}"><b>✅ SOLUCIÓN</b><br>${esc(c.solucion).split('\n').join('<br>')}</div>`:''}
+            ${c.foto_url?`<div style="margin-top:10px"><img src="${esc(c.foto_url)}" alt="Foto anexa" style="max-width:100%;max-height:320px;border-radius:8px;border:1px solid #d9a400;display:block"></div>`:''}
+          </div>`:''}
           <table><thead><tr><th>Concepto</th><th style="text-align:right">Pares</th><th style="text-align:right">Precio/par</th><th style="text-align:right">Subtotal</th></tr></thead>
             <tbody>${(Array.isArray(c.items)&&c.items.length>1)
               ? c.items.map(it=>`<tr><td>${esc((it.categoria&&it.categoria!=='Calzado'?it.categoria+' ':'')+'Ref. '+(it.referencia||''))}${it.color?' · '+esc(it.color):''}</td><td style="text-align:right">${it.pares||0}</td><td style="text-align:right">${money(it.precio_par||0)}</td><td style="text-align:right">${money(it.subtotal||0)}</td></tr>`).join('')
@@ -3443,7 +3449,7 @@ const App = {
 
   async vCotizacionNueva(editId){
     this.loading();
-    this._editCotId = editId||null;
+    this._editCotId = editId||null; this._cotFotoUrl=null;
     const { data:cli=[] } = await this.sb.from('clientes').select('id,nombre,nit,tel,depto,ciudad,barrio,direccion,correo,tipo_pago,clase,referencia,lista_precio,valor_par_nc,valor_par_gpjr,recomendado,especial,no_contactar,calificacion,contacto1,nombre_comercial').order('nombre');
     // Quien puede facturar y con que nombre sale el CED de cara al cliente
     let facts=[], sede=null;
@@ -3638,6 +3644,11 @@ const App = {
       <div class="card" style="background:#fff8c5;border:2px solid #f2b705">
         <label style="margin:0;color:#7a5a00">⚠️ Notas importantes <span style="font-weight:500;color:#9a7b1a">(salen resaltadas en la proforma)</span></label>
         <textarea class="field" id="co_notas" style="margin-top:7px;min-height:64px;background:#fffdf0;border-color:#f2b705" placeholder="Ej: entregar antes del 15 · el cliente cambia 2 pares talla 40 por 41 · recibe solo en la mañana"></textarea>
+        <label style="margin:10px 0 0;color:#7a5a00">✅ Solución <span style="font-weight:500;color:#9a7b1a">(qué se acordó hacer: reposición, cambio de talla, descuento…)</span></label>
+        <textarea class="field" id="co_solucion" style="margin-top:7px;min-height:54px;background:#fffdf0;border-color:#f2b705" placeholder="Ej: se reponen 2 pares talla 42 sin costo · el cliente devuelve los dañados con el transportador"></textarea>
+        <label style="margin:10px 0 0;color:#7a5a00">📷 Foto anexa <span style="font-weight:500;color:#9a7b1a">(del par con la falla, la guía, lo que haga falta)</span></label>
+        <input class="field" id="co_foto" type="file" accept="image/*" style="margin-top:7px;background:#fffdf0;border-color:#f2b705" onchange="App.cotFotoPreview()">
+        <div id="co_foto_prev" style="margin-top:6px"></div>
       </div>
       <div class="card" style="border:1.5px solid var(--naranja)"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0"><input type="checkbox" id="co_iva" checked style="width:18px;height:18px;accent-color:var(--naranja)"> <b>Incluir IVA (19%)</b> en la cotización</label>
         <div class="hint">Si lo desmarcas, la cotización queda SIN IVA (solo el valor de los pares + flete).</div></div>
@@ -3660,6 +3671,8 @@ const App = {
         const cc=$('co_contacto');     if(cc) cc.value=ec.contacto||'';
         const ct=$('co_contacto_tel'); if(ct) ct.value=ec.contacto_tel||'';
         const cn=$('co_notas');        if(cn) cn.value=ec.notas||'';
+        const cs=$('co_solucion');     if(cs) cs.value=ec.solucion||'';
+        this._cotFotoUrl=ec.foto_url||null; this.cotFotoPreview();
         /* Una muestra a precio especial se guarda como muestra_tipo 'par' -para que
            el flete, el PDF y el CRM la traten igual-, asi que al reabrirla se
            distingue por el precio que quedo escrito, no por el tipo. */
@@ -3720,8 +3733,26 @@ const App = {
     reg.contacto     = (($('co_contacto')||{}).value||'').trim() || null;
     reg.contacto_tel = (($('co_contacto_tel')||{}).value||'').trim() || null;
     reg.notas        = (($('co_notas')||{}).value||'').trim() || null;
+    reg.solucion     = (($('co_solucion')||{}).value||'').trim() || null;
+    /* La foto va al bucket 'garantias' (público, el mismo de las devoluciones).
+       Si no escogieron una nueva, se conserva la que ya tenía la cotización. */
+    const fi=$('co_foto'), f=fi&&fi.files&&fi.files[0];
+    if(f){
+      const path='cot/'+Date.now()+'_'+f.name.replace(/[^a-zA-Z0-9.\-]/g,'_');
+      const up=await this.sb.storage.from('garantias').upload(path,f,{contentType:f.type||'image/jpeg',upsert:true});
+      if(up.error){ alert('La foto no se pudo subir: '+up.error.message+'. La cotización se guarda sin foto.'); }
+      else this._cotFotoUrl=this.sb.storage.from('garantias').getPublicUrl(path).data.publicUrl;
+    }
+    reg.foto_url     = this._cotFotoUrl||null;
     if(this._editCotId){ const { error } = await this.sb.from('cotizaciones').update(reg).eq('id',this._editCotId); return error; }
     const { error } = await this.sb.from('cotizaciones').insert(reg); return error;
+  },
+  cotFotoPreview(){
+    const prev=$('co_foto_prev'); if(!prev) return;
+    const fi=$('co_foto'), f=fi&&fi.files&&fi.files[0];
+    const src=f?URL.createObjectURL(f):(this._cotFotoUrl||'');
+    prev.innerHTML=src?`<img src="${esc(src)}" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #f2b705">
+      ${!f&&this._cotFotoUrl?`<div class="hint">Foto ya guardada · escoge otra para reemplazarla · <a href="#" onclick="App._cotFotoUrl=null;App.cotFotoPreview();return false" style="color:#b91c1c">quitar</a></div>`:''}`:'';
   },
   nuevoClienteDesdeCot(){
     this.modalCliente(c=>{ this._clientes.push(c); const s=$('co_cliente');
@@ -4340,7 +4371,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       referencia:c.referencia||null, valor_par_nc:c.valor_par_nc||null, valor_par_gpjr:c.valor_par_gpjr||null,
       recomendado:!!c.recomendado, comision_nc:c.comision_nc||0, comision_gpjr:c.comision_gpjr||0,
       es_muestra:c.es_muestra||false, detalle:c.detalle||null, interno:c.interno||false, asesor:c.asesor||null,
-      notas:c.notas||null,
+      notas:c.notas||null, solucion:c.solucion||null, foto_url:c.foto_url||null,
       abono:abono||0, abono_forma:abono?abForma:null, abono_nota:abono?abNota:null,
       abono_en:abono?new Date().toISOString():null
     }).select().single();
@@ -5731,9 +5762,11 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     const lista=gars.length?gars.map(g=>{const c=g.cliente_snap||{},cu=g.curva||{};
       return `<div class="item" style="display:block"><div class="top"><div>
         <div class="nom">${esc(c.nombre||'cliente')} <span class="badge" style="background:${bc[g.estado]||'#999'};color:#fff">${(g.estado||'').replace('_',' ')}</span></div>
-        <div class="meta">${esc(g.tipo)} · ${g.pares||0} pares · ${new Date(g.creado_en).toLocaleDateString('es-CO')}${g.motivo?'<br>📝 '+esc(g.motivo):''}<br>${Object.entries(cu).map(([t,q])=>'T'+t+':'+q).join(' · ')}</div></div>
+        <div class="meta">${esc(g.tipo)}${g.falla?' · '+esc(g.falla):''} · ${g.pares||0} pares · ${new Date(g.creado_en).toLocaleDateString('es-CO')}${g.motivo?'<br>📝 '+esc(g.motivo):''}<br>${Object.entries(cu).map(([t,q])=>'T'+t+':'+q).join(' · ')}</div>
+        ${g.solucion?`<div style="font-size:12px;margin-top:4px;background:#fff3a3;border-left:3px solid #f2b705;padding:4px 8px;border-radius:5px;color:#3d2e00;font-weight:600">✅ ${esc(g.solucion)}</div>`:''}</div>
         ${g.foto_url?`<a href="${g.foto_url}" target="_blank"><img src="${g.foto_url}" style="width:52px;height:52px;object-fit:cover;border-radius:8px"></a>`:''}</div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">
+          ${g.estado!=='anulada'?`<button class="btn-sm" style="background:#f2b705;color:#3d2e00" onclick="App.garEditar(${g.id})">✏️ Editar</button>`:''}
           <button class="btn-sm" style="background:#111;color:#fff" onclick="App.garDoc(${g.id})">🖨️ Documento</button>
           <button class="btn-sm" style="background:#25d366;color:#fff" onclick="App.garWa(${g.id},'dest')">📲 Bodega 316</button>
           <button class="btn-sm" style="background:#0e8a4f;color:#fff" onclick="App.garWa(${g.id},'copia')">📋 Copia 323</button>
@@ -5804,6 +5837,53 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     await this.vPlanta();
     this.garDoc(data.id);
   },
+  /* Editar un caso ya creado (7-oct-2026, José): para ponerle la foto después, la
+     falla, y la SOLUCIÓN acordada. Solo cambia el registro de la garantía: no mueve
+     ninguna bodega, porque las bodegas no están conectadas a este módulo. */
+  garEditar(id){
+    const g=(this._garantias||[]).find(x=>String(x.id)===String(id)); if(!g)return;
+    const c=g.cliente_snap||{};
+    this._garEditFoto=g.foto_url||null;
+    this.modal(`<h3>✏️ Editar garantía Nº ${String(g.id).padStart(5,'0')}</h3>
+      <div class="sub">${esc(c.nombre||'cliente')} · ${g.pares||0} pares · ${new Date(g.creado_en).toLocaleDateString('es-CO')}</div>
+      <label>Tipo</label><select class="field" id="ge_tipo">${['garantia','devolucion','cambio'].map(t=>`<option value="${t}" ${g.tipo===t?'selected':''}>${{garantia:'Garantía (defecto de fábrica)',devolucion:'Devolución',cambio:'Cambio de talla'}[t]}</option>`).join('')}</select>
+      <label>Falla</label><input class="field" id="ge_falla" value="${esc(g.falla||'')}" placeholder="Suela despegada, costura, puntera…">
+      <label>Motivo / qué pasó</label><textarea class="field" id="ge_motivo" style="min-height:54px">${esc(g.motivo||'')}</textarea>
+      <div style="background:#fff8c5;border:2px solid #f2b705;border-radius:9px;padding:10px 12px;margin-top:10px">
+        <label style="margin:0;color:#7a5a00">✅ Solución <span style="font-weight:500;color:#9a7b1a">(qué se acordó: reposición, cambio, descuento…)</span></label>
+        <textarea class="field" id="ge_solucion" style="margin-top:6px;min-height:60px;background:#fffdf0;border-color:#f2b705" placeholder="Ej: se repone 1 par talla 42 sin costo en el próximo pedido">${esc(g.solucion||'')}</textarea>
+        <label style="margin:10px 0 0;color:#7a5a00">📷 Foto</label>
+        <input class="field" id="ge_foto" type="file" accept="image/*" style="margin-top:6px;background:#fffdf0;border-color:#f2b705" onchange="App.garFotoPreview()">
+        <div id="ge_foto_prev" style="margin-top:6px"></div>
+      </div>
+      <button class="btn btn-main" id="ge_btn" onclick="App.garEditarOk(${g.id})">💾 Guardar cambios</button>
+      <button class="btn btn-ghost" onclick="App.cerrarModal()">Cancelar</button>`);
+    this.garFotoPreview();
+  },
+  garFotoPreview(){
+    const prev=$('ge_foto_prev'); if(!prev) return;
+    const fi=$('ge_foto'), f=fi&&fi.files&&fi.files[0];
+    const src=f?URL.createObjectURL(f):(this._garEditFoto||'');
+    prev.innerHTML=src?`<img src="${esc(src)}" style="max-width:100%;max-height:220px;border-radius:8px;border:1px solid #f2b705">
+      ${!f&&this._garEditFoto?`<div class="hint">Foto ya guardada · escoge otra para reemplazarla · <a href="#" onclick="App._garEditFoto=null;App.garFotoPreview();return false" style="color:#b91c1c">quitar</a></div>`:''}`:'<div class="hint">Sin foto todavía. La foto es la prueba: sin ella la planta suele devolver el caso.</div>';
+  },
+  async garEditarOk(id){
+    const btn=$('ge_btn'); if(btn){btn.disabled=true;btn.textContent='Guardando…';}
+    let foto_url=this._garEditFoto||null;
+    const fi=$('ge_foto'), f=fi&&fi.files&&fi.files[0];
+    if(f){
+      const ext=(f.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+      const path='g_'+id+'_'+Date.now()+'.'+ext;
+      const up=await this.sb.storage.from('garantias').upload(path,f,{contentType:f.type||'image/jpeg',upsert:true});
+      if(up.error){ alert('La foto no se pudo subir: '+up.error.message); if(btn){btn.disabled=false;btn.textContent='💾 Guardar cambios';} return; }
+      foto_url=this.sb.storage.from('garantias').getPublicUrl(path).data.publicUrl;
+    }
+    const reg={tipo:$('ge_tipo').value, falla:($('ge_falla').value||'').trim()||null, motivo:($('ge_motivo').value||'').trim(),
+      solucion:($('ge_solucion').value||'').trim()||null, foto_url, actualizado_en:new Date().toISOString()};
+    const {error}=await this.sb.from('garantias').update(reg).eq('id',id);
+    if(error){ alert('Error: '+error.message); if(btn){btn.disabled=false;btn.textContent='💾 Guardar cambios';} return; }
+    this.cerrarModal(); this.toast('Garantía actualizada'); this.vPlanta();
+  },
   async garEstado(id,estado){
     if(estado==='anulada'&&!confirm('¿Anular esta garantía?'))return;
     await this.sb.from('garantias').update({estado,actualizado_en:new Date().toISOString()}).eq('id',id);
@@ -5816,6 +5896,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
     return `🥾 DEVOLUCIÓN A BODEGA — Feroz\nNº ${String(g.id).padStart(5,'0')} · ${new Date(g.creado_en).toLocaleDateString('es-CO')}\n`+
       `Cliente: ${c.nombre||''} (NIT ${c.nit||'—'})\nPedido: ${ped.numero||('#'+g.pedido_id)}\nTipo: ${g.tipo}${g.falla?' — '+g.falla:''}\n`+
       `Ref 701 — ${tallas} (${g.pares} pares)\nMotivo: ${g.motivo||'—'}\nEntregar en: ${g.entregar_en||'Bodega'}`+
+      (g.solucion?`\n✅ Solución: ${g.solucion}`:'')+
       (g.foto_url?`\n📷 Foto: ${g.foto_url}`:'');
   },
   garWa(id,quien){
@@ -5845,6 +5926,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       <div class="box"><b>Tipo:</b> ${tipoTxt}${g.falla?' — <b>Falla:</b> '+esc(g.falla):''}<br><b>Cliente:</b> ${esc(c.nombre||'')} · NIT ${esc(c.nit||'—')} · Tel ${esc(c.tel||c.celular||'—')}<br><b>Pedido original:</b> ${esc(ped.numero||('#'+g.pedido_id))}</div>
       <table><thead><tr><th>Ítem devuelto</th><th style="text-align:center">Pares</th></tr></thead><tbody>${filas}<tr style="font-weight:800"><td>TOTAL</td><td style="text-align:center">${g.pares}</td></tr></tbody></table>
       <div class="box"><b>Motivo:</b><br>${esc(g.motivo||'—')}${g.foto_url?`<br><b>Evidencia:</b><br><img class="ev" src="${g.foto_url}">`:''}</div>
+      ${g.solucion?`<div class="box" style="background:#fff3a3;border-color:#f2b705;color:#3d2e00;font-weight:600"><b style="color:#7a5a00">✅ SOLUCIÓN ACORDADA</b><br>${esc(g.solucion)}</div>`:''}
       <div class="firmas"><div class="firma">Entrega (Feroz)</div><div class="firma">Recibe (Bodega)</div></div>
       <script>window.onload=function(){setTimeout(function(){window.print();},450);}<\/script></body></html>`;
     const w=window.open('','_blank'); if(w){w.document.write(html);w.document.close();}
