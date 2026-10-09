@@ -34,12 +34,12 @@ button,a.b{font:inherit;border:0;border-radius:9px;padding:9px 12px;cursor:point
 <div class="grid" id="lista"></div>
 </div></div>
 <script>
-const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261009-3';
+const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261009-4';
 let D=[],clave='',cajon='ya';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const m=n=>'$'+Math.round(n).toLocaleString('es-CO');
-async function rpc(fn,args){const r=await fetch(URL_+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(args)});if(!r.ok)throw new Error(r.status);return r.json()}
+async function rpc(fn,args){const r=await fetch(URL_+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(args)});if(!r.ok)throw new Error(r.status);const t=await r.text();return t?JSON.parse(t):null}
 const CAJ={ya:['TOCA YA','Deberían comprar YA'],q15:['Toca en 15 días','Compran en 15 días'],aun:['Aún no toca','Aún no les toca'],riesgo:['Tocó hace rato (en riesgo)','En riesgo (no vuelven)'],rep:[null,'Ya repusieron'],todos:[null,'Todos'],perd:[null,'Perdidos']};
 const contactable=p=>!p.veces_enviado||p.dias_enviado>15;
 const en=(p,k)=>k==='perd'?p.perdido:p.perdido?false:k==='rep'?p.compras>=2:k==='todos'?true:p.estado===CAJ[k][0];
