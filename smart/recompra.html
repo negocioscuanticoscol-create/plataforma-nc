@@ -60,8 +60,7 @@ function card(p){const cel=(p.celular||'').replace(/\D/g,''),cls=p.estado==='TOC
   <div class="msg">${esc(p.mensaje)}</div>
   <div class="acc">${cel?`<button class="s" data-c="${cel}">📋 ${esc(cel)}</button><a class="b g" target="_blank" href="https://wa.me/57${cel}?text=${encodeURIComponent(p.mensaje)}">WhatsApp</a>`:'<span class="pill r">SIN CELULAR</span>'}<button class="s" data-m="1">📋 Mensaje</button><button class="${p.perdido?'g':'r'} pd" data-p="1" style="${p.perdido?'':'background:var(--rj)'}">${p.perdido?'↩ Recuperar':'🚫 Perdido'}</button></div></div>`}
 async function marcar(p){let mot='';
-  if(!p.perdido){mot=prompt('Marcar como PERDIDO: '+p.empresa+'
-Motivo (opcional):','');if(mot===null)return}
+  if(!p.perdido){mot=prompt('Marcar como PERDIDO: '+p.empresa+' - Motivo (opcional):','');if(mot===null)return}
   else if(!confirm('¿Recuperar a '+p.empresa+'?'))return;
   const nuevo=!p.perdido;
   try{await rpc('sr_perdido',{p_clave:clave,p_empresa:p.empresa,p_perdido:nuevo,p_motivo:mot});p.perdido=nuevo;p.motivo=mot;pintar()}catch(e){alert('No se guardó, revisa la señal')}}
