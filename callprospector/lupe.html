@@ -297,6 +297,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
      la informacion despues. Se van de la lista al marcar la casilla. -->
 <div class="rank" id="inter" style="display:none">
   <h3>🔥 Interesados <span id="inInfo">—</span></h3>
+  <div id="inTabs" style="display:flex;gap:8px;margin:2px 0 10px"></div>
   <div style="font-size:11.5px;color:var(--dim);margin:-4px 0 8px">Toca el celular y queda copiado · el mensaje de cada tarjeta también se copia con un toque.</div>
   <div id="inBody"></div>
 </div>
@@ -311,7 +312,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261007-guion-construccion';
+const VER='20261009-cotizados-aparte';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -432,6 +433,7 @@ async function darBono(llamadaId, tipo){
       body:JSON.stringify({llamada_id:llamadaId, tipo:tipo})});
     if(!r.ok && r.status!==409) throw new Error(r.status);
     (BONOS[llamadaId]=BONOS[llamadaId]||{})[tipo]=true;
+    if(tipo==='cotizacion'){ const xx=INTER.find(z=>z.id===llamadaId); if(xx && !COTIZ.some(z=>z.id===xx.id)) COTIZ.unshift(xx); }
     toast(tipo==='venta'?'💰 Venta registrada':'📄 Cotización registrada');
     if(CAT_ABIERTA) verCategoria(CAT_ABIERTA,true);
     if(typeof pintarInteresados==='function') pintarInteresados();
@@ -1071,7 +1073,23 @@ function filtrarCiudad(v){
   idx=0; pintarTag(); render(); window.scrollTo(0,0);
 }
 /* ---------- interesados por trabajar ---------- */
-let INTER=[];
+let INTER=[], COTIZ=[], INTER_TAB='int';   // COTIZ: todo lo que ya tiene el bono de cotización, se haya mandado la info o no
+async function cargarCotizados(){
+  /* Los cotizados salen aparte de los interesados. Una llamada cotizada se va de la
+     lista de interesados cuando se le manda la información (trabajado), pero la
+     cotización sigue viva: por eso se buscan por el bono y no por esa lista. */
+  const b=await GETALL('mkr_bonos?select=llamada_id&tipo=eq.cotizacion');
+  const ids=(Array.isArray(b)?b:[]).map(x=>x.llamada_id);
+  let out=[];
+  for(let i=0;i<ids.length;i+=60){
+    const d=await GETALL('mkr_llamadas?select=id,lead_id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
+      +'whatsapp2,correo,creado_en,validado,trabajado,estado_venta,agente,agente_id,base_id&id=in.('+ids.slice(i,i+60).join(',')+')&order=creado_en.desc');
+    out=out.concat(Array.isArray(d)?d:[]);
+  }
+  out.forEach(x=>{ (BONOS[x.id]=BONOS[x.id]||{}).cotizacion=true; });
+  COTIZ=(esAdmin()?out:out.filter(x=>String(x.agente_id)===String(YO.id))).sort((a,c)=>String(c.creado_en).localeCompare(String(a.creado_en)));
+}
+function setInterTab(t){ INTER_TAB=t; pintarInteresados(); }
 async function cargarInteresados(){
   if(!YO) return;
   /* Jose (Gloria/asesor) ve los de toda la red; cada telemercaderista ve solo
@@ -1088,6 +1106,7 @@ async function cargarInteresados(){
   const d=await GETALL(base + (esAdmin() ? '' : '&agente_id=eq.'+YO.id));
   INTER=Array.isArray(d)?d:[];
   await cargarBonos(INTER);
+  try{ await cargarCotizados(); }catch(e){ COTIZ=[]; }
   pintarInteresados();
 }
 function esAdmin(){ return !!(YO && YO.nivel==='asesor'); }
@@ -1122,14 +1141,32 @@ function baseDe(x){
   return b ? (b.nombre || '') : '';
 }
 
+/* En la pestaña de Cotizados no se ofrecen los botones de reclasificar (competidor, sin
+   WhatsApp, no contactar, ya es cliente): son para el interesado que apenas se clasifica,
+   y en una cotización viva se tocarían por error. */
 function pintarInteresados(){
+  _pintarInteresadosBase();
+  if(INTER_TAB==='cot'){ const b=$('inBody'); if(b) b.querySelectorAll('.ibx').forEach(e=>e.remove()); }
+}
+function _pintarInteresadosBase(){
   const b=$('inBody'), i=$('inInfo'); if(!b) return;
-  i.textContent = INTER.length ? INTER.length+' por trabajar' : 'ninguno pendiente';
-  if(!INTER.length){
-    b.innerHTML='<div class="vacio" style="padding:18px">Todo al día. Cuando marques un interesado aparece acá para mandarle la información.</div>';
+  /* Aparte: los que solo mostraron interés, y los que ya pidieron cotización. */
+  const sinCot=INTER.filter(x=>!(BONOS[x.id]||{}).cotizacion);
+  const cot=(INTER_TAB==='cot');
+  const LISTA=cot?COTIZ:sinCot, NOUN=cot?'cotizados':'por mandar';
+  const tb=$('inTabs');
+  if(tb){
+    const bt=(t,txt,n)=>`<button onclick="setInterTab('${t}')" style="flex:1;padding:9px 6px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;
+      border:2px solid ${INTER_TAB===t?'#22c55e':'var(--line)'};background:${INTER_TAB===t?'rgba(34,197,94,.12)':'transparent'};color:inherit">${txt} <span style="opacity:.8">${n}</span></button>`;
+    tb.innerHTML=bt('int','🔥 Interesados',sinCot.length)+bt('cot','📄 Cotizados',COTIZ.length);
+  }
+  i.textContent = LISTA.length ? LISTA.length+' '+(cot?'cotizados':'por trabajar') : (cot?'ninguno cotizado':'ninguno pendiente');
+  if(!LISTA.length){
+    b.innerHTML=cot?'<div class="vacio" style="padding:18px">Todavía no hay cotizaciones. Cuando alguien pida cotización aparece acá, aparte de los interesados.</div>'
+                   :'<div class="vacio" style="padding:18px">Todo al día. Cuando marques un interesado aparece acá para mandarle la información.</div>';
     return;
   }
-  if(!esAdmin()){ b.innerHTML=INTER.map(filaInteresado).join(''); return; }
+  if(!esAdmin()){ b.innerHTML=LISTA.map(filaInteresado).join(''); return; }
 
   /* Administrador: primero POR QUIEN, y al tocar un nombre se abren los suyos.
      Con la lista de toda la red de corrido no se sabe a quien reclamarle ni
@@ -1139,7 +1176,7 @@ function pintarInteresados(){
      sola lista por persona: con Sara trabajando calzado y colchones el mismo
      dia, no habia forma de saber a donde iba cada interesado. */
   const neg={};
-  INTER.forEach(x=>{ const g=negocioDe(x); (neg[g]=neg[g]||[]).push(x); });
+  LISTA.forEach(x=>{ const g=negocioDe(x); (neg[g]=neg[g]||[]).push(x); });
   const orden=Object.keys(neg).sort((a,c)=>neg[c].length-neg[a].length);
 
   b.innerHTML=orden.map(g=>{
@@ -1150,7 +1187,7 @@ function pintarInteresados(){
     const sinCelG=todos.filter(x=>!(x.whatsapp||x.lead_cel)).length;
     return `<div class="qneg">
       <div class="qnegcab"><b>${esc(g)}</b>
-        <span>${todos.length} por mandar${sinCelG?' · '+sinCelG+' sin celular':''}</span></div>
+        <span>${todos.length} ${NOUN}${sinCelG?' · '+sinCelG+' sin celular':''}</span></div>
       ${nombres.map(n=>{
         const l=por[n], llave=g+' ‹ '+n, ab=(INTER_ABIERTO===llave);
         const sinCel=l.filter(x=>!(x.whatsapp||x.lead_cel)).length;
@@ -1158,7 +1195,7 @@ function pintarInteresados(){
           <div class="qcab" onclick="abrirInteresados('${js(llave)}')">
             <span class="fl">${ab?'▾':'▸'}</span>
             <b>${esc(n)}</b>
-            <span class="qn">${l.length} por mandar${sinCel?' · '+sinCel+' sin celular':''}</span>
+            <span class="qn">${l.length} ${NOUN}${sinCel?' · '+sinCel+' sin celular':''}</span>
           </div>
           ${ab?l.map(x=>filaInteresado(x, false, true)).join(''):''}
         </div>`; }).join('')}
@@ -1437,7 +1474,7 @@ function filaBonos(x){
 async function trabajado(id){
   const antes=INTER.slice();
   const x=INTER.find(z=>z.id===id) || {};
-  INTER=INTER.filter(z=>z.id!==id); pintarInteresados();       // se va de una, sin esperar
+  INTER=INTER.filter(z=>z.id!==id); COTIZ.forEach(z=>{ if(z.id===id) z.trabajado=true; }); pintarInteresados();       // se va de una, sin esperar
   try{
     const r=await fetch(SB+'/rest/v1/mkr_llamadas?id=eq.'+encodeURIComponent(id),
       {method:'PATCH',headers:{...H,Prefer:'return=minimal'},body:JSON.stringify({trabajado:true})});
