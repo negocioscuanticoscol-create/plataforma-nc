@@ -312,7 +312,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261009-cotizados-aparte';
+const VER='20261009-copiar-cotizacion';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1073,7 +1073,7 @@ function filtrarCiudad(v){
   idx=0; pintarTag(); render(); window.scrollTo(0,0);
 }
 /* ---------- interesados por trabajar ---------- */
-let INTER=[], COTIZ=[], INTER_TAB='int';   // COTIZ: todo lo que ya tiene el bono de cotización, se haya mandado la info o no
+let INTER=[], COTIZ=[], INTER_TAB='int', COTTXT={};   // COTTXT: llamada_id -> {numero,total,texto} de la cotización de CED   // COTIZ: todo lo que ya tiene el bono de cotización, se haya mandado la info o no
 async function cargarCotizados(){
   /* Los cotizados salen aparte de los interesados. Una llamada cotizada se va de la
      lista de interesados cuando se le manda la información (trabajado), pero la
@@ -1088,6 +1088,13 @@ async function cargarCotizados(){
   }
   out.forEach(x=>{ (BONOS[x.id]=BONOS[x.id]||{}).cotizacion=true; });
   COTIZ=(esAdmin()?out:out.filter(x=>String(x.agente_id)===String(YO.id))).sort((a,c)=>String(c.creado_en).localeCompare(String(a.creado_en)));
+  /* La cotización que CED ya hizo para ese celular, lista para pegar en WhatsApp: el mismo texto del
+     botón "Enviar por WhatsApp" de la proforma. Se busca por el celular de la llamada. */
+  const idsC=COTIZ.map(x=>x.id);
+  for(let i=0;i<idsC.length;i+=60){
+    try{ const rr=await RPC('lupe_cot_textos',{p_ids:idsC.slice(i,i+60)}); const o=Array.isArray(rr)?rr[0]:rr;
+         if(o && typeof o==='object') Object.assign(COTTXT,o); }catch(e){}
+  }
 }
 function setInterTab(t){ INTER_TAB=t; pintarInteresados(); }
 async function cargarInteresados(){
@@ -1222,6 +1229,7 @@ function mensajeOferta(x){
   const ciudad=(x.lead_ciudad||'').trim();
   let t='Hola '+persona;
   if(empresa && empresa.toLowerCase()!==persona.toLowerCase()) t+=' de '+empresa;
+  if(COTTXT[x.id]) return t+', gracias por atender nuestra llamada. Te envío la cotización de nuestra bota de dotación Fortia 701 que nos pediste. Si tienes alguna duda, con gusto te ayudo.';
   const g=guionDe(x);
   if(g==='envases')
     return t+', gracias por atender nuestra llamada. Le compartimos nuestro catálogo de envases y la información de nuestro director comercial. Si sigue interesado y quiere hacer un pedido, no dude en contactarnos: puede hacerlo por este mismo WhatsApp o al WhatsApp de Smart Packaging 312 412 4034. Quedamos pendientes. ¡Muchas gracias!';
@@ -1436,6 +1444,8 @@ function filaInteresado(x, equipo, verBase){
     <div class="imsg">${esc(msg)}
       <div class="chipmail imsgcp" style="margin-top:6px" data-txt="${esc(msg)}" onclick="copiarNum(this)"
         title="Toca para copiar el mensaje">📋 Copiar mensaje</div>
+      ${COTTXT[x.id]?`<div class="chipmail imsgcp" style="margin-top:6px;border-color:#22c55e" data-txt="${esc(COTTXT[x.id].texto)}" onclick="copiarNum(this)"
+        title="Toca para copiar la cotización de CED">📄 Copiar cotización · ${esc(cop(+COTTXT[x.id].total||0))} · ${esc(COTTXT[x.id].numero)}</div>`:''}
     </div>
     <div class="ib">
       ${chips.length ? chips.join('')
