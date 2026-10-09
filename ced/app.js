@@ -3722,6 +3722,17 @@ const App = {
         const sl=$('co_lista');
         if(sl && ec.lista_precio && [].some.call(sl.options,o=>o.value===ec.lista_precio)){
           sl.value=ec.lista_precio; this.cotRefPrecio(); }
+        /* Los productos 2, 3... de la cotización. Antes solo se restauraba el primero
+           (el de las columnas sueltas) y los demás desaparecían del formulario, así que
+           al guardar la cotización se quedaba solo con uno. Se vuelven a poner como
+           anexos, con sus mismas tallas. Si una referencia ya no está en la lista (se
+           agotó el inventario) el renglón se conserva tal cual estaba. */
+        (ec.items||[]).slice(1).forEach(it=>{
+          const rx=(this._refsCot||[]).find(x=>x.referencia===it.referencia && (x.color||'')===(it.color||'') && (!it.ced || x.ced===it.ced))
+                || (this._refsCot||[]).find(x=>x.referencia===it.referencia && (x.color||'')===(it.color||''));
+          this._cotAnexos.push({id:'ax'+(this._cotAnexoN=(this._cotAnexoN||0)+1), k:rx?rx.k:'', tallas:{...(it.curva||{})}, keep:rx?null:it});
+        });
+        this._cotPintaAnexos(); this.calcCot&&this.calcCot();
         /* Si se cotizo a mano hay que volver a encender la casilla con el mismo
            valor. Sin esto el formulario se reabria con el precio de la lista y
            al guardar le cambiaba el valor al cliente por detras. */
@@ -4101,6 +4112,7 @@ const App = {
           <option value="">— escoge —</option>
           ${refs.map(r=>`<option value="${esc(r.k)}" ${r.k===a.k?'selected':''}>${esc(r.referencia)}${r.color?' · '+esc(r.color):''}${r.descripcion?' — '+esc(r.descripcion):''}${r.mostrarCed&&r.ced?'  ['+esc(r.ced)+']':''}</option>`).join('')}
         </select>
+        ${(a.keep&&!a.k)?`<div class="hint" style="color:#b45309">⚠️ ${esc(a.keep.referencia||'')} ${esc(a.keep.color||'')} ya no está en la lista de referencias. Se conserva tal como estaba (${a.keep.pares||0} pares · ${money(+a.keep.subtotal||0)}). Si escoges otra referencia arriba, la reemplaza.</div>`:''}
         <div class="hint" id="${a.id}_precio"></div>
         <label>Pares por talla</label>
         <div class="grid-tallas">
@@ -4146,7 +4158,7 @@ const App = {
   _cotAnexosResumen(){
     let pares=0, sub=0; const items=[];
     (this._cotAnexos||[]).forEach(a=>{
-      if(!a.k) return;
+      if(!a.k){ if(a.keep){ pares+=(+a.keep.pares||0); sub+=(+a.keep.subtotal||0); items.push({...a.keep}); } return; }
       const p=this._cotAnexoPrecio(a), n=this._cotAnexoPares(a);
       if(!n) return;
       pares+=n; sub+=n*p.valor;
