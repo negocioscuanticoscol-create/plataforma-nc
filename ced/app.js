@@ -3482,11 +3482,16 @@ const App = {
         <label>Empresa *</label>
         <select class="field" id="co_cliente" onchange="App.cotContactoAuto()">
           <option value="">— Selecciona —</option>
+          <option value="__gen" data-con="" data-tel="" data-nit="">★ Cliente genérico (solo el nombre, sin NIT ni teléfono)</option>
           ${cli.map(c=>`<option value="${c.id}" data-con="${esc(c.contacto1||'')}" data-tel="${esc(c.tel||'')}" data-nit="${esc(c.nit||'')}">${esc(c.nombre)}${c.nombre_comercial?' · '+esc(c.nombre_comercial):''} (${esc(c.nit||'')})</option>`).join('')}
         </select>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <button class="btn-sm" style="background:var(--negro);color:#fff" onclick="App.nuevoClienteDesdeCot()">+ Cliente nuevo</button>
           <button class="btn-sm" style="background:#eef1f5" onclick="App.editarClienteDesdeCot()">✎ Corregir datos de la empresa</button></div>
+        <div id="co_gen_wrap" style="display:none;margin-top:10px;padding:10px;border:1.5px dashed var(--naranja);border-radius:10px">
+          <label style="margin-top:0">Nombre de la empresa o cliente *</label>
+          <input class="field" id="co_gen_nombre" placeholder="Solo el nombre. No se pide NIT ni teléfono">
+          <div class="hint" style="margin-top:5px">Cliente genérico: no se crea una ficha ni entra al CRM. El nombre queda solo en esta cotización.</div></div>
         <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:9px;margin-top:10px">
           <div><label style="margin-top:0">Persona de contacto</label>
             <input class="field" id="co_contacto" placeholder="A quién se le envía"></div>
@@ -3665,7 +3670,8 @@ const App = {
     if(editId){
       const { data:ec } = await this.sb.from('cotizaciones').select('*').eq('id',editId).single();
       if(ec){ this._editCot=ec;
-        const s=$('co_cliente'); if(s) s.value=ec.cliente_id;
+        const s=$('co_cliente'); if(s) s.value=ec.cliente_id||((ec.cliente_snap&&ec.cliente_snap.generico)?'__gen':'');
+        if(s&&s.value==='__gen'){ const gn=$('co_gen_nombre'); if(gn) gn.value=(ec.cliente_snap||{}).nombre||''; const gw=$('co_gen_wrap'); if(gw) gw.style.display='block'; }
         const so=s&&s.options[s.selectedIndex], cd=$('co_doc');
         if(cd&&so&&so.dataset) cd.value=so.dataset.nit||'';
         const cc=$('co_contacto');     if(cc) cc.value=ec.contacto||'';
@@ -4053,6 +4059,7 @@ const App = {
     decir('✓ '+(hit.nombre||'')+(hit.ciudad?' · '+hit.ciudad:'')+' — datos cargados.','#1c7a3e'); },
   cotContactoAuto(){
     const s=$('co_cliente'), o=s&&s.options[s.selectedIndex]; if(!o||!o.dataset) return;
+    const gw=$('co_gen_wrap'); if(gw) gw.style.display=(s.value==='__gen')?'block':'none';
     const d=$('co_doc'); if(d) d.value=o.dataset.nit||'';
     const c=$('co_contacto'), t=$('co_contacto_tel');
     if(c && !c.value.trim()) c.value=o.dataset.con||'';
@@ -4152,11 +4159,14 @@ const App = {
 
   async guardarCotizacion(){
     const cid=$('co_cliente').value;
+    const esGen=(cid==='__gen'), cidDB=esGen?null:cid;     // el genérico no es una ficha: va sin cliente_id
+    const genNombre=esGen?(($('co_gen_nombre')||{}).value||'').trim():'';
     const tipoMv=this._cotTipoM();
     const asesorV=(($('co_asesor')||{}).value||'').trim();
     if(tipoMv==='vendedor'){ if(!asesorV){ alert('Escribe el nombre del vendedor/asesor.'); return; } }
     else if(!cid){ alert('Selecciona un cliente.'); return; }
-    const cl=this._clientes.find(c=>c.id==cid) || (tipoMv==='vendedor'?{nombre:'👔 '+asesorV+' (vendedor)',tipo_pago:'contado'}:null);
+    else if(esGen && !genNombre){ alert('Escribe el nombre de la empresa o cliente.'); if($('co_gen_nombre')) $('co_gen_nombre').focus(); return; }
+    const cl=this._clientes.find(c=>c.id==cid) || (esGen?{nombre:genNombre,nit:'',tel:'',tipo_pago:'contado',generico:true}:null) || (tipoMv==='vendedor'?{nombre:'👔 '+asesorV+' (vendedor)',tipo_pago:'contado'}:null);
     const dM=new Date(), editing=!!this._editCotId;
     const num = (editing&&this._editCot&&this._editCot.numero) ? this._editCot.numero : ('COT-'+dM.getFullYear()+('0'+(dM.getMonth()+1)).slice(-2)+('0'+dM.getDate()).slice(-2)+'-'+('0'+dM.getHours()).slice(-2)+('0'+dM.getMinutes()).slice(-2)+('0'+dM.getSeconds()).slice(-2));
     // MUESTRA: PAR ($40.900 + IVA + transporte $22.000, se cobra) o DE PIE (sin valor comercial, envío gratis).
@@ -4187,7 +4197,7 @@ const App = {
       if(_ft==='otro' && !_fo){ alert('Escribe el valor del transporte, o cambia a "Sin transporte".'); return; }
       const total=sub+iva+flete;
       const partes=Object.keys(cu.tallas).length ? Object.keys(cu.tallas).sort((a,b)=>a-b).map(t=>`T${t}×${cu.tallas[t]}`).join(', ') : `${cu.pares} nono(s)`;
-      const reg={numero:num,cliente_id:cid||null,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':(esParSV?'parsv':((esSVC||esVend)?'nono':'par')),flete,
+      const reg={numero:num,cliente_id:cidDB||null,cliente_snap:cl,es_muestra:true,muestra_tipo:esPie?'pie':(esParSV?'parsv':((esSVC||esVend)?'nono':'par')),flete,
         detalle:esPie?`Muestra de pie · sin valor comercial · ${partes}`:(esParSV?`Muestra PAR · SIN valor comercial (regalo) · ${cu.pares} par(es) · ${partes}`:(esVend?`Muestra de VENDEDOR (${asesorV}) · sin valor comercial · ${cu.pares} par(es) · ${partes}`:(esSVC?`Muestras SIN valor comercial · ${cu.pares} par(es) · ${partes}`:`Muestra par · ${cu.pares} × ${money(precioM)} = ${money(sub)} + IVA ${money(iva)} + 🚚 ${flete?('transporte '+money(flete)+(_ft==='bogota'?' (Bogotá)':(_ft==='otro'?' (cotizado)':''))+' (aparte)'):'SIN transporte'} · ${partes}`))),
         pares:cu.pares,cajas:0,resto:0,curva:cu.tallas,precio_par:sinValor?0:precioM,subtotal:sub,iva,total,flete_al_cobro:false,estado:'cotizada',
         interno:esVend,asesor:esVend?asesorV:null,
@@ -4195,7 +4205,7 @@ const App = {
         vendedor_id:this.user.id,referencia:(cl&&cl.referencia)||'701',recomendado:!!(cl&&cl.recomendado),comision_nc:0,comision_gpjr:0};
       const error=await this._saveCot(reg);
       if(error){ alert('Error: '+error.message); return; }
-      await this._avanzarEmbudo(cid,'muestra');   // aparece en CRM → Prospectos con la gestión
+      await this._avanzarEmbudo(cidDB,'muestra');   // aparece en CRM → Prospectos con la gestión
       const we=editing; this._editCotId=null; this._editCot=null;
       alert('✅ Cotización de MUESTRA '+(sinValor?'SIN VALOR COMERCIAL':`PAR (${money(total)})`)+' · '+cu.pares+` par(es): ${num}`+(we?' (actualizada)':''));
       this.go('cotizaciones'); return;
@@ -4241,7 +4251,7 @@ const App = {
     /* La comisión se paga por par vendido, así que suma los pares de TODOS los
        renglones. Antes multiplicaba solo por los del primero. */
     const comNC=vNC*paresTot, comGPJR=vGPJR*paresTot;
-    const reg={numero:num,cliente_id:cid,cliente_snap:cl,curva:cu.tallas,pares:paresTot,cajas:cu.cajas,resto:cu.resto,
+    const reg={numero:num,cliente_id:cidDB,cliente_snap:cl,curva:cu.tallas,pares:paresTot,cajas:cu.cajas,resto:cu.resto,
       precio_par:pp.valor,subtotal,iva,total,tipo_doc:tipoDoc,rem_ced:remCed,
       items:[{referencia:(pp.ref&&pp.ref.referencia)||cl.referencia||'701',
               color:(pp.ref&&pp.ref.color)||'', ced:(pp.ref&&pp.ref.ced)||'',
@@ -4284,7 +4294,7 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       ced: (($('co_ced')||{}).value)||this.miSede()||null};
     const error=await this._saveCot(reg);
     if(error){ alert('Error: '+error.message); return; }
-    await this._avanzarEmbudo(cid,'interesado');   // aparece en CRM → Prospectos con la gestión
+    await this._avanzarEmbudo(cidDB,'interesado');   // aparece en CRM → Prospectos con la gestión
     const we=editing; this._editCotId=null; this._editCot=null;
     alert('✅ Cotización '+(we?'actualizada':'guardada')+': '+num+'\nTotal '+money(total));
     this.go('cotizaciones');
