@@ -30,17 +30,18 @@ button,a.b{font:inherit;border:0;border-radius:9px;padding:9px 12px;cursor:point
 <header><div class="wrap"><h1>Smart · clientes y recompra</h1><small id="sub"></small></div></header>
 <div class="wrap">
 <div class="tabs" id="tabs"></div>
-<div class="row"><input id="q" type="search" placeholder="Buscar empresa o celular…"><select id="ord" style="max-width:200px"><option value="mayor">Mayor a menor compra</option><option value="dias">Más días sin comprar</option><option value="proxima">Próxima compra</option></select></div>
+<div class="row"><input id="q" type="search" placeholder="Buscar empresa o celular…"><select id="env" style="max-width:230px"><option value="">Todos (enviados o no)</option><option value="ok">Contactables: sin envío o más de 15 días</option><option value="rec">Enviados hace 15 días o menos</option></select><select id="ord" style="max-width:200px"><option value="mayor">Mayor a menor compra</option><option value="dias">Más días sin comprar</option><option value="proxima">Próxima compra</option></select></div>
 <div class="grid" id="lista"></div>
 </div></div>
 <script>
-const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261009-2';
+const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261009-3';
 let D=[],clave='',cajon='ya';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const m=n=>'$'+Math.round(n).toLocaleString('es-CO');
 async function rpc(fn,args){const r=await fetch(URL_+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(args)});if(!r.ok)throw new Error(r.status);return r.json()}
 const CAJ={ya:['TOCA YA','Deberían comprar YA'],q15:['Toca en 15 días','Compran en 15 días'],aun:['Aún no toca','Aún no les toca'],riesgo:['Tocó hace rato (en riesgo)','En riesgo (no vuelven)'],rep:[null,'Ya repusieron'],todos:[null,'Todos'],perd:[null,'Perdidos']};
+const contactable=p=>!p.veces_enviado||p.dias_enviado>15;
 const en=(p,k)=>k==='perd'?p.perdido:p.perdido?false:k==='rep'?p.compras>=2:k==='todos'?true:p.estado===CAJ[k][0];
 async function entrar(c){const d=c.replace(/\D/g,'');$('err').textContent='';
   try{D=await rpc('sr_lista',{p_clave:d});clave=d;try{localStorage.sr_clave=d}catch(e){}$('login').hidden=true;$('app').hidden=false;pintar()}
@@ -49,25 +50,28 @@ function pintar(){
   $('sub').textContent=`${D.length} clientes · ${m(D.reduce((a,p)=>a+ +p.total,0))} vendidos · ${D.filter(p=>p.perdido).length} perdidos`;
   $('tabs').innerHTML=Object.keys(CAJ).map(k=>`<button class="tab ${k===cajon?'on':''}" data-k="${k}"><b>${D.filter(p=>en(p,k)).length}</b><span>${CAJ[k][1]}</span></button>`).join('');
   const q=$('q').value.toLowerCase().trim(),o=$('ord').value;
-  let L=D.filter(p=>en(p,cajon)&&(!q||(p.empresa+' '+(p.celular||'')).toLowerCase().includes(q)));
+  const ev=$('env').value;let L=D.filter(p=>en(p,cajon)&&(!q||(p.empresa+' '+(p.celular||'')).toLowerCase().includes(q))&&(!ev||(ev==='ok')===contactable(p)));
   L.sort((a,b)=>o==='dias'?b.dias_sin-a.dias_sin:o==='proxima'?a.proxima.localeCompare(b.proxima):b.total-a.total);
   $('lista').innerHTML=L.map(card).join('')||'<p class="mu">Nada aquí</p>'}
 function card(p){const cel=(p.celular||'').replace(/\D/g,''),cls=p.estado==='TOCA YA'?'y':p.estado.startsWith('Tocó')?'r':p.estado.startsWith('Toca en')?'o':'';
   return `<div class="card" data-r="${p.rank}"><h3>#${p.rank} ${esc(p.empresa)}</h3>
   <div class="mu">${m(p.total)} · ${p.compras} compra${p.compras>1?'s':''} · última ${esc(p.ultima)} (${p.dias_sin} días) · ciclo ${p.ciclo} d</div>
-  <div><span class="pill ${cls}">${esc(p.estado)}</span><span class="pill">próxima ${esc(p.proxima)}</span></div>
+  <div><span class="pill ${cls}">${esc(p.estado)}</span><span class="pill">próxima ${esc(p.proxima)}</span>${p.veces_enviado?`<span class="pill ${contactable(p)?'y':'o'}">Enviado ${esc(p.enviado)} (hace ${p.dias_enviado} d${p.veces_enviado>1?' · '+p.veces_enviado+' veces':''})</span>`:'<span class="pill">Sin enviar</span>'}</div>
   ${p.perdido?`<div class="mu"><span class="pill r">PERDIDO</span>${esc(p.motivo)}</div>`:''}${p.ultimo_pedido?`<div class="mu">${esc(p.ultimo_pedido)}</div>`:''}
   <div class="msg">${esc(p.mensaje)}</div>
-  <div class="acc">${cel?`<button class="s" data-c="${cel}">📋 ${esc(cel)}</button><a class="b g" target="_blank" href="https://wa.me/57${cel}?text=${encodeURIComponent(p.mensaje)}">WhatsApp</a>`:'<span class="pill r">SIN CELULAR</span>'}<button class="s" data-m="1">📋 Mensaje</button><button class="${p.perdido?'g':'r'} pd" data-p="1" style="${p.perdido?'':'background:var(--rj)'}">${p.perdido?'↩ Recuperar':'🚫 Perdido'}</button></div></div>`}
+  <div class="acc">${cel?`<button class="s" data-c="${cel}">📋 ${esc(cel)}</button><a class="b g" target="_blank" href="https://wa.me/57${cel}?text=${encodeURIComponent(p.mensaje)}">WhatsApp</a>`:'<span class="pill r">SIN CELULAR</span>'}<button class="s" data-m="1">📋 Mensaje</button><button class="g" data-e="1">📤 Enviado</button>${p.veces_enviado?'<button class="s" data-u="1">↩ Deshacer envío</button>':''}<button class="${p.perdido?'g':'r'} pd" data-p="1" style="${p.perdido?'':'background:var(--rj)'}">${p.perdido?'↩ Recuperar':'🚫 Perdido'}</button></div></div>`}
 async function marcar(p){let mot='';
   if(!p.perdido){mot=prompt('Marcar como PERDIDO: '+p.empresa+' - Motivo (opcional):','');if(mot===null)return}
   else if(!confirm('¿Recuperar a '+p.empresa+'?'))return;
   const nuevo=!p.perdido;
   try{await rpc('sr_perdido',{p_clave:clave,p_empresa:p.empresa,p_perdido:nuevo,p_motivo:mot});p.perdido=nuevo;p.motivo=mot;pintar()}catch(e){alert('No se guardó, revisa la señal')}}
+async function enviar(p,si){
+  if(!si&&!confirm('¿Deshacer el último envío a '+p.empresa+'?'))return;
+  try{await rpc('sr_enviado',{p_clave:clave,p_empresa:p.empresa,p_enviado:si});D=await rpc('sr_lista',{p_clave:clave});pintar()}catch(e){alert('No se guardó, revisa la señal')}}
 async function copiar(t,b){try{await navigator.clipboard.writeText(t)}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}const x=b.textContent;b.textContent='✓ Copiado';setTimeout(()=>b.textContent=x,1200)}
 $('ent').onclick=()=>entrar($('cl').value);$('cl').onkeydown=e=>{if(e.key==='Enter')entrar($('cl').value)};
 $('tabs').onclick=e=>{const b=e.target.closest('.tab');if(b){cajon=b.dataset.k;pintar()}};
-$('q').oninput=$('ord').onchange=pintar;
-$('lista').onclick=e=>{const b=e.target.closest('button');if(!b)return;const p=D.find(x=>x.rank==b.closest('.card').dataset.r);if(b.dataset.c)copiar(b.dataset.c,b);if(b.dataset.m)copiar(p.mensaje,b);if(b.dataset.p)marcar(p)};
+$('q').oninput=$('ord').onchange=$('env').onchange=pintar;
+$('lista').onclick=e=>{const b=e.target.closest('button');if(!b)return;const p=D.find(x=>x.rank==b.closest('.card').dataset.r);if(b.dataset.c)copiar(b.dataset.c,b);if(b.dataset.m)copiar(p.mensaje,b);if(b.dataset.p)marcar(p);if(b.dataset.e)enviar(p,true);if(b.dataset.u)enviar(p,false)};
 try{if(localStorage.sr_clave)entrar(localStorage.sr_clave)}catch(e){}
 </script></body></html>
