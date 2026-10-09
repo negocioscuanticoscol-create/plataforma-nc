@@ -3379,12 +3379,11 @@ const App = {
     const AC = (sede.color && /^#[0-9a-fA-F]{6}$/.test(sede.color)) ? sede.color : '#E8620C';
     const txt=[`*PROFORMA ${c.numero||''}*`,
                `Te atiende: ${sede.nombre||''}`,
-               `Factura: ${emisor.nombre||'INDUSTRIAS FEROZ SAS'}${emisor.nit?' NIT '+emisor.nit:''}`,
                `Cliente: ${cl.nombre||''}${cl.nit?' NIT '+cl.nit:''}`];
     if(Array.isArray(c.items)&&c.items.length>1) c.items.forEach(it=>
       txt.push(`Ref. ${it.referencia||''}${it.color?' '+it.color:''} - ${it.pares||0} par(es) x ${money(it.precio_par||0)} = ${money(it.subtotal||0)}`));
-    else txt.push(`${concepto} - ${pares} par(es)`);
-    if(sub) txt.push(`Subtotal: ${money(sub)}`); if(iva) txt.push(`IVA: ${money(iva)}`);
+    else txt.push(`${concepto} - ${pares} par(es)` + ((!c.es_muestra && ppar>0 && sub>0) ? ` x ${money(ppar)} = ${money(sub)}` : ''));   // precio unitario y cuenta, para que el cliente vea de dónde sale el total
+    if(sub) txt.push(`Subtotal: ${money(sub)}`); if(iva) txt.push(`IVA (${Math.round((C.IVA||0.19)*100)}%): ${money(iva)}`);
     txt.push(`Transporte: ${fl.lbl}`,`TOTAL: ${money(tot)}`);
     if(c.notas) txt.push('', `⚠️ *NOTAS IMPORTANTES:* ${c.notas}`);
     if(c.solucion) txt.push(`✅ *SOLUCIÓN:* ${c.solucion}`);
