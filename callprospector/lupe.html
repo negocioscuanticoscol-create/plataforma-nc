@@ -312,7 +312,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261009-copiar-cotizacion';
+const VER='20261013-cotizados-salen';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1160,12 +1160,13 @@ function _pintarInteresadosBase(){
   /* Aparte: los que solo mostraron interés, y los que ya pidieron cotización. */
   const sinCot=INTER.filter(x=>!(BONOS[x.id]||{}).cotizacion);
   const cot=(INTER_TAB==='cot');
-  const LISTA=cot?COTIZ:sinCot, NOUN=cot?'cotizados':'por mandar';
+  const COTPEND=COTIZ.filter(x=>!x.trabajado);   // en cuanto se marca enviado, el cotizado sale de la lista como cualquier interesado
+  const LISTA=cot?COTPEND:sinCot, NOUN=cot?'cotizados':'por mandar';
   const tb=$('inTabs');
   if(tb){
     const bt=(t,txt,n)=>`<button onclick="setInterTab('${t}')" style="flex:1;padding:9px 6px;border-radius:10px;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;
       border:2px solid ${INTER_TAB===t?'#22c55e':'var(--line)'};background:${INTER_TAB===t?'rgba(34,197,94,.12)':'transparent'};color:inherit">${txt} <span style="opacity:.8">${n}</span></button>`;
-    tb.innerHTML=bt('int','🔥 Interesados',sinCot.length)+bt('cot','📄 Cotizados',COTIZ.length);
+    tb.innerHTML=bt('int','🔥 Interesados',sinCot.length)+bt('cot','📄 Cotizados',COTPEND.length);
   }
   i.textContent = LISTA.length ? LISTA.length+' '+(cot?'cotizados':'por trabajar') : (cot?'ninguno cotizado':'ninguno pendiente');
   if(!LISTA.length){
