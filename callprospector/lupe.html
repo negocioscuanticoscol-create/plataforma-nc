@@ -324,7 +324,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261014-botonera-nueva';
+const VER='20261014-cotizacion-pares';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1117,7 +1117,7 @@ async function cargarCotizados(){
   let out=[];
   for(let i=0;i<ids.length;i+=60){
     const d=await GETALL('mkr_llamadas?select=id,lead_id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
-      +'whatsapp2,correo,creado_en,validado,trabajado,estado_venta,agente,agente_id,base_id&id=in.('+ids.slice(i,i+60).join(',')+')&order=creado_en.desc');
+      +'whatsapp2,correo,creado_en,validado,trabajado,estado_venta,pares_cotizacion,agente,agente_id,base_id&id=in.('+ids.slice(i,i+60).join(',')+')&order=creado_en.desc');
     out=out.concat(Array.isArray(d)?d:[]);
   }
   out.forEach(x=>{ (BONOS[x.id]=BONOS[x.id]||{}).cotizacion=true; });
@@ -1140,7 +1140,7 @@ async function cargarInteresados(){
      invisibles, nadie les mando nada. 'not.is.true' es lo que se queria decir:
      todo lo que todavia no esta trabajado, sea false o este vacio. */
   const base='mkr_llamadas?select=id,lead_id,lead_nombre,lead_ciudad,lead_cel,contacto,whatsapp,'
-    +'whatsapp2,correo,creado_en,validado,estado_venta,agente,agente_id,base_id'
+    +'whatsapp2,correo,creado_en,validado,estado_venta,pares_cotizacion,agente,agente_id,base_id'
     +'&resultado=eq.Interesado&trabajado=not.is.true&base_id=not.is.null&order=creado_en.desc';
   /* El administrador ve los de TODA la red: el segundo paso —mandar la info por
      WhatsApp— no siempre lo hace quien marco. Los demas ven los suyos. */
@@ -1479,6 +1479,7 @@ function filaInteresado(x, equipo, verBase){
     <div class="imsg">${esc(msg)}
       <div class="chipmail imsgcp" style="margin-top:6px" data-txt="${esc(msg)}" onclick="copiarNum(this)"
         title="Toca para copiar el mensaje">📋 Copiar mensaje</div>
+      ${x.pares_cotizacion?`<div class="iq" style="margin-top:6px">📦 Pidió cotizar <b>${num(x.pares_cotizacion)}</b> par${+x.pares_cotizacion===1?'':'es'}</div>`:''}
       ${COTTXT[x.id]?`<div class="chipmail imsgcp" style="margin-top:6px;border-color:#22c55e" data-txt="${esc(COTTXT[x.id].texto)}" onclick="copiarNum(this)"
         title="Toca para copiar la cotización de CED">📄 Copiar cotización · ${esc(cop(+COTTXT[x.id].total||0))} · ${esc(COTTXT[x.id].numero)}</div>`:''}
     </div>
@@ -1763,8 +1764,14 @@ function abrirPanel(fila,l,tarifa){
     <input id="pW" inputmode="tel" placeholder="WhatsApp" value="${esc(soloNum(l.cel))}">
     <input id="pW2" inputmode="tel" placeholder="Otro celular (si dan uno distinto)">
     <input id="pM" inputmode="email" placeholder="Correo">
-    ${porHora() ? `<label style="display:flex;gap:9px;align-items:center;margin:4px 0 8px;font-size:13.5px;font-weight:700;cursor:pointer">
-      <input type="checkbox" id="pCot" style="width:20px;height:20px;accent-color:#22c55e"> 📄 Pidió cotización <small style="font-weight:500;opacity:.75">(+${cop(tarifas()['Cotización']||1000)})</small></label>` : ''}
+<!-- Cotizacion: sale en TODA base (14-oct-2026). Al marcarla pide los pares. El bono de $1.000 solo
+         lo paga la base que lo tenga en mkr_tarifa_base (hoy, las de hora). -->
+    <label style="display:flex;gap:9px;align-items:center;margin:4px 0 8px;font-size:13.5px;font-weight:700;cursor:pointer">
+      <input type="checkbox" id="pCot" style="width:20px;height:20px;accent-color:#22c55e" onchange="const q=$('pParesBox'); if(q){ q.style.display=this.checked?'block':'none'; if(this.checked) $('pPares').focus(); }">
+      📄 Pidió cotización${(+tarifas()['Cotización']||0)>0?` <small style="font-weight:500;opacity:.75">(+${cop(tarifas()['Cotización'])})</small>`:''}</label>
+    <div id="pParesBox" style="display:none;margin:0 0 8px">
+      <input id="pPares" type="number" inputmode="numeric" min="1" step="1" placeholder="¿Cuántos pares quiere cotizar?">
+    </div>
     <!-- UN solo boton. Antes eran tres —Enviar info, Pendiente y Catalogo
          enviado— y en mitad de una llamada hay que decidir cual, sin que la
          diferencia entre ellos se vea en pantalla. Aqui solo se guarda lo que
@@ -1789,6 +1796,9 @@ async function guardarPanel(id,tarifa,catalogo){
   const c=($('pC')||{}).value||'', m=($('pM')||{}).value||'';
   const w2=($('pW2')||{}).value||'';
   let w=($('pW')||{}).value||'';
+  const cotiza=!!($('pCot')||{}).checked;
+  const pares=parseInt(($('pPares')||{}).value,10)||0;
+  if(cotiza && pares<1){ toast('Escribe cuántos pares quiere cotizar',true); const q=$('pPares'); if(q) q.focus(); return; }
   /* Si mando el catalogo y no escribio otro WhatsApp, es al numero que tiene en
      pantalla: se lo acaba de mandar a ese. Pedirselo de nuevo es hacerlo teclear
      lo que ya esta ahi. */
@@ -1802,6 +1812,7 @@ async function guardarPanel(id,tarifa,catalogo){
       body:JSON.stringify({contacto:c.trim()||null, whatsapp:soloNum(w)||null,
         whatsapp2:soloNum(w2)||null, correo:m.trim()||null,
         datos:true, validado:true, valor:tarifa, actualizado:new Date().toISOString(),
+        pares_cotizacion: cotiza ? pares : null,
         estado_venta: catalogo?'catalogo_enviado':'nuevo'})});
     if(!r.ok){ toast('No se pudo guardar. Intenta otra vez.',true); return; }
 
@@ -1820,7 +1831,7 @@ async function guardarPanel(id,tarifa,catalogo){
               lead_nombre: l.nombre||null, lead_ciudad: l.ciudad||null },
              catalogo ? 2 : 1);
   }catch(e){ toast('Sin señal. Intenta otra vez.',true); return; }
-  if(($('pCot')||{}).checked){ await darBono(id,'cotizacion'); tarifa+=(+tarifas()['Cotización']||0); }
+  if(cotiza){ await darBono(id,'cotizacion'); tarifa+=(+tarifas()['Cotización']||0); }
   pendientes=Math.max(0,pendientes-1);
   miPlata+=tarifa; pintarPlata(true);
   toast((catalogo?'📄 Catálogo enviado y guardado · siguiente · +':'✅ Contacto guardado · siguiente · +')+cop(tarifa));
