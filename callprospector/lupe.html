@@ -157,6 +157,18 @@ main{flex:1;padding:13px 15px 0}
 .b-Yaescliente{background:#0F766E}
 .b-InfoWhatsApp{background:#166534}          /* ya no se pinta: queda por los registros viejos */
 .b-Cambiodebase{background:#166534}
+.b-Desconectado{background:#7C4A8A}
+.res .full{grid-column:1/-1}
+.res .full.b-Cambiodebase{flex-direction:row;justify-content:center;gap:8px;padding:12px 6px}
+/* guia de cuando oprimir cada boton */
+.guia{margin-top:12px;border:1px solid var(--line);border-radius:11px;background:var(--card2);font-size:12.5px}
+.guia summary{cursor:pointer;padding:10px 13px;font-weight:700;list-style:none}
+.guia summary::-webkit-details-marker{display:none}
+.guia[open] summary{border-bottom:1px solid var(--line)}
+.guia .gi{padding:9px 13px;border-bottom:1px solid var(--line);line-height:1.4}
+.guia .gi:last-child{border-bottom:none}
+.guia .gi b{display:block;margin-bottom:2px}
+.guia .gi span{opacity:.82}
 #bases .bcard .cli{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
   font-weight:700;color:var(--naranja2);margin-bottom:3px}
 #bases .bcard.vacia{opacity:.45;cursor:default}
@@ -312,7 +324,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261013-cotizados-salen';
+const VER='20261014-botonera-nueva';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -400,8 +412,25 @@ const SEG=['marca','canal','sector','subsector','departamento','ciudad','barrio'
    quedaban mal metidos en 'No interesado' o 'Equivocado', que no es lo mismo: el
    dato SI sirve, solo que por otro canal (llamada, correo). Va al lado de
    Interesado/Competencia/No contactar porque son los que Jose mira primero. */
-const RESULTADOS=['Interesado','Competencia','No tiene WhatsApp','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente'];
-const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No tiene WhatsApp':300,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50,'Info WhatsApp':350};
+const RESULTADOS=['Interesado','Competencia','No tiene WhatsApp','No interesado','No contesta','Desconectado','Equivocado','No contactar','Dato negativo','Habeas data','Ya es cliente'];
+/* BOTONERA (14-oct-2026, José): lo que se ve en el teclado, fila por fila. Interesado solo arriba;
+   luego de a dos. Competencia, No tiene WhatsApp, No contactar y Ya es cliente salieron del teclado
+   —igual que Info WhatsApp— pero siguen en RESULTADOS/ICONO para pintar lo que ya está guardado.
+   'Cambio de base' ya no abre una lista: guarda la llamada con ese resultado (sin pagar) y la
+   empresa sale de la cola; después se decide a qué base va (vista mkr_cambios_base_pendientes). */
+const BOTONERA=[['Interesado'],['No contesta','No interesado'],['Desconectado','Equivocado'],['Dato negativo','Habeas data'],['Cambio de base']];
+/* CUÁNDO se oprime cada botón: una sola idea por botón, para que dos personas marquen lo mismo. */
+const CUANDO={
+ 'Interesado':['Contestó alguien de la empresa y quiere recibir información o una cotización.','Dijo que sí con claridad y te da (o le pides) WhatsApp o correo. Si solo dijo "mándeme algo" para salir del paso, eso es No interesado.'],
+ 'No contesta':['Timbró y nadie contestó, dio ocupado, saltó el buzón de voz o colgaron sin hablar.','El número existe y se puede volver a intentar otro día.'],
+ 'No interesado':['Contestó la persona correcta y dijo que no le sirve, que ya tiene proveedor o que no compra.','Hablaste con quien decide y la respuesta fue no.'],
+ 'Desconectado':['El número dice que ya no está en servicio, fue desactivado o no existe (mensaje grabado o tono de fuera de servicio).','El número está muerto: no se vuelve a llamar.'],
+ 'Equivocado':['El número sí contesta, pero no es esa empresa: otra persona u otro negocio ("aquí no es").','El teléfono existe, el dato está mal.'],
+ 'Dato negativo':['La empresa existe pero NO corresponde a esta base: no es el negocio que buscamos o ya cerró.','No sirve para ninguna base. Sale de todas las listas.'],
+ 'Habeas data':['La persona pide que no la llamen más, que borren sus datos o menciona la ley de protección de datos.','Se bloquea el teléfono en todas las bases. Es un derecho, no se insiste.'],
+ 'Cambio de base':['La empresa es real y contestó, pero por lo que hace pertenece a OTRA base (por ejemplo, es una ferretería y estás en Metalmecánica).','No paga. Queda guardada y nosotros decidimos a qué base va. Si no sirve para ninguna, es Dato negativo.']
+};
+const TARIFA_DEF={'Interesado':2500,'Competencia':600,'No tiene WhatsApp':300,'No interesado':350,'No contesta':150,'Equivocado':150,'No contactar':250,'Dato negativo':150,'Habeas data':150,'Ya es cliente':50,'Info WhatsApp':350,'Desconectado':150,'Cambio de base':0};
 /* LO QUE PAGA CADA QUIEN depende de su CATEGORIA, no de la base. Hay cuatro
    -interna, principiante, telemercaderista, asesora- porque no es lo mismo
    una empleada de la empresa, que tiene sueldo aparte, que una asesora que
@@ -453,7 +482,7 @@ async function cargarMiTarifa(){
     const t={}; f.forEach(x=>t[x.resultado]=+x.valor||0); MI_TARIFA=t;
   }
 }
-const ICONO={'Interesado':'🔥','Competencia':'🏭','No tiene WhatsApp':'📵','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
+const ICONO={'Interesado':'🔥','Competencia':'🏭','No tiene WhatsApp':'📵','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬','Desconectado':'📴','Cambio de base':'🏢'};
 
 /* TODOS es la base completa; leads es lo que se esta viendo. Se separan porque
    al filtrar por ciudad hay que poder volver a "todas" sin recargar, y porque al
@@ -1024,12 +1053,16 @@ function render(){
   if(idx<0) idx=leads.length-1;
   const l=leads[idx], cel=soloNum(l.cel);
   const t=tarifas();
-  const botones=RESULTADOS.map(k=>
-    `<button class="b-${k.replace(/\s/g,'')}" onclick="marcar('${esc(k).replace(/'/g,'')}')">
-      ${ICONO[k]||''} ${esc(k)}<small>${cop(t[k])}</small></button>`).join('')
-    /* Va en la grilla para que este a la mano, pero NO llama a marcar(): mover de
-       base no es un resultado de llamada, no paga y no cuenta como marcacion. */
-    + (misBases.length>1 && !MODO_ENTREGA ? `<button class="b-Cambiodebase" onclick="abrirCambioBase()">🏢 Cambio de base<small>no paga</small></button>` : '');
+  const btn=(k,full)=>{
+    const una=BOTONERA.some(f=>f.length===1&&f[0]===k);
+    const pie = k==='Cambio de base' ? 'no paga' : cop(t[k]);
+    return `<button class="b-${k.replace(/\s/g,'')}${una?' full':''}" title="${esc((CUANDO[k]||[''])[0])}" onclick="marcar('${esc(k).replace(/'/g,'')}')">
+      ${ICONO[k]||''} ${esc(k)}<small>${pie}</small></button>`;
+  };
+  const botones=BOTONERA.map(f=>f.map(k=>btn(k)).join('')).join('');
+  const guia=`<details class="guia"><summary>📖 ¿Cuándo oprimo cada botón?</summary>`
+    + BOTONERA.flat().map(k=>`<div class="gi"><b>${ICONO[k]||''} ${esc(k)}</b><span>${esc((CUANDO[k]||['',''])[0])}</span><br><span><i>${esc((CUANDO[k]||['',''])[1])}</i></span></div>`).join('')
+    + `</details>`;
 
   $('main').innerHTML=`<div class="card">
     ${selectorCiudad()}
@@ -1045,6 +1078,7 @@ function render(){
     <a class="call" href="tel:+57${esc(cel)}">📞 LLAMAR</a>
     ${l.extension?`<div class="ext">Al contestar, marca la extensión <b>${esc(l.extension)}</b></div>`:''}
     <div class="res">${botones}</div>
+    ${guia}
     <div id="panel"></div>
     <!-- Volver al anterior: si uno se pasa de largo o quiere retomar al que
          acaba de dejar, sin tener que recorrer toda la lista otra vez. -->
@@ -1710,6 +1744,7 @@ async function marcar(resultado){
      —Enviar info, Pendiente o Catalogo enviado—, que es el que pasa al siguiente. */
   if(esInteresado){ abrirPanel(fila,l,tarifa); return; }
   miPlata+=tarifa; misLlamadas++; pintarPlata(true);
+  if(resultado==='Cambio de base') toast('🏢 Guardado para cambio de base · no paga');
   sacarActual(); render(); window.scrollTo(0,0);
 }
 

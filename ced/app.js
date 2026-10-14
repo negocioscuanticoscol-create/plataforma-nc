@@ -5162,8 +5162,8 @@ flete_al_cobro:cu.cajas<C.MIN_CAJAS_SIN_FLETE,estado:'cotizada',vendedor_id:this
       if(!bases.length) return '<div class="empty">Todavía no hay bases de <b>Lupe</b> amarradas a este CED. Cada base se amarra con <b>destino_ced</b>, y desde ahí empieza a caer aquí todo lo que marquen.</div>';
       const bs=bases.find(x=>x.id===cajon)||bases[0];
       const res=llam.filter(x=>x.base_id===bs.id);
-      const ICO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬'};
-      const ORD=['Interesado','Info WhatsApp','Ya es cliente','Competencia','No interesado','No contesta','Equivocado','No contactar','Dato negativo','Habeas data'];
+      const ICO={'Interesado':'🔥','Competencia':'🏭','No interesado':'❌','No contesta':'☎️','Equivocado':'⛔','No contactar':'🚫','Dato negativo':'🗑️','Habeas data':'🛡️','Ya es cliente':'🤝','Info WhatsApp':'💬','Desconectado':'📴','Cambio de base':'🏢'};
+      const ORD=['Interesado','Info WhatsApp','Ya es cliente','Competencia','No interesado','No contesta','Desconectado','Equivocado','No contactar','Dato negativo','Habeas data','Cambio de base'];
       const byCal={}; res.forEach(r=>{ const k=r.resultado||'—'; byCal[k]=(byCal[k]||0)+1; });
       const cats=Object.entries(byCal).sort((x,y)=>{ const a=ORD.indexOf(x[0]), c=ORD.indexOf(y[0]); return (a<0?99:a)-(c<0?99:c); });
       /* Por defecto Interesado. Si esa base no tiene ninguno, el primero que haya. */

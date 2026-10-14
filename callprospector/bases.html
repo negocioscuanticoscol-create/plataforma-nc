@@ -956,7 +956,7 @@ const M={
     /* Lo que Lupe hizo: se mide sobre las llamadas, no sobre el cruce. */
     const bs=new Set((this.bases||[]).filter(b=>b.cliente===this.efCli).map(b=>String(b.id)));
     const d=this.datos().filter(f=>bs.has(String(f.base_id)));
-    const cont=d.filter(f=>f.resultado&&f.resultado!=='No contesta'&&f.resultado!=='Equivocado').length;
+    const cont=d.filter(f=>f.resultado&&f.resultado!=='No contesta'&&f.resultado!=='Equivocado'&&f.resultado!=='Desconectado').length;
     const ints=d.filter(f=>f.resultado==='Interesado');
     const pagado=d.reduce((s,f)=>s+(+f.valor||0),0);
 
