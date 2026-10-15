@@ -563,7 +563,9 @@ const App={
     this._leads=leads;
     // los que más se venden, de primeras
     const vend={}; hist.forEach(p=>(p.items||[]).forEach(i=>{ if(i.producto_id)vend[i.producto_id]=(vend[i.producto_id]||0)+(+i.qty||0); }));
-    prods.sort((a,b)=>(vend[b.id]||0)-(vend[a.id]||0)||String(a.nombre||'').localeCompare(String(b.nombre||'')));
+    /* Los DESTACADOS van de primeros (15-oct-2026, Jose: la Ghee). Despues, los que mas se venden. Un producto nuevo no tiene ventas
+       y sin esto quedaba de ultimo. Se marca con kruh_productos.destacado = true. */
+    prods.sort((a,b)=>((b.destacado?1:0)-(a.destacado?1:0))||(vend[b.id]||0)-(vend[a.id]||0)||String(a.nombre||'').localeCompare(String(b.nombre||'')));
     this._prods=prods; this._cart=this._cart||{};
     // mapa por telefono con TODO el contacto. Si hay repetidos se guarda el primero y se cuenta
     this._telMap={}; leads.forEach(l=>{ const t=this._telKey(l.telefono); if(t.length<10)return;
