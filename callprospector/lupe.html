@@ -300,6 +300,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
     <div class="val mono" id="plata">$0</div>
     <div class="pend" id="pend"></div>
     <div class="corte" id="corteHoy"></div>
+    <div class="corte" id="repHoy" style="cursor:pointer" onclick="verRepetidos()"></div>
     <div><span class="baseTag" id="baseTag" onclick="volverBases()">—</span></div>
   </div>
 </header>
@@ -326,7 +327,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261015-sin-llamadas-perdidas';
+const VER='20261015-detector-repetidos';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1977,6 +1978,23 @@ async function pintarCorte(){
     e.innerHTML=partes.join('<br>');
   }catch(x){}
 }
+/* REPETIDOS DEL DIA (15-oct-2026, Jose): solo el supervisor lo ve. Sale de mkr_repetidos, que se llena sola cada vez que se guarda una llamada
+   a una empresa (o a un telefono del mismo cliente) que ya tenia otra. Si dice "sin repetidas" es que no paso ninguna. */
+let REP_HOY=[], _repUlt=0;
+async function pintarRepetidos(){
+  const e=$('repHoy'); if(!e||!YO||YO.nivel!=='asesor') return;
+  if(Date.now()-_repUlt<60000) return; _repUlt=Date.now();
+  try{
+    const hoyB=new Date(Date.now()-5*3600e3).toISOString().slice(0,10);
+    const r=await GET('mkr_repetidos?select=nombre,base,agentes,detalle,tel&dia=eq.'+hoyB+'&order=detectado_en.desc&limit=200');
+    REP_HOY=Array.isArray(r)?r:[];
+    e.innerHTML=REP_HOY.length?'<b style="color:#ff6b5a">🔁 '+REP_HOY.length+' empresa'+(REP_HOY.length===1?'':'s')+' repetida'+(REP_HOY.length===1?'':'s')+' hoy · toca para ver</b>':'✅ Sin repetidas hoy';
+  }catch(x){}
+}
+function verRepetidos(){
+  if(!REP_HOY.length){ toast('✅ Hoy no se ha repetido ninguna empresa'); return; }
+  alert('EMPRESAS LLAMADAS MAS DE UNA VEZ HOY\n\n'+REP_HOY.map(r=>'• '+(r.nombre||'?')+' ('+(r.tel||'')+')\n   '+(r.base||'')+'\n   '+(r.detalle||r.agentes||'')).join('\n\n'));
+}
 function pintarPlata(bump){
   /* El numero de marcaciones al lado de la plata: sin el, uno no sabe si el
      dia rindio poco porque llamo poco o porque los resultados pagaron poco. */
@@ -2199,7 +2217,7 @@ async function sincronizar(){
   const yoKey = YO.id||('n:'+YO.nombre);
   if(real[yoKey]){ miPlata=real[yoKey].plata; misLlamadas=real[yoKey].llamadas; }
   pintarPlata(false);
-  pintarCorte();
+  pintarCorte(); pintarRepetidos();
 
   /* Y lo que de verdad importa cuando hay DOS trabajando la misma base: sacar
      de la lista lo que la otra ya marco. Antes esto solo se leia al entrar, asi
