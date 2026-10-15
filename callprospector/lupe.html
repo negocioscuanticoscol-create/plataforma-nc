@@ -326,7 +326,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261015-sin-autorecarga';
+const VER='20261015-sin-llamadas-perdidas';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -894,12 +894,12 @@ async function abrirBase(b){
 
   const [ls,ya]=await Promise.all([
     GETALL(q),
-    GETALL('mkr_ya_llamados?select=lead_id&base_id=eq.'+b.id+'&limit=20000')   /* 15-oct-2026: tambien cuenta lo llamado antes de mover la empresa de base */
+    GETALL('mkr_ya_llamados?select=lead_id,agente_id,tipo,creado_en&base_id=eq.'+b.id+'&limit=20000')   /* 15-oct-2026: tambien cuenta lo llamado antes de mover la empresa de base */
   ]);
   if(!Array.isArray(ls)){ $('bases').innerHTML='<div class="vacio">No se pudieron cargar los prospectos.</div>'; return; }
 
   // los ya marcados NO vuelven a salir, aunque se recargue la página
-  const hechos=new Set((ya||[]).map(x=>x.lead_id).filter(Boolean));
+  const _ch=calcularHechos(ya); const hechos=_ch.hechos; PEND_MIOS=_ch.mios;
   TODOS=ls.filter(l=>l.cel && !hechos.has(l.id));
   /* De donde salio cada recorte. Sin esto, "no quedan prospectos" no dice si
      la base venia vacia, si ya se llamo todo, si el territorio dejo cero o si
@@ -944,6 +944,10 @@ async function abrirBase(b){
   /* Hasta aqui TODOS esta ordenado pero sin repartir. Se guarda asi para poder
      rehacer el reparto cuando entre o salga alguien. */
   ORDEN=TODOS.slice();
+  if(PEND_MIOS.size){        // lo que llame y no marque va primero, de la mas vieja a la mas nueva
+    const f=ORDEN.filter(l=>PEND_MIOS.has(l.id)).sort((x,y)=>PEND_MIOS.get(x.id)-PEND_MIOS.get(y.id));
+    ORDEN=f.concat(ORDEN.filter(l=>!PEND_MIOS.has(l.id))); TODOS=ORDEN.slice();
+  }
   await latir();
   REPARTO=await calcularReparto();
   aplicarReparto();
@@ -1052,6 +1056,31 @@ function saltarCiudad(){
 /* NO REPETIR (15-oct-2026, Jose): dos personas con la misma base veian a veces la misma empresa porque cada una trabaja sobre la lista
    que bajo al abrir y el refresco tarda hasta un minuto. Ahora, antes de dejar llamar a una empresa, se pregunta si ya tiene una llamada
    (de cualquiera, en cualquier base). Si la tiene, se salta sola y avisa quien la marco. Una consulta liviana por empresa. */
+/* LLAMADAS QUE SE HICIERON PERO NO SE MARCARON (15-oct-2026, Jose; ellas trabajan desde el CELULAR).
+   Al tocar LLAMAR el celular abre el marcador y deja el navegador en segundo plano; al volver, la pagina suele recargarse desde cero y la
+   empresa que acababa de llamar, aun sin marcar, volvia a salir (y se llamaba dos veces). Ahora cada toque en LLAMAR queda guardado en
+   mkr_intentos. Para las demas personas esa empresa deja de salir de inmediato; para mi sale PRIMERO, con el aviso "ya la llamaste, marca
+   como te fue", hasta que la marque. Lo marcado, o el mismo telefono en otra empresa del mismo cliente, no vuelve a salir para nadie. */
+let PEND_MIOS=new Map();       // lead_id -> momento en que toque LLAMAR y todavia no marque
+function calcularHechos(ya){
+  const hechos=new Set(), mios=new Map(), ahora=Date.now();
+  (Array.isArray(ya)?ya:[]).forEach(x=>{
+    if(!x.lead_id) return;
+    if(x.tipo!=='intento'){ hechos.add(x.lead_id); return; }        // 'llamada' e 'intento_tel': no se vuelve a ofrecer
+    const mio = YO && x.agente_id && String(x.agente_id)===String(YO.id);
+    const t = Date.parse(x.creado_en)||0;
+    if(!mio || ahora-t>24*3600e3){ hechos.add(x.lead_id); return; }  // lo toco otra persona, o ya paso un dia
+    mios.set(x.lead_id, Math.max(mios.get(x.lead_id)||0, t));
+  });
+  mios.forEach((t,id)=>{ if(hechos.has(id)) mios.delete(id); });      // si ya tiene marca, ya no esta pendiente
+  return {hechos, mios};
+}
+function registrarIntento(){
+  const l=leads[idx]; if(!l||!BASE||!YO) return;
+  PEND_MIOS.set(l.id, Date.now());
+  try{ fetch(SB+'/rest/v1/mkr_intentos',{method:'POST',keepalive:true,headers:{...H,Prefer:'return=minimal'},
+        body:JSON.stringify({lead_id:l.id, base_id:BASE.id, agente_id:YO.id||null, tel:soloNum(l.cel)||null})}); }catch(e){}
+}
 const _VERIF=new Set();
 async function yaLaMarcaron(l){
   if(!l||!l.id) return null;
@@ -1129,7 +1158,8 @@ function render(){
     ${l.contacto?`<div class="cont">${esc(l.contacto)}</div>`:''}
     <div class="num mono" data-num="${esc(cel)}" onclick="copiarNum(this)" title="Toca para copiar el número">${esc(cel.replace(/(\d{3})(\d{3})(\d{4})/,'$1 $2 $3'))}</div>
     ${l.email?`<div class="mail"><span class="chipmail" data-txt="${esc(l.email)}" onclick="copiarNum(this)" title="Toca para copiar el correo">✉️ ${esc(l.email)}</span><small>toca para copiar</small></div>`:''}
-    <a class="call" href="tel:+57${esc(cel)}">📞 LLAMAR</a>
+    ${PEND_MIOS.has(l.id)?`<div class="ext" style="background:rgba(255,193,84,.18);margin-top:12px">📞 <b>Esta ya la llamaste</b> (hace ${Math.max(1,Math.round((Date.now()-PEND_MIOS.get(l.id))/60000))} min). Marca cómo te fue y sigue: <b>no la vuelvas a llamar</b>.</div>`:''}
+    <a class="call" href="tel:+57${esc(cel)}" onclick="registrarIntento()">${PEND_MIOS.has(l.id)?'📞 Volver a llamar':'📞 LLAMAR'}</a>
     ${l.extension?`<div class="ext">Al contestar, marca la extensión <b>${esc(l.extension)}</b></div>`:''}
     <div class="res">${botones}</div>
     ${guia}
@@ -1149,6 +1179,7 @@ function mover(d){ idx+=d; render(); window.scrollTo(0,0); }
    leads, al volver a "todas las ciudades" reaparecería el que ya se marcó. */
 function sacarActual(){
   const l=leads[idx]; if(!l) return;
+  PEND_MIOS.delete(l.id);
   const i=TODOS.indexOf(l); if(i>=0) TODOS.splice(i,1);
   leads.splice(idx,1);
 }
@@ -2089,6 +2120,7 @@ function aplicarReparto(){
        igual sin hablarse y no se cruzan. Todas las empresas de Bogota son de la misma ciudad, que era donde mas se notaba. */
     const hashId=s=>{ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h>>>0; };
     l=ORDEN.filter(x=>{
+      if(PEND_MIOS.has(x.id)) return true;             // lo que llame y me falta marcar es mio, caiga donde caiga el reparto
       const c=String(x.ciudad||'').trim();
       const eq=equipo(c);
       if(eq.length<2) return true;                     // solo yo: toda la ciudad
@@ -2175,9 +2207,11 @@ async function sincronizar(){
      llamando a la misma empresa. No se toca la pantalla si hay un panel de
      interesado abierto, para no borrarle lo que esta escribiendo. */
   if(BASE && !($('panel')||{}).innerHTML){
-    const ya=await GETALL('mkr_ya_llamados?select=lead_id&base_id=eq.'+BASE.id);
+    const ya=await GETALL('mkr_ya_llamados?select=lead_id,agente_id,tipo,creado_en&base_id=eq.'+BASE.id);
     if(Array.isArray(ya) && ya.length){
-      const hechos=new Set(ya.map(x=>x.lead_id).filter(Boolean));
+      const _c2=calcularHechos(ya); const hechos=_c2.hechos;
+      _c2.mios.forEach((t,id)=>{ if(!PEND_MIOS.has(id)) PEND_MIOS.set(id,t); });          // sin quitar lo que acabo de tocar y aun no llega a la base
+      [...PEND_MIOS.keys()].forEach(id=>{ if(hechos.has(id)) PEND_MIOS.delete(id); });
       const antes=leads.length, actual=leads[idx] && leads[idx].id;
       TODOS=TODOS.filter(l=>!hechos.has(l.id));
       leads=leads.filter(l=>!hechos.has(l.id));
