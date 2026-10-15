@@ -1063,10 +1063,12 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   pendSub(s){ this._pendSub=s; },
   async vPendientes(){
     const admin=this.esAdmin();
+    /* 15-oct-2026: tercer cajon, "Plan de videos", para NC y para publico (el equipo de Sole lo ve y marca su checklist). */
+    const CAJ=this._pendCajas();
+    if(this._pendCaj==='videos') return this.vVideos(CAJ);
     if(!admin && this._pendCaj==='plan') this._pendCaj='grupo';   // "Plan de negocio" es solo de NC, no de público
     const todos=await this._get('soleparis_pendientes?order=creado_en.desc');
     this._pend=todos;
-    const CAJ=admin?[['grupo','👥','Pendientes grupo'],['plan','📈','Plan de negocio']]:[['grupo','👥','Pendientes grupo']];
     const esPlan=this._pendCaj==='plan';
     const items=todos.filter(p=>(p.grupo||'grupo')===this._pendCaj);
     if(esPlan && !this._pendSub) this._pendSub=this.PLAN_SUBGRUPOS[0];
@@ -1142,6 +1144,82 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     if(!confirm('¿Borrar este pendiente?'))return;
     await this._delq('soleparis_pendientes?id=eq.'+encodeURIComponent(id));
     this.vPendientes();
+  },
+
+  /* ---------- PLAN DE VIDEOS (15-oct-2026) ----------
+     Un cajon dentro de Pendientes: por producto se abre la lista de videos, cada uno con su checklist
+     (storyboard entregado, autorizado, filmacion, edicion y entrega, inicio de pauta). Al marcar una casilla se guarda
+     la fecha de entrega; al desmarcarla, se borra. Tambien el equipo y los pendientes del dia de filmacion. */
+  PROD_VIDEOS:['Nano Péptidos Capilares','Contorno de Ojos','Poción Secante','Fitoaliv','Crema Aclarante Corporal','Vitamina C Pura'],
+  _vidAbierto:null,
+  vidAbrir(prod,abierto){ this._vidAbierto=this._vidAbierto||{}; this._vidAbierto[prod]=abierto; },
+  _fechaC(x){ return x?new Date(x).toLocaleDateString('es-CO'):''; },
+  _pendCajas(){ return this.esAdmin()?[['grupo','👥','Pendientes grupo'],['plan','📈','Plan de negocio'],['videos','🎬','Plan de videos']]:[['grupo','👥','Pendientes grupo'],['videos','🎬','Plan de videos']]; },
+  async vVideos(CAJ){
+    const [vids,pasos,rod]=await Promise.all([this._get('soleparis_video?order=orden'), this._get('soleparis_video_paso?order=orden'), this._get('soleparis_rodaje?order=orden')]);
+    this._vidD={pasos,rod};
+    if(!this._vidAbierto){ this._vidAbierto={}; this._vidAbierto[this.PROD_VIDEOS[0]]=true; }
+    const fp=id=>pasos.filter(x=>x.video_id===id);
+    const prodHtml=this.PROD_VIDEOS.map((prod,k)=>{
+      const vs=vids.filter(v=>v.producto===prod).sort((a,b)=>a.orden-b.orden);
+      const ps=vs.reduce((a,v)=>a.concat(fp(v.id)),[]);
+      const hechos=ps.filter(x=>x.hecho).length;
+      const cuerpo=!vs.length?'<div class="empty">Todavía no hay videos de este producto. Cuando Negocios Cuánticos entregue los storyboards, aparecen aquí.</div>'
+        : vs.map((v,i)=>`<div class="prod" style="margin-top:10px">
+            <div class="nm">${i+1}. ${this.esc(v.titulo)} <span class="ct" style="font-weight:400">· ${v.duracion_s||''} s</span></div>
+            <div class="ct" style="margin:2px 0 6px"><b>${this.esc(v.tipo||'')}</b></div>
+            <div class="sub" style="font-size:13px;margin:0 0 8px">${this.esc(v.resumen||'')}</div>
+            ${fp(v.id).map(x=>`<label style="display:flex;gap:9px;align-items:center;padding:4px 0;cursor:pointer;${x.hecho?'opacity:.7':''}">
+              <input type="checkbox" ${x.hecho?'checked':''} onchange="App.vidPaso('${x.id}')" style="width:18px;height:18px">
+              <span style="flex:1;${x.hecho?'text-decoration:line-through':''}">${this.esc(x.paso)}${!x.hecho&&x.fecha_prevista?` <span class="ct">(${new Date(x.fecha_prevista+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long'})})</span>`:''}</span>
+              <span class="ct">${x.hecho?'✓ '+(x.entregado_en?this._fechaC(x.entregado_en):''):''}</span></label>`).join('')}
+          </div>`).join('');
+      return `<details class="card" style="margin-top:10px" ${this._vidAbierto[prod]?'open':''} ontoggle="App.vidAbrir(App.PROD_VIDEOS[${k}],this.open)">
+        <summary style="cursor:pointer;font-weight:700;font-size:15px">${this.esc(prod)} <span class="ct" style="font-weight:400">· ${vs.length?`${vs.length} ${vs.length===1?'video':'videos'} · ${hechos} de ${ps.length} pasos`:'sin videos todavía'}</span></summary>
+        ${cuerpo}</details>`;
+    }).join('');
+    const equipo=rod.filter(r=>r.tipo==='equipo'), pend=rod.filter(r=>r.tipo==='pendiente');
+    const rodHtml=rod.length?`<details class="card" style="margin-top:10px" ${this._vidAbierto['__rodaje']?'open':''} ontoggle="App.vidAbrir('__rodaje',this.open)">
+        <summary style="cursor:pointer;font-weight:700;font-size:15px">🎬 Filmación · 22 de octubre <span class="ct" style="font-weight:400">· ${pend.filter(x=>x.hecho).length} de ${pend.length} pendientes listos</span></summary>
+        <div style="font-size:12px;font-weight:700;color:var(--accent2);margin:12px 0 4px">Equipo</div>
+        ${equipo.map(r=>`<div style="padding:2px 0">• ${this.esc(r.texto)}</div>`).join('')}
+        <div style="font-size:12px;font-weight:700;color:var(--accent2);margin:14px 0 4px">Pendientes para filmar</div>
+        ${pend.map(r=>`<label style="display:flex;gap:9px;align-items:center;padding:4px 0;cursor:pointer;${r.hecho?'opacity:.7':''}">
+          <input type="checkbox" ${r.hecho?'checked':''} onchange="App.rodajeToggle('${r.id}')" style="width:18px;height:18px">
+          <span style="flex:1;${r.hecho?'text-decoration:line-through':''}">${this.esc(r.texto)}</span>
+          <span class="ct">${r.hecho&&r.entregado_en?'✓ '+this._fechaC(r.entregado_en):''}</span></label>`).join('')}
+      </details>`:'';
+    const plan=`<details class="card" style="margin-top:10px" ${this._vidAbierto['__plan']?'open':''} ontoggle="App.vidAbrir('__plan',this.open)">
+      <summary style="cursor:pointer;font-weight:700;font-size:15px">📖 Cómo es el plan <span class="ct" style="font-weight:400">· 6 productos, la misma serie de videos cada uno</span></summary>
+      <div style="font-size:12px;font-weight:700;color:var(--accent2);margin:12px 0 4px">🔵 A cargo de Negocios Cuánticos (guion, storyboard y producción)</div>
+      <div>1. <b>Realismo del dolor</b> — muestra el problema como lo vive la gente, con humor y cariño, sin burlarse de nadie.</div>
+      <div>2. <b>Dolor + reto · versión A (comercial)</b> y 3. <b>versión B (genérico)</b> — el problema y la invitación al reto con la oferta: 10 cupos, 50% de descuento a cambio de compartir los avances. Dos versiones del mismo mensaje para probar en pauta (A/B) y quedarnos con la que traiga más prospectos al menor costo.</div>
+      <div>4. <b>Invitación a especialistas y revendedores</b> — cosmetólogas, centros de estética, barberos y vendedoras por catálogo.</div>
+      <div style="font-size:12px;font-weight:700;color:var(--accent2);margin:12px 0 4px">🟣 A cargo de Solé</div>
+      <div>5. <b>Aplicación</b> (paso a paso) · 6. <b>Componentes</b> (qué tiene y para qué sirve cada ingrediente) · 7. <b>Beneficios</b> (qué resultados puede esperar) · 8. <b>Distribuidores y experiencias</b> (los videos que ya tengan).</div>
+      <div style="margin-top:12px;padding:10px;border-radius:10px;background:var(--accent-soft)"><b>📌 Importante.</b> Todo video pasa por la curaduría de Solé antes de salir en pauta. Para no tener problemas con Meta ni con INVIMA no prometemos resultados seguros: decimos "ayuda a…", nunca "elimina" ni "cura".</div>
+    </details>`;
+    const sc=window.scrollY;
+    this.set(`<h1>Pendientes</h1>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        ${CAJ.map(([k,ic,t])=>`<button class="btn gh2" onclick="App.pendCaj('${k}')"
+          style="padding:8px 14px;font-size:13px${this._pendCaj===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${ic} ${t}</button>`).join('')}
+      </div>
+      <div class="sub">Plan de videos · marca cada paso cuando se entregue y queda la fecha.</div>
+      ${plan}${prodHtml}${rodHtml}`);
+    window.scrollTo(0,sc);
+  },
+  async vidPaso(id){
+    const x=((this._vidD||{}).pasos||[]).find(p=>p.id===id); if(!x) return;
+    const hecho=!x.hecho;
+    await this._patch('soleparis_video_paso?id=eq.'+encodeURIComponent(id),{hecho, entregado_en: hecho?new Date().toISOString():null});
+    this.vVideos(this._pendCajas());
+  },
+  async rodajeToggle(id){
+    const x=((this._vidD||{}).rod||[]).find(p=>p.id===id); if(!x) return;
+    const hecho=!x.hecho;
+    await this._patch('soleparis_rodaje?id=eq.'+encodeURIComponent(id),{hecho, entregado_en: hecho?new Date().toISOString():null});
+    this.vVideos(this._pendCajas());
   },
 
   /* ---------- STARTING POINT ---------- */
