@@ -111,6 +111,7 @@ header{background:linear-gradient(160deg,var(--azul),var(--azul2));padding:12px 
 .plata .val.bump{transform:scale(1.09)}
 @media(prefers-reduced-motion:reduce){.plata .val{transition:none}}
 .pend{font-size:11px;color:var(--warn);margin-top:2px}
+.corte{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.35}.corte b{color:var(--ok)}
 .baseTag{font-size:11px;color:#9DB7DA;margin-top:7px;background:rgba(0,0,0,.22);
   padding:4px 10px;border-radius:20px;display:inline-block;cursor:pointer}
 
@@ -298,6 +299,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
     <div class="lbl">Ganado hoy</div>
     <div class="val mono" id="plata">$0</div>
     <div class="pend" id="pend"></div>
+    <div class="corte" id="corteHoy"></div>
     <div><span class="baseTag" id="baseTag" onclick="volverBases()">—</span></div>
   </div>
 </header>
@@ -324,7 +326,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261015-inicio-por-cliente';
+const VER='20261015-corte-por-hora';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1900,6 +1902,25 @@ function cerrarPanel(){
   sacarActual(); render(); window.scrollTo(0,0);
 }
 
+/* VALOR POR HORA MARCADA Y CORTES (15-oct-2026, Jose): en las bases de calzado que pagan por hora se ve cuanto vale cada hora,
+   cuantas lleva hoy y lo que llevaba en el ultimo corte (1 p. m. y 5 p. m., los calcula la base: mkr_corte_pago). */
+const horaLinda=c=>{ const m=/^(\d{1,2}):(\d{2})$/.exec(c||''); if(!m) return c||''; let h=+m[1]; const ap=h>=12?'p. m.':'a. m.'; h=h%12||12; return h+':'+m[2]+' '+ap; };
+async function pintarCorte(){
+  const e=$('corteHoy'); if(!e||!YO||!YO.id) return;
+  const hoyB=new Date(Date.now()-5*3600e3).toISOString().slice(0,10);
+  try{
+    const [hh,cc]=await Promise.all([
+      GET('mkr_horas_dia?select=horas,valor&agente_id=eq.'+encodeURIComponent(YO.id)+'&dia=eq.'+hoyB),
+      GET('mkr_corte_pago?select=corte,total,horas&agente_id=eq.'+encodeURIComponent(YO.id)+'&dia=eq.'+hoyB+'&order=calculado_en.desc&limit=1')]);
+    const h=(Array.isArray(hh)?hh:[]).reduce((t,r)=>({horas:t.horas+(+r.horas||0),valor:t.valor+(+r.valor||0)}),{horas:0,valor:0});
+    const precio=(BASE&&porHora(BASE)&&TARIFA_BASE&&+TARIFA_BASE['Hora'])||0;
+    const c=Array.isArray(cc)&&cc[0];
+    const partes=[];
+    if(precio||h.horas) partes.push('⏱️ Cada hora marcada paga <b>'+cop(precio||6250)+'</b>'+(h.horas?' · hoy llevas <b>'+h.horas.toFixed(1).replace('.',',')+' h</b> = '+cop(h.valor):''));
+    if(c) partes.push('Corte de las '+horaLinda(c.corte)+': <b>'+cop(+c.total||0)+'</b>');
+    e.innerHTML=partes.join('<br>');
+  }catch(x){}
+}
 function pintarPlata(bump){
   /* El numero de marcaciones al lado de la plata: sin el, uno no sabe si el
      dia rindio poco porque llamo poco o porque los resultados pagaron poco. */
@@ -2129,6 +2150,7 @@ async function sincronizar(){
   const yoKey = YO.id||('n:'+YO.nombre);
   if(real[yoKey]){ miPlata=real[yoKey].plata; misLlamadas=real[yoKey].llamadas; }
   pintarPlata(false);
+  pintarCorte();
 
   /* Y lo que de verdad importa cuando hay DOS trabajando la misma base: sacar
      de la lista lo que la otra ya marco. Antes esto solo se leia al entrar, asi
