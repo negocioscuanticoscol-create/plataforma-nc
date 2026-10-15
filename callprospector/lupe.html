@@ -324,7 +324,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261015-precios-en-el-texto';
+const VER='20261015-inicio-por-cliente';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -707,6 +707,8 @@ async function entrarApp(){
     /* 📚 BIBLIOTECA (6-oct-2026): la base existe y se ve en Lupe Control, pero no
        se trabaja todavía. No sale aquí para nadie, ni para el administrador. */
     if(b.en_lupe===false) return false;
+    /* Las bases de PRUEBAS no salen en el inicio (15-oct-2026, Jose). Para probar: lupe.html?pruebas=1 */
+    if(/PRUEBAS/i.test(b.nombre||'') && !new URLSearchParams(location.search).get('pruebas')) return false;
     // si se entro desde una app, solo las bases que van a esa app
     if(APP && String(b.destino_app||'').toLowerCase()!==APP) return false;
     /* el CED manda: si a la persona le asignaron un centro, solo ve las bases
@@ -780,21 +782,49 @@ async function entrarApp(){
     return;
   }
 
-  /* Siempre escoge ella, aunque solo una tenga prospectos: cada base es un
-     CLIENTE distinto y el guion de la llamada no es el mismo. Por eso la
-     tarjeta dice de quien es la base y no solo como se llama. */
+  _SIN_NADA=sinNada; _AVISO=avisoApp; CLIENTE_ABIERTO='';
+  pintarListaBases();
+}
+/* INICIO EN DOS NIVELES (15-oct-2026, Jose): primero se escoge el CLIENTE (en calzado es Grupo Perez) y luego
+   sus bases. Quien tiene bases de un solo cliente se salta el primer nivel. Cada telemercaderista ve solo lo
+   que le asignaron; el supervisor ve todo. Cada base es de un cliente distinto y el guion no es el mismo. */
+let CLIENTE_ABIERTO='', _SIN_NADA=[], _AVISO='';
+const CLI_NOM={ced:'Grupo Pérez',smart:'Smart Packaging',nido:'Colchones Nido',sole:'Sole París',kruh:'Kruh · club del pan',por_asignar:'Por asignar',pruebas:'Pruebas'};
+const CLI_SUB={ced:'Calzado de seguridad y dotación',smart:'Envases y tapas',nido:'Colchones',sole:'Belleza y cuidado personal'};
+const nombreCliente=c=>CLI_NOM[c]||(c&&c!=='otro'?String(c).charAt(0).toUpperCase()+String(c).slice(1):'Otras bases');
+function pintarListaBases(){
+  const grupos={}; misBases.forEach(b=>{ const c=b.cliente||'otro'; (grupos[c]=grupos[c]||[]).push(b); });
+  const claves=Object.keys(grupos);
+  const quedan=c=>grupos[c].reduce((t,b)=>t+(b._quedan||0),0);
+  claves.sort((a,c)=>quedan(c)-quedan(a)||nombreCliente(a).localeCompare(nombreCliente(c),'es'));
+  if(claves.length===1) CLIENTE_ABIERTO=claves[0];
+  const sinNada=_SIN_NADA, avisoApp=_AVISO;
+  const pie=sinNada.length?`<div class="s" style="margin-top:14px;opacity:.7">
+      ${sinNada.length===1?'Otra base tuya está':`Otras ${sinNada.length} bases tuyas están`}
+      sin prospectos por llamar. El supervisor ya lo ve.</div>`:'';
+  if(!CLIENTE_ABIERTO || !grupos[CLIENTE_ABIERTO]){
+    $('bases').innerHTML=`<h4>Hola, ${esc(YO.nombre)}</h4>
+      <div class="s">Escoge el cliente con el que vas a trabajar hoy.</div>${avisoApp}
+      ${claves.map(c=>`<div class="bcard" onclick="abrirCliente('${esc(c)}')">
+          <div class="cli">${esc(CLI_SUB[c]||'')}</div>
+          <div class="n">${esc(nombreCliente(c))}</div>
+          <div class="d">${grupos[c].length} ${grupos[c].length===1?'base':'bases'}</div>
+          <div class="q"><span>${num(quedan(c))} por llamar</span><b>Entrar ›</b></div>
+        </div>`).join('')}${pie}`;
+    return;
+  }
+  const lista=grupos[CLIENTE_ABIERTO];
   $('bases').innerHTML=`<h4>Hola, ${esc(YO.nombre)}</h4>
-    <div class="s">Escoge con cuál base vas a trabajar hoy.</div>${avisoApp}
-    ${misBases.map((b,i)=>`<div class="bcard" onclick="abrirBase(misBases[${i}])">
+    ${claves.length>1?`<div class="s"><a href="#" style="color:inherit" onclick="CLIENTE_ABIERTO='';pintarListaBases();return false">‹ Todos los clientes</a> · <b>${esc(nombreCliente(CLIENTE_ABIERTO))}</b></div>`
+                      :`<div class="s">${esc(nombreCliente(CLIENTE_ABIERTO))} · escoge con cuál base vas a trabajar hoy.</div>`}${avisoApp}
+    ${lista.map(b=>`<div class="bcard" onclick="abrirBase(misBases[${misBases.indexOf(b)}])">
         ${b._cajon?`<div class="cli">${esc(b._cajon)}</div>`:''}
         <div class="n">${esc(b.nombre)}</div>
         <div class="d">${esc(b.descripcion||'')}</div>
         <div class="q"><span>${b._quedan==null?'entra y mira':num(b._quedan)+' por llamar'}</span><b>Entrar ›</b></div>
-      </div>`).join('')}
-    ${sinNada.length?`<div class="s" style="margin-top:14px;opacity:.7">
-      ${sinNada.length===1?'Otra base tuya está':`Otras ${sinNada.length} bases tuyas están`}
-      sin prospectos por llamar. El supervisor ya lo ve.</div>`:''}`;
+      </div>`).join('')}${pie}`;
 }
+function abrirCliente(c){ CLIENTE_ABIERTO=c; pintarListaBases(); window.scrollTo(0,0); }
 function volverBases(){
   if(MODO_ENTREGA){ pintarTrabajos(); $('bases').style.display='block'; window.scrollTo(0,0); return; }
   if(misBases.length>1){ $('bases').style.display='block'; window.scrollTo(0,0); } }
