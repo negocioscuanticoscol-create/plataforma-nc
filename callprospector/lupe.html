@@ -326,7 +326,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261015-reparto-por-id';
+const VER='20261015-sin-autorecarga';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1665,7 +1665,7 @@ async function alEmbudo(x, etapa){
 
 let ultimoChequeo=0;
 async function mirarVersion(){
-  if(Date.now()-ultimoChequeo < 120000) return;      // cada 2 minutos, no mas
+  if(Date.now()-ultimoChequeo < 300000) return;      // cada 5 minutos, no mas
   ultimoChequeo=Date.now();
   try{
     const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'});
@@ -1676,10 +1676,8 @@ async function mirarVersion(){
       const d=document.createElement('div');
       d.id='nuevaVer';
       d.textContent='✨ Hay una versión nueva · toca aquí para actualizar';
-      d.onclick=()=>location.reload();
-      /* Antes solo salia el aviso verde y habia que tocarlo: quien no lo tocaba seguia con el codigo viejo (asi siguieron los repetidos).
-         Ahora, si no tiene un panel de interesado abierto ni esta guardando una marca, Lupe se recarga sola a los 30 segundos. */
-      const _t=setInterval(()=>{ if(!($('panel')||{}).innerHTML && !MARCANDO){ clearInterval(_t); location.reload(); } },30000);
+      d.onclick=()=>{ location.href=location.pathname+'?v='+Date.now()+location.search.replace(/^\?/,'&'); };    // salta la cache del navegador y del CDN
+      /* Sin recarga automatica (15-oct-2026): recargar solo puede dejar a la persona en un bucle si el CDN aun sirve la copia vieja, y pierde su lugar. */
       d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99999;padding:14px;'
         +'background:#16a34a;color:#fff;text-align:center;font-weight:600;cursor:pointer;'
         +'box-shadow:0 -4px 18px rgba(0,0,0,.3)';
