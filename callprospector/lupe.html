@@ -326,7 +326,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261015-sin-repetidos';
+const VER='20261015-reparto-por-id';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1665,7 +1665,7 @@ async function alEmbudo(x, etapa){
 
 let ultimoChequeo=0;
 async function mirarVersion(){
-  if(Date.now()-ultimoChequeo < 300000) return;      // cada 5 minutos, no mas
+  if(Date.now()-ultimoChequeo < 120000) return;      // cada 2 minutos, no mas
   ultimoChequeo=Date.now();
   try{
     const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'});
@@ -1677,6 +1677,9 @@ async function mirarVersion(){
       d.id='nuevaVer';
       d.textContent='✨ Hay una versión nueva · toca aquí para actualizar';
       d.onclick=()=>location.reload();
+      /* Antes solo salia el aviso verde y habia que tocarlo: quien no lo tocaba seguia con el codigo viejo (asi siguieron los repetidos).
+         Ahora, si no tiene un panel de interesado abierto ni esta guardando una marca, Lupe se recarga sola a los 30 segundos. */
+      const _t=setInterval(()=>{ if(!($('panel')||{}).innerHTML && !MARCANDO){ clearInterval(_t); location.reload(); } },30000);
       d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99999;padding:14px;'
         +'background:#16a34a;color:#fff;text-align:center;font-weight:600;cursor:pointer;'
         +'box-shadow:0 -4px 18px rgba(0,0,0,.3)';
@@ -2080,26 +2083,18 @@ function aplicarReparto(){
       }).map(v=>v.agente_id);
       return equipoDe[k]=[...new Set(ids.concat([YO.id]))].sort();
     };
-    /* EL TURNO ARRANCA DISTINTO EN CADA CIUDAD.
-       Antes empezaba siempre por el primero del orden, y el orden es el
-       agente_id, que nunca cambia. En una ciudad con UNA sola empresa, el
-       primero se la llevaba siempre: a Sara le tocaron cero en nueve ciudades
-       seguidas -Dosquebradas, Madrid, Pitalito, Mosquera, Duitama...- porque en
-       todas habia una sola y Jose iba de primero. Le dijo a la plataforma que
-       no habia prospectos y era verdad: no le habian dejado ninguno.
-       Ahora el arranque sale del nombre de la ciudad. Es el mismo numero en
-       las dos pantallas -no se hablan, lo calculan igual-, asi que sigue sin
-       haber choques, pero las ciudades de una sola empresa se reparten.
-       Suma simple de letras: no necesita ser criptografico, necesita ser IGUAL. */
-    const arranque=(k,n)=>{ let h=0; for(let i=0;i<k.length;i++) h=(h*31+k.charCodeAt(i))%100003; return h%n; };
-    const cuenta={};
+    /* REPARTO POR EL ID DE LA EMPRESA (15-oct-2026, Jose).
+       Antes se repartia por la POSICION en la lista (la 1 para una, la 2 para la otra...). Pero la lista se encoge cada vez que
+       alguien marca, y cada pantalla se refresca en un momento distinto: la posicion de una misma empresa cambiaba de una pantalla
+       a otra y a las dos les salia la misma. En una simulacion de 1.500 empresas, 288 quedaban en las dos listas. Ahora cada empresa
+       le toca a UNA persona segun su propio id (hash), que no cambia aunque la lista se achique: las dos pantallas la reparten
+       igual sin hablarse y no se cruzan. Todas las empresas de Bogota son de la misma ciudad, que era donde mas se notaba. */
+    const hashId=s=>{ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h>>>0; };
     l=ORDEN.filter(x=>{
       const c=String(x.ciudad||'').trim();
       const eq=equipo(c);
       if(eq.length<2) return true;                     // solo yo: toda la ciudad
-      const k=c.toLowerCase();
-      const i=(cuenta[k]=(cuenta[k]||0)+1)-1;
-      return ((i+arranque(k,eq.length)) % eq.length)===eq.indexOf(YO.id);
+      return (hashId(String(x.id))%eq.length)===eq.indexOf(YO.id);
     });
   }
   TODOS=l; leads=TODOS.slice();
