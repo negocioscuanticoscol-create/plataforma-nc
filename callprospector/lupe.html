@@ -326,7 +326,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261015-corte-por-hora';
+const VER='20261015-sin-repetidos';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -894,7 +894,7 @@ async function abrirBase(b){
 
   const [ls,ya]=await Promise.all([
     GETALL(q),
-    GETALL('mkr_llamadas?select=lead_id&base_id=eq.'+b.id+'&limit=20000')
+    GETALL('mkr_ya_llamados?select=lead_id&base_id=eq.'+b.id+'&limit=20000')   /* 15-oct-2026: tambien cuenta lo llamado antes de mover la empresa de base */
   ]);
   if(!Array.isArray(ls)){ $('bases').innerHTML='<div class="vacio">No se pudieron cargar los prospectos.</div>'; return; }
 
@@ -1049,6 +1049,27 @@ function saltarCiudad(){
   filtrarCiudad(sig===cSin?cSin:sig);
   return true;
 }
+/* NO REPETIR (15-oct-2026, Jose): dos personas con la misma base veian a veces la misma empresa porque cada una trabaja sobre la lista
+   que bajo al abrir y el refresco tarda hasta un minuto. Ahora, antes de dejar llamar a una empresa, se pregunta si ya tiene una llamada
+   (de cualquiera, en cualquier base). Si la tiene, se salta sola y avisa quien la marco. Una consulta liviana por empresa. */
+const _VERIF=new Set();
+async function yaLaMarcaron(l){
+  if(!l||!l.id) return null;
+  try{ const r=await GET('mkr_llamadas?select=agente,agente_id,resultado&lead_id=eq.'+encodeURIComponent(l.id)+'&limit=1');
+       return Array.isArray(r)&&r[0]?r[0]:null; }catch(e){ return null; }
+}
+function verificarNoRepetida(l){
+  if(!l||!l.id||_VERIF.has(l.id)) return;
+  _VERIF.add(l.id);
+  yaLaMarcaron(l).then(y=>{
+    if(!y) return;
+    const actual=leads[idx];
+    if(!actual||actual.id!==l.id) { TODOS=TODOS.filter(x=>x.id!==l.id); leads=leads.filter(x=>x.id!==l.id); return; }
+    if(($('panel')||{}).innerHTML) return;                      // si esta escribiendo un interesado, no se le toca la pantalla
+    toast('↪️ '+(y.agente||'Alguien')+' ya marcó esa empresa. Sigue la que sigue.');
+    sacarActual(); render();
+  });
+}
 function render(){
   /* NO se repinta mientras el panel del interesado esta abierto. El panel se
      dibuja DENTRO de lo que render() rehace, asi que repintar le borra a la
@@ -1084,6 +1105,7 @@ function render(){
   if(idx>=leads.length) idx=0;
   if(idx<0) idx=leads.length-1;
   const l=leads[idx], cel=soloNum(l.cel);
+  verificarNoRepetida(l);          // si otra persona ya la marco, se salta sola
   const t=tarifas();
   const btn=(k,full)=>{
     const una=BOTONERA.some(f=>f.length===1&&f[0]===k);
@@ -1742,6 +1764,8 @@ async function moverDeBase(destino){
 async function marcar(resultado){
   if(MARCANDO) return;                       // doble toque = una sola llamada
   const l=leads[idx]; if(!l||!BASE) return;
+  { const y=await yaLaMarcaron(l);           // ultimo seguro: si en estos segundos otra la marco, no se duplica ni se paga dos veces
+    if(y && !(YO&&y.agente_id&&String(y.agente_id)===String(YO.id))){ toast('↪️ '+(y.agente||'Alguien')+' acaba de marcar esa empresa. No se guardó; sigue la que sigue.',true); sacarActual(); render(); return; } }
   trabarTarjeta(true);
   const tarifa=+tarifas()[resultado]||0;
   const esInteresado = resultado==='Interesado';
@@ -2158,7 +2182,7 @@ async function sincronizar(){
      llamando a la misma empresa. No se toca la pantalla si hay un panel de
      interesado abierto, para no borrarle lo que esta escribiendo. */
   if(BASE && !($('panel')||{}).innerHTML){
-    const ya=await GETALL('mkr_llamadas?select=lead_id&base_id=eq.'+BASE.id);
+    const ya=await GETALL('mkr_ya_llamados?select=lead_id&base_id=eq.'+BASE.id);
     if(Array.isArray(ya) && ya.length){
       const hechos=new Set(ya.map(x=>x.lead_id).filter(Boolean));
       const antes=leads.length, actual=leads[idx] && leads[idx].id;
