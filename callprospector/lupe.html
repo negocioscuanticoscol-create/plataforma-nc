@@ -324,7 +324,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261015-publico-por-base';
+const VER='20261015-precios-en-el-texto';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1262,6 +1262,16 @@ function guionDe(x){
   if(b.pago==='hora' || /usan dotaci/i.test(b.arbol_nicho||'') || /PRUEBAS/i.test(b.nombre||'')) return 'empresa';
   return 'distribuidor';
 }
+/* Precio de la bota Fortia 701 al cliente final (lista Publico de CED) e IVA. Solo se usa cuando CED todavia no
+   hizo la cotizacion de ese celular; si la hizo, el texto trae la de CED. Cambiar aqui si sube el precio. */
+const PRECIO_PAR=50000, IVA_PCT=0.19;
+function detallePrecios(np){
+  const L=String.fromCharCode(10);
+  if(!np) return 'Bota dotación Fortia 701'+L+'Valor unitario: '+cop(PRECIO_PAR)+' + IVA (19%)'+L+'Dime cuántos pares necesitas y te confirmo el total.';
+  const sub=np*PRECIO_PAR, iva=Math.round(sub*IVA_PCT);
+  return 'Bota dotación Fortia 701'+L+'Valor unitario: '+cop(PRECIO_PAR)+L+num(np)+' par(es): '+cop(sub)+L+'IVA (19%): '+cop(iva)+L
+    +'Transporte: '+(np>=160?'Incluido (gratis)':'Al cobro (transportadora que elija)')+L+'TOTAL: '+cop(sub+iva);
+}
 function mensajeOferta(x){
   const persona=(x.contacto||x.lead_nombre||'').trim();
   const empresa=(x.lead_nombre||'').trim();
@@ -1277,9 +1287,12 @@ function mensajeOferta(x){
      usan dotacion. Si CED todavia no tiene la cotizacion, el texto sale sin el detalle y la tarjeta avisa. */
   if(COTTXT[x.id] || guionDe(x)==='empresa'){
     const c=COTTXT[x.id], np=c ? (+c.pares||+x.pares_cotizacion||0) : (+x.pares_cotizacion||0), NL=String.fromCharCode(10,10);
-    let m=t+', gracias por estar interesado en nuestra bota de dotación Fortia 701. A continuación te compartimos nuestra ficha técnica';
-    if(c) m+=(np?' y el valor de tus '+num(np)+(np===1?' par':' pares')+' es de '+cop(+c.total||0)+' (IVA incluido)':' y la cotización')+'. Este es el detalle:'+NL+c.texto;
-    else  m+=(np?' y, enseguida, el detalle de la cotización de tus '+num(np)+(np===1?' par':' pares'):'')+'.';
+    /* Los precios van SIEMPRE en el texto (15-oct-2026, Jose). Si CED ya genero la cotizacion se usa esa, que es la oficial;
+       si no, se calculan aqui con el precio de cliente final y los pares que marco quien llamo. */
+    const total=c ? (+c.total||0) : (np ? Math.round(np*PRECIO_PAR*(1+IVA_PCT)) : 0);
+    let m=t+', gracias por estar interesado en nuestra bota de dotación Fortia 701. Con este mensaje te compartimos nuestra ficha técnica'
+      +(np?' y el valor de tus '+num(np)+(np===1?' par':' pares')+' es de '+cop(total)+' (IVA incluido). Este es el detalle:':' y los precios. Este es el detalle:')
+      +NL+(c ? c.texto : detallePrecios(np));
     return m+NL+'Quedamos a tus órdenes para cualquier necesidad que tengas: siempre contamos con stock disponible.';
   }
   const g=guionDe(x);
@@ -1496,7 +1509,6 @@ function filaInteresado(x, equipo, verBase){
     <div class="imsg">${esc(msg)}
       <div class="chipmail imsgcp" style="margin-top:6px" data-txt="${esc(msg)}" onclick="copiarNum(this)"
         title="Toca para copiar el mensaje">📋 Copiar mensaje</div>
-      ${(guionDe(x)==='empresa' && !COTTXT[x.id] && ((BONOS[x.id]||{}).cotizacion||x.pares_cotizacion))?`<div class="iaviso" style="color:var(--warn)">⚠️ Todavía no hay cotización en CED para este celular: el texto sale sin el detalle.</div>`:''}
       ${x.pares_cotizacion?`<div class="iq" style="margin-top:6px">📦 Pidió cotizar <b>${num(x.pares_cotizacion)}</b> par${+x.pares_cotizacion===1?'':'es'}</div>`:''}
     </div>
     <div class="ib">
