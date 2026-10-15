@@ -324,7 +324,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261015-texto-cliente-final';
+const VER='20261015-publico-por-base';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1255,6 +1255,10 @@ function abrirInteresados(n){ INTER_ABIERTO=(INTER_ABIERTO===n)?'':n; pintarInte
 function guionDe(x){
   const b=TODAS_BASES[String(x.base_id||'')]||{};
   if(b.cliente==='smart') return 'envases';
+  /* El dato manda (15-oct-2026, Jose): cada base dice en mkr_bases.publico si su gente es CLIENTE FINAL o
+     DISTRIBUIDOR, y de eso sale el parrafo. Solo si la base no esta marcada se adivina como antes. */
+  if(b.publico==='cliente_final') return 'empresa';
+  if(b.publico==='distribuidor') return 'distribuidor';
   if(b.pago==='hora' || /usan dotaci/i.test(b.arbol_nicho||'') || /PRUEBAS/i.test(b.nombre||'')) return 'empresa';
   return 'distribuidor';
 }
