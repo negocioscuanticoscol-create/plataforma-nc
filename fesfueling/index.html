@@ -228,8 +228,8 @@ _bqPaint(){
               ? `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAnular('${esc(x.id)}',false)">↩︎ Reactivar</button>`
               : `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAbrir('${esc(x.id)}')">🚚 Proveedores</button>
                  ${x.estado==='creado'
-                    ? `<button class="btn" style="padding:6px 10px" title="Ver y corregir el costo" onclick="App.bqRef('${esc(x.id)}')">✎ Costos</button>`
-                    : `<button class="btn" style="padding:6px 10px" onclick="App.bqRef('${esc(x.id)}')">＋ Costos</button>`}
+                    ? `<button class="btn" style="padding:6px 10px" title="Ver y corregir el costo" onclick="App._bqDesde='';App.bqRef('${esc(x.id)}')">✎ Costos</button>`
+                    : `<button class="btn" style="padding:6px 10px" onclick="App._bqDesde='';App.bqRef('${esc(x.id)}')">＋ Costos</button>`}
                  <button class="btn gh" style="padding:6px 9px" title="Buscar este producto en el catálogo de Estados Unidos"
                          onclick="App.mkBuscar('${esc(x.id)}')">🌎</button>
                  <button class="btn gh" style="padding:6px 9px;color:#b3261e" title="Anular: sale de la lista pero no se borra"
@@ -505,6 +505,10 @@ async bqRef(id){
       <div><label>Código</label><input id="rf_cod" value="${esc(val('codigo'))}" placeholder="FES-001"></div>
       <div><label>Categoría</label><input id="rf_cat" value="${esc(x.categoria||'')}" placeholder="Bombas, filtros, acoples…"></div>
     </div>
+    <div class="g2">
+      <div><label>Número de parte</label><input id="rf_pn" value="${esc(val('part_number'))}" placeholder="P/N del fabricante"></div>
+      <div><label>Marca</label><input id="rf_marca" value="${esc(val('marca'))}" placeholder="Marca"></div>
+    </div>
     <label>Nombre</label><input id="rf_nom" value="${esc(x.nombre)}">
     <div class="mini" style="margin-top:11px;font-weight:700">🇨🇳 COSTO DE IMPORTACIÓN</div>
     <div class="g2">
@@ -587,6 +591,7 @@ async bqRefOk(){
   if(!nom){ alert('Falta el nombre.'); return; }
   if(!this._bqCosto){ alert('Falta el costo: al menos el FOB en dólares y la TRM.'); return; }
   const b={codigo:cod, nombre:nom, categoria:($('rf_cat')?$('rf_cat').value.trim():'')||x.categoria||'',
+    part_number:($('rf_pn')?$('rf_pn').value.trim():''), marca:($('rf_marca')?$('rf_marca').value.trim():''),
     subcategoria:x.aplicacion||'',
     foto:x.archivo, foto_url:'fotos/'+x.archivo,
     proveedor:x.proveedor||'', url_proveedor:x.principal||x.escogido||x.escogido2||x.encontrado||'',
@@ -599,15 +604,16 @@ async bqRefOk(){
   if(this._bqEdit&&this._bqEdit.id){
     const u=await patch('ff_referencias?id=eq.'+encodeURIComponent(this._bqEdit.id),b);
     if(u===null){ toast('⚠️ No se pudo guardar'); return; }
-    cerrar(); toast('Referencia '+cod+' actualizada · venta '+money(this._bqVenta)); this._bqPaint(); return;
+    cerrar(); toast('Referencia '+cod+' actualizada · venta '+money(this._bqVenta)); this._bqVolver(); return;
   }
   const r=await post('ff_referencias',b);
   if(!r||!r.length){ toast('⚠️ No se pudo crear la referencia'); return; }
   await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),
     {estado:'creado', referencia_id:r[0].id, actualizado:new Date().toISOString()});
   x.estado='creado'; x.referencia_id=r[0].id;
-  cerrar(); toast('Referencia '+cod+' creada · venta '+money(this._bqVenta)); this._bqPaint();
+  cerrar(); toast('Referencia '+cod+' creada · venta '+money(this._bqVenta)); this._bqVolver();
 },
+_bqVolver(){ if(this._bqDesde==='catalogo'){ this._bqDesde=''; this.vCatalogo(); } else this._bqPaint(); },
 
 /* ================= INICIO ================= */
 vInicio: safe(async function(){
@@ -654,6 +660,7 @@ vInicio: safe(async function(){
 /* ================= CATÁLOGO ================= */
 vCatalogo: safe(async function(){
   const refs=await this.refs();
+  if((this._catModo||'homo')==='homo'){ await this.busq(); return this._catHomo(refs); }
   const q=(this._catQ||'').toLowerCase();
   const list=refs.filter(r=>!q||[r.codigo,r.part_number,r.nombre,r.marca,r.fabricante,r.categoria,r.descripcion,r.compatibilidad].join(' ').toLowerCase().includes(q));
   const cats=[...new Set(refs.map(r=>r.categoria).filter(Boolean))];
@@ -661,6 +668,7 @@ vCatalogo: safe(async function(){
   <div class="tools">
     <input placeholder="🔎 Buscar por código, part number, marca…" value="${esc(this._catQ||'')}" oninput="App._catQ=this.value" onchange="App.vCatalogo()">
     <button class="btn" onclick="App.refForm()">➕ Nueva referencia</button>
+    <button class="btn gh" onclick="App._catModo='homo';App.vCatalogo()">← Solo homologados</button>
   </div>
   <div class="card" style="padding:0;overflow-x:auto"><table>
   <thead><tr><th></th><th>Código</th><th>Referencia</th><th>Part #</th><th>Marca</th><th>Categoría</th><th class="num">Exist.</th><th class="num">Precio venta<div class="mini">sin IVA</div></th><th></th></tr></thead>
@@ -673,6 +681,82 @@ vCatalogo: safe(async function(){
     <td><button class="btn sm sec" onclick="App.refForm(${r.id})">✏️</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">Sin resultados</td></tr>'}</tbody></table></div>`);
 },'el catálogo'),
 
+
+/* ================= CATÁLOGO · SOLO HOMOLOGADOS =================
+   El catalogo son los productos marcados como HOMOLOGADO en Busqueda. Cada uno sale
+   con su foto, referencia, numero de parte, marca, categoria y precio de compra
+   (el costo puesto en bodega). Tocando el precio se despliega todo lo que cuesta.
+   Esta lista es la base para subir los productos a la pagina web. */
+_catHomo(refs){
+  const B=(this._busq||[]).filter(x=>x.homologado&&x.estado!=='anulado');
+  const porId={}; refs.forEach(r=>porId[r.id]=r);
+  const q=(this._catQ||'').toLowerCase();
+  let L=B.map(x=>({x:x, r:x.referencia_id?porId[x.referencia_id]:null}));
+  L.forEach(o=>{ o.cat=(o.r&&o.r.categoria)||o.x.categoria||'Otros'; });
+  if(q) L=L.filter(o=>[o.x.nombre,o.r&&o.r.codigo,o.r&&o.r.part_number,o.r&&o.r.marca,o.cat].join(' ').toLowerCase().includes(q));
+  L.sort((a,b)=>String(a.cat).localeCompare(String(b.cat))||String(a.x.nombre).localeCompare(String(b.x.nombre)));
+  const sinCosto=L.filter(o=>!(o.r&&+o.r.costo_bodega>0)).length;
+  const foto=o=>{ const u=(o.r&&o.r.foto_url)||(o.x.archivo?this.FOTOS+o.x.archivo:'');
+    return u?`<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" alt="" loading="lazy" style="width:76px;height:76px;object-fit:contain;background:#f6f7f9;border-radius:8px;display:block"></a>`
+            :'<div style="width:76px;height:76px;border-radius:8px;background:#f1f3f6"></div>'; };
+  this.set(`<h1>📦 Catálogo · homologados</h1>
+  <div class="sub2">${L.length} productos homologados${sinCosto?` · <b style="color:#b45309">${sinCosto} sin costo de compra todavía</b>`:''} · solo salen los que marcaste como homologados en Búsqueda</div>
+  <div class="tools">
+    <input placeholder="🔎 Buscar por nombre, código, número de parte, marca…" value="${esc(this._catQ||'')}" oninput="App._catQ=this.value" onchange="App.vCatalogo()">
+    <button class="btn gh" onclick="App._catModo='todas';App.vCatalogo()" title="La lista completa de referencias con inventario y precios de venta">Ver todas las referencias (${refs.length})</button>
+  </div>
+  <div class="card" style="padding:0;overflow-x:auto"><table>
+  <thead><tr><th></th><th>Referencia</th><th>Número de parte</th><th>Marca</th><th>Categoría</th><th class="num">Precio de compra<div class="mini">puesto en bodega · toca para ver el desglose</div></th><th></th></tr></thead>
+  <tbody>${L.map(o=>{ const r=o.r, x=o.x, id=esc(x.id);
+    const precio = r&&+r.costo_bodega>0
+      ? `<button class="btn" style="padding:8px 12px;font-size:15px;font-weight:800" onclick="App.catCostos('${id}')">${money(r.costo_bodega)}</button>`
+      : `<button class="btn gh" style="padding:7px 10px;border:2px solid #b45309;color:#b45309;background:#fff" onclick="App.catEditar('${id}')">＋ Poner costos</button>`;
+    return `<tr>
+      <td>${foto(o)}</td>
+      <td><b>${r&&r.codigo?esc(r.codigo):'<span style="color:#b45309">sin código</span>'}</b><div>${esc(x.nombre)}</div>${r&&r.ficha_url?`<a href="${esc(r.ficha_url)}" target="_blank">📄 ficha</a>`:''}</td>
+      <td>${r&&r.part_number?esc(r.part_number):'<span style="color:#9ca3af">—</span>'}</td>
+      <td>${r&&r.marca?esc(r.marca):'<span style="color:#9ca3af">—</span>'}</td>
+      <td>${esc(o.cat)}</td>
+      <td class="num">${precio}</td>
+      <td><button class="btn sm sec" title="Editar referencia, número de parte, marca y costos" onclick="App.catEditar('${id}')">✏️</button></td></tr>`; }).join('')
+    ||'<tr><td colspan="7" class="empty">Todavía no hay productos homologados. Márcalos en 🔎 Búsqueda con el botón “Marcar como homologado”.</td></tr>'}</tbody></table></div>`);
+},
+/* Desde el catalogo se edita con el mismo formulario de costos de Busqueda; al guardar
+   se vuelve al catalogo, no a Busqueda. */
+catEditar(id){ this._bqDesde='catalogo'; return this.bqRef(id); },
+/* El desglose de lo que cuesta un producto, leido de lo que quedo guardado en su
+   referencia. Hace la misma cuenta que el formulario de costos. */
+async catCostos(id){
+  const x=(this._busq||[]).find(b=>b.id===id); if(!x||!x.referencia_id) return this.catEditar(id);
+  const r=((this._refs||[]).find(z=>z.id===x.referencia_id))||((await api('ff_referencias?id=eq.'+encodeURIComponent(x.referencia_id)+'&limit=1'))||[])[0];
+  if(!r) return this.catEditar(id);
+  const usd=+r.costo_usd||0, trm=+r.trm||0, fle=+r.flete_int||0, seg=+r.seguro||0, ara=+r.arancel_pct||0,
+        ivp=r.iva_pct!=null?+r.iva_pct:19, nac=+r.nacionalizac||0, tra=+r.transp_int||0, cop=+r.comision_pct||0;
+  const fob=usd*trm, comis=fob*cop/100, cif=fob+fle+seg, arancel=cif*ara/100, ivaImp=(cif+arancel)*ivp/100;
+  const costo=cif+comis+arancel+nac+tra;
+  const fila=(t,v,x2)=>`<div style="display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:3px 0;${x2||''}"><span>${t}</span><b>${money(v)}</b></div>`;
+  modal(`<h3>💰 ¿Cuánto cuesta este producto?</h3>
+    <div class="mini">${esc(r.codigo||'')} · ${esc(r.nombre||x.nombre)}${r.proveedor?' · Proveedor: '+esc(r.proveedor):''}</div>
+    <div class="card" style="margin-top:10px;padding:12px;background:#f6f7f9">
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:3px 0"><span>Precio en el proveedor (FOB)</span><b>USD ${usd.toLocaleString('es-CO',{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div>
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:13.5px;padding:3px 0"><span>TRM (pesos por dólar)</span><b>${money(trm)}</b></div>
+      ${fila('= Precio del proveedor en pesos',fob,'border-top:1px dashed #cbd5e1;margin-top:3px;padding-top:5px')}
+      ${fila('+ Transporte internacional (flete)',fle)}
+      ${fila('+ Seguro',seg)}
+      ${fila('= CIF (valor para la aduana)',cif,'border-top:1px dashed #cbd5e1;margin-top:3px;padding-top:5px')}
+      ${fila('+ Comisión del comprador en China ('+cop+'%)',comis)}
+      ${fila('+ Arancel ('+ara+'%)',arancel)}
+      ${fila('+ Nacionalización (SIA, puerto)',nac)}
+      ${fila('+ Transporte nacional (interno)',tra)}
+      ${fila('= PRECIO DE COMPRA · puesto en bodega',costo,'border-top:2px solid #0f2440;margin-top:6px;padding-top:7px;font-size:16px;color:#0f2440')}
+      <div class="mini" style="margin-top:8px"><b>IVA de importación ${ivp}%: ${money(ivaImp)}.</b> Se paga al nacionalizar y se recupera después; por eso no suma al precio de compra. Con el IVA, el desembolso total es <b>${money(costo+ivaImp)}</b>.</div>
+    </div>
+    <div class="mini" style="margin-top:8px">Precio de venta ${money(r.precio_venta)} · margen ${(+r.margen_pct||0).toFixed(1)}% sobre el costo${r.url_proveedor?` · <a href="${esc(r.url_proveedor)}" target="_blank">ver proveedor</a>`:''}</div>
+    <div class="row" style="gap:8px;margin-top:12px">
+      <button class="btn" style="flex:1" onclick="App.catEditar('${esc(id)}')">✎ Editar costos</button>
+      <button class="btn gh" onclick="cerrar()">Cerrar</button>
+    </div>`);
+},
 refForm(id){
   const r=(this._refs||[]).find(x=>x.id===id)||{};
   const F=(k,l,tp)=>`<div><label>${l}</label><input id="rf_${k}" type="${tp||'text'}" value="${esc(r[k]==null?'':r[k])}"></div>`;
@@ -1303,7 +1387,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-10-15b',
+VER:'2026-10-15c',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
