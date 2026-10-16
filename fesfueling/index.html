@@ -214,26 +214,7 @@ _bqPaint(){
                 : x.estado==='creado' ? '<span class="tag" style="background:#e7f6ec;color:#1c7a3e">✓ referencia creada</span>'
                 : x.estado==='escogido' ? '<span class="tag" style="background:#fff4e5;color:#8a5300">proveedor escogido</span>'
                 : '<span class="tag">buscando</span>';
-  this.set(`<h2>🔎 Búsqueda de proveedores</h2>
-    <div class="mini">Cada foto es un producto por cotizar. Anota hasta 5 direcciones, marca la que sirve y crea la referencia.</div>
-    <div class="row" style="gap:7px;flex-wrap:wrap;margin:12px 0">
-      ${caj('todos','Todos · '+cnt.todos)}${caj('homologado','✅ Homologados · '+cnt.homologado)}${caj('porhomol','Por homologar · '+cnt.porhomol)}
-      ${caj('buscando','Buscando · '+cnt.buscando)}
-      ${caj('escogido','Escogidos · '+cnt.escogido)}${caj('creado','Creados · '+cnt.creado)}
-      ${caj('nombrar','⚠️ Sin nombre · '+cnt.nombrar)}${cnt.anulado?caj('anulado','⃠ Anulados · '+cnt.anulado):''}
-      <select onchange="App._bqCat=this.value;App._bqPaint()" style="min-width:150px">
-        <option value="">Toda categoría</option>
-        ${this.CATEGORIAS.map(c=>`<option ${c===(this._bqCat||'')?'selected':''}>${esc(c)}</option>`).join('')}
-      </select>
-      <select onchange="App._bqApl=this.value;App._bqPaint()" style="min-width:120px">
-        <option value="">Toda aplicación</option>
-        ${this.APLICACIONES.map(c=>`<option ${c===(this._bqApl||'')?'selected':''}>${esc(c)}</option>`).join('')}
-      </select>
-      <input placeholder="Buscar por nombre…" value="${esc(this._bqQ||'')}" style="flex:1;min-width:160px"
-             oninput="App._bqQ=this.value;clearTimeout(App._bqT);App._bqT=setTimeout(()=>App._bqPaint(),300)">
-    </div>
-    <div class="grid-fotos">
-      ${L.length?L.map(x=>`
+  const cardHTML=x=>`
         <div class="card" style="padding:10px">
           <img src="${this.FOTOS}${esc(x.archivo)}" alt="${esc(x.nombre)}" loading="lazy"
                style="width:100%;height:140px;object-fit:contain;background:#f6f7f9;border-radius:8px;cursor:pointer${x.estado==='anulado'?';opacity:.35;filter:grayscale(1)':''}"
@@ -255,9 +236,33 @@ _bqPaint(){
                          onclick="App.bqAnular('${esc(x.id)}',true)">⃠</button>`}
           </div>
           ${x.estado==='anulado'?'':`<button class="btn ${x.homologado?'':'gh'}" style="width:100%;margin-top:6px;padding:7px;${x.homologado?'background:#1c7a3e;border:2px solid #1c7a3e;color:#fff':'background:#fff;color:#1c7a3e;border:2px solid #1c7a3e'}" title="${x.homologado?'Ya hace parte del catálogo. Toca para quitarle la marca.':'Marcar como homologado: pasa a hacer parte del catálogo'}" onclick="App.bqHomologar('${esc(x.id)}',${x.homologado?'false':'true'})">${x.homologado?'✅ Homologado':'☐ Marcar como homologado'}</button>`}
-        </div>`).join('')
-      :'<div class="empty">Nada con ese filtro.</div>'}
-    </div>`);
+        </div>`;
+  const LH=L.filter(x=>x.homologado), LN=L.filter(x=>!x.homologado);
+  const grid=arr=>arr.length?`<div class="grid-fotos">${arr.map(cardHTML).join('')}</div>`:'';
+  const tit=(txt,col)=>`<div style="font-weight:800;font-size:15px;color:${col};margin:14px 0 4px">${txt}</div>`;
+  const linea=(LH.length&&LN.length)?'<div style="border-top:8px solid #1d4ed8;border-radius:4px;margin:26px 0 8px"></div>':'';
+  const cuerpo=L.length
+    ? ((LH.length&&LN.length?tit('✅ HOMOLOGADOS · '+LH.length,'#1c7a3e'):'')+grid(LH)+linea+(LH.length&&LN.length?tit('POR HOMOLOGAR · '+LN.length,'#1d4ed8'):'')+grid(LN))
+    : '<div class="empty">Nada con ese filtro.</div>';
+  this.set(`<h2>🔎 Búsqueda de proveedores</h2>
+    <div class="mini">Cada foto es un producto por cotizar. Anota hasta 5 direcciones, marca la que sirve y crea la referencia.</div>
+    <div class="row" style="gap:7px;flex-wrap:wrap;margin:12px 0">
+      ${caj('todos','Todos · '+cnt.todos)}${caj('homologado','✅ Homologados · '+cnt.homologado)}${caj('porhomol','Por homologar · '+cnt.porhomol)}
+      ${caj('buscando','Buscando · '+cnt.buscando)}
+      ${caj('escogido','Escogidos · '+cnt.escogido)}${caj('creado','Creados · '+cnt.creado)}
+      ${caj('nombrar','⚠️ Sin nombre · '+cnt.nombrar)}${cnt.anulado?caj('anulado','⃠ Anulados · '+cnt.anulado):''}
+      <select onchange="App._bqCat=this.value;App._bqPaint()" style="min-width:150px">
+        <option value="">Toda categoría</option>
+        ${this.CATEGORIAS.map(c=>`<option ${c===(this._bqCat||'')?'selected':''}>${esc(c)}</option>`).join('')}
+      </select>
+      <select onchange="App._bqApl=this.value;App._bqPaint()" style="min-width:120px">
+        <option value="">Toda aplicación</option>
+        ${this.APLICACIONES.map(c=>`<option ${c===(this._bqApl||'')?'selected':''}>${esc(c)}</option>`).join('')}
+      </select>
+      <input placeholder="Buscar por nombre…" value="${esc(this._bqQ||'')}" style="flex:1;min-width:160px"
+             oninput="App._bqQ=this.value;clearTimeout(App._bqT);App._bqT=setTimeout(()=>App._bqPaint(),300)">
+    </div>
+    ${cuerpo}`);
 },
 /* ---------- PRECIO DE REFERENCIA DE ESTADOS UNIDOS ----------
    ff_mercado tiene el catalogo publico de apsaviation.com con precio en dolares.
@@ -1298,7 +1303,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-10-15a',
+VER:'2026-10-15b',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
