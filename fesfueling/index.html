@@ -195,11 +195,15 @@ _bqPaint(){
     escogido:B.filter(x=>x.estado==='escogido').length,
     creado:B.filter(x=>x.estado==='creado').length,
     anulado:B.filter(x=>x.estado==='anulado').length,
+    homologado:B.filter(x=>x.homologado&&x.estado!=='anulado').length,
+    porhomol:B.filter(x=>!x.homologado&&x.estado!=='anulado').length,
     nombrar:B.filter(x=>x.por_nombrar&&x.estado!=='anulado').length};
   /* Los anulados NO se borran: salen de la vista pero quedan guardados, porque
      mañana puede volver a interesar el producto y la foto ya no estaría. */
   let L;
-  if(f==='nombrar')     L=B.filter(x=>x.por_nombrar&&x.estado!=='anulado');
+  if(f==='homologado') L=B.filter(x=>x.homologado&&x.estado!=='anulado');
+  else if(f==='porhomol') L=B.filter(x=>!x.homologado&&x.estado!=='anulado');
+  else if(f==='nombrar') L=B.filter(x=>x.por_nombrar&&x.estado!=='anulado');
   else if(f==='todos')  L=B.filter(x=>x.estado!=='anulado');
   else                  L=B.filter(x=>x.estado===f);
   if(this._bqCat) L=L.filter(x=>(x.categoria||'Otros')===this._bqCat);
@@ -213,7 +217,8 @@ _bqPaint(){
   this.set(`<h2>🔎 Búsqueda de proveedores</h2>
     <div class="mini">Cada foto es un producto por cotizar. Anota hasta 5 direcciones, marca la que sirve y crea la referencia.</div>
     <div class="row" style="gap:7px;flex-wrap:wrap;margin:12px 0">
-      ${caj('todos','Todos · '+cnt.todos)}${caj('buscando','Buscando · '+cnt.buscando)}
+      ${caj('todos','Todos · '+cnt.todos)}${caj('homologado','✅ Homologados · '+cnt.homologado)}${caj('porhomol','Por homologar · '+cnt.porhomol)}
+      ${caj('buscando','Buscando · '+cnt.buscando)}
       ${caj('escogido','Escogidos · '+cnt.escogido)}${caj('creado','Creados · '+cnt.creado)}
       ${caj('nombrar','⚠️ Sin nombre · '+cnt.nombrar)}${cnt.anulado?caj('anulado','⃠ Anulados · '+cnt.anulado):''}
       <select onchange="App._bqCat=this.value;App._bqPaint()" style="min-width:150px">
@@ -236,7 +241,7 @@ _bqPaint(){
           <div style="font-weight:700;font-size:13px;margin-top:7px;${x.por_nombrar?'color:#b45309':''}">${esc(x.nombre)}</div>
           ${(()=>{const p=this._prom(x); return p?`<div style="font-weight:800;font-size:14px;color:#0f6b4f;margin-top:3px">USD ${p.prom.toFixed(2)} <span style="font-weight:400;font-size:11px;color:#6b7280">promedio · ${p.n}</span></div>`:'';})()}
           <div class="mini" style="margin-top:2px">${esc(x.categoria||'Otros')} · ${esc(x.aplicacion||'Mixto')}${(()=>{const n=this._anexosDe(x).length; return n?' · 📎 '+n:'';})()}</div>
-          <div style="margin-top:4px">${badge(x)}</div>
+          <div style="margin-top:4px">${badge(x)}${x.homologado?' <span class="tag" style="background:#1c7a3e;color:#fff">✅ HOMOLOGADO</span>':''}</div>
           <div class="row" style="gap:6px;margin-top:7px">
             ${x.estado==='anulado'
               ? `<button class="btn gh" style="flex:1;padding:6px" onclick="App.bqAnular('${esc(x.id)}',false)">↩︎ Reactivar</button>`
@@ -249,6 +254,7 @@ _bqPaint(){
                  <button class="btn gh" style="padding:6px 9px;color:#b3261e" title="Anular: sale de la lista pero no se borra"
                          onclick="App.bqAnular('${esc(x.id)}',true)">⃠</button>`}
           </div>
+          ${x.estado==='anulado'?'':`<button class="btn ${x.homologado?'':'gh'}" style="width:100%;margin-top:6px;padding:7px;${x.homologado?'background:#1c7a3e;border:2px solid #1c7a3e;color:#fff':'background:#fff;color:#1c7a3e;border:2px solid #1c7a3e'}" title="${x.homologado?'Ya hace parte del catálogo. Toca para quitarle la marca.':'Marcar como homologado: pasa a hacer parte del catálogo'}" onclick="App.bqHomologar('${esc(x.id)}',${x.homologado?'false':'true'})">${x.homologado?'✅ Homologado':'☐ Marcar como homologado'}</button>`}
         </div>`).join('')
       :'<div class="empty">Nada con ese filtro.</div>'}
     </div>`);
@@ -456,6 +462,18 @@ async bqAnular(id,v){
   const r=await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),{estado:nv,actualizado:new Date().toISOString()});
   if(r===null){ toast('⚠️ No se pudo'); return; }
   x.estado=nv; toast(v?'Anulado':'Reactivado'); this._bqPaint();
+},
+/* Homologado = el producto ya esta aprobado y hace parte del catalogo de FES.
+   Es una marca aparte del estado (buscando / escogido / creado): un producto puede
+   estar homologado aunque todavia no tenga proveedor escogido ni referencia creada.
+   Quitarla no borra nada. */
+async bqHomologar(id,v){
+  const x=(this._busq||[]).find(b=>b.id===id); if(!x) return;
+  if(!v && !confirm('¿Quitar la marca de homologado a "'+(x.nombre||'')+'"?\n\nDeja de contarse como parte del catálogo.')) return;
+  const r=await patch('ff_busqueda?id=eq.'+encodeURIComponent(id),{homologado:v,homologado_en:v?new Date().toISOString():null,actualizado:new Date().toISOString()});
+  if(r===null){ toast('⚠️ No se pudo guardar'); return; }
+  x.homologado=v; x.homologado_en=v?new Date().toISOString():null;
+  toast(v?'✅ Homologado':'Marca quitada'); this._bqPaint();
 },
 async bqBorrar(id){
   if(!confirm('¿Quitar esta ficha de la búsqueda?\n\nLa foto no se borra del disco.')) return;
@@ -1280,7 +1298,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-09-07a',
+VER:'2026-10-15a',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
