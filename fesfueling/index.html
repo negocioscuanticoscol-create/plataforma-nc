@@ -1036,6 +1036,19 @@ vFacturacion: safe(async function(){
   const list = sub==='factura'
     ? docs.filter(d=>d.tipo==='factura' || (d.tipo==='remision'&&d.estado==='cerrada'))
     : docs.filter(d=>d.tipo===sub);
+  /* El cajon de Facturas va EN ORDEN del consecutivo (FFE-1, FFE-2, ...). Si falta un
+     numero se deja una fila marcada, porque una factura que no aparece en el
+     consecutivo es una pregunta de contabilidad. Las remisiones cerradas siguen
+     aqui pero al final: el consecutivo es solo de las facturas. */
+  let lista=list;
+  if(sub==='factura'){
+    const nF=d=>{ const m=String(d.numero||'').match(/^FFE-(\d+)$/); return (d.tipo==='factura'&&m)?+m[1]:null; };
+    const fs=list.filter(d=>nF(d)!==null).sort((a,b)=>nF(a)-nF(b));
+    const otras=list.filter(d=>nF(d)===null);
+    lista=[]; let prev=null;
+    fs.forEach(d=>{ const n=nF(d); if(prev!==null) for(let k=prev+1;k<n;k++) lista.push({_hueco:true,numero:'FFE-'+k}); lista.push(d); prev=n; });
+    lista=lista.concat(otras);
+  }
   /* Dos cosas distintas que antes iban en la misma columna y se confundian:
      ESTADO   = en que va el documento (facturada / por facturar)
      PAGO     = cuanta plata entro, que sale de los abonos del banco */
@@ -1106,7 +1119,7 @@ vFacturacion: safe(async function(){
   <div class="tools"><button class="btn" onclick="App.docForm('${sub}')">➕ Nueva ${sub.replace('_',' ')}</button></div>
   <div class="card" style="padding:0;overflow-x:auto"><table>
   <thead><tr><th>Número</th><th>Fecha</th><th>Cliente</th><th class="num">Total</th><th>Estado</th>${sub==='factura'?'<th>Pago</th>':''}<th></th></tr></thead><tbody>
-  ${list.map(d=>`<tr><td><b>${esc(d.numero)}</b></td><td>${fecha(d.fecha_emision)}</td><td>${esc(this.cliNom(d.cliente_id))}</td>
+  ${lista.map(d=>d._hueco?`<tr style="background:#fff4e5"><td><b>${esc(d.numero)}</b></td><td colspan="${sub==='factura'?6:5}" style="color:#b45309;font-weight:700">⚠️ FALTA en el consecutivo: no hay factura ni PDF cargados</td></tr>`:`<tr><td><b>${esc(d.numero)}</b></td><td>${fecha(d.fecha_emision)}</td><td>${esc(this.cliNom(d.cliente_id))}</td>
   <td class="num">${d.sin_valor&&!(+d.total)?'<span class="mini">sin valor comercial</span>':money(d.total)}</td><td>${est(d)}</td>${sub==='factura'?`<td>${pago(d)}</td>`:''}
   <td><button class="btn sm sec" onclick="App.verDoc(${d.id})">👁</button>
   ${d.tipo==='cotizacion'&&d.estado!=='anulada'&&!yaRem[d.id]&&!yaFact[d.id]?`<button class="btn sm ok" onclick="App.docARemision(${d.id})">→ Remisión</button>`:''}
@@ -1387,7 +1400,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-10-15c',
+VER:'2026-10-15d',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
