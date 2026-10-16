@@ -664,7 +664,7 @@ vInicio: safe(async function(){
 /* ================= CATÁLOGO ================= */
 vCatalogo: safe(async function(){
   const refs=await this.refs();
-  if((this._catModo||'homo')==='homo'){ await this.busq(); return this._catHomo(refs); }
+  if((this._catModo||'homo')==='homo'){ await Promise.all([this.busq(),this.docs()]); return this._catHomo(refs); }
   const q=(this._catQ||'').toLowerCase();
   const list=refs.filter(r=>!q||[r.codigo,r.part_number,r.nombre,r.marca,r.fabricante,r.categoria,r.descripcion,r.compatibilidad].join(' ').toLowerCase().includes(q));
   const cats=[...new Set(refs.map(r=>r.categoria).filter(Boolean))];
@@ -699,7 +699,14 @@ _catHomo(refs){
   /* Todo lo que hay en bodega tambien hace parte del catalogo y sale con su precio de venta,
      aunque no tenga ficha homologada en Busqueda (las valvulas, los filtros, etc.). */
   const yaEstan=new Set(L.map(o=>o.r&&o.r.id).filter(Boolean));
-  const extras=refs.filter(r=>r.activo&&(+r.existencias||0)>0&&!yaEstan.has(r.id)).map(r=>({x:null,r:r}));
+  /* Lo que aparece VENDIDO en una factura tambien es del catalogo, tenga o no foto o existencias:
+     queda aqui pendiente para que se vea que existe y que hace parte de lo que vendemos. */
+  const vendidos={};
+  (this._docs||[]).filter(d=>d.tipo==='factura'&&d.estado!=='anulada').forEach(d=>{
+    let its=d.items; if(typeof its==='string'){ try{ its=JSON.parse(its); }catch(e){ its=[]; } }
+    (its||[]).forEach(i=>{ if(i&&i.ref_id) (vendidos[i.ref_id]=vendidos[i.ref_id]||new Set()).add(d.numero); }); });
+  const facDe=id=>[...(vendidos[id]||[])].sort((a,b)=>parseInt(String(a).replace(/\D/g,''))-parseInt(String(b).replace(/\D/g,'')));
+  const extras=refs.filter(r=>((r.activo&&(+r.existencias||0)>0)||vendidos[r.id])&&!yaEstan.has(r.id)).map(r=>({x:null,r:r}));
   const nHomo=L.length; L=L.concat(extras);
   L.forEach(o=>{ o.cat=(o.r&&o.r.categoria)||(o.x&&o.x.categoria)||'Otros'; o.nom=(o.r&&o.r.nombre)||(o.x&&o.x.nombre)||''; });
   if(q) L=L.filter(o=>[o.nom,o.r&&o.r.codigo,o.r&&o.r.part_number,o.r&&o.r.marca,o.cat].join(' ').toLowerCase().includes(q));
@@ -710,7 +717,7 @@ _catHomo(refs){
     return u?`<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" alt="" loading="lazy" style="width:76px;height:76px;object-fit:contain;background:#f6f7f9;border-radius:8px;display:block"></a>`
             :'<div style="width:76px;height:76px;border-radius:8px;background:#f1f3f6"></div>'; };
   this.set(`<h1>📦 Catálogo</h1>
-  <div class="sub2">${nHomo} homologados${extras.length?` + <b>${extras.length} que hay en inventario</b> sin ficha homologada`:''}${sinCosto?` · <b style="color:#b45309">${sinCosto} sin costo de compra</b>`:''} · todo con su precio de venta, sin IVA</div>
+  <div class="sub2">${nHomo} homologados${extras.length?` + <b>${extras.length} en inventario o vendidos en facturas</b>, sin ficha homologada`:''}${sinCosto?` · <b style="color:#b45309">${sinCosto} sin costo de compra</b>`:''} · todo con su precio de venta, sin IVA</div>
   <div class="tools">
     <input placeholder="🔎 Buscar por nombre, código, número de parte, marca…" value="${esc(this._catQ||'')}" oninput="App._catQ=this.value" onchange="App.vCatalogo()">
     <button class="btn gh" onclick="App._catModo='todas';App.vCatalogo()" title="La lista completa de referencias con inventario y precios de venta">Ver todas las referencias (${refs.length})</button>
@@ -724,7 +731,7 @@ _catHomo(refs){
       : `<button class="btn gh" style="padding:7px 10px;border:2px solid #b45309;color:#b45309;background:#fff" onclick="${edit}">＋ Poner costos</button>`;
     return `<tr>
       <td>${foto(o)}</td>
-      <td><b>${r&&r.codigo?esc(r.codigo):'<span style="color:#b45309">sin código</span>'}</b><div>${esc(o.nom)}</div>${!x?'<span class="badge b-gris" title="Está en inventario pero no tiene ficha homologada en Búsqueda">en inventario</span>':''}${r&&r.ficha_url?` <a href="${esc(r.ficha_url)}" target="_blank">📄 ficha</a>`:''}</td>
+      <td><b>${r&&r.codigo?esc(r.codigo):'<span style="color:#b45309">sin código</span>'}</b><div>${esc(o.nom)}</div><div style="margin-top:3px;display:flex;gap:4px;flex-wrap:wrap">${!x&&ex>0?'<span class="badge b-gris" title="Está en inventario pero no tiene ficha homologada en Búsqueda">en inventario</span>':''}${r&&vendidos[r.id]?`<span class="badge b-ok" title="Vendido en: ${esc(facDe(r.id).join(', '))}">vendido · ${esc(facDe(r.id).slice(0,3).join(', '))}${facDe(r.id).length>3?' +'+(facDe(r.id).length-3):''}</span>`:''}${!((r&&(r.foto_url||r.foto))||(x&&x.archivo))?'<span class="badge b-pend" title="Todavía no tiene foto">sin foto</span>':''}</div>${r&&r.ficha_url?` <a href="${esc(r.ficha_url)}" target="_blank">📄 ficha</a>`:''}</td>
       <td>${r&&r.part_number?esc(r.part_number):'<span style="color:#9ca3af">—</span>'}</td>
       <td>${r&&r.marca?esc(r.marca):'<span style="color:#9ca3af">—</span>'}</td>
       <td>${esc(o.cat)}</td>
@@ -1470,7 +1477,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-10-15i',
+VER:'2026-10-15j',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
