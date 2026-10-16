@@ -1306,7 +1306,7 @@ vCartera: safe(async function(){
      Cualquier otro cobro (p. ej. consignaciones por corresponsal) NO se cuenta y se avisa abajo. */
   const dicenEnergizar=x=>/ENERGIZAR/i.test(x.detalle||'');
   const efectivoGrande=x=>/CONSIG\w*\s+LOCAL\s+EFECTIVO/i.test(x.detalle||'')&&(+x.valor||0)>=1000000;
-  const cobros=(this._cmov||[]).filter(x=>x.clase==='Cobro de cliente'&&(+x.valor||0)>0&&x.origen==='banco');
+  const cobros=(this._cmov||[]).filter(x=>x.origen==='banco'&&(+x.valor||0)>0&&x.clase!=='Rendimientos'&&!/INTERES/i.test(x.detalle||''));   // toda entrada del banco que no sea rendimiento
   const cuentaPago=x=>dicenEnergizar(x)||efectivoGrande(x);
   const pagos=cobros.filter(cuentaPago).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
   const noCuentan=cobros.filter(x=>!cuentaPago(x));
@@ -1389,7 +1389,7 @@ vCartera: safe(async function(){
       const s=l=>l.reduce((a,x)=>a+(+x.valor||0),0);
       return `<div class="row" style="justify-content:space-between;font-size:13px;padding:3px 0"><span>Pagos que dicen ENERGIZAR · ${e.length}</span><b>${money(s(e))}</b></div>`
        +(c.length?`<div class="row" style="justify-content:space-between;font-size:13px;padding:3px 0"><span>Consignación en efectivo (se toma como pago de Energizar) · ${c.length}</span><b>${money(s(c))}</b></div>`:'')
-       +(noCuentan.length?`<div class="mini" style="margin-top:6px;color:#b45309">No se cuentan ${noCuentan.length} consignaciones por ${money(s(noCuentan))} que no dicen Energizar (${esc([...new Set(noCuentan.map(x=>String(x.detalle||'').slice(0,28)))].join(', '))}, ${esc(noCuentan.map(x=>fecha(x.fecha)).filter((v,i,a)=>a.indexOf(v)===i).join(', '))}). Si son de Energizar, hay que avisar.</div>`:''); })()}
+       +(noCuentan.length?`<div class="mini" style="margin-top:6px;color:#b45309"><b>No se cuentan como pago de Energizar ${noCuentan.length} entradas por ${money(s(noCuentan))}</b>: no dicen Energizar, son consignaciones de otras personas (${esc([...new Set(noCuentan.map(x=>String(x.detalle||'').slice(0,28)+' · '+fecha(x.fecha)))].join('; '))}).</div>`:''); })()}
   </div>
 
   <div class="card" style="padding:0;overflow-x:auto"><table>
@@ -1445,7 +1445,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-10-15f',
+VER:'2026-10-15g',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
