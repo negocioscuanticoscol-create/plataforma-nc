@@ -1298,7 +1298,7 @@ vCartera: safe(async function(){
     if(superado[d.id]) return false;            // ya hay uno mas avanzado
     if(d.tipo==='nota_credito') return false;
     return ['factura','remision','cotizacion'].includes(d.tipo);
-  }).sort((a,b)=>String(a.fecha_emision).localeCompare(String(b.fecha_emision)));
+  }).sort((a,b)=>String(a.fecha_emision).localeCompare(String(b.fecha_emision))||String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
 
   // los pagos salen del extracto, no de abonos digitados a mano
   const pagos=(this._cmov||[]).filter(x=>x.clase==='Cobro de cliente')
@@ -1307,6 +1307,34 @@ vCartera: safe(async function(){
   const totGen=cuenta.reduce((a,d)=>a+(+d.total||0),0);
   const totPag=pagos.reduce((a,p)=>a+(+p.valor||0),0);
   const saldo=totGen-totPag;
+
+  /* CORTE: los pagos salen de los extractos del banco, asi que la cartera solo sabe de pagos
+     hasta donde llega el ultimo extracto cargado. Las facturas van TODAS, incluso las posteriores.
+     La anotacion dice que extractos faltan segun el dia de hoy. */
+  const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const nomMes=ym=>MESES[+ym.slice(5,7)-1]+' de '+ym.slice(0,4);
+  const sigMes=ym=>{ let y=+ym.slice(0,4), m=+ym.slice(5,7)+1; if(m>12){ m=1; y++; } return y+'-'+String(m).padStart(2,'0'); };
+  const dmy=iso=>{ const [y,m,d]=iso.split('-'); return (+d)+' de '+MESES[+m-1]+' de '+y; };
+  const extrs=[...new Set((this._cmov||[]).filter(x=>x.origen==='banco'&&x.extracto).map(x=>x.extracto))].sort();
+  const ult=extrs[extrs.length-1]||'';
+  let corteHtml='';
+  if(ult){
+    const dl=new Date(), hoyIso=dl.getFullYear()+'-'+String(dl.getMonth()+1).padStart(2,'0')+'-'+String(dl.getDate()).padStart(2,'0'),   // fecha LOCAL (hoy() da la de UTC y de noche adelanta un dia)
+          mesHoy=hoyIso.slice(0,7), corte=sigMes(ult)+'-01';
+    const finUlt=new Date(+sigMes(ult).slice(0,4), +sigMes(ult).slice(5,7)-1, 0).toISOString().slice(0,10);
+    const faltan=[]; let m=sigMes(ult);
+    while(m<=mesHoy && faltan.length<24){
+      if(m<mesHoy) faltan.push('<b>Extracto de '+nomMes(m)+':</b> el mes ya terminó, <b>ya debió llegar</b>. Hay que bajarlo del correo de FES y cargarlo; mientras tanto los pagos de ese mes <b>no están</b> en la cartera.');
+      else faltan.push('<b>Extracto de '+nomMes(m)+':</b> el mes sigue corriendo (hoy es '+dmy(hoyIso)+'). El banco lo manda a comienzos de '+nomMes(sigMes(m)).split(' de ')[0]+'. Los pagos recibidos del 1 de '+MESES[+m.slice(5,7)-1]+' a hoy <b>no están</b> en este corte.');
+      m=sigMes(m);
+    }
+    const despues=cuenta.filter(d=>String(d.fecha_emision)>=corte&&d.tipo==='factura');
+    corteHtml=`<div class="card" style="border-left:5px solid #1d4ed8;background:#eff6ff">
+      <div style="font-weight:800;font-size:15px;color:#1e3a8a">📅 CORTE AL ${dmy(corte).toUpperCase()}</div>
+      <div class="mini" style="margin:4px 0 8px;color:#1e293b">Los pagos son los que muestran los extractos del banco hasta el <b>${dmy(finUlt)}</b> (último extracto cargado: ${nomMes(ult)}), más la consignación en efectivo. Las facturas están <b>todas</b>${despues.length?', incluidas las emitidas después del corte ('+despues.map(d=>esc(d.numero)).join(', ')+')':''}.</div>
+      ${faltan.length?`<div style="font-weight:700;font-size:13px;color:#b45309">⚠️ Extractos del banco que faltan:</div>`+faltan.map(x=>`<div style="font-size:13px;margin-top:4px;color:#7c2d12">• ${x}</div>`).join(''):`<div style="font-size:13px;color:#166534">✅ Están todos los extractos hasta el mes de hoy.</div>`}
+    </div>`;
+  }
 
   const ETIQ={factura:'🧾 Factura', remision:'📦 Remisión', cotizacion:'📋 Cotización'};
   const estado=d=>{
@@ -1329,6 +1357,7 @@ vCartera: safe(async function(){
 
   this.set(`<h1>💰 Cartera · estado de cuenta</h1>
   <div class="sub2">${esc((this._cli&&this._cli[0]&&this._cli[0].empresa)||'Cliente')} · todo lo entregado contra todo lo pagado</div>
+  ${corteHtml}
   <div class="grid g4">
     <div class="kpi"><div class="v">${money(totGen)}</div><div class="l">Entregado (${cuenta.length} documentos)</div></div>
     <div class="kpi ok verde"><div class="v">${money(totPag)}</div><div class="l">Pagado (${pagos.length} consignaciones)</div></div>
@@ -1400,7 +1429,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-10-15d',
+VER:'2026-10-15e',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
