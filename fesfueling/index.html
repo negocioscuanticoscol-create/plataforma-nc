@@ -37,6 +37,9 @@ th.num{text-align:right}
 .btn.sec{background:#e8ecf2;color:var(--tx)}
 .btn.ok{background:var(--ok)} .btn.rojo{background:var(--rojo)} .btn.navy{background:var(--navy)}
 .btn.sm{padding:6px 11px;font-size:12.5px;border-radius:7px}
+/* filtros de Busqueda: el oprimido va en azul solido, los demas en blanco */
+.btn.bqf{background:#fff;color:#1b2a44;border:2px solid #cbd5e1}
+.btn.bqf.on{background:#1d4ed8;color:#fff;border-color:#1d4ed8}
 .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700}
 .b-ok{background:#e3f5ec;color:var(--ok)} .b-pend{background:#fdeeee;color:var(--rojo)}
 .b-par{background:#fdf3e0;color:var(--amar)} .b-gris{background:#eef1f5;color:var(--sub)}
@@ -184,6 +187,7 @@ async docsLib(){
 _anexosDe(x){ try{ return Array.isArray(x.anexos)?x.anexos:JSON.parse(x.anexos||'[]'); }catch(e){ return []; } },
 vBusqueda: safe(async function(){
   await Promise.all([this.busq(), this.docsLib()]);
+  this._bqFil='homologado';   // al entrar a Busqueda SIEMPRE queda oprimido Homologados
   this._bqPaint();
 },'la búsqueda'),
 _bqPaint(){
@@ -209,7 +213,7 @@ _bqPaint(){
   if(this._bqCat) L=L.filter(x=>(x.categoria||'Otros')===this._bqCat);
   if(this._bqApl) L=L.filter(x=>(x.aplicacion||'Mixto')===this._bqApl);
   if(q) L=L.filter(x=>String(x.nombre||'').toLowerCase().includes(q));
-  const caj=(k,t)=>`<button class="btn ${f===k?'':'gh'}" style="padding:8px 13px" onclick="App._bqFil='${k}';App._bqPaint()">${t}</button>`;
+  const caj=(k,t)=>`<button class="btn bqf ${f===k?'on':''}" style="padding:8px 13px" onclick="App._bqFil='${k}';App._bqPaint()">${t}</button>`;
   const badge=x=> x.estado==='anulado' ? '<span class="tag" style="background:#fde8e8;color:#b3261e">⃠ anulado</span>'
                 : x.estado==='creado' ? '<span class="tag" style="background:#e7f6ec;color:#1c7a3e">✓ referencia creada</span>'
                 : x.estado==='escogido' ? '<span class="tag" style="background:#fff4e5;color:#8a5300">proveedor escogido</span>'
@@ -1445,7 +1449,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-10-15g',
+VER:'2026-10-15h',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
