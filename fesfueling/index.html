@@ -1066,7 +1066,7 @@ vFacturacion: safe(async function(){
          contar como pendiente en vez de quedarse en rojo para siempre. */
       if(d.estado==='cerrada') return '<span class="badge b-acc">REMISIONADA · cerrada</span>';
       return '<span class="badge b-pend">POR FACTURAR</span>'; }
-    if(d.tipo==='factura') return '<span class="badge b-ok">GENERADA</span>';
+    if(d.tipo==='factura') return String(d.notas||'').startsWith('PROVISIONAL') ? '<span class="badge b-pend">PROVISIONAL · falta el documento</span>' : '<span class="badge b-ok">GENERADA</span>';
     return '<span class="badge b-acc">'+esc(d.estado||'ok')+'</span>'; };
   const pago=d=>{ if(d.tipo!=='factura'&&!(d.tipo==='remision'&&d.estado==='cerrada')) return '';
     const ab=abPorDoc[d.id]||0, t=+d.total||0;
@@ -1301,8 +1301,15 @@ vCartera: safe(async function(){
   }).sort((a,b)=>String(a.fecha_emision).localeCompare(String(b.fecha_emision))||String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
 
   // los pagos salen del extracto, no de abonos digitados a mano
-  const pagos=(this._cmov||[]).filter(x=>x.clase==='Cobro de cliente')
-    .sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
+  /* LO PAGADO = solo las entradas del banco cuyo detalle dice ENERGIZAR (desde que se abrio la cuenta)
+     MAS la consignacion grande en efectivo, que José pidio contar como pago de Energizar aunque no lo diga.
+     Cualquier otro cobro (p. ej. consignaciones por corresponsal) NO se cuenta y se avisa abajo. */
+  const dicenEnergizar=x=>/ENERGIZAR/i.test(x.detalle||'');
+  const efectivoGrande=x=>/CONSIG\w*\s+LOCAL\s+EFECTIVO/i.test(x.detalle||'')&&(+x.valor||0)>=1000000;
+  const cobros=(this._cmov||[]).filter(x=>x.clase==='Cobro de cliente'&&(+x.valor||0)>0&&x.origen==='banco');
+  const cuentaPago=x=>dicenEnergizar(x)||efectivoGrande(x);
+  const pagos=cobros.filter(cuentaPago).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
+  const noCuentan=cobros.filter(x=>!cuentaPago(x));
 
   const totGen=cuenta.reduce((a,d)=>a+(+d.total||0),0);
   const totPag=pagos.reduce((a,p)=>a+(+p.valor||0),0);
@@ -1325,7 +1332,7 @@ vCartera: safe(async function(){
     const faltan=[]; let m=sigMes(ult);
     while(m<=mesHoy && faltan.length<24){
       if(m<mesHoy) faltan.push('<b>Extracto de '+nomMes(m)+':</b> el mes ya terminó, <b>ya debió llegar</b>. Hay que bajarlo del correo de FES y cargarlo; mientras tanto los pagos de ese mes <b>no están</b> en la cartera.');
-      else faltan.push('<b>Extracto de '+nomMes(m)+':</b> el mes sigue corriendo (hoy es '+dmy(hoyIso)+'). El banco lo manda a comienzos de '+nomMes(sigMes(m)).split(' de ')[0]+'. Los pagos recibidos del 1 de '+MESES[+m.slice(5,7)-1]+' a hoy <b>no están</b> en este corte.');
+      else faltan.push('<b>Faltan los posibles pagos de Energizar del 1 de '+MESES[+m.slice(5,7)-1]+' al '+(+hoyIso.slice(8,10))+' de '+MESES[+m.slice(5,7)-1]+':</b> todavía no hay extracto de '+nomMes(m)+' (el mes sigue corriendo; el banco lo manda a comienzos de '+nomMes(sigMes(m)).split(' de ')[0]+'). Cuando llegue, se cargan y la deuda se actualiza.');
       m=sigMes(m);
     }
     const despues=cuenta.filter(d=>String(d.fecha_emision)>=corte&&d.tipo==='factura');
@@ -1338,7 +1345,7 @@ vCartera: safe(async function(){
 
   const ETIQ={factura:'🧾 Factura', remision:'📦 Remisión', cotizacion:'📋 Cotización'};
   const estado=d=>{
-    if(d.tipo==='factura') return '<span class="badge b-ok">generada</span>';
+    if(d.tipo==='factura') return String(d.notas||'').startsWith('PROVISIONAL') ? '<span class="badge b-pend">PROVISIONAL · falta el documento</span>' : '<span class="badge b-ok">generada</span>';
     if(d.tipo==='remision') return d.estado==='cerrada'
       ? '<span class="badge b-ok">generada (REM)</span>'
       : '<span class="badge b-pend">sin facturar</span>';
@@ -1374,6 +1381,15 @@ vCartera: safe(async function(){
         <span>${ETIQ[t]} · ${l.length} — ${esc(l.map(d=>d.numero).join(', '))}</span><b>${money(v)}</b></div>`;
     }).join('')}
     <div class="mini" style="margin-top:6px">Cada negocio se cuenta una sola vez: si la cotización ya se remisionó o se facturó, solo cuenta el documento final.</div>
+  </div>
+
+  <div class="card">
+    <div class="mini" style="font-weight:700;margin-bottom:6px">CÓMO SE COMPONE LO PAGADO · hasta el último extracto</div>
+    ${(()=>{ const e=pagos.filter(dicenEnergizar), c=pagos.filter(x=>!dicenEnergizar(x));
+      const s=l=>l.reduce((a,x)=>a+(+x.valor||0),0);
+      return `<div class="row" style="justify-content:space-between;font-size:13px;padding:3px 0"><span>Pagos que dicen ENERGIZAR · ${e.length}</span><b>${money(s(e))}</b></div>`
+       +(c.length?`<div class="row" style="justify-content:space-between;font-size:13px;padding:3px 0"><span>Consignación en efectivo (se toma como pago de Energizar) · ${c.length}</span><b>${money(s(c))}</b></div>`:'')
+       +(noCuentan.length?`<div class="mini" style="margin-top:6px;color:#b45309">No se cuentan ${noCuentan.length} consignaciones por ${money(s(noCuentan))} que no dicen Energizar (${esc([...new Set(noCuentan.map(x=>String(x.detalle||'').slice(0,28)))].join(', '))}, ${esc(noCuentan.map(x=>fecha(x.fecha)).filter((v,i,a)=>a.indexOf(v)===i).join(', '))}). Si son de Energizar, hay que avisar.</div>`:''); })()}
   </div>
 
   <div class="card" style="padding:0;overflow-x:auto"><table>
@@ -1429,7 +1445,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-10-15e',
+VER:'2026-10-15f',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
