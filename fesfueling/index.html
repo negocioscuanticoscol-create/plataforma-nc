@@ -696,34 +696,55 @@ _catHomo(refs){
   const porId={}; refs.forEach(r=>porId[r.id]=r);
   const q=(this._catQ||'').toLowerCase();
   let L=B.map(x=>({x:x, r:x.referencia_id?porId[x.referencia_id]:null}));
-  L.forEach(o=>{ o.cat=(o.r&&o.r.categoria)||o.x.categoria||'Otros'; });
-  if(q) L=L.filter(o=>[o.x.nombre,o.r&&o.r.codigo,o.r&&o.r.part_number,o.r&&o.r.marca,o.cat].join(' ').toLowerCase().includes(q));
-  L.sort((a,b)=>String(a.cat).localeCompare(String(b.cat))||String(a.x.nombre).localeCompare(String(b.x.nombre)));
-  const sinCosto=L.filter(o=>!(o.r&&+o.r.costo_bodega>0)).length;
-  const foto=o=>{ const u=(o.r&&o.r.foto_url)||(o.x.archivo?this.FOTOS+o.x.archivo:'');
+  /* Todo lo que hay en bodega tambien hace parte del catalogo y sale con su precio de venta,
+     aunque no tenga ficha homologada en Busqueda (las valvulas, los filtros, etc.). */
+  const yaEstan=new Set(L.map(o=>o.r&&o.r.id).filter(Boolean));
+  const extras=refs.filter(r=>r.activo&&(+r.existencias||0)>0&&!yaEstan.has(r.id)).map(r=>({x:null,r:r}));
+  const nHomo=L.length; L=L.concat(extras);
+  L.forEach(o=>{ o.cat=(o.r&&o.r.categoria)||(o.x&&o.x.categoria)||'Otros'; o.nom=(o.r&&o.r.nombre)||(o.x&&o.x.nombre)||''; });
+  if(q) L=L.filter(o=>[o.nom,o.r&&o.r.codigo,o.r&&o.r.part_number,o.r&&o.r.marca,o.cat].join(' ').toLowerCase().includes(q));
+  L.sort((a,b)=>String(a.cat).localeCompare(String(b.cat))||String(a.nom).localeCompare(String(b.nom)));
+  const compra=o=>o.r?(+o.r.costo_bodega>0?+o.r.costo_bodega:(+o.r.costo_promedio||0)):0;
+  const sinCosto=L.filter(o=>!(compra(o)>0)).length;
+  const foto=o=>{ const u=(o.r&&o.r.foto_url)||(o.r&&o.r.foto?this.FOTOS+o.r.foto:'')||(o.x&&o.x.archivo?this.FOTOS+o.x.archivo:'');
     return u?`<a href="${esc(u)}" target="_blank"><img src="${esc(u)}" alt="" loading="lazy" style="width:76px;height:76px;object-fit:contain;background:#f6f7f9;border-radius:8px;display:block"></a>`
             :'<div style="width:76px;height:76px;border-radius:8px;background:#f1f3f6"></div>'; };
-  this.set(`<h1>📦 Catálogo · homologados</h1>
-  <div class="sub2">${L.length} productos homologados${sinCosto?` · <b style="color:#b45309">${sinCosto} sin costo de compra todavía</b>`:''} · solo salen los que marcaste como homologados en Búsqueda</div>
+  this.set(`<h1>📦 Catálogo</h1>
+  <div class="sub2">${nHomo} homologados${extras.length?` + <b>${extras.length} que hay en inventario</b> sin ficha homologada`:''}${sinCosto?` · <b style="color:#b45309">${sinCosto} sin costo de compra</b>`:''} · todo con su precio de venta, sin IVA</div>
   <div class="tools">
     <input placeholder="🔎 Buscar por nombre, código, número de parte, marca…" value="${esc(this._catQ||'')}" oninput="App._catQ=this.value" onchange="App.vCatalogo()">
     <button class="btn gh" onclick="App._catModo='todas';App.vCatalogo()" title="La lista completa de referencias con inventario y precios de venta">Ver todas las referencias (${refs.length})</button>
   </div>
   <div class="card" style="padding:0;overflow-x:auto"><table>
-  <thead><tr><th></th><th>Referencia</th><th>Número de parte</th><th>Marca</th><th>Categoría</th><th class="num">Precio de compra<div class="mini">puesto en bodega · toca para ver el desglose</div></th><th></th></tr></thead>
-  <tbody>${L.map(o=>{ const r=o.r, x=o.x, id=esc(x.id);
-    const precio = r&&+r.costo_bodega>0
-      ? `<button class="btn" style="padding:8px 12px;font-size:15px;font-weight:800" onclick="App.catCostos('${id}')">${money(r.costo_bodega)}</button>`
-      : `<button class="btn gh" style="padding:7px 10px;border:2px solid #b45309;color:#b45309;background:#fff" onclick="App.catEditar('${id}')">＋ Poner costos</button>`;
+  <thead><tr><th></th><th>Referencia</th><th>Número de parte</th><th>Marca</th><th>Categoría</th><th class="num">Exist.</th><th class="num">Precio de venta<div class="mini">sin IVA</div></th><th class="num">Precio de compra<div class="mini">puesto en bodega · toca para ver el desglose</div></th><th></th></tr></thead>
+  <tbody>${L.map(o=>{ const r=o.r, x=o.x, ex=r?(+r.existencias||0):0, pv=r?(+r.precio_venta||0):0, c=compra(o);
+    const idx=x?esc(x.id):'', edit=x?`App.catEditar('${idx}')`:`App.refForm(${r.id})`;
+    const precioC = c>0
+      ? `<button class="btn" style="padding:8px 12px;font-size:15px;font-weight:800" onclick="${x&&r&&+r.costo_bodega>0?`App.catCostos('${idx}')`:`App.catCostoSimple(${r.id})`}">${money(c)}</button>`
+      : `<button class="btn gh" style="padding:7px 10px;border:2px solid #b45309;color:#b45309;background:#fff" onclick="${edit}">＋ Poner costos</button>`;
     return `<tr>
       <td>${foto(o)}</td>
-      <td><b>${r&&r.codigo?esc(r.codigo):'<span style="color:#b45309">sin código</span>'}</b><div>${esc(x.nombre)}</div>${r&&r.ficha_url?`<a href="${esc(r.ficha_url)}" target="_blank">📄 ficha</a>`:''}</td>
+      <td><b>${r&&r.codigo?esc(r.codigo):'<span style="color:#b45309">sin código</span>'}</b><div>${esc(o.nom)}</div>${!x?'<span class="badge b-gris" title="Está en inventario pero no tiene ficha homologada en Búsqueda">en inventario</span>':''}${r&&r.ficha_url?` <a href="${esc(r.ficha_url)}" target="_blank">📄 ficha</a>`:''}</td>
       <td>${r&&r.part_number?esc(r.part_number):'<span style="color:#9ca3af">—</span>'}</td>
       <td>${r&&r.marca?esc(r.marca):'<span style="color:#9ca3af">—</span>'}</td>
       <td>${esc(o.cat)}</td>
-      <td class="num">${precio}</td>
-      <td><button class="btn sm sec" title="Editar referencia, número de parte, marca y costos" onclick="App.catEditar('${id}')">✏️</button></td></tr>`; }).join('')
-    ||'<tr><td colspan="7" class="empty">Todavía no hay productos homologados. Márcalos en 🔎 Búsqueda con el botón “Marcar como homologado”.</td></tr>'}</tbody></table></div>`);
+      <td class="num"><b>${ex}</b></td>
+      <td class="num">${pv>0?`<b style="font-size:15px;color:#0f6b4f">${money(pv)}</b>`:'<span style="color:#9ca3af">sin valor</span>'}</td>
+      <td class="num">${precioC}</td>
+      <td><button class="btn sm sec" title="Editar referencia, número de parte, marca y costos" onclick="${edit}">✏️</button></td></tr>`; }).join('')
+    ||'<tr><td colspan="9" class="empty">Todavía no hay productos. Marca productos como homologados en 🔎 Búsqueda.</td></tr>'}</tbody></table></div>`);
+},
+/* Costo de lo que NO viene de una importacion con desglose (p. ej. las valvulas): solo el costo promedio. */
+catCostoSimple(id){
+  const r=(this._refs||[]).find(z=>z.id===id); if(!r) return;
+  modal(`<h3>💰 Costo de ${esc(r.codigo)}</h3><div class="mini">${esc(r.nombre)}</div>
+    <div class="card" style="margin-top:10px;padding:12px;background:#f6f7f9;font-size:13.5px;line-height:2">
+      <div style="display:flex;justify-content:space-between"><span>Costo promedio (precio de compra)</span><b>${money(r.costo_promedio)}</b></div>
+      <div style="display:flex;justify-content:space-between"><span>Último costo</span><b>${money(r.ultimo_costo)}</b></div>
+      <div style="display:flex;justify-content:space-between;border-top:2px solid #0f2440;padding-top:6px;margin-top:4px"><span>Precio de venta (sin IVA)</span><b style="color:#0f6b4f">${money(r.precio_venta)}</b></div>
+    </div>
+    <div class="mini" style="margin-top:8px">Esta referencia no tiene el desglose de importación (FOB, TRM, flete…). Si quieres uno, edítala con ✏️ y llena los costos.</div>
+    <div class="row" style="gap:8px;margin-top:12px"><button class="btn" style="flex:1" onclick="App.refForm(${r.id})">✏️ Editar</button><button class="btn gh" onclick="cerrar()">Cerrar</button></div>`);
 },
 /* Desde el catalogo se edita con el mismo formulario de costos de Busqueda; al guardar
    se vuelve al catalogo, no a Busqueda. */
@@ -1449,7 +1470,7 @@ async abonoGuardar(docId){
      CAJA   -> todos los movimientos, con lo que de verdad fue cada uno
    El detalle bancario casi nunca dice para que fue la plata: por eso cada
    movimiento lleva ademas un "detalle FES" y, si aplica, a que socio se carga. */
-VER:'2026-10-15h',
+VER:'2026-10-15i',
 ORIGENES:['banco','efectivo','prestamo'],
 /* A quien se le carga la plata. Un retiro es utilidad que el socio saca; un
    prestamo es plata que la empresa le presta y vuelve. Separarlos importa: el
