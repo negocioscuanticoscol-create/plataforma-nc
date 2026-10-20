@@ -1,4 +1,4 @@
-/* Lupe · VISTA POR NICHO Y ZONA  (prueba: lupe.html?vista=nicho)   José, 20-oct-2026
+/* Lupe · VISTA POR NICHO Y ZONA  (por defecto; la de antes: lupe.html?vista=bases)   José, 20-oct-2026
    Flujo:  Cliente  →  NICHO  →  ZONA (todo el país, o departamento → municipio → localidad)  →  llamar.
    Meta: tamizar con llamadas a todos los clientes y dejar cada zona limpia, y ver dónde falta traer más empresas (scraping).
    No cambia nada de lo que ya hace Lupe: las asignaciones, el pago y el reparto siguen siendo por base. Aquí solo se reorganiza la

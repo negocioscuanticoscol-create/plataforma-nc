@@ -327,7 +327,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261020-vista-nicho';
+const VER='20261020-nicho-por-defecto';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -2413,8 +2413,8 @@ async function pagarSemanas(){
 })();
 </script>
 <script>
-/* PRUEBA (20-oct-2026): lupe.html?vista=nicho  →  Cliente › NICHO › ZONA › llamar. Sin ese parámetro Lupe funciona exactamente igual que antes. */
-if(new URLSearchParams(location.search).get('vista')==='nicho'){ document.write('<scr'+'ipt src="lupe-nicho.js?v=1"></scr'+'ipt>'); }
+/* VISTA POR DEFECTO desde el 20-oct-2026 (José): Cliente › NICHO › ZONA › llamar. Para ver la lista de bases de antes: lupe.html?vista=bases */
+if(new URLSearchParams(location.search).get('vista')!=='bases'){ document.write('<scr'+'ipt src="lupe-nicho.js?v=2"></scr'+'ipt>'); }
 </script>
 </body>
 </html>
