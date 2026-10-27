@@ -1072,8 +1072,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
                🎥 <b>Graba un video corto</b> (10 a 20 segundos) contando <b>cómo te sientes con tu tratamiento
                en estas 4 semanas</b>. Con luz de frente y sin ruido alrededor.
                <div style="margin-top:6px;color:var(--accent2);font-weight:600">Vale el ${av.pct.video}% del producto.</div></div>
-             <label class="hint" style="margin-top:10px;display:block">Mi video</label>
-             <input type="file" id="sg_v_${x.id}" accept="video/*" class="field" style="padding:9px">`
+             <input type="file" id="sg_v_${x.id}" accept="video/*" style="display:none" onchange="App.segPrevia('${x.id}','v')">
+             <button class="btn gh2" style="margin-top:10px;padding:14px;font-size:15px;background:#fff" onclick="document.getElementById('sg_v_${x.id}').click()">🎥 Grabar o elegir video</button>
+             <div id="sg_pv_${x.id}"></div>`
           :`<div style="background:#fff;border-radius:10px;padding:13px 14px;margin-top:10px;font-size:14px;line-height:1.55">
                📸 <b>Así se toma la foto</b>
                <ul style="margin:6px 0 0 18px;padding:0">
@@ -1082,8 +1083,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
                  <li>Que se vea bien <b>el área donde esperas el resultado</b>.</li>
                  <li>Sin filtros ni maquillaje en esa zona.</li></ul>
                <div style="margin-top:6px;color:var(--accent2);font-weight:600">Esta foto vale el ${av.pct.foto}% del producto.</div></div>
-             <label class="hint" style="margin-top:10px;display:block">${s.foto?'Otra foto de esta semana':'Mi foto de esta semana'}</label>
-             <input type="file" id="sg_f_${x.id}" accept="image/*" class="field" style="padding:9px">`}
+             <input type="file" id="sg_f_${x.id}" accept="image/*" style="display:none" onchange="App.segPrevia('${x.id}','f')">
+             <button class="btn gh2" style="margin-top:10px;padding:14px;font-size:15px;background:#fff" onclick="document.getElementById('sg_f_${x.id}').click()">📷 ${s.foto?'Tomar otra foto':'Tomar o elegir mi foto'}</button>
+             <div id="sg_pf_${x.id}"></div>`}
         <label class="hint" style="margin-top:8px;display:block">¿Cómo te has sentido? ¿Qué cambios has notado?</label>
         <textarea class="field" id="sg_n_${x.id}" rows="3" placeholder="Cuéntanos"></textarea>
         <button class="btn" id="sg_b_${x.id}" style="margin-top:10px" onclick="App.segSubir('${x.id}',${esVid?4:i},${esVid?"'video'":"'foto'"})">Guardar</button>
@@ -1176,6 +1178,15 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     if(!r||!r.ok){ this.toast(r&&r.status===409?'Esa cédula ya la tiene otra participante':'No se pudo guardar. Intenta otra vez.'); return; }
     this._segFil=(ok&&ini)?'reg':'sin'; this._segCaj=k.id||'_sin'; this._segEdit=false;
     this.toast('Guardado'); this.vCasos();
+  },
+  /* Apenas escoge el archivo se le muestra: así sabe que quedó elegido antes de Guardar. */
+  segPrevia(id,t){
+    const f=document.getElementById('sg_'+t+'_'+id).files[0], c=document.getElementById('sg_p'+t+'_'+id); if(!c) return;
+    if(!f){ c.innerHTML=''; return; }
+    const u=URL.createObjectURL(f);
+    c.innerHTML=(t==='v'?`<video src="${u}" controls style="width:100%;max-width:280px;border-radius:8px;margin-top:8px;display:block"></video>`
+                        :`<img src="${u}" style="width:100%;max-width:240px;border-radius:8px;margin-top:8px;display:block">`)
+      +`<div class="hint">${this.esc(f.name)} · ${(f.size/1048576).toFixed(1)} MB · lista para guardar</div>`;
   },
   async _segArchivo(id,f){
     const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
