@@ -1003,7 +1003,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       :`<div class="card" style="color:var(--faint);text-align:center">Todavía no hay nadie registrada. Una participante queda registrada cuando tiene fecha de entrega y contrato firmado.</div>`;
     }else{
       cuerpo=sin.length?sin.map(x=>`<div class="prod" style="cursor:pointer${this._segSel===x.id?';border-color:var(--accent2)':''}" onclick="App.segAbrir('${x.id}')">
-          <div class="top"><div><div class="nm">${this.esc(x.nombre)}</div><div class="ct">${this.esc(x.kit_nombre||'sin tratamiento')}${x.celular?' · '+this.esc(x.celular):''}</div></div></div>
+          <div class="top"><div><div class="nm">${this.esc(x.nombre)}</div><div class="ct">${this.esc(x.kit_nombre||'sin tratamiento')}${x.celular?' · '+this.esc(x.celular):''}</div></div>
+            ${this._dueno()?`<button class="btn gh2" title="Borrar participante" style="width:auto;margin:0;padding:6px 9px;font-size:14px;color:var(--warn)" onclick="event.stopPropagation();App.segBorrar('${x.id}')">🗑</button>`:''}</div>
           <div class="meta" style="margin-top:6px">
             <span class="pchip ${x.inicio?'stock':'cost'}">${x.inicio?'Entrega '+this._fechaC(this._fechaLocal(x.inicio)):'sin fecha de entrega'}</span>
             <span class="pchip ${x.consentimiento?'stock':'cost'}">${x.consentimiento?'Contrato ✓':'sin contrato'}</span></div>
@@ -1041,7 +1042,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <div><div style="font-weight:600">${this.esc(x.nombre)}</div>
           <div class="ct">Entrega ${this._fechaC(this._fechaLocal(x.inicio))}${x.celular?' · '+this.esc(x.celular):''}</div></div>
-        <span class="pchip ${av.gana?'stock':''}" style="white-space:nowrap">${av.fotos}/4 📷 ${av.video?'🎥':''} · <b>${av.p}%</b></span></div>
+        <div style="display:flex;align-items:center;gap:8px"><span class="pchip ${av.gana?'stock':''}" style="white-space:nowrap">${av.fotos}/4 📷 ${av.video?'🎥':''} · <b>${av.p}%</b></span>
+          ${this._dueno()?`<button class="btn gh2" title="Borrar participante" style="width:auto;margin:0;padding:6px 9px;font-size:14px;color:var(--warn)" onclick="event.stopPropagation();App.segBorrar('${x.id}')">🗑</button>`:''}</div></div>
       ${abierta?(this._ok(x.id)?this.segAvance(x,mios,av):`<div onclick="event.stopPropagation()" style="margin-top:10px">
           <label class="hint">Escribe tu celular para entrar</label>
           <div style="display:flex;gap:8px"><input class="field" id="se_cel_${x.id}" inputmode="tel" placeholder="300 000 0000" style="padding:10px"
