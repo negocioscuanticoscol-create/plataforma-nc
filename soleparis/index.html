@@ -259,13 +259,13 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     // Cliente: SOLO Starting Point. Público: SOLO Pendientes. Admin (NC): toda la botonería.
     const TABS = this.esAdmin()
       ? [['resultados','📊','Dashboard'],['panel','📈','Panel'],['catalogo','📋','Catálogo'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['ventas','💹','Ventas'],['crm','📇','CRM'],['capacitacion','🎓','Capacitación'],['casos','⭐','Casos de éxito'],['fidelizacion','💛','Fidelización'],['pendientes','📋','Pendientes']]
-      : this.rol==='publico' ? [['pendientes','📋','Pendientes']]
+      : this.rol==='publico' ? [['pendientes','📋','Pendientes'],['casos','⭐','Casos de éxito']]   // 27-oct-2026 (José): el seguimiento del reto lo ve todo el equipo
       : [['inicio','✦','Starting Point']];
     document.getElementById('nav').innerHTML = TABS.map(([v,ic,t])=>
       `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
   },
   go(view){
-    if(this.rol==='publico') view='pendientes';
+    if(this.rol==='publico' && view!=='casos') view='pendientes';
     else if(!this.esAdmin() && view!=='inicio') view='inicio';
     else if(this.esAdmin() && view==='inicio') view='resultados';   // admin ya no usa Starting
     this.view=view;
