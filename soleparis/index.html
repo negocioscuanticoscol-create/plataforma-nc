@@ -976,6 +976,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     return {pct,sems,fotos,video,p,gana:p>=100};
   },
   _ok(id){ return this.esAdmin()||sessionStorage.getItem('sole_seg_'+id)==='1'; },
+  /* Solo la clave de admin (José) edita datos, borra participantes y quita fotos o
+     videos. Para los demás, una semana guardada queda cerrada. */
+  _dueno(){ return this.rol==='admin'; },
   async vCasos(){
     const [pacs,ava,progs]=await Promise.all([
       this._get('soleparis_paciente?order=nombre&limit=300'),
@@ -1004,7 +1007,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
           <div class="meta" style="margin-top:6px">
             <span class="pchip ${x.inicio?'stock':'cost'}">${x.inicio?'Entrega '+this._fechaC(this._fechaLocal(x.inicio)):'sin fecha de entrega'}</span>
             <span class="pchip ${x.consentimiento?'stock':'cost'}">${x.consentimiento?'Contrato ✓':'sin contrato'}</span></div>
-          ${this._segSel===x.id?`<div onclick="event.stopPropagation()" style="border-top:1px solid var(--line,#eee);margin-top:12px;padding-top:4px">${this.segDatos(x)}</div>`:''}
+          ${this._segSel===x.id?`<div onclick="event.stopPropagation()" style="border-top:1px solid var(--line,#eee);margin-top:12px;padding-top:4px">${this._dueno()?this.segDatos(x):'<div class="hint" style="margin-top:8px">Solo el administrador completa estos datos.</div>'}</div>`:''}
         </div>`).join('')
       :`<div class="card" style="color:var(--faint);text-align:center">No hay nadie sin registrar.</div>`;
     }
@@ -1066,8 +1069,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
             ?`<video src="${this.esc(a.url)}" controls preload="metadata" style="width:100%;max-width:280px;border-radius:8px;display:block"></video>`
             :`<img src="${this.esc(a.url)}" style="width:100%;max-width:240px;border-radius:8px;display:block" loading="lazy">`):''}
           ${a.nota?`<div style="font-size:13px;margin-top:5px;font-style:italic">“${this.esc(a.nota)}”</div>`:''}
-          <div class="hint">${this.esc(String(a.creado_en||'').slice(0,10))}</div></div>`).join('')}
-        ${esVid
+          <div class="hint">${this.esc(String(a.creado_en||'').slice(0,10))}${this._dueno()?` · <a href="javascript:void(0)" style="color:var(--warn)" onclick="App.segQuitar('${a.id}')">✕ quitar</a>`:''}</div></div>`).join('')}
+        ${(ya.length&&!this._dueno())?`<div class="hint" style="margin-top:10px">${esVid?'Tu video ya quedó guardado.':'Esta semana ya quedó guardada.'} Si hay que corregir algo, avísale al equipo de Sole Paris.</div>`:`${esVid
           ?`<div style="background:#fff;border-radius:10px;padding:13px 14px;margin-top:10px;font-size:14px;line-height:1.55">
                🎥 <b>Graba un video corto</b> (10 a 20 segundos) contando <b>cómo te sientes con tu tratamiento
                en estas 4 semanas</b>. Con luz de frente y sin ruido alrededor.
@@ -1088,7 +1091,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
              <div id="sg_pf_${x.id}"></div>`}
         <label class="hint" style="margin-top:8px;display:block">¿Cómo te has sentido? ¿Qué cambios has notado?</label>
         <textarea class="field" id="sg_n_${x.id}" rows="3" placeholder="Cuéntanos"></textarea>
-        <button class="btn" id="sg_b_${x.id}" style="margin-top:10px" onclick="App.segSubir('${x.id}',${esVid?4:i},${esVid?"'video'":"'foto'"})">Guardar</button>
+        <button class="btn" id="sg_b_${x.id}" style="margin-top:10px" onclick="App.segSubir('${x.id}',${esVid?4:i},${esVid?"'video'":"'foto'"})">Guardar</button>`}
       </div>`;
     }
     return `<div onclick="event.stopPropagation()" style="border-top:1px solid var(--line,#eee);margin-top:12px;padding-top:12px">
@@ -1097,8 +1100,9 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
         Cada semana sube tu foto y cuéntanos cómo vas; al cierre del mes, tu video.</div>
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-top:10px">
         <div><b>${av.p}%</b> del producto ganado${av.gana?' · 🎁 el del mes siguiente gratis':''}${x.video_ok?' · 🎬 producto de regalo':''}</div>
-        <a href="javascript:void(0)" style="font-size:12px;color:var(--faint)" onclick="App.segEditar(${!this._segEdit})">${this._segEdit?'cerrar datos':'✎ datos'}</a></div>
-      ${this._segEdit?this.segDatos(x):''}
+        ${this._dueno()?`<div style="display:flex;gap:12px"><a href="javascript:void(0)" style="font-size:12px;color:var(--faint)" onclick="App.segEditar(${!this._segEdit})">${this._segEdit?'cerrar datos':'✎ datos'}</a>
+          <a href="javascript:void(0)" style="font-size:12px;color:var(--warn)" onclick="App.segBorrar('${x.id}')">🗑 borrar</a></div>`:''}</div>
+      ${this._segEdit&&this._dueno()?this.segDatos(x):''}
       <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px">${sems}</div>${form}</div>`;
   },
   segFormNuevo(){
@@ -1187,6 +1191,20 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     c.innerHTML=(t==='v'?`<video src="${u}" controls style="width:100%;max-width:280px;border-radius:8px;margin-top:8px;display:block"></video>`
                         :`<img src="${u}" style="width:100%;max-width:240px;border-radius:8px;margin-top:8px;display:block">`)
       +`<div class="hint">${this.esc(f.name)} · ${(f.size/1048576).toFixed(1)} MB · lista para guardar</div>`;
+  },
+  async segQuitar(aid){
+    if(!this._dueno()) return;
+    if(!confirm('¿Quitar esta foto o video? La participante podrá volver a subirlo.')) return;
+    await this._delq('soleparis_avance?id=eq.'+aid); this.toast('Quitado'); this.vCasos();
+  },
+  async segBorrar(id){
+    if(!this._dueno()) return;
+    const x=(this._pacs||[]).find(p=>p.id===id)||{};
+    if(!confirm('¿Borrar a '+(x.nombre||'esta participante')+' con todas sus fotos y videos? No se puede deshacer.')) return;
+    await this._delq('soleparis_avance?paciente_id=eq.'+id);
+    await this._delq('soleparis_redencion?paciente_id=eq.'+id);
+    await this._delq('soleparis_paciente?id=eq.'+id);
+    this._segSel=null; this._segSem=null; this.toast('Participante borrada'); this.vCasos();
   },
   async _segArchivo(id,f){
     const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
