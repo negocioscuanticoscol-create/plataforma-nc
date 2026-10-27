@@ -265,7 +265,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
   },
   go(view){
-    if(this.rol==='publico' && view!=='casos') view='pendientes';
+    if(this.rol==='publico'){ if(view!=='casos') view='pendientes'; }
     else if(!this.esAdmin() && view!=='inicio') view='inicio';
     else if(this.esAdmin() && view==='inicio') view='resultados';   // admin ya no usa Starting
     this.view=view;
