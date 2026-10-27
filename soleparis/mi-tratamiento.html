@@ -200,7 +200,7 @@ function err(m){ const e=$('e_err'); if(e){ e.textContent=m; e.style.display='bl
 async function vDatos(nom,ced){
   if(!PROGS.length){
     [PROGS,PRODS,CANALES]=await Promise.all([
-      api('soleparis_fideliza?activo=is.true&order=kit_nombre'),
+      api('soleparis_fideliza?activo=is.true&order=orden.nullslast,kit_nombre'),
       api('soleparis_productos?select=id,nombre,precio_venta&limit=100'),
       api('soleparis_canal?activo=is.true&order=orden')]);
   }

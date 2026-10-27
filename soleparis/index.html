@@ -300,7 +300,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   _fcat:'', _fsel:[], _pacSel:null,
   async vFidelizacion(){
     const [progs,pacs,ava,red,cans]=await Promise.all([
-      this._get('soleparis_fideliza?order=kit_nombre'),
+      this._get('soleparis_fideliza?order=orden.nullslast,kit_nombre'),
       this._get('soleparis_paciente?order=creado_en.desc&limit=300'),
       this._get('soleparis_avance?order=creado_en.desc&limit=800'),
       this._get('soleparis_redencion?order=creado_en.desc&limit=200'),
@@ -978,7 +978,7 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const [pacs,ava,progs]=await Promise.all([
       this._get('soleparis_paciente?order=nombre&limit=300'),
       this._get('soleparis_avance?order=creado_en.desc&limit=1500'),
-      this._get('soleparis_fideliza?order=kit_nombre')]);
+      this._get('soleparis_fideliza?order=orden.nullslast,kit_nombre')]);
     this._pacs=pacs; this._ava=ava; this._progs=progs;
     const nReg=pacs.filter(x=>this._reg(x)).length, nSin=pacs.length-nReg;
     const lista=pacs.filter(x=>this._segFil==='reg'?this._reg(x):!this._reg(x));
