@@ -959,10 +959,12 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   _pct(x){ const p=(this._progs||[]).find(q=>q.id===x.programa_id)||{};
     const f=+p.valor_foto||0, v=+p.valor_video||0;
     return (f>100||v>100||(!f&&!v))?{foto:20,video:20}:{foto:f,video:v}; },
-  /* Las 4 semanas de la participante: la 1 arranca el lunes de la semana de la entrega. */
+  /* Las 4 semanas de la participante son las SIGUIENTES a la de la entrega: si firmó
+     en la semana 43, sus fotos son de las semanas 44, 45, 46 y 47 (José, 27-oct-2026). */
+  _rango(l){ const f=new Date(l); f.setDate(f.getDate()+6); return this._fCorta(l)+' al '+this._fCorta(f); },
   _semanas(x,mios){
     const ini=this._fechaLocal(x.inicio), hoy=this._lunes(new Date());
-    return [1,2,3,4].map(w=>{ const l=this._lunes(ini); l.setDate(l.getDate()+7*(w-1));
+    return [1,2,3,4].map(w=>{ const l=this._lunes(ini); l.setDate(l.getDate()+7*w);
       const mias=mios.filter(a=>+a.semana===w);
       return {w,l,iso:this._semISO(l),abierta:l<=hoy,
         foto:mias.some(a=>a.tipo==='foto'&&a.url),nota:mias.some(a=>(a.nota||'').trim()),mias}; });
@@ -1050,35 +1052,48 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     const vid=mios.filter(a=>a.tipo==='video'&&a.url);
     const boton=(k,titulo,sub,estado,on)=>`<button class="btn gh2" ${on?'':'disabled'} style="margin:0;padding:10px 12px;font-size:13px;width:auto;flex:1 1 44%;text-align:left${this._segSem===k?';border-color:var(--accent2);background:var(--accent-soft)':''}${on?'':';opacity:.45'}"
         onclick="event.stopPropagation();App.segSem('${x.id}',${k})"><b>${titulo}</b> <span style="color:var(--faint)">· ${sub}</span><span style="float:right">${estado}</span></button>`;
-    const sems=av.sems.map(s=>boton(s.w,'Semana '+s.w,'sem. '+s.iso+' · '+this._fCorta(s.l),
+    const sems=av.sems.map(s=>boton(s.w,'Semana '+s.iso,this._rango(s.l),
         (s.foto?'📷':'')+(s.nota?'✎':'')||(s.abierta?'<span style=&quot;color:var(--warn)&quot;>falta</span>':'aún no'),s.abierta)).join('')
-      +boton(5,'Video del resultado','al terminar',vid.length?'🎥':'<span style=&quot;color:var(--warn)&quot;>falta</span>',true);
+      +boton(5,'Video del cierre del mes','cómo te sientes',vid.length?'🎥':'<span style=&quot;color:var(--warn)&quot;>falta</span>',true);
+    const ini=this._fechaLocal(x.inicio), l0=this._lunes(ini);
     let form='';
     if(i){
       const esVid=i===5, s=av.sems[i-1], ya=esVid?vid:(s?s.mias:[]);
       form=`<div class="card" style="margin-top:10px;background:var(--accent-soft)" onclick="event.stopPropagation()">
-        <div style="font-weight:600">${esVid?'Video del resultado':'Semana '+i+' · desde el '+this._fCorta(s.l)}</div>
+        <div style="font-weight:600;font-size:15px">${esVid?'Video del cierre del mes':'Semana '+s.iso+' · del '+this._rango(s.l)}</div>
         ${ya.map(a=>`<div style="margin-top:9px">
           ${a.url?(a.tipo==='video'
             ?`<video src="${this.esc(a.url)}" controls preload="metadata" style="width:100%;max-width:280px;border-radius:8px;display:block"></video>`
             :`<img src="${this.esc(a.url)}" style="width:100%;max-width:240px;border-radius:8px;display:block" loading="lazy">`):''}
           ${a.nota?`<div style="font-size:13px;margin-top:5px;font-style:italic">“${this.esc(a.nota)}”</div>`:''}
           <div class="hint">${this.esc(String(a.creado_en||'').slice(0,10))}</div></div>`).join('')}
-        <div style="background:#fff;border-radius:9px;padding:10px 12px;margin-top:10px;font-size:12.5px;line-height:1.5">
-          📸 <b>Para que se pueda comparar:</b> fondo blanco, buena luz, siempre la misma posición
-          y la misma distancia, y que se vea el área donde se esperan los resultados.</div>
         ${esVid
-          ?`<label class="hint" style="margin-top:8px;display:block">Video de 10 a 20 segundos contando el resultado <b style="color:var(--accent2)">· vale el ${av.pct.video}%</b></label>
+          ?`<div style="background:#fff;border-radius:10px;padding:13px 14px;margin-top:10px;font-size:14px;line-height:1.55">
+               🎥 <b>Graba un video corto</b> (10 a 20 segundos) contando <b>cómo te sientes con tu tratamiento
+               en estas 4 semanas</b>. Con luz de frente y sin ruido alrededor.
+               <div style="margin-top:6px;color:var(--accent2);font-weight:600">Vale el ${av.pct.video}% del producto.</div></div>
+             <label class="hint" style="margin-top:10px;display:block">Mi video</label>
              <input type="file" id="sg_v_${x.id}" accept="video/*" class="field" style="padding:9px">`
-          :`<label class="hint" style="margin-top:8px;display:block">${s.foto?'Otra foto':'Mi foto de esta semana'} <b style="color:var(--accent2)">· vale el ${av.pct.foto}%</b></label>
+          :`<div style="background:#fff;border-radius:10px;padding:13px 14px;margin-top:10px;font-size:14px;line-height:1.55">
+               📸 <b>Así se toma la foto</b>
+               <ul style="margin:6px 0 0 18px;padding:0">
+                 <li>Fondo <b>blanco</b> y buena luz, sin sombras.</li>
+                 <li>Siempre la <b>misma posición</b> y la <b>misma distancia</b>.</li>
+                 <li>Que se vea bien <b>el área donde esperas el resultado</b>.</li>
+                 <li>Sin filtros ni maquillaje en esa zona.</li></ul>
+               <div style="margin-top:6px;color:var(--accent2);font-weight:600">Esta foto vale el ${av.pct.foto}% del producto.</div></div>
+             <label class="hint" style="margin-top:10px;display:block">${s.foto?'Otra foto de esta semana':'Mi foto de esta semana'}</label>
              <input type="file" id="sg_f_${x.id}" accept="image/*" class="field" style="padding:9px">`}
         <label class="hint" style="margin-top:8px;display:block">¿Cómo te has sentido? ¿Qué cambios has notado?</label>
         <textarea class="field" id="sg_n_${x.id}" rows="3" placeholder="Cuéntanos"></textarea>
         <button class="btn" id="sg_b_${x.id}" style="margin-top:10px" onclick="App.segSubir('${x.id}',${esVid?4:i},${esVid?"'video'":"'foto'"})">Guardar</button>
       </div>`;
     }
-    return `<div onclick="event.stopPropagation()" style="border-top:1px solid var(--line,#eee);margin-top:12px;padding-top:10px">
-      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+    return `<div onclick="event.stopPropagation()" style="border-top:1px solid var(--line,#eee);margin-top:12px;padding-top:12px">
+      <div style="font-family:'Cormorant Garamond',Georgia,serif;font-size:21px;line-height:1.2">Bienvenida, ${this.esc((x.nombre||'').split(' ')[0])}</div>
+      <div style="font-size:13.5px;margin-top:4px">Tu tratamiento comienza la <b>semana ${this._semISO(l0)}</b>, del ${this._rango(l0)}.
+        Cada semana sube tu foto y cuéntanos cómo vas; al cierre del mes, tu video.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-top:10px">
         <div><b>${av.p}%</b> del producto ganado${av.gana?' · 🎁 el del mes siguiente gratis':''}${x.video_ok?' · 🎬 producto de regalo':''}</div>
         <a href="javascript:void(0)" style="font-size:12px;color:var(--faint)" onclick="App.segEditar(${!this._segEdit})">${this._segEdit?'cerrar datos':'✎ datos'}</a></div>
       ${this._segEdit?this.segDatos(x):''}
