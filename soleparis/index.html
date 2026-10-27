@@ -258,8 +258,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   pintarNav(){
     // Cliente: SOLO Starting Point. Público: SOLO Pendientes. Admin (NC): toda la botonería.
     const TABS = this.esAdmin()
-      ? [['resultados','📊','Dashboard'],['panel','📈','Panel'],['catalogo','📋','Catálogo'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['ventas','💹','Ventas'],['crm','📇','CRM'],['capacitacion','🎓','Capacitación'],['casos','⭐','Casos de éxito'],['fidelizacion','💛','Fidelización'],['pendientes','📋','Pendientes']]
-      : this.rol==='publico' ? [['pendientes','📋','Pendientes'],['casos','⭐','Casos de éxito']]   // 27-oct-2026 (José): el seguimiento del reto lo ve todo el equipo
+      ? [['resultados','📊','Dashboard'],['panel','📈','Panel'],['catalogo','📋','Catálogo'],['clientes','👥','Clientes'],['cotizar','🧮','Cotizar'],['ventas','💹','Ventas'],['crm','📇','CRM'],['capacitacion','🎓','Capacitación'],['casos','⭐','Seguimiento'],['fidelizacion','💛','Fidelización'],['pendientes','📋','Pendientes']]
+      : this.rol==='publico' ? [['pendientes','📋','Pendientes'],['casos','⭐','Seguimiento']]   // 27-oct-2026 (José): el seguimiento del reto lo ve todo el equipo
       : [['inicio','✦','Starting Point']];
     document.getElementById('nav').innerHTML = TABS.map(([v,ic,t])=>
       `<button data-v="${v}" onclick="App.go('${v}')"><span class="ic">${ic}</span>${t}</button>`).join('');
@@ -935,91 +935,231 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     this.vCapacitacion();
   },
 
-  /* ---------- CASOS DE ÉXITO ----------
-     Lo que cierra una venta de dermocosmética no es el folleto: es el resultado de
-     otra persona. Sin el permiso escrito de esa persona, el caso no se publica. */
-  async vCasos(){
-    const [cs,pacs,ava,red,progs]=await Promise.all([
-      this._get('soleparis_casos?order=destacado.desc,orden'),
-      this._get('soleparis_paciente?order=creado_en.desc&limit=300'),
-      this._get('soleparis_avance?order=creado_en.desc&limit=800'),
-      this._get('soleparis_redencion?order=creado_en.desc&limit=200'),
-      this._get('soleparis_fideliza?order=kit_nombre')]);
-    this._casos=cs; this._pacs=pacs; this._ava=ava; this._red=red; this._progs=progs;
-    const pub=cs.filter(c=>c.autoriza).length;
-    const link=location.href.replace(/[^/]*$/,'')+'mi-tratamiento.html';
-    this.set(`<h1>Casos de éxito</h1>
-      <div class="sub">${pacs.length} concursante${pacs.length===1?'':'s'} · ${pacs.filter(x=>x.consentimiento).length} con autorización para publicar</div>
-      <div class="card" style="background:var(--accent-soft)">
-        <div style="font-weight:600;margin-bottom:4px">De dónde salen los casos</div>
-        <div style="font-size:12.5px;color:var(--faint);margin-bottom:9px">Este es el enlace donde tus
-          clientas llevan su tratamiento y suben sus fotos. De ahí salen los antes y después que
-          después se publican acá — con su autorización.</div>
-        <input class="field" readonly value="${this.esc(link)}" onclick="this.select()">
-        <div style="display:flex;gap:7px">
-          <button class="btn" style="flex:1" onclick="App.copiarLink('${this.esc(link)}')">Copiar enlace</button>
-          <button class="btn gh2" onclick="App.abrirLink('${this.esc(link)}')">Abrir</button>
-        </div>
-      </div>
-      ${(this._pacs||[]).length?(()=>{
-        const av=id=>(this._ava||[]).filter(a=>a.paciente_id===id);
-        const kits=[...new Set((this._pacs||[]).map(x=>x.kit_nombre).filter(Boolean))].sort();
-        const vis=(this._pacs||[]).filter(x=>!this._kfil||x.kit_nombre===this._kfil);
-        /* «En juego» es lo que la marca ya se comprometió a reconocer y todavía no ha
-           pagado. Hay que verlo antes de que llegue a caja, no cuando ya llegó. */
-        const juego=vis.reduce((t,x)=>t+av(x.id).filter(a=>a.aprobado!==false&&!a.redencion_id)
-          .reduce((u,a)=>u+(+a.valor||0),0),0);
-        const tf=vis.reduce((t,x)=>t+av(x.id).filter(a=>a.tipo==='foto').length,0);
-        const tv=vis.reduce((t,x)=>t+av(x.id).filter(a=>a.tipo==='video').length,0);
-        const chip=(k,txt,cnt)=>`<button class="btn gh2" onclick="App.kitFil('${k}')"
-          style="padding:6px 13px;font-size:12.5px${this._kfil===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${txt} <b>${cnt}</b></button>`;
-        return `<h1 style="font-size:18px;margin-top:20px">Concursantes</h1>
-        <div class="sub" style="margin-bottom:9px">Toca una para ver sus fotos y de ahí sale el caso.</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:11px">
-          ${chip('','Todos',(this._pacs||[]).length)}
-          ${kits.map(k=>chip(this.esc(k),this.esc(k),(this._pacs||[]).filter(x=>x.kit_nombre===k).length)).join('')}
-        </div>
-        <div class="kpis">
-          <div class="kpi"><b>${this.fmt(juego)}</b><span>Descuentos en juego</span></div>
-          <div class="kpi"><b>${tf} · ${tv}</b><span>Fotos · videos</span></div>
-        </div>
-        ${vis.map(x=>{ const mios=av(x.id);
-          const f=mios.filter(a=>a.tipo==='foto').length, v=mios.filter(a=>a.tipo==='video').length;
-          const debe=mios.filter(a=>a.aprobado!==false&&!a.redencion_id).reduce((t,a)=>t+(+a.valor||0),0);
-          const cobr=mios.filter(a=>a.redencion_id).reduce((t,a)=>t+(+a.valor||0),0);
-          return `<div class="prod" style="cursor:pointer${x.id===this._pacSel?';border-color:var(--accent2)':''}"
-            onclick="App.pacAbrir2('${x.id}')"><div class="top">
-            <div><div class="nm">${this.esc(x.nombre)}</div>
-              <div class="ct">c.c. ${this.esc(x.cedula||'')} · ${this.esc(x.kit_nombre||'—')}${x.celular?' · '+this.esc(x.celular):''}</div></div>
-            <div class="pv">${this.fmt(debe)}</div></div>
-            <div class="meta" style="margin-top:6px">
-              <span class="pchip ${f?'stock':'cost'}">${f} fotos · ${v} videos</span>
-              ${debe?'<span class="pchip cost">sin reclamar</span>'
-                   :(cobr?`<span class="pchip stock">reclamó ${this.fmt(cobr)}</span>`:'')}
-              ${x.consentimiento?'<span class="pchip stock">autorización firmada</span>':'<span class="pchip cost">sin autorización</span>'}
-            </div>
-            ${x.id===this._pacSel?this.pacFicha(x,mios):''}
-          </div>`;}).join('')}`;})():''}
-
-      ${cs.length?`<h1 style="font-size:18px;margin-top:22px">Casos publicables</h1>`+cs.map(c=>`<div class="prod">
-        <div class="top"><div><div class="nm">${this.esc(c.titulo)}${c.destacado?' ⭐':''}</div>
-          <div class="ct">${[c.cliente,c.edad&&c.edad+' años',c.producto,c.tiempo].filter(Boolean).map(x=>this.esc(x)).join(' · ')}</div></div>
-          <div class="pv" style="font-size:13px"><span class="pchip ${c.autoriza?'stock':'cost'}">${c.autoriza?'autorizado':'sin permiso'}</span></div></div>
-        ${c.problema?`<div style="font-size:13px;margin-top:8px"><b>Antes:</b> ${this.esc(c.problema)}</div>`:''}
-        ${c.resultado?`<div style="font-size:13px;margin-top:3px"><b>Después:</b> ${this.esc(c.resultado)}</div>`:''}
-        ${c.testimonio?`<div style="font-size:13px;color:var(--ink);margin-top:9px;background:var(--accent-soft);border-radius:8px;padding:11px 13px;font-style:italic">“${this.esc(c.testimonio)}”</div>`:''}
-        ${(c.foto_antes||c.foto_despues)?`<div style="display:flex;gap:8px;margin-top:9px">
-          ${c.foto_antes?`<img src="${this.esc(c.foto_antes)}" style="width:50%;border-radius:8px" alt="antes">`:''}
-          ${c.foto_despues?`<img src="${this.esc(c.foto_despues)}" style="width:50%;border-radius:8px" alt="después">`:''}</div>`:''}
-        <div class="meta" style="margin-top:9px;gap:6px">
-          <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.casoDest('${c.id}',${!c.destacado})">${c.destacado?'quitar destacado':'destacar'}</button>
-          <button class="btn gh2" style="padding:5px 12px;font-size:12px" onclick="App.casoDel('${c.id}')">✕</button></div>
-      </div>`).join('')
-      :''}`);
+  /* ---------- SEGUIMIENTO A TU TRATAMIENTO (27-oct-2026, José) ----------
+     La pestaña del reto. Una persona está REGISTRADA cuando firmó el contrato y
+     tiene fecha de entrega del producto; hasta entonces está "sin registrar".
+     Desde la entrega, las semanas son las del CALENDARIO (semana 44, 45, 46…):
+     la de la entrega es la foto de antes y cada semana siguiente aparece sola al
+     llegar. Se toca la semana, se sube la foto y se anota cómo se ha sentido.
+     REMUNERACIÓN (José, 27-oct-2026): ya no hay plata por foto. Si acepta que le
+     grabemos el video, se le regala un producto. Y cada foto vale un PORCENTAJE del
+     precio del producto (valor_foto del programa) y el video del resultado otro
+     (valor_video): 4 fotos + 1 video en el mes = 100% = el producto del mes
+     siguiente gratis.
+     Lo guardado va a soleparis_avance con semana = semanas desde la entrega
+     (0 = entrega) y valor 0; mi-tratamiento.html todavía muestra la regla vieja. */
+  _segFil:'reg', _segSel:null, _segSem:null, _segNuevo:false,
+  _lunes(d){ const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); x.setDate(x.getDate()-((x.getDay()+6)%7)); return x; },
+  _semISO(d){ const x=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const n=x.getUTCDay()||7;
+    x.setUTCDate(x.getUTCDate()+4-n); const y0=new Date(Date.UTC(x.getUTCFullYear(),0,1)); return Math.ceil((((x-y0)/86400000)+1)/7); },
+  _fechaLocal(s){ if(!s) return null; const [y,m,d]=String(s).slice(0,10).split('-').map(Number); return new Date(y,m-1,d); },
+  _fCorta(d){ return d.toLocaleDateString('es-CO',{day:'numeric',month:'short'}); },
+  _reg(x){ return !!(x.consentimiento&&x.inicio); },
+  /* Un mes del reto = 4 semanas: el mes 1 son las semanas 1 a 4 después de la entrega. */
+  _mes(i){ return i<=0?0:Math.ceil(i/4); },
+  _pct(x){ const p=(this._progs||[]).find(q=>q.id===x.programa_id)||{};
+    const f=+p.valor_foto||0, v=+p.valor_video||0;
+    return (f>100||v>100||(!f&&!v))?{foto:20,video:20}:{foto:f,video:v}; },   // si el plan aún tiene pesos, 20/20
+  _meses(mios,k,pct){
+    pct=pct||{foto:20,video:20};
+    const out=[]; const n=Math.max(1,Math.ceil(Math.max(k,1)/4));
+    for(let m=1;m<=n;m++){
+      const del=(m-1)*4+1, al=m*4;
+      const fs=mios.filter(a=>a.tipo==='foto'&&+a.semana>=del&&+a.semana<=al);
+      const fotos=new Set(fs.filter(a=>a.url).map(a=>+a.semana)).size;
+      const notas=new Set(fs.filter(a=>(a.nota||'').trim()).map(a=>+a.semana)).size;
+      const video=mios.some(a=>a.tipo==='video'&&+a.semana>=del&&+a.semana<=al);
+      const p=Math.min(100,Math.min(fotos,4)*pct.foto+(video?pct.video:0));
+      out.push({m,del,al,fotos,notas,video,pct:p,gana:p>=100});
+    }
+    return out;
   },
-  async casoDest(id,v){ await this._patch('soleparis_casos?id=eq.'+id,{destacado:v}); this.vCasos(); },
-  async casoDel(id){ if(!confirm('¿Quitar este caso?'))return;
-    await this._delq('soleparis_casos?id=eq.'+id); this.vCasos(); },
+  async vCasos(){
+    const [pacs,ava,progs]=await Promise.all([
+      this._get('soleparis_paciente?order=nombre&limit=300'),
+      this._get('soleparis_avance?order=creado_en.desc&limit=1500'),
+      this._get('soleparis_fideliza?order=kit_nombre')]);
+    this._pacs=pacs; this._ava=ava; this._progs=progs;
+    const nReg=pacs.filter(x=>this._reg(x)).length, nSin=pacs.length-nReg;
+    const lista=pacs.filter(x=>this._segFil==='reg'?this._reg(x):!this._reg(x));
+    const tab=(k,t,n)=>`<button class="btn gh2" onclick="App.segFil('${k}')"
+      style="flex:1;margin-top:0;padding:11px;font-size:13.5px${this._segFil===k?';background:var(--accent2);color:#fff;border-color:var(--accent2)':''}">${t} <b>${n}</b></button>`;
+    this.set(`<h1>Seguimiento a tu tratamiento</h1>
+      <div class="sub">${pacs.length} participante${pacs.length===1?'':'s'} · ${nReg} registrada${nReg===1?'':'s'}</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">${tab('reg','Registrados',nReg)}${tab('sin','Sin registrar',nSin)}</div>
+      ${this._segNuevo?this.segFormNuevo():`<button class="btn gh2" style="margin:0 0 12px" onclick="App.segNuevo(true)">＋ Nueva participante</button>`}
+      ${lista.length?lista.map(x=>this.segTarjeta(x)).join('')
+        :`<div class="card" style="color:var(--faint);text-align:center">${this._segFil==='reg'
+          ?'Todavía no hay nadie registrada. Una participante queda registrada cuando tiene fecha de entrega y contrato firmado.'
+          :'No hay nadie sin registrar.'}</div>`}
+      <div class="hint" style="margin-top:14px;line-height:1.6"><b>Cómo se gana:</b> si acepta que le grabemos el video, un producto de regalo.
+        Cada foto vale un porcentaje del producto y el video del resultado otro: 4 fotos + 1 video en el mes = 100% = el producto del mes siguiente gratis.</div>`);
+  },
+  segFil(k){ this._segFil=k; this._segSel=null; this._segSem=null; this.vCasos(); },
+  segNuevo(v){ this._segNuevo=v; this.vCasos(); },
+  segAbrir(id){ this._segSel=(this._segSel===id?null:id); this._segSem=null; this.vCasos(); },
+  segSem(id,k){ this._segSel=id; this._segSem=(this._segSem===k?null:k); this.vCasos(); },
+  segFormNuevo(){
+    const progs=this._progs||[];
+    return `<div class="card" onclick="event.stopPropagation()">
+      <div style="font-weight:600;margin-bottom:6px">Nueva participante</div>
+      <label class="hint">Nombre completo</label><input class="field" id="sn_nom">
+      <div style="display:flex;gap:8px"><div style="flex:1"><label class="hint">Cédula</label><input class="field" id="sn_ced" inputmode="numeric"></div>
+        <div style="flex:1"><label class="hint">Celular</label><input class="field" id="sn_cel" inputmode="tel"></div></div>
+      <label class="hint">Correo</label><input class="field" id="sn_ema" inputmode="email">
+      <label class="hint">Dirección</label><input class="field" id="sn_dir">
+      <label class="hint">Tratamiento</label><select class="field" id="sn_kit"><option value="">— elige —</option>
+        ${progs.map(k=>`<option value="${k.id}">${this.esc(k.kit_nombre)}</option>`).join('')}</select>
+      <label class="hint">Fecha en que se le entregó el producto</label><input class="field" id="sn_ini" type="date">
+      <label style="display:flex;gap:9px;align-items:center;margin-top:10px;font-size:13.5px;cursor:pointer">
+        <input type="checkbox" id="sn_ok" style="width:19px;height:19px"> Firmó el contrato</label>
+      <label style="display:flex;gap:9px;align-items:center;margin-top:8px;font-size:13.5px;cursor:pointer">
+        <input type="checkbox" id="sn_vid" style="width:19px;height:19px"> Aceptó que le grabemos el video (producto de regalo)</label>
+      <div style="display:flex;gap:8px"><button class="btn" style="flex:1" onclick="App.segGuardarNuevo()">Guardar</button>
+        <button class="btn gh2" onclick="App.segNuevo(false)">Cancelar</button></div>
+    </div>`;
+  },
+  async segGuardarNuevo(){
+    const g=id=>(document.getElementById(id).value||'').trim();
+    if(g('sn_nom').length<4){ this.toast('Escribe el nombre completo'); return; }
+    if(!g('sn_ced')){ this.toast('Falta la cédula'); return; }
+    const k=(this._progs||[]).find(x=>x.id===g('sn_kit'))||{};
+    const ok=document.getElementById('sn_ok').checked;
+    await this._post('soleparis_paciente',{id:'pa'+Date.now(),nombre:g('sn_nom'),cedula:g('sn_ced').replace(/\D/g,''),
+      celular:g('sn_cel')||null,email:g('sn_ema')||null,direccion:g('sn_dir')||null,
+      programa_id:k.id||null,kit_nombre:k.kit_nombre||null,productos:k.productos||[],
+      inicio:g('sn_ini')||null,consentimiento:ok,consentimiento_en:ok?new Date().toISOString():null,
+      consentimiento_txt:ok?'Contrato firmado en físico, registrado por el equipo de Sole Paris.':null,
+      video_ok:document.getElementById('sn_vid').checked,saldo:0,activo:true});
+    this._segNuevo=false; this._segFil=(ok&&g('sn_ini'))?'reg':'sin';
+    this.toast('Participante guardada'); this.vCasos();
+  },
+  /* La tarjeta: datos de la persona arriba (fecha de entrega, contrato y video
+     editables ahí mismo), el resumen por mes y debajo las semanas desde la entrega. */
+  segTarjeta(x){
+    const mios=(this._ava||[]).filter(a=>a.paciente_id===x.id);
+    const ini=this._fechaLocal(x.inicio);
+    const abierta=this._segSel===x.id;
+    const k=ini?Math.max(0,Math.round((this._lunes(new Date())-this._lunes(ini))/604800000)):null;
+    const fotos=mios.filter(a=>a.tipo==='foto'&&a.url), vids=mios.filter(a=>a.tipo==='video');
+    const hechas=new Set(fotos.map(a=>+a.semana||0));
+    const faltan=ini?[...Array(k+1).keys()].filter(i=>!hechas.has(i)).length:0;
+    const ganados=ini?this._meses(mios,k,this._pct(x)).filter(m=>m.gana).length:0;
+    return `<div class="prod" style="cursor:pointer${abierta?';border-color:var(--accent2)':''}" onclick="App.segAbrir('${x.id}')">
+      <div class="top"><div><div class="nm">${this.esc(x.nombre)}</div>
+        <div class="ct">${this.esc(x.kit_nombre||'sin tratamiento')}${x.celular?' · '+this.esc(x.celular):''}</div></div>
+        <div class="pv" style="font-size:12.5px">${ini?'Semana '+this._semISO(new Date()):''}</div></div>
+      <div class="meta" style="margin-top:6px">
+        <span class="pchip ${ini?'stock':'cost'}">${ini?'Entrega '+this._fechaC(ini):'sin fecha de entrega'}</span>
+        <span class="pchip ${x.consentimiento?'stock':'cost'}">${x.consentimiento?'Contrato ✓':'sin contrato'}</span>
+        ${x.video_ok?'<span class="pchip stock">Video ✓ · producto de regalo</span>':''}
+        ${ini?`<span class="pchip">${fotos.length} foto${fotos.length===1?'':'s'} · ${vids.length} video${vids.length===1?'':'s'}${faltan?' · faltan '+faltan:''}</span>`:''}
+        ${ganados?`<span class="pchip stock">${ganados} mes${ganados===1?'':'es'} gratis ganado${ganados===1?'':'s'}</span>`:''}
+      </div>
+      ${abierta?this.segFicha(x,mios,ini,k):''}
+    </div>`;
+  },
+  segFicha(x,mios,ini,k){
+    const fila=(t,v)=>`<tr><td style="padding:4px 0;color:var(--faint);width:38%">${t}</td><td style="text-align:right">${v}</td></tr>`;
+    const datos=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px">
+      ${fila('Cédula',this.esc(x.cedula||'—'))}${fila('Celular',this.esc(x.celular||'—'))}${fila('Teléfono',this.esc(x.telefono||'—'))}
+      ${fila('Correo',this.esc(x.email||'—'))}${fila('Dirección',this.esc(x.direccion||'—'))}${fila('Tratamiento',this.esc(x.kit_nombre||'—'))}
+      ${fila('Se inscribió',this.esc(String(x.creado_en||'').slice(0,10)))}</table>
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-top:10px">
+        <div style="flex:1"><label class="hint">Fecha de entrega del producto</label>
+          <input class="field" type="date" id="sf_ini_${x.id}" value="${this.esc(String(x.inicio||'').slice(0,10))}" style="padding:9px"></div>
+      </div>
+      <label style="display:flex;gap:7px;align-items:center;font-size:13px;margin-top:8px;cursor:pointer">
+        <input type="checkbox" id="sf_ok_${x.id}" ${x.consentimiento?'checked':''} style="width:19px;height:19px"> Contrato firmado</label>
+      <label style="display:flex;gap:7px;align-items:center;font-size:13px;margin-top:6px;cursor:pointer">
+        <input type="checkbox" id="sf_vid_${x.id}" ${x.video_ok?'checked':''} style="width:19px;height:19px"> Aceptó que le grabemos el video (producto de regalo)</label>
+      <button class="btn gh2" style="margin-top:8px;padding:9px" onclick="App.segGuardarDatos('${x.id}')">Guardar datos</button>`;
+    if(!ini) return `<div onclick="event.stopPropagation()" style="border-top:1px solid var(--line,#eee);margin-top:12px;padding-top:4px">${datos}
+      <div class="hint" style="margin-top:10px">Las semanas aparecen cuando tenga fecha de entrega.</div></div>`;
+    const porSem={}; mios.forEach(a=>{ (porSem[+a.semana||0]=porSem[+a.semana||0]||[]).push(a); });
+    const pct=this._pct(x);
+    const meses=this._meses(mios,k,pct).map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line,#eee);font-size:13px">
+      <div><b>Mes ${m.m}</b> <span style="color:var(--faint)">· semanas ${m.del} a ${m.al}</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+        <span class="pchip ${m.fotos>=4?'stock':''}">${m.fotos}/4 fotos</span>
+        <span class="pchip ${m.video?'stock':''}">${m.video?'video ✓':'sin video'}</span>
+        <span class="pchip ${m.gana?'stock':'cost'}"><b>${m.pct}%</b> del producto</span>
+        ${m.gana?`<span class="pchip stock">🎁 mes ${m.m+1} gratis</span>`:''}</div></div>`).join('');
+    const sems=[...Array(k+1).keys()].reverse().map(i=>{
+      const lun=new Date(ini); lun.setDate(lun.getDate()+7*i); const l=this._lunes(lun);
+      const mias=porSem[i]||[];
+      const foto=mias.some(a=>a.tipo==='foto'&&a.url), nota=mias.some(a=>(a.nota||'').trim()), vid=mias.some(a=>a.tipo==='video');
+      const sel=this._segSem===i;
+      const est=(foto?'📷':'')+(nota?'✎':'')+(vid?'🎥':'');
+      return `<button class="btn gh2" style="margin:0;padding:9px 12px;font-size:12.5px;width:auto;flex:1 1 44%;text-align:left${sel?';border-color:var(--accent2);background:var(--accent-soft)':''}"
+        onclick="event.stopPropagation();App.segSem('${x.id}',${i})">
+        <b>${i===0?'Entrega':'Semana '+this._semISO(l)}</b> <span style="color:var(--faint)">· ${this._fCorta(i===0?ini:l)}</span>
+        <span style="float:right">${est||'<span style=&quot;color:var(--warn)&quot;>falta</span>'}</span></button>`; }).join('');
+    const i=this._segSem;
+    let form='';
+    if(i!==null&&i!==undefined){
+      const lun=new Date(ini); lun.setDate(lun.getDate()+7*i); const l=this._lunes(lun);
+      const ya=(porSem[i]||[]);
+      form=`<div class="card" style="margin-top:10px;background:var(--accent-soft)" onclick="event.stopPropagation()">
+        <div style="font-weight:600">${i===0?'Foto de antes · entrega del '+this._fechaC(ini):'Semana '+this._semISO(l)+' · desde el '+this._fCorta(l)+' · mes '+this._mes(i)}</div>
+        ${ya.map(a=>`<div style="margin-top:9px">
+          ${a.url?(a.tipo==='video'
+            ?`<video src="${this.esc(a.url)}" controls preload="metadata" style="width:100%;max-width:280px;border-radius:8px;display:block"></video>`
+            :`<img src="${this.esc(a.url)}" style="width:100%;max-width:240px;border-radius:8px;display:block" loading="lazy">`):''}
+          ${a.nota?`<div style="font-size:13px;margin-top:5px;font-style:italic">“${this.esc(a.nota)}”</div>`:''}
+          <div class="hint">${a.tipo==='video'?'video':'foto'} · ${this.esc(String(a.creado_en||'').slice(0,10))}</div></div>`).join('')}
+        <div style="background:#fff;border-radius:9px;padding:10px 12px;margin-top:10px;font-size:12.5px;line-height:1.5">
+          📸 <b>Para que las fotos se puedan comparar:</b> fondo blanco, buena luz, siempre la misma posición
+          y la misma distancia, y que se vea el área donde se esperan los resultados.</div>
+        <label class="hint" style="margin-top:8px;display:block">${ya.some(a=>a.tipo==='foto'&&a.url)?'Otra foto':'Foto de la semana'} <b style="color:var(--accent2)">· vale el ${pct.foto}% del producto</b></label>
+        <input type="file" id="sg_f_${x.id}" accept="image/*" class="field" style="padding:9px">
+        <label class="hint" style="margin-top:8px;display:block">¿Cómo se ha sentido? ¿Qué cambios ha hecho?</label>
+        <textarea class="field" id="sg_n_${x.id}" rows="3" placeholder="Lo que cuenta la participante esta semana"></textarea>
+        <label class="hint" style="margin-top:8px;display:block">Video del resultado del mes (10 a 20 segundos) <b style="color:var(--accent2)">· vale el ${pct.video}%</b></label>
+        <input type="file" id="sg_v_${x.id}" accept="video/*" class="field" style="padding:9px">
+        <button class="btn" id="sg_b_${x.id}" style="margin-top:10px" onclick="App.segSubir('${x.id}',${i})">Guardar</button>
+      </div>`;
+    }
+    return `<div onclick="event.stopPropagation()" style="border-top:1px solid var(--line,#eee);margin-top:12px;padding-top:4px">${datos}
+      <div style="font-weight:600;font-size:13px;margin-top:14px">Por mes</div>${meses}
+      <div style="font-weight:600;font-size:13px;margin-top:14px">Semanas desde la entrega</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:7px">${sems}</div>${form}</div>`;
+  },
+  async segGuardarDatos(id){
+    const ini=(document.getElementById('sf_ini_'+id).value||'').trim()||null;
+    const ok=document.getElementById('sf_ok_'+id).checked;
+    const x=(this._pacs||[]).find(p=>p.id===id)||{};
+    const b={inicio:ini,consentimiento:ok,video_ok:document.getElementById('sf_vid_'+id).checked};
+    if(ok&&!x.consentimiento){ b.consentimiento_en=new Date().toISOString(); b.consentimiento_txt='Contrato firmado en físico, registrado por el equipo de Sole Paris.'; }
+    await this._patch('soleparis_paciente?id=eq.'+id,b);
+    this._segFil=(ok&&ini)?'reg':'sin';
+    this.toast('Guardado'); this.vCasos();
+  },
+  async _segArchivo(id,f){
+    const ext=(f.name.split('.').pop()||'jpg').toLowerCase();
+    const ruta='soleparis/avance/'+id+'_'+Date.now()+'.'+ext;
+    try{ const r=await fetch(this.SB+'/storage/v1/object/documentos/'+ruta,{method:'POST',
+        headers:{apikey:this.KEY,Authorization:'Bearer '+this.KEY,'Content-Type':f.type||'application/octet-stream'},body:f});
+      if(r.ok) return this.SB+'/storage/v1/object/public/documentos/'+ruta; }catch(e){}
+    return null;
+  },
+  async segSubir(id,i){
+    const b=document.getElementById('sg_b_'+id);
+    const nota=(document.getElementById('sg_n_'+id).value||'').trim();
+    const f=document.getElementById('sg_f_'+id).files[0], v=document.getElementById('sg_v_'+id).files[0];
+    if(!f&&!v&&!nota){ this.toast('Elige la foto, el video o escribe la nota'); return; }
+    if((f&&f.size>50*1048576)||(v&&v.size>50*1048576)){ this.toast('El archivo pesa más de 50 MB'); return; }
+    b.disabled=true; b.textContent='Guardando…';
+    const x=(this._pacs||[]).find(p=>p.id===id)||{};
+    const lun=this._fechaLocal(x.inicio); lun.setDate(lun.getDate()+7*i);
+    const fecha=this._lunes(lun).toISOString().slice(0,10);
+    let urlF=null, urlV=null;
+    if(f){ urlF=await this._segArchivo(id,f); if(!urlF){ this.toast('No se pudo subir la foto. Intenta otra vez.'); b.disabled=false; b.textContent='Guardar'; return; } }
+    if(v){ urlV=await this._segArchivo(id,v); if(!urlV){ this.toast('No se pudo subir el video. Intenta otra vez.'); b.disabled=false; b.textContent='Guardar'; return; } }
+    if(urlF||nota) await this._post('soleparis_avance',{id:'av'+Date.now(),paciente_id:id,semana:i,fecha:fecha,tipo:'foto',url:urlF,nota:nota||null,valor:0,aprobado:true});
+    if(urlV) await this._post('soleparis_avance',{id:'av'+(Date.now()+1),paciente_id:id,semana:i,fecha:fecha,tipo:'video',url:urlV,nota:null,valor:0,aprobado:true});
+    this.toast('Guardado'); this.vCasos();
+  },
 
   _crmCaj:'piedra',
   crmCaj(c){ this._crmCaj=c; this.vCrm(); },
