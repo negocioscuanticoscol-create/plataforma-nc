@@ -1027,12 +1027,15 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     if(g('sn_nom').length<3){ this.toast('Escribe el nombre'); return; }
     const k=(this._progs||[]).find(x=>x.id===g('sn_kit'))||{};
     const ok=document.getElementById('sn_ok').checked;
-    await this._post('soleparis_paciente',{id:'pa'+Date.now(),nombre:g('sn_nom'),cedula:g('sn_ced').replace(/\D/g,'')||null,
+    /* Se graba con fetch directo para SABER si quedó: _post se traga el error y
+       la pantalla decía "guardada" aunque la base la hubiera rechazado. */
+    const r=await fetch(this.SB+'/rest/v1/soleparis_paciente',{method:'POST',headers:{...this._H(),Prefer:'return=minimal'},body:JSON.stringify({id:'pa'+Date.now(),nombre:g('sn_nom'),cedula:g('sn_ced').replace(/\D/g,'')||null,
       celular:g('sn_cel')||null,email:g('sn_ema')||null,direccion:g('sn_dir')||null,
       programa_id:k.id||null,kit_nombre:k.kit_nombre||null,productos:k.productos||[],
       inicio:g('sn_ini')||null,consentimiento:ok,consentimiento_en:ok?new Date().toISOString():null,
       consentimiento_txt:ok?'Contrato firmado en físico, registrado por el equipo de Sole Paris.':null,
-      video_ok:document.getElementById('sn_vid').checked,saldo:0,activo:true});
+      video_ok:document.getElementById('sn_vid').checked,saldo:0,activo:true})}).catch(()=>null);
+    if(!r||!r.ok){ this.toast(r&&r.status===409?'Esa cédula ya está registrada':'No se pudo guardar. Intenta otra vez.'); return; }
     this._segNuevo=false; this._segFil=(ok&&g('sn_ini'))?'reg':'sin';
     this.toast('Participante guardada'); this.vCasos();
   },
@@ -1147,7 +1150,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       email:g('sf_ema')||null,direccion:g('sf_dir')||null,programa_id:k.id||null,kit_nombre:k.kit_nombre||null,
       inicio:ini,consentimiento:ok,video_ok:document.getElementById('sf_vid_'+id).checked};
     if(ok&&!x.consentimiento){ b.consentimiento_en=new Date().toISOString(); b.consentimiento_txt='Contrato firmado en físico, registrado por el equipo de Sole Paris.'; }
-    await this._patch('soleparis_paciente?id=eq.'+id,b);
+    const r=await fetch(this.SB+'/rest/v1/soleparis_paciente?id=eq.'+id,{method:'PATCH',headers:{...this._H(),Prefer:'return=minimal'},body:JSON.stringify(b)}).catch(()=>null);
+    if(!r||!r.ok){ this.toast(r&&r.status===409?'Esa cédula ya la tiene otra participante':'No se pudo guardar. Intenta otra vez.'); return; }
     this._segFil=(ok&&ini)?'reg':'sin';
     this.toast('Guardado'); this.vCasos();
   },
