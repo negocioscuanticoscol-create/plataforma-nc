@@ -1002,7 +1002,8 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   segFormNuevo(){
     const progs=this._progs||[];
     return `<div class="card" onclick="event.stopPropagation()">
-      <div style="font-weight:600;margin-bottom:6px">Nueva participante</div>
+      <div style="font-weight:600;margin-bottom:2px">Nueva participante</div>
+      <div class="hint" style="margin-bottom:6px">Solo el nombre es obligatorio; lo demás se puede completar después.</div>
       <label class="hint">Nombre completo</label><input class="field" id="sn_nom">
       <div style="display:flex;gap:8px"><div style="flex:1"><label class="hint">Cédula</label><input class="field" id="sn_ced" inputmode="numeric"></div>
         <div style="flex:1"><label class="hint">Celular</label><input class="field" id="sn_cel" inputmode="tel"></div></div>
@@ -1021,11 +1022,12 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
   },
   async segGuardarNuevo(){
     const g=id=>(document.getElementById(id).value||'').trim();
-    if(g('sn_nom').length<4){ this.toast('Escribe el nombre completo'); return; }
-    if(!g('sn_ced')){ this.toast('Falta la cédula'); return; }
+    /* Solo el nombre es obligatorio (José, 27-oct-2026): se graba con lo que haya y
+       lo demás se completa después desde la ficha. */
+    if(g('sn_nom').length<3){ this.toast('Escribe el nombre'); return; }
     const k=(this._progs||[]).find(x=>x.id===g('sn_kit'))||{};
     const ok=document.getElementById('sn_ok').checked;
-    await this._post('soleparis_paciente',{id:'pa'+Date.now(),nombre:g('sn_nom'),cedula:g('sn_ced').replace(/\D/g,''),
+    await this._post('soleparis_paciente',{id:'pa'+Date.now(),nombre:g('sn_nom'),cedula:g('sn_ced').replace(/\D/g,'')||null,
       celular:g('sn_cel')||null,email:g('sn_ema')||null,direccion:g('sn_dir')||null,
       programa_id:k.id||null,kit_nombre:k.kit_nombre||null,productos:k.productos||[],
       inicio:g('sn_ini')||null,consentimiento:ok,consentimiento_en:ok?new Date().toISOString():null,
@@ -1060,12 +1062,21 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
     </div>`;
   },
   segFicha(x,mios,ini,k){
-    const fila=(t,v)=>`<tr><td style="padding:4px 0;color:var(--faint);width:38%">${t}</td><td style="text-align:right">${v}</td></tr>`;
-    const datos=`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:10px">
-      ${fila('Cédula',this.esc(x.cedula||'—'))}${fila('Celular',this.esc(x.celular||'—'))}${fila('Teléfono',this.esc(x.telefono||'—'))}
-      ${fila('Correo',this.esc(x.email||'—'))}${fila('Dirección',this.esc(x.direccion||'—'))}${fila('Tratamiento',this.esc(x.kit_nombre||'—'))}
-      ${fila('Se inscribió',this.esc(String(x.creado_en||'').slice(0,10)))}</table>
-      <div style="display:flex;gap:8px;align-items:flex-end;margin-top:10px">
+    /* Todos los datos se editan aquí mismo: se graba con lo que haya y se completa después. */
+    const inp=(t,id,v,extra)=>`<label class="hint" style="display:block;margin-top:7px">${t}</label><input class="field" id="${id}_${x.id}" value="${this.esc(v||'')}" style="padding:9px" ${extra||''}>`;
+    const progs=this._progs||[];
+    const datos=`<div style="margin-top:8px">
+      ${inp('Nombre completo','sf_nom',x.nombre)}
+      <div style="display:flex;gap:8px"><div style="flex:1">${inp('Cédula','sf_ced',x.cedula,'inputmode="numeric"')}</div>
+        <div style="flex:1">${inp('Celular','sf_cel',x.celular,'inputmode="tel"')}</div></div>
+      <div style="display:flex;gap:8px"><div style="flex:1">${inp('Teléfono','sf_tel',x.telefono,'inputmode="tel"')}</div>
+        <div style="flex:1">${inp('Correo','sf_ema',x.email,'inputmode="email"')}</div></div>
+      ${inp('Dirección','sf_dir',x.direccion)}
+      <label class="hint" style="display:block;margin-top:7px">Tratamiento</label>
+      <select class="field" id="sf_kit_${x.id}" style="padding:9px"><option value="">— elige —</option>
+        ${progs.map(k=>`<option value="${k.id}" ${k.id===x.programa_id?'selected':''}>${this.esc(k.kit_nombre)}</option>`).join('')}</select>
+      <div class="hint" style="margin-top:6px">Se inscribió el ${this.esc(String(x.creado_en||'').slice(0,10))}</div></div>
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-top:4px">
         <div style="flex:1"><label class="hint">Fecha de entrega del producto</label>
           <input class="field" type="date" id="sf_ini_${x.id}" value="${this.esc(String(x.inicio||'').slice(0,10))}" style="padding:9px"></div>
       </div>
@@ -1126,10 +1137,15 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:7px">${sems}</div>${form}</div>`;
   },
   async segGuardarDatos(id){
-    const ini=(document.getElementById('sf_ini_'+id).value||'').trim()||null;
+    const g=k=>(document.getElementById(k+'_'+id).value||'').trim();
+    if(g('sf_nom').length<3){ this.toast('El nombre no puede quedar vacío'); return; }
+    const ini=g('sf_ini')||null;
     const ok=document.getElementById('sf_ok_'+id).checked;
     const x=(this._pacs||[]).find(p=>p.id===id)||{};
-    const b={inicio:ini,consentimiento:ok,video_ok:document.getElementById('sf_vid_'+id).checked};
+    const k=(this._progs||[]).find(q=>q.id===g('sf_kit'))||{};
+    const b={nombre:g('sf_nom'),cedula:g('sf_ced').replace(/\D/g,'')||null,celular:g('sf_cel')||null,telefono:g('sf_tel')||null,
+      email:g('sf_ema')||null,direccion:g('sf_dir')||null,programa_id:k.id||null,kit_nombre:k.kit_nombre||null,
+      inicio:ini,consentimiento:ok,video_ok:document.getElementById('sf_vid_'+id).checked};
     if(ok&&!x.consentimiento){ b.consentimiento_en=new Date().toISOString(); b.consentimiento_txt='Contrato firmado en físico, registrado por el equipo de Sole Paris.'; }
     await this._patch('soleparis_paciente?id=eq.'+id,b);
     this._segFil=(ok&&ini)?'reg':'sin';
