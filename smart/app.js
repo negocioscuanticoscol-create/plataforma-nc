@@ -141,9 +141,9 @@ const App = {
       {v:'admin', ic:'⚙️', t:'Equipo'},
       {v:'permisos', ic:'🔐', t:'Permisos'},
     ];
-    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats','datos','admin','permisos','itinerario'];
-    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats','itinerario'],
-      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','chats','itinerario'],
+    const TODOS=['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','metacom','chats','datos','admin','permisos','itinerario'];
+    const DEF={admin:TODOS, gerente:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','metacom','chats','itinerario'],
+      director:['dashboard','cotizaciones','pedidos','cartera','despachos','clientes','ventas','panel','crm','cobertura','planta','autopedido','comisiones','metacom','chats','itinerario'],
       vendedor:['dashboard','cotizaciones','pedidos','cartera','clientes','crm','ventas','cobertura','panel','autopedido'],
       facturacion:['panel','cotizaciones','pedidos','despachos','clientes'], bodega:['dashboard','despachos'], planta:['dashboard','pedidos','planta']};
     let permitidos=(this._permisos && this._permisos[r]) || DEF[r] || ['dashboard'];
@@ -164,6 +164,7 @@ const App = {
   _GRUPOS:{
     panel:[['panel','📈','Panel'],['dashboard','📊','Resultados']],
     despachos:[['despachos','🚚','Despachos'],['itinerario','🚐','Itinerario']],
+    comisiones:[['comisiones','🧾','Cuenta'],['metacom','🎯','Meta de comisión']],
     clientes:[['clientes','👥','Clientes'],['cobertura','🗺️','Cobertura'],['ventas','💰','Ventas'],['autopedido','🛒','Autopedido']],
   },
   _grupoDe(view){ for(const g in this._GRUPOS){ if(this._GRUPOS[g].some(i=>i[0]===view)) return g; } return null; },
@@ -191,6 +192,7 @@ const App = {
     if(window.NC_EMPRESA==='smart' && view==='despachos') return this.vDespachosSmart();
     if(window.NC_EMPRESA==='smart' && view==='autopedido') return this.vAutoPedidosSmart();
     if(view==='comisiones') return this.vComisiones();
+    if(view==='metacom') return this.vMetaCom();   // meta de comisión por lista y expectativa por cliente
     if(view==='itinerario') return this.vItinerario();
     const FEROZ_ONLY=['cotizaciones','cotizacionNueva','pedidos','cartera','despachos','ventas','clientes','crm','cobertura','planta','autopedido'];
     if(window.NC_EMPRESA && window.NC_EMPRESA!=='feroz' && FEROZ_ONLY.includes(view)) return this.enConstruccion(view);
@@ -1060,6 +1062,156 @@ const App = {
   _mesHoy(){ return new Date().toISOString().slice(0,7); },
   _mesNom(m){ const N=['','enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
     const p=String(m||'').split('-'); return p[1]?(N[+p[1]]+' '+p[0]):(m||'—'); },
+
+  /* ================= META DE COMISIÓN =================
+     José (27-oct-2026): "cada vez que tomo un cliente me pongo una expectativa de
+     cuánto me quiero ganar en comisión, y después saber cuántos clientes me faltan".
+     · La tabla base vive en nc_meta_comision (una fila por empresa): meta del mes y,
+       por lista, comisión por unidad del 1.000 ml, pedido típico, cada cuántos días
+       compra y cuántos clientes de esa lista se quieren.
+     · La expectativa de cada cliente vive en nc_clientes: meta_lista, meta_uds,
+       meta_dias y meta_mes (comisión esperada al mes).
+     · "Compraron" sale de nc_cotizaciones con estado=pedido (últimos 120 días). */
+  _mcH(){ return {apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json'}; },
+  async _mcGet(u){ try{ const r=await fetch(this._SBU()+'/rest/v1/'+u,{headers:this._mcH()}); const j=await r.json(); return Array.isArray(j)?j:[]; }catch(e){ return []; } },
+  _mcMes(l){ return (!l.dias||!l.uds)?0:Math.round(l.uds*l.com*30/l.dias); },   // comisión por cliente al mes
+  async vMetaCom(){
+    this.loading();
+    const [cfg,clis,ped]=await Promise.all([
+      this._mcGet('nc_meta_comision?empresa=eq.smart'),
+      this._mcGet('nc_clientes?empresa=eq.smart&meta_mes=not.is.null&select=documento,nombre,celular,meta_lista,meta_uds,meta_dias,meta_mes&order=meta_mes.desc&limit=1000'),
+      this._mcGet('nc_cotizaciones?empresa=eq.smart&estado=eq.pedido&select=cliente,creado_en,lista_idx:datos->>lista_idx,comision:datos->>comision&order=creado_en.desc&limit=1000')
+    ]);
+    const c=cfg[0]||{meta_mes:0,config:{listas:[]}};
+    this._mc={meta:+c.meta_mes||0, listas:(c.config&&c.config.listas)||[], clis, ped, sel:null};
+    this._mcPaint();
+  },
+  _mcPaint(){
+    const M=this._mc, L=M.listas, meta=M.meta;
+    const hace=d=>{ const x=new Date(); x.setDate(x.getDate()-d); return x; };
+    const d120=hace(120), d30=hace(30);
+    const nomL=k=>(L.find(l=>+l.k===+k)||{}).n||('Lista '+k);
+    // por lista: expectativas puestas, clientes que compraron en 120 días, comisión real 30 días
+    const fila=l=>{
+      const mios=M.clis.filter(x=>+x.meta_lista===+l.k);
+      const esp=mios.reduce((a,x)=>a+(+x.meta_mes||0),0);
+      const comp=new Set(M.ped.filter(p=>+p.lista_idx===+l.k&&new Date(p.creado_en)>=d120).map(p=>p.cliente)).size;
+      const real=M.ped.filter(p=>+p.lista_idx===+l.k&&new Date(p.creado_en)>=d30).reduce((a,p)=>a+(+p.comision||0),0);
+      const xmes=this._mcMes(l), aporte=xmes*(+l.meta||0);
+      return {l,mios,esp,comp,real,xmes,aporte,faltan:Math.max(0,(+l.meta||0)-mios.length),faltanS:Math.max(0,aporte-esp)};
+    };
+    const F=L.map(fila);
+    const totMeta=F.reduce((a,f)=>a+f.aporte,0), totEsp=F.reduce((a,f)=>a+f.esp,0), totReal=F.reduce((a,f)=>a+f.real,0);
+    const totCli=F.reduce((a,f)=>a+(+f.l.meta||0),0), totCon=F.reduce((a,f)=>a+f.mios.length,0);
+    const inp=(id,v,w)=>`<input id="${id}" type="number" value="${v==null?'':v}" style="width:${w||70}px;padding:6px;border:1px solid var(--linea);border-radius:7px;text-align:right">`;
+    const th=t=>`<th style="padding:7px 8px;text-align:right;border-bottom:2px solid var(--linea);font-size:11.5px;white-space:nowrap">${t}</th>`;
+    const td=(t,b)=>`<td style="padding:6px 8px;text-align:right;border-bottom:1px solid #eee;white-space:nowrap${b?';font-weight:700':''}">${t}</td>`;
+    const sel=M.sel||{};
+    const selL=L.find(l=>+l.k===+(sel.meta_lista||0));
+    const auto=selL?this._mcMes({com:+selL.com,uds:+(sel.meta_uds||selL.uds),dias:+(sel.meta_dias||selL.dias)}):0;
+    this.set(`<h1>🎯 Meta de comisión</h1>
+      <div class="sub">Solo con el 1.000 ml: cuánto deja cada lista, cuántos clientes hacen la meta y cuántos faltan. Cada cliente lleva su expectativa.</div>
+
+      <div class="kpi" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:12px">
+        <div><div style="font-size:11px;color:var(--suave);font-weight:700">META DEL MES</div>
+          <div style="display:flex;gap:6px;align-items:center">${inp('mc_meta',meta,130)}<button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.mcGuardarMeta()">💾</button></div></div>
+        <div><div style="font-size:11px;color:var(--suave);font-weight:700">LA TABLA DA</div><div style="font-size:20px;font-weight:800">${money(totMeta)}</div><div style="font-size:11px;color:var(--suave)">${totCli} clientes</div></div>
+        <div><div style="font-size:11px;color:var(--suave);font-weight:700">EXPECTATIVA PUESTA</div><div style="font-size:20px;font-weight:800;color:#1d6fa5">${money(totEsp)}</div><div style="font-size:11px;color:var(--suave)">${totCon} clientes con expectativa</div></div>
+        <div><div style="font-size:11px;color:var(--suave);font-weight:700">REAL ÚLTIMOS 30 DÍAS</div><div style="font-size:20px;font-weight:800;color:#2e7d32">${money(totReal)}</div></div>
+        <div><div style="font-size:11px;color:var(--suave);font-weight:700">FALTA PARA LA META</div><div style="font-size:20px;font-weight:800;color:#c62828">${money(Math.max(0,meta-totEsp))}</div><div style="font-size:11px;color:var(--suave)">${Math.max(0,totCli-totCon)} clientes</div></div>
+      </div>
+
+      <div class="card"><div style="font-weight:700;margin-bottom:6px">Tabla base · 1.000 ml</div>
+        <div class="sub">Cambia los números y guarda. Comisión por cliente al mes = unidades × comisión × 30 ÷ días.</div>
+        <div style="overflow:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>
+          <th style="padding:7px 8px;text-align:left;border-bottom:2px solid var(--linea);font-size:11.5px">Lista</th>${th('Comisión / ud')}${th('Pedido típico')}${th('Cada (días)')}${th('Por pedido')}${th('Por cliente / mes')}${th('Meta clientes')}${th('Aporte')}</tr></thead>
+          <tbody>${F.map((f,i)=>`<tr><td style="padding:6px 8px;border-bottom:1px solid #eee;font-weight:700">${esc(f.l.n)}</td>
+            ${td(inp('mc_com_'+i,f.l.com,60))}${td(inp('mc_uds_'+i,f.l.uds,70))}${td(inp('mc_dias_'+i,f.l.dias,60))}
+            ${td(money(f.l.uds*f.l.com))}${td(money(f.xmes),1)}${td(inp('mc_meta_'+i,f.l.meta,60))}${td(money(f.aporte),1)}</tr>`).join('')}
+          <tr><td style="padding:6px 8px;font-weight:700">Total</td>${td('')}${td('')}${td('')}${td('')}${td('')}${td(totCli,1)}${td(money(totMeta),1)}</tr></tbody></table></div>
+        <button class="btn-sm" style="background:var(--naranja);color:#fff;margin-top:8px" onclick="App.mcGuardarTabla()">💾 Guardar tabla</button>
+      </div>
+
+      <div class="card"><div style="font-weight:700;margin-bottom:6px">Conseguidos y faltan</div>
+        <div class="sub">"Con expectativa" = clientes a los que ya les pusiste meta. "Compraron" = pedidos reales de esa lista en los últimos 120 días.</div>
+        <div style="overflow:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>
+          <th style="padding:7px 8px;text-align:left;border-bottom:2px solid var(--linea);font-size:11.5px">Lista</th>${th('Meta clientes')}${th('Con expectativa')}${th('$ esperado / mes')}${th('Compraron (120 d)')}${th('$ real (30 d)')}${th('Faltan clientes')}${th('Faltan $ / mes')}</tr></thead>
+          <tbody>${F.map(f=>`<tr><td style="padding:6px 8px;border-bottom:1px solid #eee;font-weight:700">${esc(f.l.n)}</td>
+            ${td(f.l.meta)}${td(f.mios.length)}${td(money(f.esp))}${td(f.comp)}${td(money(f.real))}${td(f.faltan,1)}${td(money(f.faltanS),1)}</tr>`).join('')}
+          <tr><td style="padding:6px 8px;font-weight:700">Total</td>${td(totCli,1)}${td(totCon,1)}${td(money(totEsp),1)}${td('')}${td(money(totReal),1)}${td(Math.max(0,totCli-totCon),1)}${td(money(Math.max(0,totMeta-totEsp)),1)}</tr></tbody></table></div>
+      </div>
+
+      <div class="card" id="mc_asig"><div style="font-weight:700;margin-bottom:6px">Ponerle expectativa a un cliente</div>
+        <div class="sub">Busca el cliente, dile la lista, cuánto pide y cada cuánto. La comisión al mes se calcula sola; si quieres, la cambias.</div>
+        <input id="mc_q" placeholder="🔍 Nombre o NIT del cliente…" value="${esc(sel.nombre||'')}" style="width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--linea);border-radius:8px" oninput="App.mcBuscar(this.value)">
+        <div id="mc_res" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
+        ${sel.documento?`<div style="margin-top:10px;padding:10px;background:#f4f6fb;border-radius:10px">
+          <div style="font-weight:700">${esc(sel.nombre)} <span style="color:var(--suave);font-weight:400">· ${esc(sel.documento)}</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-top:8px">
+            <label style="font-size:11px;font-weight:700;color:var(--suave)">Lista<br><select id="mc_s_lista" style="padding:7px;border:1px solid var(--linea);border-radius:7px" onchange="App.mcSelLista(this.value)">
+              ${L.map(l=>`<option value="${l.k}" ${+l.k===+(sel.meta_lista||0)?'selected':''}>${esc(l.n)}</option>`).join('')}</select></label>
+            <label style="font-size:11px;font-weight:700;color:var(--suave)">Unidades por pedido<br>${inp('mc_s_uds',sel.meta_uds||(selL||{}).uds||'',90)}</label>
+            <label style="font-size:11px;font-weight:700;color:var(--suave)">Cada (días)<br>${inp('mc_s_dias',sel.meta_dias||(selL||{}).dias||'',70)}</label>
+            <label style="font-size:11px;font-weight:700;color:var(--suave)">Comisión al mes<br>${inp('mc_s_mes',sel.meta_mes||auto||'',110)}</label>
+            <button class="btn-sm" style="background:#eef2ff;color:#3a48b3" onclick="App.mcCalcular()">🧮 Calcular</button>
+            <button class="btn-sm" style="background:var(--naranja);color:#fff" onclick="App.mcGuardarCliente()">💾 Guardar expectativa</button>
+            ${sel.meta_mes?`<button class="btn-sm" style="background:#fdecec;color:#c62828" onclick="App.mcQuitarCliente()">✕ Quitar</button>`:''}
+          </div></div>`:''}
+      </div>
+
+      <div class="card"><div style="font-weight:700;margin-bottom:6px">Clientes con expectativa · ${M.clis.length}</div>
+        ${M.clis.length?`<div style="overflow:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px"><thead><tr>
+          <th style="padding:7px 8px;text-align:left;border-bottom:2px solid var(--linea);font-size:11.5px">Cliente</th><th style="padding:7px 8px;text-align:left;border-bottom:2px solid var(--linea);font-size:11.5px">Lista</th>${th('Uds')}${th('Cada')}${th('$ / mes')}<th></th></tr></thead>
+          <tbody>${M.clis.map(x=>`<tr><td style="padding:6px 8px;border-bottom:1px solid #eee">${esc(x.nombre)}<div style="font-size:11px;color:var(--suave)">${esc(x.documento)}</div></td>
+            <td style="padding:6px 8px;border-bottom:1px solid #eee">${esc(nomL(x.meta_lista))}</td>${td(x.meta_uds||'')}${td(x.meta_dias?x.meta_dias+' d':'')}${td(money(x.meta_mes),1)}
+            <td style="padding:6px 8px;border-bottom:1px solid #eee"><button class="btn-sm" style="background:#eef2ff;color:#3a48b3;padding:3px 8px" onclick="App.mcEditar('${esc(x.documento)}')">✏️</button></td></tr>`).join('')}</tbody></table></div>`
+        :'<div class="empty">Todavía no le has puesto expectativa a ningún cliente.</div>'}
+      </div>`);
+  },
+  async mcGuardarMeta(){
+    const v=+($('mc_meta').value||0);
+    const r=await fetch(this._SBU()+'/rest/v1/nc_meta_comision?empresa=eq.smart',{method:'PATCH',headers:this._mcH(),body:JSON.stringify({meta_mes:v,actualizado_en:new Date().toISOString()})}).catch(()=>null);
+    if(!r||!r.ok){ this.toast('No se pudo guardar la meta'); return; }
+    this._mc.meta=v; this.toast('Meta guardada'); this._mcPaint();
+  },
+  async mcGuardarTabla(){
+    const L=this._mc.listas.map((l,i)=>({...l,com:+($('mc_com_'+i).value||0),uds:+($('mc_uds_'+i).value||0),dias:+($('mc_dias_'+i).value||0),meta:+($('mc_meta_'+i).value||0)}));
+    const r=await fetch(this._SBU()+'/rest/v1/nc_meta_comision?empresa=eq.smart',{method:'PATCH',headers:this._mcH(),body:JSON.stringify({config:{listas:L},actualizado_en:new Date().toISOString()})}).catch(()=>null);
+    if(!r||!r.ok){ this.toast('No se pudo guardar la tabla'); return; }
+    this._mc.listas=L; this.toast('Tabla guardada'); this._mcPaint();
+  },
+  async mcBuscar(q){
+    q=(q||'').trim(); const box=$('mc_res'); if(!box) return;
+    if(q.length<2){ box.innerHTML=''; return; }
+    const esNum=/^\d+$/.test(q);
+    const rows=await this._mcGet('nc_clientes?empresa=eq.smart&select=documento,nombre,celular,meta_lista,meta_uds,meta_dias,meta_mes&'+(esNum?'documento=like.*'+q+'*':'nombre=ilike.*'+encodeURIComponent(q)+'*')+'&order=nombre.asc&limit=12');
+    this._mcRes=rows;
+    box.innerHTML=rows.length?rows.map((x,i)=>`<button class="btn-sm" style="background:#e5e7eb" onclick="App.mcElegir(${i})">${esc(x.nombre)}${x.meta_mes?' · '+money(x.meta_mes):''}</button>`).join(''):'<span style="font-size:12px;color:var(--suave)">Nada con ese nombre</span>';
+  },
+  mcElegir(i){ const x=(this._mcRes||[])[i]; if(!x) return; this._mc.sel={...x, meta_lista:x.meta_lista||this._mc.listas[0].k}; this._mcPaint(); const a=$('mc_asig'); if(a) a.scrollIntoView({behavior:'smooth',block:'start'}); },
+  mcEditar(doc){ const x=this._mc.clis.find(c=>c.documento===doc); if(!x) return; this._mc.sel={...x}; this._mcPaint(); const a=$('mc_asig'); if(a) a.scrollIntoView({behavior:'smooth',block:'start'}); },
+  mcSelLista(k){ const l=this._mc.listas.find(x=>+x.k===+k); if(!l) return; Object.assign(this._mc.sel,{meta_lista:+k,meta_uds:l.uds,meta_dias:l.dias,meta_mes:null}); this._mcPaint(); },
+  mcCalcular(){
+    const k=+$('mc_s_lista').value, l=this._mc.listas.find(x=>+x.k===k)||{com:0};
+    const v=this._mcMes({com:+l.com,uds:+($('mc_s_uds').value||0),dias:+($('mc_s_dias').value||0)});
+    $('mc_s_mes').value=v; return v;
+  },
+  async mcGuardarCliente(){
+    const s=this._mc.sel; if(!s||!s.documento) return;
+    const body={meta_lista:+$('mc_s_lista').value, meta_uds:+($('mc_s_uds').value||0)||null, meta_dias:+($('mc_s_dias').value||0)||null, meta_mes:+($('mc_s_mes').value||0)||null};
+    if(!body.meta_mes){ body.meta_mes=this.mcCalcular()||null; }
+    if(!body.meta_mes){ this.toast('Pon las unidades y cada cuánto, o escribe la comisión al mes'); return; }
+    const r=await fetch(this._SBU()+'/rest/v1/nc_clientes?empresa=eq.smart&documento=eq.'+encodeURIComponent(s.documento),{method:'PATCH',headers:this._mcH(),body:JSON.stringify(body)}).catch(()=>null);
+    if(!r||!r.ok){ this.toast('No se pudo guardar'); return; }
+    this.toast('Expectativa guardada: '+money(body.meta_mes)+' al mes'); this._mc.sel=null; this.vMetaCom();
+  },
+  async mcQuitarCliente(){
+    const s=this._mc.sel; if(!s||!s.documento) return;
+    if(!confirm('¿Quitar la expectativa de '+s.nombre+'?')) return;
+    const r=await fetch(this._SBU()+'/rest/v1/nc_clientes?empresa=eq.smart&documento=eq.'+encodeURIComponent(s.documento),{method:'PATCH',headers:this._mcH(),body:JSON.stringify({meta_lista:null,meta_uds:null,meta_dias:null,meta_mes:null})}).catch(()=>null);
+    if(!r||!r.ok){ this.toast('No se pudo quitar'); return; }
+    this.toast('Expectativa quitada'); this._mc.sel=null; this.vMetaCom();
+  },
 
   async vComisiones(){
     const emp=window.NC_EMPRESA||'smart';
@@ -4169,7 +4321,7 @@ const App = {
     this.loading();
     const { data:cfg } = await this.sb.from('config').select('value').eq('key','nav_permisos').maybeSingle();
     this._permisos = cfg?cfg.value:{};
-    const MODS=[['dashboard','📊 Tablero'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],['despachos','🚚 Despachos'],['ventas','💰 Ventas'],['crm','📇 CRM'],['clientes','👥 Clientes'],['cobertura','🗺️ Cobertura'],['planta','🏭 Planta'],['admin','⚙️ Equipo']];
+    const MODS=[['dashboard','📊 Tablero'],['cotizaciones','📝 Cotizar'],['pedidos','📦 Pedidos'],['despachos','🚚 Despachos'],['ventas','💰 Ventas'],['crm','📇 CRM'],['clientes','👥 Clientes'],['cobertura','🗺️ Cobertura'],['planta','🏭 Planta'],['comisiones','🧾 Comisiones'],['metacom','🎯 Meta de comisión'],['admin','⚙️ Equipo']];
     const ROLES=[['director','Director General'],['gerente','Gerente'],['vendedor','Vendedor'],['facturacion','Facturación'],['bodega','Bodega'],['planta','Jefe de Planta']];
     let html=`<h1>🔐 Permisos</h1><div class="sub">Marca qué módulos ve cada rol</div>
       <div class="hint" style="margin-bottom:10px">El Admin (tú) siempre ve todo. Cada persona ve según su rol (lo asignas en ⚙️ Equipo).</div>`;
