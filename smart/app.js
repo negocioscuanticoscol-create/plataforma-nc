@@ -1360,7 +1360,8 @@ const App = {
     this.renderCotLanding();
   },
   renderCotLanding(){
-    const cots=this._cotsCola||[];
+    const posp=c=>!!((c.datos||{}).pospuesta);
+    const cots=(this._cotsCola||[]).slice().sort((a,b)=>posp(a)-posp(b));   // ⏸️ pospuestas al final; sort estable = se respeta la fecha
     const totVal=cots.reduce((a,c)=>a+(+c.total||0),0);
     const all=this._cotAll||[]; const cl=n=>'$'+Math.round(n||0).toLocaleString('es-CO');
     const mesAct=new Date().toISOString().slice(0,7); const val=arr=>arr.reduce((a,c)=>a+(+c.total||0),0);
@@ -1403,12 +1404,14 @@ const App = {
         <h2 style="font-size:15px;margin:0">📝 Cotizaciones de pedidos · ${cotsPed.length}${this._cotsOcultas?` <span style="font-size:11px;color:#8a93a6;font-weight:400">· ${this._cotsOcultas} ya en ventas (ocultas)</span>`:''}</h2>
         ${cots.filter(c=>c.contactado).length?`<button class="btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;white-space:nowrap" onclick="App.cotResetContactados()" title="Apaga todos los círculos de contactado para empezar la semana">🔄 Reiniciar contactados (${cots.filter(c=>c.contactado).length})</button>`:''}
       </div>
-      ${cotsPed.length? cotsPed.map(c=>this._cotItemHTML(c)).join('') : '<div class="empty">No hay cotizaciones de pedidos en cola.</div>'}
+      ${cotsPed.length? cotsPed.filter(c=>!posp(c)).map(c=>this._cotItemHTML(c)).join('') : '<div class="empty">No hay cotizaciones de pedidos en cola.</div>'}
+      ${cotsPed.some(posp)?`<h2 style="font-size:14px;margin:16px 0 8px;color:#6b7280">⏸️ Pospuestas · ${cotsPed.filter(posp).length} <span style="font-size:11px;font-weight:400">· quedan al final, por fecha</span></h2>${cotsPed.filter(posp).map(c=>this._cotItemHTML(c)).join('')}`:''}
     `);
   },
   _cotItemHTML(c){
     const f=(c.creado_en||'').slice(0,10),cel=c.celular||'';
-    const ac=c.accion?`<span class="badge" style="background:#eef2ff;color:#3a48b3">${c.accion==='llamar'?'📞 en seguimiento':c.accion==='remarketing'?'📣 remarketing':esc(c.accion)}</span>`:'<span class="badge b-cotizada">en cola</span>';
+    const pospuesta=!!((c.datos||{}).pospuesta);
+    const ac=pospuesta?`<span class="badge" style="background:#f3f4f6;color:#6b7280">⏸️ pospuesta ${esc(((c.datos||{}).pospuesta_en||'').slice(0,10))}</span>`:c.accion?`<span class="badge" style="background:#eef2ff;color:#3a48b3">${c.accion==='llamar'?'📞 en seguimiento':c.accion==='remarketing'?'📣 remarketing':esc(c.accion)}</span>`:'<span class="badge b-cotizada">en cola</span>';
     const dd=c.datos||{}, pctD=+dd.descuento_pct||0;
     const descHTML=pctD?`<div style="font-size:12px;color:#7c2d12;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:5px 9px;margin-top:6px">💸 Descuento <b>${pctD}%</b> (−$${(+dd.descuento_valor||0).toLocaleString('es-CO')} antes de IVA) · antes $${(+dd.total_antes_descuento||0).toLocaleString('es-CO')} · <i>${esc(dd.descuento_motivo||'')}</i>${dd.descuento_por?' · '+esc(dd.descuento_por):''}</div>`:'';
     return `<div class="item"><div class="top"><div><div class="nom">${esc(c.cliente||c.folio||'—')}</div><div class="meta">${c.folio?esc(c.folio)+' · ':''}$${(+c.total||0).toLocaleString('es-CO')} · 📅 ${f}${cel?' · 📱 '+esc(cel):''}</div>${descHTML}</div>${ac}</div>
@@ -1418,6 +1421,7 @@ const App = {
         <button class="btn-sm" style="background:#16a34a;color:#fff;font-weight:700" onclick="App.cotAutorizar('${c.id}')">✅ Autorizar → pedido</button>
         <button class="btn-sm" style="background:#6b7280;color:#fff" onclick="App.cotEditar('${c.id}')">✏️ Modificar</button>
         <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.cotAnular('${c.id}')">❌ Anular</button>
+        <button class="btn-sm" style="background:#f3f4f6;color:#374151;border:1px solid #d1d5db" onclick="App.cotPosponer('${c.id}')" title="${pospuesta?'Vuelve a subir a la cola normal':'La manda al final del listado para dejar arriba lo más vigente'}">${pospuesta?'↩️ Reactivar':'⏸️ Posponer'}</button>
         <span style="font-size:12.5px;color:#667;margin-left:auto">¿Contactado?</span>
         <span onclick="App.cotContactoToggle('${c.id}')" id="ctc-${c.id}" title="Marca que ya lo contacté" style="cursor:pointer;display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid #16a34a;background:${c.contactado?'#16a34a':'#fff'}"></span>
       </div></div>`;
@@ -1571,6 +1575,16 @@ const App = {
   cotWA(id){ const c=this._findCot(id); const m=`Hola ${c.cliente||''} 👋 Te recuerdo tu cotización ${c.folio||''} de Smart Packaging por $${(+c.total||0).toLocaleString('es-CO')}. ¿Te ayudo a cerrarla?`; window.open('https://wa.me/57'+(c.celular||'')+'?text='+encodeURIComponent(m),'_blank'); },
   async cotRemarket(id){ const c=this._findCot(id); const m=`Hola ${c.cliente||''} 👋 ¿Activamos tu cotización ${c.folio||''} ($${(+c.total||0).toLocaleString('es-CO')})? Te dejo lista la producción de tus envases.`; window.open('https://wa.me/57'+(c.celular||'')+'?text='+encodeURIComponent(m),'_blank'); await this.cotUpd(id,{accion:'remarketing'}); this.vCotLanding(); },
   async cotLlamar(id){ await this.cotUpd(id,{accion:'llamar'}); this.vCotLanding(); },
+  /* ⏸️ POSPONER (José, 29-oct-2026): no anula; la manda al final del listado (por fecha) para dejar arriba lo vigente.
+     Se guarda en datos.pospuesta / datos.pospuesta_en; Reactivar la devuelve a la cola normal. */
+  async cotPosponer(id){
+    const c=this._findCot(id); const d=Object.assign({}, c.datos||{});
+    const ya=!!d.pospuesta;
+    if(ya){ delete d.pospuesta; delete d.pospuesta_en; } else { d.pospuesta=true; d.pospuesta_en=new Date().toISOString(); }
+    await this.cotUpd(id,{datos:d});
+    this._toast(ya?'Cotización reactivada · vuelve a la cola':'Cotización pospuesta · quedó al final del listado');
+    this.vCotLanding();
+  },
   cotAnular(id){ this._anulId=id; this._anulMotivo=''; this._anulModal('cotización'); },
   _anulModal(que){
     this.modal(`<h3>❌ Anular ${que}</h3>
