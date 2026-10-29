@@ -1416,8 +1416,7 @@ const App = {
     const descHTML=pctD?`<div style="font-size:12px;color:#7c2d12;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:5px 9px;margin-top:6px">💸 Descuento <b>${pctD}%</b> (−$${(+dd.descuento_valor||0).toLocaleString('es-CO')} antes de IVA) · antes $${(+dd.total_antes_descuento||0).toLocaleString('es-CO')} · <i>${esc(dd.descuento_motivo||'')}</i>${dd.descuento_por?' · '+esc(dd.descuento_por):''}</div>`:'';
     return `<div class="item"><div class="top"><div><div class="nom">${esc(c.cliente||c.folio||'—')}</div><div class="meta">${c.folio?esc(c.folio)+' · ':''}$${(+c.total||0).toLocaleString('es-CO')} · 📅 ${f}${cel?' · 📱 '+esc(cel):''}</div>${descHTML}</div>${ac}</div>
       <div class="acciones-item" style="align-items:center;gap:8px;flex-wrap:wrap">
-        <label style="font-size:12px;color:#b45309;display:flex;align-items:center;gap:4px;cursor:pointer;font-weight:700" title="Si lo prendes, el pedido queda a crédito en Cartera (por cobrar)"><input type="checkbox" id="cotcred-${c.id}" style="accent-color:#d97706;width:15px;height:15px">💳 Crédito</label>
-        ${(window.NC_EMPRESA||'')==='smart'&&!this._esKitCot(dd)?`<button class="btn-sm" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-weight:700" onclick="App.cotDescuento('${c.id}')">💸 Descuento${pctD?' ('+pctD+'%)':''}</button>`:''}
+        <button class="btn-sm" style="background:#e7f7ee;color:#16734a;border:1px solid #a9dfbd;font-weight:700" onclick="App.cotCopiarMsg('${c.id}')" title="Copia el mensaje de seguimiento para pegarlo en WhatsApp">💬 Copiar mensaje</button>
         <button class="btn-sm" style="background:#16a34a;color:#fff;font-weight:700" onclick="App.cotAutorizar('${c.id}')">✅ Autorizar → pedido</button>
         <button class="btn-sm" style="background:#6b7280;color:#fff" onclick="App.cotEditar('${c.id}')">✏️ Modificar</button>
         <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.cotAnular('${c.id}')">❌ Anular</button>
@@ -1584,6 +1583,16 @@ const App = {
     await this.cotUpd(id,{datos:d});
     this._toast(ya?'Cotización reactivada · vuelve a la cola':'Cotización pospuesta · quedó al final del listado');
     this.vCotLanding();
+  },
+  /* 💬 Mensaje de seguimiento listo para pegar (José, 29-oct-2026). Reemplaza los botones de Crédito y Descuento en la cola. */
+  cotCopiarMsg(id){
+    const c=this._findCot(id); const d=c.datos||{};
+    const nom=String(d.contacto||c.contacto||c.cliente||'').trim().split(/\s+/)[0]||'';
+    const f=c.creado_en?new Date(c.creado_en).toLocaleDateString('es-CO',{day:'numeric',month:'long',timeZone:'America/Bogota'}):'';
+    const nomBonito=nom?nom.charAt(0).toUpperCase()+nom.slice(1).toLowerCase():'';
+    const msg=`Hola${nomBonito?' '+nomBonito:''} 👋, ¿sigues interesado en la cotización que te compartimos el ${f}${c.folio?' ('+c.folio+')':''}? Estamos atentos a tus inquietudes. Te invitamos a visitar nuestra página https://smartempaques.co`;
+    const ok=()=>this._toast('💬 Mensaje copiado · pégalo en el WhatsApp del cliente');
+    try{ navigator.clipboard.writeText(msg).then(ok,()=>prompt('Copia el mensaje:',msg)); }catch(e){ prompt('Copia el mensaje:',msg); }
   },
   cotAnular(id){ this._anulId=id; this._anulMotivo=''; this._anulModal('cotización'); },
   _anulModal(que){
