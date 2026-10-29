@@ -1347,8 +1347,8 @@ const App = {
     try{ const r=await fetch(this._SBU()+'/rest/v1/nc_cotizaciones?empresa=eq.'+e+'&estado=eq.cotizacion&order=creado_en.desc',{headers:H}); const j=await r.json(); cots=Array.isArray(j)?j:[]; }catch(e2){}
     // ocultar de la cola SOLO las que ya tienen su venta por FOLIO exacto (no por nombre, para no esconder pedidos nuevos de clientes que ya compraron)
     let vFol=new Set();
-    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.'+e+'&select=folio&limit=5000',{headers:H}); const vv=await r.json();
-      (Array.isArray(vv)?vv:[]).forEach(v=>{ if(v.folio) vFol.add(v.folio); }); }catch(e2){}
+    try{ const r=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.'+e+'&select=folio,estado_pago&limit=5000',{headers:H}); const vv=await r.json();
+      (Array.isArray(vv)?vv:[]).forEach(v=>{ if(v.folio && v.estado_pago!=='Cancelada') vFol.add(v.folio); }); }catch(e2){}   // Cancelada = devuelto a cotización: SÍ va en la cola
     const total=cots.length;
     const pend=cots.filter(c=> !(c.folio && vFol.has(c.folio)) );
     // TODAS las cotizaciones (para el resumen: acumuladas, del mes, anuladas, kit)
@@ -1660,15 +1660,16 @@ const App = {
     //    Check-then-insert por folio para no duplicar lo ya importado.
     try{
       const d=c.datos||{}; const folio=c.folio||'';
-      let ya=[]; if(folio){ const rx=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(folio)+'&select=id&limit=1',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); ya=await rx.json(); }
-      if(!(Array.isArray(ya)&&ya.length)){
+      let ya=[]; if(folio){ const rx=await fetch(this._SBU()+'/rest/v1/nc_ventas?empresa=eq.smart&folio=eq.'+encodeURIComponent(folio)+'&select=id,estado_pago&limit=1',{headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK()}}); ya=await rx.json(); }
+      const _revive=Array.isArray(ya)&&ya.length&&ya[0].estado_pago==='Cancelada';   // se había devuelto a cotización: la venta vuelve, con los valores de ahora
+      if(!(Array.isArray(ya)&&ya.length) || _revive){
         const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
         const _dtv=new Date(); const mes=M[_dtv.getMonth()]+'-'+_dtv.getFullYear();   // mes de la venta = AHORA (cuándo se autoriza), no la creación → cierre a fin de mes cae en el mes correcto
         const esKit=this._esKitCot(d);
         const tv=esKit ? +(c.total||d.total||0) : +(d.subtotal_sin_iva||d.total||c.total||0);   // el kit ES venta: vale su precio, no 0
         const exceso=Math.max(0, (_cons||0) - (+(c.total||0)));   // lo que consignó de más → a comisión
         const cb=(+(d.comision||0))+exceso;
-        await fetch(this._SBU()+'/rest/v1/nc_ventas',{method:'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},
+        await fetch(this._SBU()+'/rest/v1/nc_ventas'+(_revive?'?id=eq.'+ya[0].id:''),{method:_revive?'PATCH':'POST',headers:{apikey:this._SBK(),Authorization:'Bearer '+this._SBK(),'Content-Type':'application/json','Prefer':'return=minimal'},
           body:JSON.stringify({empresa:'smart',mes,cliente:c.cliente||d.empresa||'',documento:d.cedula_nit||'',pedidos_mes:1,total_vendido:tv,total_convenio:Math.max(0,Math.round(tv-cb)),comision_bruta:cb,pct_comision:tv?+(cb/tv*100).toFixed(1):0,estado_pago:'Pendiente',lista:d.lista_nombre||'',es_kit:(d.kit_muestras==='SI'),folio:folio,notas:[(exceso>0?('Consignó $'+(_cons).toLocaleString('es-CO')+' · excedente $'+exceso.toLocaleString('es-CO')+' a comisión'):'Generado en plataforma'),
             (+d.descuento_pct?('Descuento '+d.descuento_pct+'% (−$'+(+d.descuento_valor||0).toLocaleString('es-CO')+' de la comisión) · '+(d.descuento_motivo||'')+(d.descuento_por?' · '+d.descuento_por:'')):'')].filter(Boolean).join(' · ')})});
         this._avisar(this._margenVenta(d,tv,cb));   // 🚨 avisa si el margen quedó por debajo de lo esperado
