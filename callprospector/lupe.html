@@ -327,7 +327,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261023-no-info';
+const VER='20261030-no-valido';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1666,11 +1666,32 @@ function filaBonos(x){
   const b=BONOS[x.id]||{};
   const btn='style="font-size:12px;padding:6px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line);background:transparent;color:inherit;font-family:inherit;font-weight:700"';
   const cot = b.cotizacion ? '<span style="color:#22c55e;font-size:12px;font-weight:700">📄 cotizó ✓</span>'
+      + (x.trabajado ? '' : ` <button ${btn} onclick="noValido('${esc(x.id)}')" title="No hay correo ni cómo mandarle la cotización: no cuenta, no se paga y sale de la lista">🚫 No válido</button>`)
     : `<button ${btn} onclick="darBono('${esc(x.id)}','cotizacion')">📄 Pidió cotización</button>`;
   /* La venta ($5.000) NO se marca aqui: Jose la verifica por otro lado (la
      consignacion) y se registra aparte en mkr_bonos. Aqui solo se muestra. */
   const ven = b.venta ? '<span style="color:#22c55e;font-size:12px;font-weight:700">💰 venta pagada ✓</span>' : '';
   return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px">${cot}${ven}</div>`;
+}
+/* 'No válido' (José, 30-oct-2026): un cotizado al que no hay cómo mandarle la cotización (ej. sin correo).
+   No cuenta: se borra el bono de cotización, la llamada queda 'Sin info' con valor 0 —igual que 'No info'—
+   y sale de la lista de cotizados. La empresa no se bloquea. */
+async function noValido(id){
+  const x=COTIZ.find(z=>String(z.id)===String(id)) || INTER.find(z=>String(z.id)===String(id)) || {};
+  const nom=x.lead_nombre||'este dato';
+  if(!confirm('¿'+nom+' NO es válido?\n\nNo cuenta: se quita la cotización, la llamada queda como "Sin info", NO se paga y sale de la lista.')) return;
+  const antesC=COTIZ.slice(), antesI=INTER.slice();
+  COTIZ=COTIZ.filter(z=>String(z.id)!==String(id)); INTER=INTER.filter(z=>String(z.id)!==String(id));
+  if(BONOS[id]) delete BONOS[id].cotizacion;
+  pintarInteresados();
+  try{
+    const r1=await fetch(SB+'/rest/v1/mkr_bonos?llamada_id=eq.'+encodeURIComponent(id)+'&tipo=eq.cotizacion',{method:'DELETE',headers:{...H,Prefer:'return=minimal'}});
+    if(!r1.ok) throw new Error(r1.status);
+    const r2=await fetch(SB+'/rest/v1/mkr_llamadas?id=eq.'+encodeURIComponent(id),{method:'PATCH',headers:{...H,'Content-Type':'application/json',Prefer:'return=minimal'},
+      body:JSON.stringify({resultado:'Sin info', valor:0, trabajado:true})});
+    if(!r2.ok) throw new Error(r2.status);
+    toast('🚫 '+nom+' quedó como no válido · no se paga');
+  }catch(e){ COTIZ=antesC; INTER=antesI; (BONOS[id]=BONOS[id]||{}).cotizacion=true; pintarInteresados(); toast('⚠️ No se pudo. Revisa la señal.',true); }
 }
 async function trabajado(id){
   const antes=INTER.slice();
