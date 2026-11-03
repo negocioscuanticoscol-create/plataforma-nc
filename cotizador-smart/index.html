@@ -1307,6 +1307,11 @@ function autofillCot(){
     if(d.lista_idx!=null && d.lista_idx!==''){ const li=parseInt(d.lista_idx); if(!isNaN(li)){ listaActiva=li; const ls=document.getElementById('lista-sel'); if(ls) ls.value=String(li); } }
     let prods=d.productos; if(typeof prods==='string'){ try{prods=JSON.parse(prods);}catch(e){prods=null;} }
     if(Array.isArray(prods)){ prods.forEach(p=>{ const prod=allProds().find(x=>(p.ref||'').includes(x.v)); if(!prod) return; const color=(p.color||'').toLowerCase().includes('blanc')?'blanco':'transparente'; const inp=document.getElementById('qty-'+prod.id+'_'+color); if(inp){ inp.value=p.qty; inp.dispatchEvent(new Event('input')); inp.dispatchEvent(new Event('change')); } }); }
+    // restaura el TRANSPORTE con que se guardó (antes volvía a 'Incluido' y al re-guardar se perdía el cambio; José 3-nov-2026)
+    if(d.tipo_transporte && ['incluido','cobro','propio','smart'].includes(d.tipo_transporte)){
+      setTransporte(d.tipo_transporte);
+      if(d.tipo_transporte==='smart'){ fleteSmart=parseInt(String(d.flete_manual||'').replace(/\D/g,''),10)||0; const v=document.getElementById('sb-valor'); if(v) v.value=fleteSmart?fleteSmart.toLocaleString('es-CO'):''; pintarSmart(); }
+    }
   }).catch(()=>{});
 }
 goStep(2);   // arranca SIEMPRE en Cliente (cliente-primero), aunque no venga ?cliente
