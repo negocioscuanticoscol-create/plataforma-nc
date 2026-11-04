@@ -1,0 +1,357 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Escáner Solé · Piloto</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Manrope:wght@400;500;700&display=swap">
+<style>
+/* Layout: a single phone-width column, one screen at a time; porcelain ground, plum accent, sage = bien, ámbar = punto más bajo */
+:root{
+  --bg:#f7f3f4; --panel:#ffffff; --ink:#2b2127; --muted:#6e5f67; --line:#e5d9de;
+  --plum:#6b2d4f; --plum-soft:#f1e3ea; --sage:#5b7a5e; --sage-soft:#e3ece2; --amber:#b57a2a; --amber-soft:#f6ebd9;
+  --display:"Fraunces",Georgia,serif; --body:"Manrope",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#1b1518; --panel:#241c20; --ink:#f3e9ed; --muted:#b39aa6; --line:#3a2c33;
+  --plum:#d79ab9; --plum-soft:#3b2431; --sage:#9dbb9f; --sage-soft:#243127; --amber:#e0a854; --amber-soft:#3a2e1c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#1b1518; --panel:#241c20; --ink:#f3e9ed; --muted:#b39aa6; --line:#3a2c33;
+  --plum:#d79ab9; --plum-soft:#3b2431; --sage:#9dbb9f; --sage-soft:#243127; --amber:#e0a854; --amber-soft:#3a2e1c; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;margin:0;
+  padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.app{max-width:420px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:22px 18px 20px;display:grid;gap:14px;min-height:min(680px,calc(100% - 8px))}
+.brand{font-family:var(--display);font-size:15px;letter-spacing:.08em;text-align:center;color:var(--plum)}
+h1,h2{font-family:var(--display);font-weight:600;line-height:1.12;margin:0;text-wrap:balance}
+h1{font-size:28px} h2{font-size:22px}
+p{margin:0}
+.small{font-size:13px;color:var(--muted)}
+.eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--plum);font-weight:700}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+input[type=text],input[type=tel],input[type=number],select{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font:inherit;font-size:16px;background:var(--bg);color:var(--ink)}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--plum);outline-offset:2px}
+.btn{display:block;width:100%;border:0;background:var(--plum);color:#fff;border-radius:999px;padding:13px;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--plum);border:1.5px solid var(--plum)}
+.btn:disabled{opacity:.5;cursor:default}
+.chk{display:flex;gap:10px;align-items:flex-start;font-size:13px;color:var(--muted)}
+.chk input{width:18px;height:18px;margin-top:2px;flex:none;accent-color:var(--plum)}
+.opts{display:flex;gap:8px;flex-wrap:wrap}
+.pill{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+.pill.on{background:var(--plum);color:#fff;border-color:var(--plum)}
+.prog{display:flex;gap:4px}.prog i{flex:1;height:4px;border-radius:2px;background:var(--line)}.prog i.on{background:var(--plum)}
+.cam{background:#2b2127;border-radius:16px;aspect-ratio:3/4;max-width:100%;display:grid;place-items:center;position:relative;overflow:hidden}
+.cam img{width:100%;height:100%;object-fit:cover}
+.cam svg{width:68%;height:auto;position:absolute}
+.cam .hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:#fff;font-size:12px;text-shadow:0 1px 2px #000}
+.rules{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.score{display:grid;place-items:center;gap:0;padding:6px 0}
+.score b{font-family:var(--display);font-size:64px;line-height:1;color:var(--plum);font-variant-numeric:tabular-nums}
+.score span{font-size:11px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+.bars{display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:118px 1fr 26px;gap:8px;align-items:center;font-size:13px}
+.bar i{height:8px;border-radius:4px;background:var(--line);position:relative;display:block;overflow:hidden}
+.bar i::after{content:"";position:absolute;inset:0;width:var(--w);background:var(--sage);border-radius:4px}
+.bar.low{color:var(--amber);font-weight:700}.bar.low i::after{background:var(--amber)}
+.bar em{font-style:normal;text-align:right;font-variant-numeric:tabular-nums;color:var(--muted)}
+.card{background:var(--plum-soft);border-radius:12px;padding:12px 14px;font-size:14px;display:grid;gap:4px}
+.card b{color:var(--plum)}
+.card.ok{background:var(--sage-soft)}.card.ok b{color:var(--sage)}
+.card.warn{background:var(--amber-soft)}.card.warn b{color:var(--amber)}
+.wait{display:grid;place-items:center;gap:10px;padding:30px 0;color:var(--muted);text-align:center}
+.spin{width:36px;height:36px;border:3px solid var(--line);border-top-color:var(--plum);border-radius:50%;animation:sp 1s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+.foot{margin-top:auto;font-size:11px;color:var(--muted);text-align:center}
+.tbl{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:12px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}th{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cup{font-size:13px}.cup b{color:var(--plum)}
+.steps{display:grid;gap:8px}
+.stp{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:start;font-size:14px}
+.stp b{font-family:var(--display);font-size:22px;line-height:1;color:var(--plum);padding-top:2px}
+.stp span{color:var(--muted);font-size:13px;display:block}
+.link{display:block;text-align:center;text-decoration:none}
+.share{background:var(--plum);color:#fff;border-radius:14px;padding:16px;display:grid;gap:2px;text-align:center}
+.share b{font-family:var(--display);font-size:40px;line-height:1}
+.share span{font-size:11px;letter-spacing:.12em;text-transform:uppercase;opacity:.85}
+</style>
+
+<div class="app" id="app">
+  <div class="brand">SOLÉ PARIS</div>
+  <div id="view"></div>
+  <div class="foot">Piloto Escáner Solé · Negocios Cuánticos · Describe tendencias cosméticas; no es un diagnóstico médico.</div>
+</div>
+
+<script>
+(function(){
+const PRODUCTS={
+  grasa:{n:"Niacinamida Solé",why:"regula el brillo y el exceso de grasa"},
+  barritos:{n:"Poción Secante",why:"seca el barrito y evita que salga el siguiente"},
+  poros:{n:"Niacinamida Solé",why:"afina el poro y empareja la textura"},
+  ojeras:{n:"Contorno de ojos Solé",why:"para decirle adiós a la cara de cansancio"},
+  manchas:{n:"Vitamina C Solé",why:"empareja el tono y devuelve la luz"},
+  lineas:{n:"Vitamina C Solé",why:"rejuvenece y suaviza las líneas de expresión"},
+  irritacion:{n:"Fitoaliv",why:"calma, hidrata y baja el enrojecimiento"},
+  caida:{n:"Nanopéptidos Solé",why:"activa el cuero cabelludo donde el pelo se está yendo"}
+};
+const LANDING={"Niacinamida Solé":"https://soleparis.com","Poción Secante":"https://soleparis.com","Contorno de ojos Solé":"https://soleparis.com","Vitamina C Solé":"https://soleparis.com","Fitoaliv":"https://soleparis.com","Nanopéptidos Solé":"https://soleparis.com"};
+const landingDe=(p)=>LANDING[p.n]||"https://soleparis.com";
+const KEYS=[["grasa","Brillo y grasa"],["barritos","Barritos y puntos negros"],["poros","Poros"],["ojeras","Ojeras y bolsas"],["manchas","Manchas y tono"],["lineas","Líneas de expresión"],["irritacion","Irritación y resequedad"]];
+const KEYS_CAP=[["caida","Densidad en la coronilla"],["entradas","Línea frontal y entradas"],["grasa","Cuero cabelludo graso"],["irritacion","Caspa o irritación"]];
+const RETO={ojeras:"Reto Adiós Ojeras",barritos:"Reto Adiós Barritos",manchas:"Reto Piel Pareja",lineas:"Reto Piel Nueva",irritacion:"Reto Piel Calmada",grasa:"Reto Piel Mate",poros:"Reto Piel Lisa",caida:"Reto Capilar Solé",entradas:"Reto Capilar Solé"};
+const CUPOS={ojeras:6,barritos:10,manchas:8,lineas:9,irritacion:10,grasa:10,poros:10,caida:4,entradas:4};
+
+const S={step:"registro",lead:{},q:{},photo:null,result:null,capilar:false,id:null};
+let db=null,sample=null,canImages=false;
+const view=document.getElementById("view");
+const $=(h)=>{view.innerHTML=h;window.scrollTo({top:0});};
+const esc=(s)=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const use=(n)=>{try{const c=window.claude;if(c&&typeof c.use==="function")return Promise.resolve(c.use(n));}catch(e){}return Promise.resolve(null);};
+use("db").then(d=>{db=d||localDb();}).catch(()=>{db=localDb();});
+/* Respaldo fuera de claude.ai: las fichas se guardan en este mismo navegador (localStorage) */
+function localDb(){
+  const K="sole_escaner_leads";
+  const leer=()=>{try{return JSON.parse(localStorage.getItem(K)||"[]");}catch(e){return [];}};
+  const escribir=(a)=>{try{localStorage.setItem(K,JSON.stringify(a));}catch(e){}};
+  return {
+    collection:()=>({
+      add:async(d)=>{const a=leer();const id="L"+Date.now();a.push(Object.assign({_id:id},d));escribir(a);return {id};},
+      orderBy:()=>({limit:()=>({get:async()=>{const a=leer().sort((x,y)=>(y.creado||"").localeCompare(x.creado||""));return {docs:a.map(d=>({data:()=>d}))};}})})
+    }),
+    doc:(ruta)=>({set:async(d)=>{const id=ruta.split("/")[1];const a=leer();const i=a.findIndex(x=>x._id===id);if(i>=0)a[i]=Object.assign({_id:id},d);else a.push(Object.assign({_id:id},d));escribir(a);}})
+  };
+}
+use("sample").then(async s=>{if(!s)return;sample=s;try{const l=await s.limits();canImages=!!l.images;}catch(e){}}).catch(()=>{});
+
+async function save(stage,extra){
+  Object.assign(S.lead,{etapa:stage,actualizado:new Date().toISOString()},extra||{});
+  if(!db)return;
+  try{
+    if(!S.id){const r=await db.collection("leads").add(S.lead);S.id=r.id;}
+    else await db.doc("leads/"+S.id).set(S.lead);
+  }catch(e){}
+}
+
+/* ---------- 1. Registro ---------- */
+function registro(){
+  if(location.hash==="#panel")return panel();
+  $(`<div style="display:grid;gap:14px">
+    <h1>Descubre cómo está tu piel hoy</h1>
+    <p class="small">Test gratis · 3 minutos · tu resultado en 7 puntos y un puntaje para compartir.</p>
+    <label>Nombre y apellido<input id="f-nombre" type="text" autocomplete="name" value="${esc(S.lead.nombre)}"></label>
+    <label>Sexo<div class="opts" id="f-sexo"><button type="button" class="pill ${S.lead.sexo==='Mujer'?'on':''}" data-o="Mujer">Mujer</button><button type="button" class="pill ${S.lead.sexo==='Hombre'?'on':''}" data-o="Hombre">Hombre</button></div></label>
+    <label>Celular (WhatsApp)<input id="f-cel" type="tel" inputmode="tel" autocomplete="tel" value="${esc(S.lead.celular)}"></label>
+    <label>Ciudad<input id="f-ciudad" type="text" value="${esc(S.lead.ciudad)}"></label>
+    <label>Edad<input id="f-edad" type="number" inputmode="numeric" min="12" max="99" value="${esc(S.lead.edad)}"></label>
+    <label class="chk"><input id="f-ok" type="checkbox"> Acepto el tratamiento de mis datos para recibir mi resultado y novedades de Solé Paris.</label>
+    <p class="small" id="f-err" hidden style="color:var(--amber);font-weight:700"></p>
+    <button class="btn" id="go">Empezar el test</button>
+  </div>`);
+  let sexo=S.lead.sexo||"";
+  document.getElementById("f-sexo").onclick=e=>{const b=e.target.closest(".pill");if(!b)return;sexo=b.dataset.o;[...document.querySelectorAll("#f-sexo .pill")].forEach(p=>p.classList.toggle("on",p.dataset.o===sexo));};
+  document.getElementById("go").onclick=async()=>{
+    const v=id=>document.getElementById(id).value.trim();
+    const ok=document.getElementById("f-ok").checked;
+    const d={nombre:v("f-nombre"),sexo,celular:v("f-cel"),ciudad:v("f-ciudad"),edad:Number(v("f-edad"))||0};
+    const falta=[];if(!d.nombre)falta.push("tu nombre y apellido");if(!d.sexo)falta.push("tu sexo");if(!d.celular)falta.push("tu celular");if(!d.ciudad)falta.push("tu ciudad");if(!d.edad)falta.push("tu edad");if(!ok)falta.push("aceptar el tratamiento de datos");
+    if(falta.length){const e=document.getElementById("f-err");e.textContent="Te falta: "+falta.join(", ")+".";e.hidden=false;const first={"tu nombre y apellido":"f-nombre","tu celular":"f-cel","tu ciudad":"f-ciudad","tu edad":"f-edad","aceptar el tratamiento de datos":"f-ok"}[falta[0]];if(first)document.getElementById(first).focus();return;}
+    Object.assign(S.lead,d,{origen:"piloto",creado:new Date().toISOString()});
+    await save("registro");
+    pregunta(0);
+  };
+}
+
+/* ---------- 2. Cinco preguntas ---------- */
+const Q=[
+  {k:"sensacion",t:"¿Cómo sientes tu piel al final del día?",o:["Grasa","Normal","Seca","Mixta"]},
+  {k:"preocupa",t:"¿Qué es lo que más te preocupa?",o:["Barritos","Ojeras","Manchas","Líneas de expresión","Caída del cabello"],multi:3},
+  {k:"desde",t:"¿Desde cuándo?",o:["Hace poco","Hace meses","Hace años"]},
+  {k:"usa",t:"¿Qué usas hoy?",o:["Nada","Una crema","Rutina completa","Tratamiento médico"]},
+  {k:"irrita",t:"¿Tu piel se irrita fácil?",o:["Sí","No"]}
+];
+function pregunta(i){
+  const q=Q[i];const sel=S.q[q.k]||[];
+  $(`<div style="display:grid;gap:16px">
+    <div class="prog">${Q.map((_,j)=>`<i class="${j<=i?'on':''}"></i>`).join("")}</div>
+    <p class="small">Pregunta ${i+1} de 5</p>
+    <h2>${q.t}</h2>
+    <div class="opts" id="opts">${q.o.map(o=>`<button class="pill ${sel.includes(o)?'on':''}" data-o="${esc(o)}">${esc(o)}</button>`).join("")}</div>
+    <p class="small">${q.multi?`Puedes marcar hasta ${q.multi}.`:"Toca una opción."}</p>
+    <div style="height:40px"></div>
+    <button class="btn" id="next" ${sel.length?"":"disabled"}>Siguiente</button>
+    ${i>0?`<button class="btn ghost" id="back">Atrás</button>`:""}
+  </div>`);
+  const next=document.getElementById("next");
+  document.getElementById("opts").onclick=e=>{
+    const b=e.target.closest(".pill");if(!b)return;const o=b.dataset.o;
+    let cur=S.q[q.k]||[];
+    if(q.multi){cur=cur.includes(o)?cur.filter(x=>x!==o):[...cur,o].slice(-q.multi);}else cur=[o];
+    S.q[q.k]=cur;
+    [...document.querySelectorAll(".pill")].forEach(p=>p.classList.toggle("on",cur.includes(p.dataset.o)));
+    next.disabled=!cur.length;
+  };
+  next.onclick=()=>{ if(i<Q.length-1)pregunta(i+1); else { S.capilar=(S.q.preocupa||[]).includes("Caída del cabello")&&(S.q.preocupa||[]).length===1; S.lead.respuestas=S.q; S.lead.ruta=S.capilar?"capilar":"facial"; save("preguntas"); camara(); } };
+  const back=document.getElementById("back");if(back)back.onclick=()=>pregunta(i-1);
+}
+
+/* ---------- 3. Selfie guiada ---------- */
+function camara(){
+  const cap=S.capilar;
+  $(`<div style="display:grid;gap:12px">
+    <h2>${cap?"Toma una foto de tu coronilla":"Ponte frente a una ventana"}</h2>
+    <p class="small">${cap?"Pídele a alguien que la tome desde arriba, con luz natural.":"Sin filtro, sin maquillaje, cara dentro de la línea."}</p>
+    <div class="cam" id="cam">
+      <svg viewBox="0 0 100 130" aria-hidden="true">${cap?'<circle cx="50" cy="65" r="40" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="4 4"/>':'<ellipse cx="50" cy="62" rx="34" ry="46" fill="none" stroke="#fff" stroke-width="1.5" stroke-dasharray="4 4"/>'}</svg>
+      <div class="hint">${cap?"La coronilla en el centro del círculo":"Acomoda tu cara dentro de la línea"}</div>
+    </div>
+    <div class="rules"><span>✓ Sin filtro</span><span>✓ Sin maquillaje</span><span>✓ Luz natural</span></div>
+    <input id="file" type="file" accept="image/*" capture="user" hidden>
+    <button class="btn" id="take">Tomar foto</button>
+    <button class="btn ghost" id="skip">Seguir sin foto</button>
+    <p class="small">Tu foto se analiza y se borra. Solo se guarda si entras al reto y lo autorizas.</p>
+  </div>`);
+  const file=document.getElementById("file");
+  document.getElementById("take").onclick=()=>file.click();
+  file.onchange=()=>{const f=file.files&&file.files[0];if(!f)return;S.photo=f;
+    const url=URL.createObjectURL(f);document.getElementById("cam").innerHTML=`<img src="${url}" alt="Tu foto">`;
+    document.getElementById("take").textContent="Analizar mi foto";
+    document.getElementById("take").onclick=()=>analizar();
+  };
+  document.getElementById("skip").onclick=()=>{S.photo=null;analizar();};
+}
+
+/* ---------- Análisis ---------- */
+function heuristica(){
+  const q=S.q,p=q.preocupa||[],sens=(q.sensacion||[])[0],irr=(q.irrita||[])[0]==="Sí";
+  const base={grasa:3.5,barritos:3.8,poros:3.4,ojeras:3.6,manchas:3.7,lineas:3.8,irritacion:3.9,caida:3.5,entradas:3.6};
+  if(sens==="Grasa"){base.grasa=2.2;base.poros=2.8;}if(sens==="Mixta"){base.grasa=2.9;}if(sens==="Seca"){base.irritacion=2.9;}
+  if(irr)base.irritacion=Math.min(base.irritacion,2.4);
+  const MAP={Barritos:"barritos",Ojeras:"ojeras",Manchas:"manchas","Líneas de expresión":"lineas","Caída del cabello":"caida"};
+  p.forEach((x,i)=>{const k=MAP[x];if(k)base[k]=1.9+i*0.3;});
+  if((q.desde||[])[0]==="Hace años")p.forEach((x,i)=>{const k=MAP[x];if(k)base[k]=1.6+i*0.3;});
+  const keys=(S.capilar?KEYS_CAP:KEYS).map(k=>k[0]);
+  const puntos={};keys.forEach(k=>puntos[k]=Math.round(base[k]*10)/10);
+  return {puntos,fuente:"cuestionario",observacion:"Resultado estimado por tus respuestas. Con una foto el escáner afina los 7 puntos."};
+}
+async function analizar(){
+  $(`<div class="wait"><div class="spin"></div><p>${S.photo?"Leyendo tu foto…":"Armando tu resultado…"}</p><p class="small">Esto toma unos segundos.</p></div>`);
+  let r=null;
+  if(S.photo&&sample&&canImages){
+    const keys=S.capilar?KEYS_CAP:KEYS;
+    const prompt=`Eres el asesor cosmético de Solé Paris. Mira la foto adjunta (${S.capilar?"cuero cabelludo / coronilla":"rostro de frente"}) y califica estos puntos de 1 (muy marcado, necesita atención) a 5 (excelente): ${keys.map(k=>k[0]+" = "+k[1]).join("; ")}. Habla directo y cercano, como una asesora de piel; puedes decir mejorar, cambiar, recuperar. No des diagnósticos médicos ni nombres de enfermedades. Si la foto no sirve (oscura, borrosa, con filtro fuerte, no se ve ${S.capilar?"el cuero cabelludo":"la cara"}), pon foto_ok en false y explica en 8 palabras qué cambiar. Datos de la persona: ${JSON.stringify(S.q)}. Responde SOLO con JSON: {"foto_ok":true,"motivo":"","puntos":{${keys.map(k=>'"'+k[0]+'":3').join(",")}},"observacion":"una frase cálida y directa en español, máximo 22 palabras, que diga qué muestra la ${S.capilar?"coronilla":"piel"} y qué se puede mejorar"}`;
+    try{
+      r=await sample.json(prompt,{images:S.photo,modelTier:"default"});
+      if(r&&r.foto_ok===false){return fotoMala(r.motivo||"Toma la foto con más luz y sin filtro.");}
+      if(!r||!r.puntos)r=null; else {r.fuente="foto";}
+    }catch(e){
+      if(e&&e.code==="image_rejected")return fotoMala("Esa imagen no se pudo leer. Prueba con otra foto.");
+      r=null;
+    }
+  }
+  if(!r)r=heuristica();
+  const keys=(S.capilar?KEYS_CAP:KEYS).map(k=>k[0]);
+  keys.forEach(k=>{let v=Number(r.puntos[k]);if(!(v>=1&&v<=5))v=3.5;r.puntos[k]=Math.round(v*10)/10;});
+  const vals=keys.map(k=>r.puntos[k]);
+  r.total=Math.round((vals.reduce((a,b)=>a+b,0)/vals.length-1)/4*100);
+  r.bajo=keys.reduce((a,b)=>r.puntos[b]<r.puntos[a]?b:a,keys[0]);
+  S.result=r;
+  S.lead.puntaje=r.total;S.lead.puntos=r.puntos;S.lead.punto_bajo=r.bajo;S.lead.con_foto=r.fuente==="foto";
+  S.lead.producto=(PRODUCTS[r.bajo]||PRODUCTS.caida).n;
+  await save("test");
+  resultado();
+}
+function fotoMala(m){
+  $(`<div style="display:grid;gap:14px"><h2>Vamos a repetir la foto</h2><div class="card warn"><b>${esc(m)}</b></div><p class="small">Acércate a una ventana, quita el filtro y vuelve a intentarlo.</p><button class="btn" id="again">Tomar otra foto</button><button class="btn ghost" id="skip">Seguir sin foto</button></div>`);
+  document.getElementById("again").onclick=camara;
+  document.getElementById("skip").onclick=()=>{S.photo=null;analizar();};
+}
+
+/* ---------- 4. Resultado ---------- */
+function resultado(){
+  const r=S.result,keys=S.capilar?KEYS_CAP:KEYS,prod=PRODUCTS[r.bajo]||PRODUCTS.caida;
+  $(`<div style="display:grid;gap:14px">
+    <div class="score"><b>${r.total}</b><span>${S.capilar?"tu cuero cabelludo hoy":"tu piel hoy"} · sobre 100</span></div>
+    <div class="bars">${keys.map(([k,n])=>`<div class="bar ${k===r.bajo?'low':''}"><span>${n}</span><i style="--w:${(r.puntos[k]-1)/4*100}%"></i><em>${r.puntos[k].toFixed(1)}</em></div>`).join("")}</div>
+    <p class="small">${esc(r.observacion||"")}${r.fuente==="cuestionario"?"":" "}</p>
+    <div class="card"><b>Tu punto más bajo: ${keys.find(k=>k[0]===r.bajo)[1].toLowerCase()}</b>${esc(prod.n)} ${esc(prod.why)}.</div>
+    <button class="btn" id="reto">Recibe tu tratamiento gratis con nuestro reto</button>
+    <a class="btn ghost link" id="verprod" href="${landingDe(prod)}" target="_blank" rel="noopener">Quiero ver el producto y su kit</a>
+    <button class="btn ghost" id="share">Compartir mi puntaje</button>
+    <div id="sharebox" hidden><div class="share"><b>${r.total}</b><span>mi piel hoy · Escáner Solé</span></div><p class="small" id="copied" style="text-align:center"></p></div>
+    <p class="small">${r.fuente==="foto"?"Calculado con tu foto y tus respuestas.":"Calculado con tus respuestas."}</p>
+  </div>`);
+  document.getElementById("reto").onclick=retoPantalla;
+  document.getElementById("verprod").onclick=()=>{save("vio_producto");};
+  document.getElementById("share").onclick=()=>{
+    const box=document.getElementById("sharebox");box.hidden=false;
+    const txt=`Mi piel hoy está en ${r.total}/100 según el Escáner Solé. Haz el tuyo gratis.`;
+    const note=document.getElementById("copied");
+    try{navigator.clipboard.writeText(txt).then(()=>note.textContent="Texto copiado para pegar en tus historias.",()=>note.textContent=txt);}catch(e){note.textContent=txt;}
+  };
+}
+
+/* ---------- 5. El reto ---------- */
+function retoPantalla(){
+  const r=S.result,prod=PRODUCTS[r.bajo]||PRODUCTS.caida,nombre=RETO[r.bajo]||"Reto Solé",cupos=CUPOS[r.bajo]??10;
+  const menor=S.lead.edad<18;
+  $(`<div style="display:grid;gap:12px">
+    <div class="eyebrow">${esc(nombre)}</div>
+    <h2>Recibe tu tratamiento gratis con nuestro reto</h2>
+    <p class="cup">Quedan <b>${cupos} de 10</b> cupos${S.lead.ciudad?` en ${esc(S.lead.ciudad)}`:""}.</p>
+    <div class="card"><b>Recibes</b>Tu tratamiento con ${esc(prod.n)}, totalmente gratis.</div>
+    <div class="card"><b>Das a cambio</b>Un video de inicio, 4 fotos (una por semana) y un video de resumen. Nada más.</div>
+    <div class="eyebrow">Así es el reto, paso a paso</div>
+    <div class="steps">
+      <div class="stp"><b>1</b><div>Tocas "Quiero que me llamen"<span>Hoy, desde aquí.</span></div></div>
+      <div class="stp"><b>2</b><div>Te llamamos y te hacemos el examen de piel<span>En el punto de Solé. Ahí recibes tu tratamiento con ${esc(prod.n)} gratis.</span></div></div>
+      <div class="stp"><b>3</b><div>Día 1 · video inicial de tu reto y fotos de inicio<span>Con tu celular. Cuenta cómo está tu piel hoy.</span></div></div>
+      <div class="stp"><b>4</b><div>Cada semana una foto · 4 en el mes<span>Misma luz, misma pose, y una nota de cómo te sientes.</span></div></div>
+      <div class="stp"><b>5</b><div>Video de resumen · al cumplir el mes<span>Cómo ha sido el cambio.</span></div></div>
+    </div>
+    <div class="eyebrow">Y con eso obtienes</div>
+    <div class="steps">
+      <div class="stp"><b>✓</b><div>Extiendes el reto gratis<span>Los meses que necesites hasta lograr tu resultado ideal.</span></div></div>
+      <div class="stp"><b>✓</b><div>40 % de descuento en los productos de complemento<span>Comprando una sola unidad.</span></div></div>
+      <div class="stp"><b>✓</b><div>Puedes ser distribuidor de nuestra marca<span>Te contamos cómo en la llamada.</span></div></div>
+    </div>
+    <div class="card ok"><b>Y empiezas a cambiar tu piel</b>Si prefieres no hacer el reto, compra el producto o el kit con el botón de abajo.</div>
+    ${menor?`<div class="card warn"><b>Eres menor de 18</b>Puedes entrar al reto con la autorización de tu acudiente. En la llamada te explicamos cómo.</div>`:""}
+    <label class="chk"><input id="c-foto" type="checkbox"> Autorizo guardar mi ${S.photo?"foto y mi ":""}puntaje de hoy como punto de partida del reto.</label>
+    <button class="btn" id="call">Quiero que me llamen</button>
+    <a class="btn ghost link" id="buy" href="${landingDe(prod)}" target="_blank" rel="noopener">No quiero el reto, quiero comprarlo</a>
+  </div>`);
+  document.getElementById("call").onclick=async()=>{
+    const ok=document.getElementById("c-foto").checked;
+    if(!ok){document.getElementById("c-foto").focus();document.querySelector(".chk").style.color="var(--amber)";return;}
+    await save("pidio_llamada",{reto:nombre,guardar_inicio:true,menor});
+    fin(true);
+  };
+  document.getElementById("buy").onclick=()=>{save("solo_compra",{reto:nombre});};
+}
+function fin(llamada){
+  const prod=PRODUCTS[S.result.bajo]||PRODUCTS.caida;
+  $(`<div style="display:grid;gap:14px">
+    <h2>${llamada?`Listo, ${esc(S.lead.nombre)}. Te llamamos pronto.`:"Gracias por hacer el test"}</h2>
+    <div class="card ok"><b>${llamada?"Tu cupo quedó apartado":"Tu resultado quedó guardado"}</b>${llamada?`Te llamamos al ${esc(S.lead.celular)} para agendar tu examen de piel y entregarte tu ${esc(prod.n)}. Desde ese día empiezas a mejorar tu piel.`:`Puedes comprar ${esc(prod.n)} en soleparis.com cuando quieras.`}</div>
+    <a class="btn link" href="${landingDe(prod)}" target="_blank" rel="noopener">Ver ${esc(prod.n)}</a>
+    <button class="btn ghost" id="restart">Hacer otro test</button>
+  </div>`);
+  document.getElementById("restart").onclick=()=>{S.step="registro";S.lead={};S.q={};S.photo=null;S.result=null;S.id=null;registro();};
+}
+
+/* ---------- Panel NC (#panel) ---------- */
+async function panel(){
+  $(`<div style="display:grid;gap:12px"><div class="eyebrow">Panel Negocios Cuánticos</div><h2>Fichas del escáner</h2><p class="small" id="pn">Cargando…</p><div class="tbl" id="pt"></div><button class="btn ghost" id="toapp">Ir al test</button></div>`);
+  document.getElementById("toapp").onclick=()=>{location.hash="";registro();};
+  if(!db){document.getElementById("pn").textContent="El registro no está disponible en esta vista.";return;}
+  try{
+    const snap=await db.collection("leads").orderBy("creado","desc").limit(200).get();
+    const rows=snap.docs.map(d=>d.data());
+    document.getElementById("pn").textContent=rows.length?`${rows.length} personas`:"Todavía no hay fichas. Haz el test y vuelve aquí.";
+    if(rows.length)document.getElementById("pt").innerHTML=`<table><tr><th>Fecha</th><th>Nombre</th><th>Sexo</th><th>Celular</th><th>Ciudad</th><th>Edad</th><th>Etapa</th><th>Puntaje</th><th>Punto bajo</th><th>Producto</th><th>Foto</th></tr>${rows.map(l=>`<tr><td>${esc((l.creado||"").slice(0,10))}</td><td>${esc(l.nombre)}</td><td>${esc(l.sexo??"")}</td><td>${esc(l.celular)}</td><td>${esc(l.ciudad)}</td><td>${esc(l.edad)}</td><td>${esc(l.etapa)}</td><td>${esc(l.puntaje??"")}</td><td>${esc(l.punto_bajo??"")}</td><td>${esc(l.producto??"")}</td><td>${l.con_foto?"sí":"no"}</td></tr>`).join("")}</table>`;
+  }catch(e){document.getElementById("pn").textContent="No se pudieron leer las fichas.";}
+}
+window.addEventListener("hashchange",()=>{if(location.hash==="#panel")panel();});
+registro();
+})();
+</script>
+
+</body></html>
