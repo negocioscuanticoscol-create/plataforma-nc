@@ -84,6 +84,30 @@ def telegram(texto):
         print('telegram:', r.status)
 
 
+TRM_FUENTE = 'https://www.datos.gov.co/resource/32sa-8pi3.json?$order=vigenciadesde%20DESC&$limit=1'
+TRM = None
+
+
+def trm():
+    """TRM oficial vigente (Banco de la República vía datos.gov.co, la misma fuente del job del dólar). Si falla, solo dólares."""
+    global TRM
+    try:
+        with urllib.request.urlopen(TRM_FUENTE, timeout=30) as r:
+            TRM = float(json.loads(r.read())[0]['valor'])
+    except Exception as e:
+        print('trm:', e)
+    return TRM
+
+
+def cop(usd):
+    """'$1.365 (4,42 M)' = dólares y millones de pesos a la TRM del día, con puntos y comas a la colombiana."""
+    d = f'{usd:,.0f}'.replace(',', '.')
+    if not TRM:
+        return '$' + d
+    m = f'{usd * TRM / 1e6:.2f}'.replace('.', ',')
+    return f'${d} ({m} M)'
+
+
 MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
 
@@ -94,8 +118,8 @@ def fmt(d):
 
 def flecha(p, pa):
     if pa is None: return ''
-    if p < pa: return f' ⬇️ (ayer {pa:,.0f})'
-    if p > pa: return f' ⬆️ (ayer {pa:,.0f})'
+    if p < pa: return f' ⬇️ (ayer ${pa:,.0f})'.replace(',', '.')
+    if p > pa: return f' ⬆️ (ayer ${pa:,.0f})'.replace(',', '.')
     return ' = ayer'
 
 
@@ -124,7 +148,8 @@ def main():
 
     # ---------- resumen
     hoy = (dt.datetime.utcnow() - dt.timedelta(hours=5)).strftime('%d/%m')
-    L = [f'✈️ <b>Vuelos a Madrid · {hoy}</b> (USD, ida y vuelta, económica)']
+    trm()
+    L = [f'✈️ <b>Vuelos a Madrid · {hoy}</b> (dólares y millones de pesos' + (f' a TRM {TRM:,.0f}'.replace(',', '.') if TRM else '') + ', ida y vuelta, económica)']
     niveles = {'low': 'barato', 'typical': 'normal', 'high': 'caro'}
     for persona, o, d, gl, salida, regresos in PERSONAS:
         ops = resumen.get(persona)
@@ -132,13 +157,13 @@ def main():
             L.append(f'\n<b>{persona}</b> ({o}→{d}, sale {fmt(salida)}): sin datos hoy'); continue
         L.append(f'\n<b>{persona}</b> ({o}→{d}, sale {fmt(salida)})')
         for p, reg, aer, esc, pa, niv in sorted(ops, key=lambda x: x[1]):
-            L.append(f'  vuelve {fmt(reg)}: <b>${p:,.0f}</b>{flecha(p, pa)} · {aer or "?"} · {esc} escala{"s" if esc != 1 else ""} · {niveles.get(niv, niv or "")}')
+            L.append(f'  vuelve {fmt(reg)}: <b>{cop(p)}</b>{flecha(p, pa)} · {aer or "?"} · {esc} escala{"s" if esc != 1 else ""} · {niveles.get(niv, niv or "")}')
         pmin = min(ops, key=lambda x: x[0])
-        L.append(f'  → el más barato: <b>${pmin[0]:,.0f}</b> volviendo el {fmt(pmin[1])}')
+        L.append(f'  → el más barato: <b>{cop(pmin[0])}</b> volviendo el {fmt(pmin[1])}')
     b1 = next((x for x in resumen.get('Bogotá 1', []) if x[1] == JUNTAS), None)
     b2 = next((x for x in resumen.get('Bogotá 2', []) if x[1] == JUNTAS), None)
     if b1 and b2:
-        L.append(f'\n👭 Las dos de Bogotá volviendo juntas el {fmt(JUNTAS)}: <b>${b1[0] + b2[0]:,.0f}</b> entre las dos')
+        L.append(f'\n👭 Las dos de Bogotá volviendo juntas el {fmt(JUNTAS)}: <b>{cop(b1[0] + b2[0])}</b> entre las dos')
     if errores:
         L.append('\n⚠️ ' + ' · '.join(errores))
     texto = '\n'.join(L)
