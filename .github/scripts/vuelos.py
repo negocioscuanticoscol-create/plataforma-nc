@@ -4,7 +4,7 @@ combinación de fechas, lo guarda en nc_vuelos y manda por Telegram, en dólares
 el precio de cada combinación, la más barata de cada persona y el día en que los dos de Bogotá vuelven juntos más barato.
 
 Personas y fechas (todas adultas, económica, ida y vuelta) — segunda versión, 6 nov 2026:
-  Natalia Rojas  Chicago → Madrid  sale 12 dic 2026, vuelve 2 o 3 ene 2027 (debe estar en Chicago el 3)  (2 combinaciones)
+  Natalia Rojas  Chicago → Madrid  sale 12 dic 2026, vuelve 3 o 4 ene 2027  (2 combinaciones)
   José Rojas     Bogotá  → Madrid  sale 19, 20 o 21 dic, vuelve 4, 5, 6 o 7 ene            (12)
   María Zarrate  Bogotá  → Madrid  sale 9, 10 u 11 dic, vuelve 6, 7 u 8 ene                (9)
 Bogotá SOLO DIRECTOS (stops=1) y Chicago máximo 1 escala porque no hay directo en diciembre (José, 6 nov). Son 23 consultas por día. El plan gratis de SerpApi da 250 al mes: alcanza para los ~7 días en que José decide la compra;
@@ -30,7 +30,7 @@ DESDE_BASE = os.environ.get('DESDE_BASE', '0') == '1'
 # escalas (SerpApi: 1 = solo directos, 2 = máximo 1 escala). Chicago→Madrid NO tiene directo en diciembre (0 resultados el 6 nov):
 # Natalia va con 1 escala máximo; los de Bogotá, directos (pedido de José el 6 nov).
 PERSONAS = [
-    ('Natalia Rojas', 'ORD', 'MAD', 'us', ['2026-12-12'], ['2027-01-02', '2027-01-03'], 2),   # tiene que ESTAR en Chicago el 3 (José, 6 nov): vuelve el 2 o el 3 (llega el mismo día)
+    ('Natalia Rojas', 'ORD', 'MAD', 'us', ['2026-12-12'], ['2027-01-03', '2027-01-04'], 2),   # vuelve (sale de Madrid) el 3 o el 4 de enero; solo visa de EE. UU., pasaporte colombiano
     ('José Rojas',    'BOG', 'MAD', 'co', ['2026-12-19', '2026-12-20', '2026-12-21'], ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07'], 1),
     ('María Zarrate', 'BOG', 'MAD', 'co', ['2026-12-09', '2026-12-10', '2026-12-11'], ['2027-01-08', '2027-01-09', '2027-01-10'], 1),   # vuelve del 8 en adelante (José, 6 nov)
 ]
