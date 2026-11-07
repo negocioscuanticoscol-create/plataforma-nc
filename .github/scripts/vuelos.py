@@ -32,7 +32,7 @@ DESDE_BASE = os.environ.get('DESDE_BASE', '0') == '1'
 PERSONAS = [
     ('Natalia Rojas', 'ORD', 'MAD', 'us', ['2026-12-12'], ['2027-01-02', '2027-01-03'], 2),   # tiene que ESTAR en Chicago el 3 (José, 6 nov): vuelve el 2 o el 3 (llega el mismo día)
     ('José Rojas',    'BOG', 'MAD', 'co', ['2026-12-19', '2026-12-20', '2026-12-21'], ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07'], 1),
-    ('María Zarrate', 'BOG', 'MAD', 'co', ['2026-12-09', '2026-12-10', '2026-12-11'], ['2027-01-06', '2027-01-07', '2027-01-08'], 1),
+    ('María Zarrate', 'BOG', 'MAD', 'co', ['2026-12-09', '2026-12-10', '2026-12-11'], ['2027-01-08', '2027-01-09', '2027-01-10'], 1),   # vuelve del 8 en adelante (José, 6 nov)
 ]
 ESCALAS_TXT = {1: 'directo', 2: 'máx. 1 escala'}
 JUNTOS = ('José Rojas', 'María Zarrate')   # los dos de Bogotá: se busca el día de regreso en que volver juntos sale más barato
@@ -263,7 +263,8 @@ def main():
                                                                esc=m['escalas'], ayer=pa, nivel=pi.get('price_level'), token=m['token'],
                                                                o=o, d=d, gl=gl, stops=stops, url=(resp.get('search_metadata') or {}).get('google_flights_url') or link_google(o, d, salida, regreso), vende=None))
                     print(persona, salida, regreso, m['precio'], m['aerolinea'], m['escalas'], 'escalas · ayer', pa)
-        for persona, ops in resumen.items():
+        # quién lo vende cuesta 2 consultas por persona: solo si VENDEDOR=1 (el plan gratis va justo para la semana de decisión)
+        for persona, ops in (resumen.items() if os.environ.get('VENDEDOR', '0') == '1' else []):
             pm = min(ops, key=lambda x: x['p'])
             pm['vende'] = vendedor(pm['o'], pm['d'], pm['gl'], pm['salida'], pm['regreso'], pm['token'], pm['stops'])
             for f in filas:
