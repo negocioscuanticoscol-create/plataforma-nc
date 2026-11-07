@@ -254,11 +254,11 @@ def main():
                     filas.append(dict(persona=persona, origen=o, destino=d, salida=salida, regreso=regreso, moneda='USD', **m,
                                       mas_bajo=pi.get('lowest_price'), nivel=pi.get('price_level'),
                                       rango_tipico='-'.join(str(x) for x in (pi.get('typical_price_range') or [])) or None,
-                                      detalle={'best': (resp.get('best_flights') or [])[:3], 'url': link_google(o, d, salida, regreso)}))
+                                      detalle={'best': (resp.get('best_flights') or [])[:3], 'url': (resp.get('search_metadata') or {}).get('google_flights_url') or link_google(o, d, salida, regreso)}))
                     pa, _ = ayer(persona, salida, regreso)
                     resumen.setdefault(persona, []).append(dict(p=m['precio'], salida=salida, regreso=regreso, aer=m['aerolinea'],
                                                                esc=m['escalas'], ayer=pa, nivel=pi.get('price_level'), token=m['token'],
-                                                               o=o, d=d, gl=gl, url=link_google(o, d, salida, regreso), vende=None))
+                                                               o=o, d=d, gl=gl, url=(resp.get('search_metadata') or {}).get('google_flights_url') or link_google(o, d, salida, regreso), vende=None))
                     print(persona, salida, regreso, m['precio'], m['aerolinea'], m['escalas'], 'escalas · ayer', pa)
         for persona, ops in resumen.items():
             pm = min(ops, key=lambda x: x['p'])
