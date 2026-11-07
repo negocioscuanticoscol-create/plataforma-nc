@@ -145,7 +145,7 @@ def main():
     print('\n' + texto)
     if SOLO:
         return
-    if filas:
+    if filas and not DEMO:      # los precios de mentira no se guardan
         guardar(filas)
     if TG_TOKEN and TG_CHAT:
         telegram(texto)
