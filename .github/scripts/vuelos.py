@@ -67,7 +67,35 @@ def mejor(resp):
     o = min(opciones, key=lambda x: x['price'])
     vuelos = o.get('flights') or []
     aer = ' + '.join(dict.fromkeys(v.get('airline', '') for v in vuelos if v.get('airline'))) or None
-    return dict(precio=o['price'], aerolinea=aer, escalas=len(o.get('layovers') or []), duracion_min=o.get('total_duration'))
+    return dict(precio=o['price'], aerolinea=aer, escalas=len(o.get('layovers') or []), duracion_min=o.get('total_duration'), token=o.get('booking_token'))
+
+
+def vendedor(origen, destino, gl, salida, regreso, token):
+    """Segunda consulta con el booking_token: Google dice quién vende ese vuelo y a cuánto (aerolínea o agencia)."""
+    if DEMO or not token:
+        return 'LATAM (demo)' if DEMO else None
+    qs = urllib.parse.urlencode({'engine': 'google_flights', 'departure_id': origen, 'arrival_id': destino, 'outbound_date': salida,
+                                 'return_date': regreso, 'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es',
+                                 'gl': gl, 'booking_token': token, 'api_key': KEY})
+    try:
+        with urllib.request.urlopen('https://serpapi.com/search.json?' + qs, timeout=90) as r:
+            j = json.loads(r.read())
+    except Exception as e:
+        print('vendedor:', e); return None
+    ops = []
+    for b in j.get('booking_options') or []:
+        t = b.get('together') or {}
+        if t.get('book_with'):
+            ops.append((t.get('price') or 10**9, t['book_with']))
+    if not ops:
+        return None
+    ops.sort()
+    return ', '.join(dict.fromkeys(n for _, n in ops[:2]))   # el más barato y el siguiente
+
+
+def link_google(origen, destino, salida, regreso):
+    """Enlace a Google Flights con esa búsqueda ya hecha: ahí se escoge el vuelo y Google lleva a la página de compra."""
+    return 'https://www.google.com/travel/flights?q=' + urllib.parse.quote(f'vuelos de {origen} a {destino} el {salida} regreso {regreso}')
 
 
 def leer(params):
@@ -89,7 +117,8 @@ def ayer(persona, salida, regreso):
 
 def desde_base():
     """Lo último guardado HOY por combinación (sin consultar SerpApi)."""
-    j = leer({'select': 'persona,origen,salida,regreso,precio,aerolinea,escalas,nivel,consultado_en', 'dia': 'eq.' + hoy_bogota().isoformat(),
+    gl_de = {p[0]: p[3] for p in PERSONAS}
+    j = leer({'select': 'persona,origen,destino,salida,regreso,precio,aerolinea,escalas,nivel,consultado_en,detalle', 'dia': 'eq.' + hoy_bogota().isoformat(),
               'order': 'consultado_en.desc', 'limit': 500})
     out, vistos = {}, set()
     for r in j:
@@ -98,7 +127,15 @@ def desde_base():
         if k in vistos: continue
         vistos.add(k)
         out.setdefault(persona, []).append(dict(p=float(r['precio']), salida=r['salida'], regreso=r['regreso'], aer=r['aerolinea'],
-                                                esc=r['escalas'] or 0, ayer=None, nivel=r['nivel']))
+                                                esc=r['escalas'] or 0, ayer=None, nivel=r['nivel'], url=(r.get('detalle') or {}).get('url') or link_google(r['origen'], r['destino'], r['salida'], r['regreso']),
+                                                vende=(r.get('detalle') or {}).get('vende'), o=r['origen'], d=r['destino'], gl=gl_de.get(persona, 'co'),
+                                                token=next((b.get('booking_token') for b in (r.get('detalle') or {}).get('best', []) if b.get('price') == float(r['precio'])), None)))
+    # quién vende la más barata de cada persona (si no se averiguó cuando se guardó): una consulta por persona
+    if KEY and not SOLO:
+        for persona, ops in out.items():
+            pm = min(ops, key=lambda x: x['p'])
+            if not pm['vende']:
+                pm['vende'] = vendedor(pm['o'], pm['d'], pm['gl'], pm['salida'], pm['regreso'], pm['token']); print(persona, 'lo vende:', pm['vende'])
     return out
 
 
@@ -168,6 +205,7 @@ def resumen_texto(resumen, errores):
             L.append(f'  sale {fmt(salida)} → ' + ' · '.join(f'{dia(x["regreso"])} ene {cop(x["p"])}{flecha(x["p"], x["ayer"])}' for x in fila))
         pm = min(ops, key=lambda x: x['p'])
         L.append(f'  ⭐ más barato: sale {fmt(pm["salida"])}, vuelve {fmt(pm["regreso"])}: <b>{cop(pm["p"])}</b> · {pm["aer"] or "?"} · {pm["esc"]} escala{"s" if pm["esc"] != 1 else ""} · {niveles.get(pm["nivel"], pm["nivel"] or "")}')
+        L.append(f'     🛒 lo vende: {pm.get("vende") or "ver en Google Flights"} · <a href="{pm["url"]}">abrir en Google Flights</a>')
     a, b = resumen.get(JUNTOS[0], []), resumen.get(JUNTOS[1], [])
     comunes = sorted(set(x['regreso'] for x in a) & set(x['regreso'] for x in b))
     if comunes:
@@ -177,7 +215,7 @@ def resumen_texto(resumen, errores):
             pa_ = min((x for x in a if x['regreso'] == reg), key=lambda x: x['p'])
             pb_ = min((x for x in b if x['regreso'] == reg), key=lambda x: x['p'])
             tot = pa_['p'] + pb_['p']
-            L.append(f'  {fmt(reg)}: <b>{cop(tot)}</b> entre los dos (él sale {fmt(pa_["salida"])}, ella sale {fmt(pb_["salida"])})')
+            L.append(f'  {fmt(reg)}: <b>{cop(tot)}</b> entre los dos (<a href="{pa_["url"]}">él sale {fmt(pa_["salida"])}</a>, <a href="{pb_["url"]}">ella sale {fmt(pb_["salida"])}</a>)')
             if not mejor_j or tot < mejor_j[0]: mejor_j = (tot, reg)
         L.append(f'  ⭐ lo más barato juntos: el {fmt(mejor_j[1])}, {cop(mejor_j[0])}')
     if errores:
@@ -206,11 +244,19 @@ def main():
                     filas.append(dict(persona=persona, origen=o, destino=d, salida=salida, regreso=regreso, moneda='USD', **m,
                                       mas_bajo=pi.get('lowest_price'), nivel=pi.get('price_level'),
                                       rango_tipico='-'.join(str(x) for x in (pi.get('typical_price_range') or [])) or None,
-                                      detalle={'best': (resp.get('best_flights') or [])[:3]}))
+                                      detalle={'best': (resp.get('best_flights') or [])[:3], 'url': link_google(o, d, salida, regreso)}))
                     pa, _ = ayer(persona, salida, regreso)
                     resumen.setdefault(persona, []).append(dict(p=m['precio'], salida=salida, regreso=regreso, aer=m['aerolinea'],
-                                                               esc=m['escalas'], ayer=pa, nivel=pi.get('price_level')))
+                                                               esc=m['escalas'], ayer=pa, nivel=pi.get('price_level'), token=m['token'],
+                                                               o=o, d=d, gl=gl, url=link_google(o, d, salida, regreso), vende=None))
                     print(persona, salida, regreso, m['precio'], m['aerolinea'], m['escalas'], 'escalas · ayer', pa)
+        for persona, ops in resumen.items():
+            pm = min(ops, key=lambda x: x['p'])
+            pm['vende'] = vendedor(pm['o'], pm['d'], pm['gl'], pm['salida'], pm['regreso'], pm['token'])
+            for f in filas:
+                if f['persona'] == persona and f['salida'] == pm['salida'] and f['regreso'] == pm['regreso']:
+                    f['detalle']['vende'] = pm['vende']
+            print(persona, 'lo vende:', pm['vende'])
     texto = resumen_texto(resumen, errores)
     print('\n' + texto)
     if SOLO:
