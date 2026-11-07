@@ -67,19 +67,29 @@ def mejor(resp):
     o = min(opciones, key=lambda x: x['price'])
     vuelos = o.get('flights') or []
     aer = ' + '.join(dict.fromkeys(v.get('airline', '') for v in vuelos if v.get('airline'))) or None
-    return dict(precio=o['price'], aerolinea=aer, escalas=len(o.get('layovers') or []), duracion_min=o.get('total_duration'), token=o.get('booking_token'))
+    return dict(precio=o['price'], aerolinea=aer, escalas=len(o.get('layovers') or []), duracion_min=o.get('total_duration'), token=o.get('departure_token') or o.get('booking_token'))
 
 
 def vendedor(origen, destino, gl, salida, regreso, token):
-    """Segunda consulta con el booking_token: Google dice quién vende ese vuelo y a cuánto (aerolínea o agencia)."""
-    if DEMO or not token:
-        return 'LATAM (demo)' if DEMO else None
-    qs = urllib.parse.urlencode({'engine': 'google_flights', 'departure_id': origen, 'arrival_id': destino, 'outbound_date': salida,
-                                 'return_date': regreso, 'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es',
-                                 'gl': gl, 'booking_token': token, 'api_key': KEY})
+    """Quién vende la combinación más barata. Google Flights lo entrega en dos pasos más: con el departure_token de la ida
+    devuelve las vueltas (cada una con booking_token); con el booking_token de la vuelta más barata devuelve quién la vende.
+    Cuesta 2 consultas por persona."""
+    if DEMO:
+        return 'LATAM (demo)'
+    if not token:
+        return None
+    base = {'engine': 'google_flights', 'departure_id': origen, 'arrival_id': destino, 'outbound_date': salida, 'return_date': regreso,
+            'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es', 'gl': gl, 'api_key': KEY}
+    def llamar(extra):
+        with urllib.request.urlopen('https://serpapi.com/search.json?' + urllib.parse.urlencode({**base, **extra}), timeout=90) as r:
+            return json.loads(r.read())
     try:
-        with urllib.request.urlopen('https://serpapi.com/search.json?' + qs, timeout=90) as r:
-            j = json.loads(r.read())
+        j = llamar({'departure_token': token})
+        vueltas = [o for o in (j.get('best_flights') or []) + (j.get('other_flights') or []) if o.get('price') and o.get('booking_token')]
+        if not vueltas:
+            return None
+        v = min(vueltas, key=lambda x: x['price'])
+        j = llamar({'booking_token': v['booking_token']})
     except Exception as e:
         print('vendedor:', e); return None
     ops = []
@@ -90,7 +100,7 @@ def vendedor(origen, destino, gl, salida, regreso, token):
     if not ops:
         return None
     ops.sort()
-    return ', '.join(dict.fromkeys(n for _, n in ops[:2]))   # el más barato y el siguiente
+    return ' / '.join(f'{n} ${p:,.0f}'.replace(',', '.') if p < 10**9 else n for p, n in ops[:2])   # el más barato y el siguiente
 
 
 def link_google(origen, destino, salida, regreso):
@@ -129,7 +139,7 @@ def desde_base():
         out.setdefault(persona, []).append(dict(p=float(r['precio']), salida=r['salida'], regreso=r['regreso'], aer=r['aerolinea'],
                                                 esc=r['escalas'] or 0, ayer=None, nivel=r['nivel'], url=(r.get('detalle') or {}).get('url') or link_google(r['origen'], r['destino'], r['salida'], r['regreso']),
                                                 vende=(r.get('detalle') or {}).get('vende'), o=r['origen'], d=r['destino'], gl=gl_de.get(persona, 'co'),
-                                                token=next((b.get('booking_token') for b in (r.get('detalle') or {}).get('best', []) if b.get('price') == float(r['precio'])), None)))
+                                                token=next((b.get('departure_token') for b in (r.get('detalle') or {}).get('best', []) if b.get('price') == float(r['precio'])), None)))
     # quién vende la más barata de cada persona (si no se averiguó cuando se guardó): una consulta por persona
     if KEY and not SOLO:
         for persona, ops in out.items():
