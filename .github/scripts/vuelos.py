@@ -1,16 +1,19 @@
 # -*- coding: utf-8 -*-
 """Vuelos de fin de año (José, 6 nov 2026): todos los días pregunta en Google Flights (vía SerpApi) el precio de cada
-combinación de fechas, lo guarda en nc_vuelos y manda por Telegram el más barato de cada persona, si subió o bajó frente
-a ayer, y la mejor combinación para que las dos de Bogotá vuelvan juntas el 7 de enero.
+combinación de fechas, lo guarda en nc_vuelos y manda por Telegram, en dólares y millones de pesos a la TRM del día,
+el precio de cada combinación, la más barata de cada persona y el día en que los dos de Bogotá vuelven juntos más barato.
 
-Personas y fechas (todas adultas, económica, ida y vuelta):
-  Chicago  → Madrid  sale 12 dic 2026, vuelve 3 o 4 ene 2027
-  Bogotá 1 → Madrid  sale 20 dic 2026, vuelve 4, 5, 6 o 7 ene 2027 (mejor el 7)
-  Bogotá 2 → Madrid  sale 10 dic 2026, vuelve 7 u 8 ene 2027
-Son 8 consultas por día = 240 al mes: cabe en el plan gratis de SerpApi (250). Si se agregan fechas, toca plan de pago.
+Personas y fechas (todas adultas, económica, ida y vuelta) — segunda versión, 6 nov 2026:
+  Natalia Rojas  Chicago → Madrid  sale 12 dic 2026, vuelve 3 o 4 ene 2027                 (2 combinaciones)
+  José Rojas     Bogotá  → Madrid  sale 19, 20 o 21 dic, vuelve 4, 5, 6 o 7 ene            (12)
+  María Zarrate  Bogotá  → Madrid  sale 9, 10 u 11 dic, vuelve 6, 7 u 8 ene                (9)
+Son 23 consultas por día. El plan gratis de SerpApi da 250 al mes: alcanza para los ~7 días en que José decide la compra;
+después hay que recortar fechas o pasar al plan de 25 USD (1.000/mes).
 
-Variables: SERPAPI_KEY, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID. SOLO_IMPRIMIR=1 no guarda ni manda. DEMO=1 usa una respuesta
-de mentira para probar el resumen sin gastar consultas.
+Variables: SERPAPI_KEY, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.
+  SOLO_IMPRIMIR=1  no guarda ni manda.
+  DEMO=1           precios de mentira para probar el resumen (no gasta consultas ni guarda).
+  DESDE_BASE=1     no consulta: arma el resumen con lo último guardado hoy en nc_vuelos y lo manda (no gasta consultas).
 """
 import os, json, urllib.request, urllib.parse, datetime as dt
 
@@ -21,14 +24,25 @@ TG_TOKEN = os.environ.get('TELEGRAM_TOKEN', '')
 TG_CHAT = os.environ.get('TELEGRAM_CHAT_ID', '')
 SOLO = os.environ.get('SOLO_IMPRIMIR', '0') == '1'
 DEMO = os.environ.get('DEMO', '0') == '1'
+DESDE_BASE = os.environ.get('DESDE_BASE', '0') == '1'
 
-# persona, origen, destino, país de compra (Google cobra distinto según desde dónde se compra), salida, regresos posibles
+# persona, origen, destino, país de compra (Google cobra distinto según desde dónde se compra), salidas posibles, regresos posibles
 PERSONAS = [
-    ('Chicago',  'ORD', 'MAD', 'us', '2026-12-12', ['2027-01-03', '2027-01-04']),
-    ('Bogotá 1', 'BOG', 'MAD', 'co', '2026-12-20', ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07']),
-    ('Bogotá 2', 'BOG', 'MAD', 'co', '2026-12-10', ['2027-01-07', '2027-01-08']),
+    ('Natalia Rojas', 'ORD', 'MAD', 'us', ['2026-12-12'], ['2027-01-03', '2027-01-04']),
+    ('José Rojas',    'BOG', 'MAD', 'co', ['2026-12-19', '2026-12-20', '2026-12-21'], ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07']),
+    ('María Zarrate', 'BOG', 'MAD', 'co', ['2026-12-09', '2026-12-10', '2026-12-11'], ['2027-01-06', '2027-01-07', '2027-01-08']),
 ]
-JUNTAS = '2027-01-07'   # el día en que las dos de Bogotá querrían volver juntas
+JUNTOS = ('José Rojas', 'María Zarrate')   # los dos de Bogotá: se busca el día de regreso en que volver juntos sale más barato
+# nombres con los que se guardaron las primeras corridas (6 nov), para leerlas desde la base
+ALIAS = {'Chicago': 'Natalia Rojas', 'Bogotá 1': 'José Rojas', 'Bogotá 2': 'María Zarrate'}
+
+TRM_FUENTE = 'https://www.datos.gov.co/resource/32sa-8pi3.json?$order=vigenciadesde%20DESC&$limit=1'
+TRM = None
+MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+
+def hoy_bogota():
+    return (dt.datetime.utcnow() - dt.timedelta(hours=5)).date()
 
 
 def serpapi(origen, destino, gl, salida, regreso):
@@ -56,17 +70,36 @@ def mejor(resp):
     return dict(precio=o['price'], aerolinea=aer, escalas=len(o.get('layovers') or []), duracion_min=o.get('total_duration'))
 
 
+def leer(params):
+    u = SB + 'nc_vuelos?' + urllib.parse.urlencode(params)
+    with urllib.request.urlopen(urllib.request.Request(u, headers={'apikey': SBK, 'Authorization': 'Bearer ' + SBK}), timeout=30) as r:
+        return json.loads(r.read())
+
+
 def ayer(persona, salida, regreso):
     """Último precio guardado para esa combinación antes de hoy, para decir si subió o bajó."""
-    hoy = (dt.datetime.utcnow() - dt.timedelta(hours=5)).date().isoformat()
-    u = SB + 'nc_vuelos?select=precio,dia&' + urllib.parse.urlencode({'persona': 'eq.' + persona, 'salida': 'eq.' + salida, 'regreso': 'eq.' + regreso,
-                                                                    'dia': 'lt.' + hoy, 'order': 'consultado_en.desc', 'limit': 1})
+    nombres = [persona] + [k for k, v in ALIAS.items() if v == persona]
     try:
-        with urllib.request.urlopen(urllib.request.Request(u, headers={'apikey': SBK, 'Authorization': 'Bearer ' + SBK}), timeout=30) as r:
-            j = json.loads(r.read())
-            return (float(j[0]['precio']), j[0]['dia']) if j else (None, None)
+        j = leer({'select': 'precio,dia', 'persona': 'in.(' + ','.join('"' + n + '"' for n in nombres) + ')', 'salida': 'eq.' + salida,
+                  'regreso': 'eq.' + regreso, 'dia': 'lt.' + hoy_bogota().isoformat(), 'order': 'consultado_en.desc', 'limit': 1})
+        return (float(j[0]['precio']), j[0]['dia']) if j else (None, None)
     except Exception as e:
         print('ayer:', e); return (None, None)
+
+
+def desde_base():
+    """Lo último guardado HOY por combinación (sin consultar SerpApi)."""
+    j = leer({'select': 'persona,origen,salida,regreso,precio,aerolinea,escalas,nivel,consultado_en', 'dia': 'eq.' + hoy_bogota().isoformat(),
+              'order': 'consultado_en.desc', 'limit': 500})
+    out, vistos = {}, set()
+    for r in j:
+        persona = ALIAS.get(r['persona'], r['persona'])
+        k = (persona, r['salida'], r['regreso'])
+        if k in vistos: continue
+        vistos.add(k)
+        out.setdefault(persona, []).append(dict(p=float(r['precio']), salida=r['salida'], regreso=r['regreso'], aer=r['aerolinea'],
+                                                esc=r['escalas'] or 0, ayer=None, nivel=r['nivel']))
+    return out
 
 
 def guardar(filas):
@@ -82,10 +115,6 @@ def telegram(texto):
     req = urllib.request.Request(f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage', data=data, headers={'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=30) as r:
         print('telegram:', r.status)
-
-
-TRM_FUENTE = 'https://www.datos.gov.co/resource/32sa-8pi3.json?$order=vigenciadesde%20DESC&$limit=1'
-TRM = None
 
 
 def trm():
@@ -108,12 +137,13 @@ def cop(usd):
     return f'${d} ({m} M)'
 
 
-MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-
-
 def fmt(d):
     f = dt.date.fromisoformat(d)
     return f'{f.day} {MESES[f.month - 1]}'
+
+
+def dia(d):
+    return str(dt.date.fromisoformat(d).day)
 
 
 def flecha(p, pa):
@@ -123,50 +153,65 @@ def flecha(p, pa):
     return ' = ayer'
 
 
-def main():
-    if not KEY and not DEMO:
-        raise SystemExit('falta SERPAPI_KEY')
-    filas, resumen, errores = [], {}, []
-    for persona, o, d, gl, salida, regresos in PERSONAS:
-        for regreso in regresos:
-            try:
-                resp = serpapi(o, d, gl, salida, regreso)
-            except Exception as e:
-                errores.append(f'{persona} {salida}→{regreso}: {e}'); continue
-            m = mejor(resp)
-            if not m:
-                errores.append(f'{persona} {salida}→{regreso}: sin vuelos'); continue
-            pi = resp.get('price_insights') or {}
-            fila = dict(persona=persona, origen=o, destino=d, salida=salida, regreso=regreso, moneda='USD', **m,
-                        mas_bajo=pi.get('lowest_price'), nivel=pi.get('price_level'),
-                        rango_tipico='-'.join(str(x) for x in (pi.get('typical_price_range') or [])) or None,
-                        detalle={'best': (resp.get('best_flights') or [])[:3]})
-            filas.append(fila)
-            pa, dia_pa = ayer(persona, salida, regreso)
-            resumen.setdefault(persona, []).append((m['precio'], regreso, m['aerolinea'], m['escalas'], pa, pi.get('price_level')))
-            print(persona, salida, regreso, m['precio'], m['aerolinea'], m['escalas'], 'escalas · ayer', pa)
-
-    # ---------- resumen
-    hoy = (dt.datetime.utcnow() - dt.timedelta(hours=5)).strftime('%d/%m')
+def resumen_texto(resumen, errores):
+    hoy = hoy_bogota().strftime('%d/%m')
     trm()
     L = [f'✈️ <b>Vuelos a Madrid · {hoy}</b> (dólares y millones de pesos' + (f' a TRM {TRM:,.0f}'.replace(',', '.') if TRM else '') + ', ida y vuelta, económica)']
     niveles = {'low': 'barato', 'typical': 'normal', 'high': 'caro'}
-    for persona, o, d, gl, salida, regresos in PERSONAS:
+    for persona, o, d, gl, salidas, regresos in PERSONAS:
         ops = resumen.get(persona)
         if not ops:
-            L.append(f'\n<b>{persona}</b> ({o}→{d}, sale {fmt(salida)}): sin datos hoy'); continue
-        L.append(f'\n<b>{persona}</b> ({o}→{d}, sale {fmt(salida)})')
-        for p, reg, aer, esc, pa, niv in sorted(ops, key=lambda x: x[1]):
-            L.append(f'  vuelve {fmt(reg)}: <b>{cop(p)}</b>{flecha(p, pa)} · {aer or "?"} · {esc} escala{"s" if esc != 1 else ""} · {niveles.get(niv, niv or "")}')
-        pmin = min(ops, key=lambda x: x[0])
-        L.append(f'  → el más barato: <b>{cop(pmin[0])}</b> volviendo el {fmt(pmin[1])}')
-    b1 = next((x for x in resumen.get('Bogotá 1', []) if x[1] == JUNTAS), None)
-    b2 = next((x for x in resumen.get('Bogotá 2', []) if x[1] == JUNTAS), None)
-    if b1 and b2:
-        L.append(f'\n👭 Las dos de Bogotá volviendo juntas el {fmt(JUNTAS)}: <b>{cop(b1[0] + b2[0])}</b> entre las dos')
+            L.append(f'\n<b>{persona}</b> ({o}→{d}): sin datos hoy'); continue
+        L.append(f'\n<b>{persona}</b> ({o}→{d}) · vuelve el …')
+        for salida in sorted(set(x['salida'] for x in ops)):
+            fila = sorted((x for x in ops if x['salida'] == salida), key=lambda x: x['regreso'])
+            L.append(f'  sale {fmt(salida)} → ' + ' · '.join(f'{dia(x["regreso"])} ene {cop(x["p"])}{flecha(x["p"], x["ayer"])}' for x in fila))
+        pm = min(ops, key=lambda x: x['p'])
+        L.append(f'  ⭐ más barato: sale {fmt(pm["salida"])}, vuelve {fmt(pm["regreso"])}: <b>{cop(pm["p"])}</b> · {pm["aer"] or "?"} · {pm["esc"]} escala{"s" if pm["esc"] != 1 else ""} · {niveles.get(pm["nivel"], pm["nivel"] or "")}')
+    a, b = resumen.get(JUNTOS[0], []), resumen.get(JUNTOS[1], [])
+    comunes = sorted(set(x['regreso'] for x in a) & set(x['regreso'] for x in b))
+    if comunes:
+        L.append(f'\n👫 {JUNTOS[0]} y {JUNTOS[1]} volviendo juntos el mismo día:')
+        mejor_j = None
+        for reg in comunes:
+            pa_ = min((x for x in a if x['regreso'] == reg), key=lambda x: x['p'])
+            pb_ = min((x for x in b if x['regreso'] == reg), key=lambda x: x['p'])
+            tot = pa_['p'] + pb_['p']
+            L.append(f'  {fmt(reg)}: <b>{cop(tot)}</b> entre los dos (él sale {fmt(pa_["salida"])}, ella sale {fmt(pb_["salida"])})')
+            if not mejor_j or tot < mejor_j[0]: mejor_j = (tot, reg)
+        L.append(f'  ⭐ lo más barato juntos: el {fmt(mejor_j[1])}, {cop(mejor_j[0])}')
     if errores:
         L.append('\n⚠️ ' + ' · '.join(errores))
-    texto = '\n'.join(L)
+    return '\n'.join(L)
+
+
+def main():
+    filas, resumen, errores = [], {}, []
+    if DESDE_BASE:
+        resumen = desde_base()
+    else:
+        if not KEY and not DEMO:
+            raise SystemExit('falta SERPAPI_KEY')
+        for persona, o, d, gl, salidas, regresos in PERSONAS:
+            for salida in salidas:
+                for regreso in regresos:
+                    try:
+                        resp = serpapi(o, d, gl, salida, regreso)
+                    except Exception as e:
+                        errores.append(f'{persona} {salida}→{regreso}: {e}'); continue
+                    m = mejor(resp)
+                    if not m:
+                        errores.append(f'{persona} {salida}→{regreso}: sin vuelos'); continue
+                    pi = resp.get('price_insights') or {}
+                    filas.append(dict(persona=persona, origen=o, destino=d, salida=salida, regreso=regreso, moneda='USD', **m,
+                                      mas_bajo=pi.get('lowest_price'), nivel=pi.get('price_level'),
+                                      rango_tipico='-'.join(str(x) for x in (pi.get('typical_price_range') or [])) or None,
+                                      detalle={'best': (resp.get('best_flights') or [])[:3]}))
+                    pa, _ = ayer(persona, salida, regreso)
+                    resumen.setdefault(persona, []).append(dict(p=m['precio'], salida=salida, regreso=regreso, aer=m['aerolinea'],
+                                                               esc=m['escalas'], ayer=pa, nivel=pi.get('price_level')))
+                    print(persona, salida, regreso, m['precio'], m['aerolinea'], m['escalas'], 'escalas · ayer', pa)
+    texto = resumen_texto(resumen, errores)
     print('\n' + texto)
     if SOLO:
         return

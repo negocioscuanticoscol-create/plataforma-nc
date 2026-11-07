@@ -15,6 +15,9 @@ on:
       demo:
         description: 'DEMO=1 prueba el resumen con precios de mentira (no gasta consultas)'
         required: false
+      desde_base:
+        description: 'DESDE_BASE=1 reenvía por Telegram lo último guardado hoy, sin consultar (no gasta consultas)'
+        required: false
 jobs:
   consultar:
     runs-on: ubuntu-latest
@@ -30,4 +33,5 @@ jobs:
           TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DEMO: ${{ github.event.inputs.demo || '0' }}
+          DESDE_BASE: ${{ github.event.inputs.desde_base || '0' }}
         run: python .github/scripts/vuelos.py
