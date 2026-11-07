@@ -56,7 +56,7 @@ def serpapi(origen, destino, gl, salida, regreso, stops=1):
                 'price_insights': {'lowest_price': p, 'price_level': 'typical', 'typical_price_range': [p - 100, p + 300]}}
     qs = urllib.parse.urlencode({'engine': 'google_flights', 'departure_id': origen, 'arrival_id': destino, 'outbound_date': salida,
                                  'return_date': regreso, 'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es',
-                                 'gl': gl, 'stops': stops, 'api_key': KEY})   # stops: 1 = solo directos, 2 = máx. 1 escala
+                                 'gl': gl, 'stops': stops, 'api_key': KEY, **({'exclude_airlines': 'BA,EI,VS'} if origen == 'ORD' else {})})   # stops: 1 = solo directos, 2 = máx. 1 escala; Natalia no tiene visa de Reino Unido ni Irlanda: sin British Airways, Aer Lingus ni Virgin
     with urllib.request.urlopen('https://serpapi.com/search.json?' + qs, timeout=90) as r:
         return json.loads(r.read())
 
