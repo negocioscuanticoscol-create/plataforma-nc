@@ -7,7 +7,7 @@ Personas y fechas (todas adultas, económica, ida y vuelta) — segunda versión
   Natalia Rojas  Chicago → Madrid  sale 12 dic 2026, vuelve 3 o 4 ene 2027                 (2 combinaciones)
   José Rojas     Bogotá  → Madrid  sale 19, 20 o 21 dic, vuelve 4, 5, 6 o 7 ene            (12)
   María Zarrate  Bogotá  → Madrid  sale 9, 10 u 11 dic, vuelve 6, 7 u 8 ene                (9)
-Son 23 consultas por día. El plan gratis de SerpApi da 250 al mes: alcanza para los ~7 días en que José decide la compra;
+SOLO VUELOS DIRECTOS (stops=1), pedido de José el 6 nov. Son 23 consultas por día. El plan gratis de SerpApi da 250 al mes: alcanza para los ~7 días en que José decide la compra;
 después hay que recortar fechas o pasar al plan de 25 USD (1.000/mes).
 
 Variables: SERPAPI_KEY, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.
@@ -53,7 +53,7 @@ def serpapi(origen, destino, gl, salida, regreso):
                 'price_insights': {'lowest_price': p, 'price_level': 'typical', 'typical_price_range': [p - 100, p + 300]}}
     qs = urllib.parse.urlencode({'engine': 'google_flights', 'departure_id': origen, 'arrival_id': destino, 'outbound_date': salida,
                                  'return_date': regreso, 'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es',
-                                 'gl': gl, 'api_key': KEY})
+                                 'gl': gl, 'stops': 1, 'api_key': KEY})   # stops=1 = SOLO DIRECTOS (José, 6 nov)
     with urllib.request.urlopen('https://serpapi.com/search.json?' + qs, timeout=90) as r:
         return json.loads(r.read())
 
@@ -79,7 +79,7 @@ def vendedor(origen, destino, gl, salida, regreso, token):
     if not token:
         return None
     base = {'engine': 'google_flights', 'departure_id': origen, 'arrival_id': destino, 'outbound_date': salida, 'return_date': regreso,
-            'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es', 'gl': gl, 'api_key': KEY}
+            'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es', 'gl': gl, 'stops': 1, 'api_key': KEY}
     def llamar(extra):
         with urllib.request.urlopen('https://serpapi.com/search.json?' + urllib.parse.urlencode({**base, **extra}), timeout=90) as r:
             return json.loads(r.read())
@@ -203,7 +203,7 @@ def flecha(p, pa):
 def resumen_texto(resumen, errores):
     hoy = hoy_bogota().strftime('%d/%m')
     trm()
-    L = [f'✈️ <b>Vuelos a Madrid · {hoy}</b> (dólares y millones de pesos' + (f' a TRM {TRM:,.0f}'.replace(',', '.') if TRM else '') + ', ida y vuelta, económica)']
+    L = [f'✈️ <b>Vuelos a Madrid · {hoy}</b> (dólares y millones de pesos' + (f' a TRM {TRM:,.0f}'.replace(',', '.') if TRM else '') + ', ida y vuelta, económica, SOLO DIRECTOS)']
     niveles = {'low': 'barato', 'typical': 'normal', 'high': 'caro'}
     for persona, o, d, gl, salidas, regresos in PERSONAS:
         ops = resumen.get(persona)
@@ -249,7 +249,7 @@ def main():
                         errores.append(f'{persona} {salida}→{regreso}: {e}'); continue
                     m = mejor(resp)
                     if not m:
-                        errores.append(f'{persona} {salida}→{regreso}: sin vuelos'); continue
+                        errores.append(f'{persona} {fmt(salida)}→{fmt(regreso)}: sin directo'); continue
                     pi = resp.get('price_insights') or {}
                     filas.append(dict(persona=persona, origen=o, destino=d, salida=salida, regreso=regreso, moneda='USD', **m,
                                       mas_bajo=pi.get('lowest_price'), nivel=pi.get('price_level'),
