@@ -1,0 +1,33 @@
+name: vuelos
+
+# Vuelos de fin de año a Madrid (José, 6 nov 2026): todos los días a las 5:00 a. m. de Bogotá (10:00 UTC) pregunta en
+# Google Flights, vía SerpApi, el precio de cada combinación de fechas (Chicago 12 dic → 3/4 ene; Bogotá 20 dic → 4 al 7 ene;
+# Bogotá 10 dic → 7/8 ene), lo guarda en nc_vuelos (por la función nc_vuelos_guardar, con la llave pública: este repo es
+# público y acá no viaja ninguna llave de escritura) y manda el resumen por Telegram.
+#
+# Secretos: SERPAPI_KEY (cuenta de José en serpapi.com, plan gratis = 250 consultas/mes; esto gasta 8 al día),
+#           TELEGRAM_TOKEN y TELEGRAM_CHAT_ID (los mismos del dólar).
+on:
+  schedule:
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+    inputs:
+      demo:
+        description: 'DEMO=1 prueba el resumen con precios de mentira (no gasta consultas)'
+        required: false
+jobs:
+  consultar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Consultar los vuelos de hoy
+        env:
+          SERPAPI_KEY:      ${{ secrets.SERPAPI_KEY }}
+          TELEGRAM_TOKEN:   ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DEMO: ${{ github.event.inputs.demo || '0' }}
+        run: python .github/scripts/vuelos.py
