@@ -7,7 +7,7 @@ Personas y fechas (todas adultas, económica, ida y vuelta) — segunda versión
   Natalia Rojas  Chicago → Madrid  sale 12 dic 2026, vuelve 3 o 4 ene 2027                 (2 combinaciones)
   José Rojas     Bogotá  → Madrid  sale 19, 20 o 21 dic, vuelve 4, 5, 6 o 7 ene            (12)
   María Zarrate  Bogotá  → Madrid  sale 9, 10 u 11 dic, vuelve 6, 7 u 8 ene                (9)
-SOLO VUELOS DIRECTOS (stops=1), pedido de José el 6 nov. Son 23 consultas por día. El plan gratis de SerpApi da 250 al mes: alcanza para los ~7 días en que José decide la compra;
+Bogotá SOLO DIRECTOS (stops=1) y Chicago máximo 1 escala porque no hay directo en diciembre (José, 6 nov). Son 23 consultas por día. El plan gratis de SerpApi da 250 al mes: alcanza para los ~7 días en que José decide la compra;
 después hay que recortar fechas o pasar al plan de 25 USD (1.000/mes).
 
 Variables: SERPAPI_KEY, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID.
@@ -26,12 +26,15 @@ SOLO = os.environ.get('SOLO_IMPRIMIR', '0') == '1'
 DEMO = os.environ.get('DEMO', '0') == '1'
 DESDE_BASE = os.environ.get('DESDE_BASE', '0') == '1'
 
-# persona, origen, destino, país de compra (Google cobra distinto según desde dónde se compra), salidas posibles, regresos posibles
+# persona, origen, destino, país de compra (Google cobra distinto según desde dónde se compra), salidas posibles, regresos posibles,
+# escalas (SerpApi: 1 = solo directos, 2 = máximo 1 escala). Chicago→Madrid NO tiene directo en diciembre (0 resultados el 6 nov):
+# Natalia va con 1 escala máximo; los de Bogotá, directos (pedido de José el 6 nov).
 PERSONAS = [
-    ('Natalia Rojas', 'ORD', 'MAD', 'us', ['2026-12-12'], ['2027-01-03', '2027-01-04']),
-    ('José Rojas',    'BOG', 'MAD', 'co', ['2026-12-19', '2026-12-20', '2026-12-21'], ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07']),
-    ('María Zarrate', 'BOG', 'MAD', 'co', ['2026-12-09', '2026-12-10', '2026-12-11'], ['2027-01-06', '2027-01-07', '2027-01-08']),
+    ('Natalia Rojas', 'ORD', 'MAD', 'us', ['2026-12-12'], ['2027-01-03', '2027-01-04'], 2),
+    ('José Rojas',    'BOG', 'MAD', 'co', ['2026-12-19', '2026-12-20', '2026-12-21'], ['2027-01-04', '2027-01-05', '2027-01-06', '2027-01-07'], 1),
+    ('María Zarrate', 'BOG', 'MAD', 'co', ['2026-12-09', '2026-12-10', '2026-12-11'], ['2027-01-06', '2027-01-07', '2027-01-08'], 1),
 ]
+ESCALAS_TXT = {1: 'directo', 2: 'máx. 1 escala'}
 JUNTOS = ('José Rojas', 'María Zarrate')   # los dos de Bogotá: se busca el día de regreso en que volver juntos sale más barato
 # nombres con los que se guardaron las primeras corridas (6 nov), para leerlas desde la base
 ALIAS = {'Chicago': 'Natalia Rojas', 'Bogotá 1': 'José Rojas', 'Bogotá 2': 'María Zarrate'}
@@ -45,7 +48,7 @@ def hoy_bogota():
     return (dt.datetime.utcnow() - dt.timedelta(hours=5)).date()
 
 
-def serpapi(origen, destino, gl, salida, regreso):
+def serpapi(origen, destino, gl, salida, regreso, stops=1):
     if DEMO:
         import random
         p = random.randint(900, 1600)
@@ -53,7 +56,7 @@ def serpapi(origen, destino, gl, salida, regreso):
                 'price_insights': {'lowest_price': p, 'price_level': 'typical', 'typical_price_range': [p - 100, p + 300]}}
     qs = urllib.parse.urlencode({'engine': 'google_flights', 'departure_id': origen, 'arrival_id': destino, 'outbound_date': salida,
                                  'return_date': regreso, 'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es',
-                                 'gl': gl, 'stops': 1, 'api_key': KEY})   # stops=1 = SOLO DIRECTOS (José, 6 nov)
+                                 'gl': gl, 'stops': stops, 'api_key': KEY})   # stops: 1 = solo directos, 2 = máx. 1 escala
     with urllib.request.urlopen('https://serpapi.com/search.json?' + qs, timeout=90) as r:
         return json.loads(r.read())
 
@@ -70,7 +73,7 @@ def mejor(resp):
     return dict(precio=o['price'], aerolinea=aer, escalas=len(o.get('layovers') or []), duracion_min=o.get('total_duration'), token=o.get('departure_token') or o.get('booking_token'))
 
 
-def vendedor(origen, destino, gl, salida, regreso, token):
+def vendedor(origen, destino, gl, salida, regreso, token, stops=1):
     """Quién vende la combinación más barata. Google Flights lo entrega en dos pasos más: con el departure_token de la ida
     devuelve las vueltas (cada una con booking_token); con el booking_token de la vuelta más barata devuelve quién la vende.
     Cuesta 2 consultas por persona."""
@@ -79,7 +82,7 @@ def vendedor(origen, destino, gl, salida, regreso, token):
     if not token:
         return None
     base = {'engine': 'google_flights', 'departure_id': origen, 'arrival_id': destino, 'outbound_date': salida, 'return_date': regreso,
-            'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es', 'gl': gl, 'stops': 1, 'api_key': KEY}
+            'type': 1, 'adults': 1, 'travel_class': 1, 'currency': 'USD', 'hl': 'es', 'gl': gl, 'stops': stops, 'api_key': KEY}
     def llamar(extra):
         with urllib.request.urlopen('https://serpapi.com/search.json?' + urllib.parse.urlencode({**base, **extra}), timeout=90) as r:
             return json.loads(r.read())
@@ -127,7 +130,7 @@ def ayer(persona, salida, regreso):
 
 def desde_base():
     """Lo último guardado HOY por combinación (sin consultar SerpApi)."""
-    gl_de = {p[0]: p[3] for p in PERSONAS}
+    gl_de = {p[0]: p[3] for p in PERSONAS}; st_de = {p[0]: p[6] for p in PERSONAS}
     j = leer({'select': 'persona,origen,destino,salida,regreso,precio,aerolinea,escalas,nivel,consultado_en,detalle', 'dia': 'eq.' + hoy_bogota().isoformat(),
               'order': 'consultado_en.desc', 'limit': 500})
     out, vistos = {}, set()
@@ -138,14 +141,14 @@ def desde_base():
         vistos.add(k)
         out.setdefault(persona, []).append(dict(p=float(r['precio']), salida=r['salida'], regreso=r['regreso'], aer=r['aerolinea'],
                                                 esc=r['escalas'] or 0, ayer=None, nivel=r['nivel'], url=(r.get('detalle') or {}).get('url') or link_google(r['origen'], r['destino'], r['salida'], r['regreso']),
-                                                vende=(r.get('detalle') or {}).get('vende'), o=r['origen'], d=r['destino'], gl=gl_de.get(persona, 'co'),
+                                                vende=(r.get('detalle') or {}).get('vende'), o=r['origen'], d=r['destino'], gl=gl_de.get(persona, 'co'), stops=st_de.get(persona, 1),
                                                 token=next((b.get('departure_token') for b in (r.get('detalle') or {}).get('best', []) if b.get('price') == float(r['precio'])), None)))
     # quién vende la más barata de cada persona (si no se averiguó cuando se guardó): una consulta por persona
     if KEY and not SOLO:
         for persona, ops in out.items():
             pm = min(ops, key=lambda x: x['p'])
             if not pm['vende']:
-                pm['vende'] = vendedor(pm['o'], pm['d'], pm['gl'], pm['salida'], pm['regreso'], pm['token']); print(persona, 'lo vende:', pm['vende'])
+                pm['vende'] = vendedor(pm['o'], pm['d'], pm['gl'], pm['salida'], pm['regreso'], pm['token'], pm['stops']); print(persona, 'lo vende:', pm['vende'])
     return out
 
 
@@ -203,13 +206,13 @@ def flecha(p, pa):
 def resumen_texto(resumen, errores):
     hoy = hoy_bogota().strftime('%d/%m')
     trm()
-    L = [f'✈️ <b>Vuelos a Madrid · {hoy}</b> (dólares y millones de pesos' + (f' a TRM {TRM:,.0f}'.replace(',', '.') if TRM else '') + ', ida y vuelta, económica, SOLO DIRECTOS)']
+    L = [f'✈️ <b>Vuelos a Madrid · {hoy}</b> (dólares y millones de pesos' + (f' a TRM {TRM:,.0f}'.replace(',', '.') if TRM else '') + ', ida y vuelta, económica)']
     niveles = {'low': 'barato', 'typical': 'normal', 'high': 'caro'}
-    for persona, o, d, gl, salidas, regresos in PERSONAS:
+    for persona, o, d, gl, salidas, regresos, stops in PERSONAS:
         ops = resumen.get(persona)
         if not ops:
             L.append(f'\n<b>{persona}</b> ({o}→{d}): sin datos hoy'); continue
-        L.append(f'\n<b>{persona}</b> ({o}→{d}) · vuelve el …')
+        L.append(f'\n<b>{persona}</b> ({o}→{d}, {ESCALAS_TXT[stops]}) · vuelve el …')
         for salida in sorted(set(x['salida'] for x in ops)):
             fila = sorted((x for x in ops if x['salida'] == salida), key=lambda x: x['regreso'])
             L.append(f'  sale {fmt(salida)} → ' + ' · '.join(f'{dia(x["regreso"])} ene {cop(x["p"])}{flecha(x["p"], x["ayer"])}' for x in fila))
@@ -240,11 +243,11 @@ def main():
     else:
         if not KEY and not DEMO:
             raise SystemExit('falta SERPAPI_KEY')
-        for persona, o, d, gl, salidas, regresos in PERSONAS:
+        for persona, o, d, gl, salidas, regresos, stops in PERSONAS:
             for salida in salidas:
                 for regreso in regresos:
                     try:
-                        resp = serpapi(o, d, gl, salida, regreso)
+                        resp = serpapi(o, d, gl, salida, regreso, stops)
                     except Exception as e:
                         errores.append(f'{persona} {salida}→{regreso}: {e}'); continue
                     m = mejor(resp)
@@ -258,11 +261,11 @@ def main():
                     pa, _ = ayer(persona, salida, regreso)
                     resumen.setdefault(persona, []).append(dict(p=m['precio'], salida=salida, regreso=regreso, aer=m['aerolinea'],
                                                                esc=m['escalas'], ayer=pa, nivel=pi.get('price_level'), token=m['token'],
-                                                               o=o, d=d, gl=gl, url=(resp.get('search_metadata') or {}).get('google_flights_url') or link_google(o, d, salida, regreso), vende=None))
+                                                               o=o, d=d, gl=gl, stops=stops, url=(resp.get('search_metadata') or {}).get('google_flights_url') or link_google(o, d, salida, regreso), vende=None))
                     print(persona, salida, regreso, m['precio'], m['aerolinea'], m['escalas'], 'escalas · ayer', pa)
         for persona, ops in resumen.items():
             pm = min(ops, key=lambda x: x['p'])
-            pm['vende'] = vendedor(pm['o'], pm['d'], pm['gl'], pm['salida'], pm['regreso'], pm['token'])
+            pm['vende'] = vendedor(pm['o'], pm['d'], pm['gl'], pm['salida'], pm['regreso'], pm['token'], pm['stops'])
             for f in filas:
                 if f['persona'] == persona and f['salida'] == pm['salida'] and f['regreso'] == pm['regreso']:
                     f['detalle']['vende'] = pm['vende']
