@@ -1417,6 +1417,7 @@ const App = {
     return `<div class="item"><div class="top"><div><div class="nom">${esc(c.cliente||c.folio||'—')}</div><div class="meta">${c.folio?esc(c.folio)+' · ':''}$${(+c.total||0).toLocaleString('es-CO')} · 📅 ${f}${cel?' · 📱 '+esc(cel):''}</div>${descHTML}</div>${ac}</div>
       <div class="acciones-item" style="align-items:center;gap:8px;flex-wrap:wrap">
         <button class="btn-sm" style="background:#e7f7ee;color:#16734a;border:1px solid #a9dfbd;font-weight:700" onclick="App.cotCopiarMsg('${c.id}')" title="Copia el mensaje de seguimiento para pegarlo en WhatsApp">💬 Copiar mensaje</button>
+        <button class="btn-sm" style="background:#eef2ff;color:#3a48b3;border:1px solid #c7d0f5;font-weight:700" onclick="App.cotProforma('${c.id}')" title="Abre la proforma para revisarla, imprimirla o guardarla en PDF">📄 Ver proforma</button>
         <button class="btn-sm" style="background:#16a34a;color:#fff;font-weight:700" onclick="App.cotAutorizar('${c.id}')">✅ Autorizar → pedido</button>
         <button class="btn-sm" style="background:#6b7280;color:#fff" onclick="App.cotEditar('${c.id}')">✏️ Modificar</button>
         <button class="btn-sm" style="background:#fde8e8;color:#b3261e" onclick="App.cotAnular('${c.id}')">❌ Anular</button>
@@ -1593,6 +1594,45 @@ const App = {
     const msg=`Hola${nomBonito?' '+nomBonito:''} 👋, ¿sigues interesado en la cotización que te compartimos el ${f}${c.folio?' ('+c.folio+')':''}? Estamos atentos a tus inquietudes. Te invitamos a visitar nuestra página https://smartempaques.co`;
     const ok=()=>this._toast('💬 Mensaje copiado · pégalo en el WhatsApp del cliente');
     try{ navigator.clipboard.writeText(msg).then(ok,()=>prompt('Copia el mensaje:',msg)); }catch(e){ prompt('Copia el mensaje:',msg); }
+  },
+  /* 📄 Proforma de una cotización de la cola (José, 10-nov-2026). Solo se MIRA: abre una hoja imprimible
+     (Ctrl+P → PDF) armada con lo guardado en la cotización; no toca nada en la base. */
+  cotProforma(id){
+    const c=this._findCot(id); if(!c) return;
+    const d=c.datos||{}; let it=d.productos; if(typeof it==='string'){ try{ it=JSON.parse(it); }catch(e){ it=[]; } } if(!Array.isArray(it)) it=[];
+    const $$=n=>'$'+Math.round(+n||0).toLocaleString('es-CO'), N=n=>(+n||0).toLocaleString('es-CO');
+    const sub0=it.reduce((a,x)=>a+(+x.subtotal||0),0), dsc=+d.descuento_valor||0;
+    const sub=+d.subtotal_sin_iva||(sub0-dsc), iva=+d.iva||Math.round(sub*0.19), fl=+d.flete||0, kit=+d.kit_muestras_precio||0, tot=+c.total||+d.total||(sub+iva+fl+kit);
+    const fila=(k,v)=>v?`<tr><td class="k">${k}</td><td>${esc(v)}</td></tr>`:'';
+    const entrega=[d.envio_dir,d.envio_barrio&&d.envio_barrio!==d.envio_dir?d.envio_barrio:'',d.envio_ciudad].filter(Boolean).join(' · ');
+    const html=`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Proforma ${esc(c.folio||'')}</title><style>
+      body{font-family:Arial,sans-serif;color:#1a1d24;margin:0;padding:24px;background:#eef0f3}
+      .h{max-width:760px;margin:0 auto;background:#fff;padding:28px 32px;border-radius:10px}
+      .top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1a1d24;padding-bottom:12px}
+      .top b{font-size:20px}.top small{display:block;color:#667;margin-top:3px}.pf{text-align:right}.pf b{font-size:22px;letter-spacing:.06em}
+      h4{margin:18px 0 6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#667}
+      table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:6px 4px;border-bottom:1px solid #e5e7eb;text-align:left}
+      th{font-size:11px;text-transform:uppercase;color:#667}.r{text-align:right}.k{color:#667;width:150px}
+      .t td{border:0;padding:3px 4px}.g td{border-top:2px solid #1a1d24;font-size:16px;font-weight:700;padding-top:8px}
+      .nota{font-size:11.5px;color:#667;margin-top:16px;line-height:1.5}
+      .bar{max-width:760px;margin:0 auto 12px;text-align:right}.bar button{padding:9px 16px;font-size:14px;border:0;border-radius:8px;background:#1a1d24;color:#fff;cursor:pointer}
+      @media print{body{background:#fff;padding:0}.bar{display:none}.h{border-radius:0;padding:0}}
+    </style></head><body><div class="bar"><button onclick="window.print()">🖨️ Imprimir / guardar PDF</button></div><div class="h">
+      <div class="top"><div><b>Smart Packaging Colombia</b><small>Envases herméticos</small></div><div class="pf"><b>PROFORMA</b><small>${esc(c.folio||'')}${d.fecha?' · '+esc(d.fecha):''}</small></div></div>
+      <h4>Cliente</h4><table>${fila('Razón social / nombre',d.empresa||c.cliente)}${fila('Contacto',d.contacto&&d.contacto!==(d.empresa||c.cliente)?d.contacto:'')}${fila('NIT / cédula',d.cedula_nit)}${fila('Dirección',[d.dir_factura,d.barrio_factura,d.ciudad_factura,d.dep_factura].filter(Boolean).join(', '))}${fila('Correo',d.correo)}${fila('Celular',d.celular||c.celular)}</table>
+      <h4>Entrega</h4><table>${fila('Dirección de entrega',entrega)}${fila('Recibe',d.envio_nombre)}${fila('Teléfono',d.envio_tel)}${fila('Transporte',d.transporte_nombre)}</table>
+      <h4>Detalle</h4><table><tr><th>Referencia</th><th>Color</th><th class="r">Unidades</th><th class="r">Precio unit.</th><th class="r">Subtotal</th></tr>
+      ${it.map(x=>`<tr><td>${esc(x.ref)}</td><td>${esc(x.color||'')}</td><td class="r">${N(x.qty)}</td><td class="r">${$$(x.precio)}</td><td class="r">${$$(x.subtotal)}</td></tr>`).join('')||'<tr><td colspan="5">Sin referencias</td></tr>'}</table>
+      <table class="t" style="margin-top:8px"><tr><td class="r">Subtotal sin IVA</td><td class="r" style="width:150px">${$$(sub0)}</td></tr>
+      ${dsc?`<tr><td class="r">Descuento${d.descuento_pct?' '+d.descuento_pct+'%':''}</td><td class="r">− ${$$(dsc)}</td></tr>`:''}
+      <tr><td class="r">IVA 19%</td><td class="r">${$$(iva)}</td></tr>
+      ${kit?`<tr><td class="r">Kit de muestras</td><td class="r">${$$(kit)}</td></tr>`:''}
+      <tr><td class="r">Flete</td><td class="r">${fl?$$(fl):'Incluido'}</td></tr>
+      <tr class="g"><td class="r">TOTAL A PAGAR</td><td class="r">${$$(tot)}</td></tr></table>
+      <div class="nota">Lista de precios: ${esc(d.lista_nombre||'')}. Documento informativo, no es factura de venta. Cotización válida 5 días hábiles. ${d.itinerario&&!/^Sin ruta|^Falta/.test(d.itinerario)?esc(d.itinerario):''}</div>
+    </div></body></html>`;
+    const w=window.open('','_blank'); if(!w){ this._toast('El navegador bloqueó la ventana: permite ventanas emergentes'); return; }
+    w.document.open(); w.document.write(html); w.document.close();
   },
   cotAnular(id){ this._anulId=id; this._anulMotivo=''; this._anulModal('cotización'); },
   _anulModal(que){
