@@ -327,7 +327,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261030-no-valido';
+const VER='20261111-pago-nuevo';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -449,9 +449,13 @@ let TARIFA_BASE=null;
 /* Bases de NICHO (mkr_bases.pago='hora'): se paga la hora validada + interesado
    + bonos de cotizacion y venta (mkr_bonos). Ver _PLAYBOOK/mkr_pago_por_hora.sql. */
 function porHora(b){ b=b||BASE; return !!(b && b.pago==='hora'); }
+/* PAGO NUEVO (José, 11-nov-2026; rige desde el 12-nov): interesado $1.000, cotización $1.500 (una o la otra) y $50 el resto.
+   Ya no hay pago por hora ni bono de venta: la base pasa todas las bases a pago='llamada' sola, a la medianoche.
+   La cotización deja de depender de "por hora": la tienen todas las bases menos las de Smart. Ver _PLAYBOOK/mkr_pago_nuevo_20261112.sql. */
+function conCotiz(b){ b=b||BASE; return !!(b && (b.cliente||'')!=='smart'); }
 let BONOS={};   // llamada_id -> {cotizacion:true, venta:true}
 async function cargarBonos(filas){
-  const ids=(filas||[]).filter(x=>x.base_id && porHora(TODAS_BASES[String(x.base_id)])).map(x=>x.id);
+  const ids=(filas||[]).filter(x=>x.base_id && conCotiz(TODAS_BASES[String(x.base_id)])).map(x=>x.id);
   for(let i=0;i<ids.length;i+=80){
     const d=await GET('mkr_bonos?select=llamada_id,tipo&llamada_id=in.('+ids.slice(i,i+80).join(',')+')');
     (Array.isArray(d)?d:[]).forEach(b=>{ (BONOS[b.llamada_id]=BONOS[b.llamada_id]||{})[b.tipo]=true; });
@@ -459,7 +463,7 @@ async function cargarBonos(filas){
 }
 async function darBono(llamadaId, tipo){
   if(tipo==='venta' && !esJefe()) return;
-  if(tipo==='venta' && !confirm('¿Ya llegó la consignación de este pedido? Se le abonan $5.000 a quien consiguió el interesado.')) return;
+  if(tipo==='venta' && !confirm('¿Ya llegó la consignación de este pedido? Queda registrada la venta. (Desde el 12-nov-2026 la venta ya no paga bono.)')) return;
   try{
     const r=await fetch(SB+'/rest/v1/mkr_bonos',{method:'POST',headers:{...H,Prefer:'return=minimal'},
       body:JSON.stringify({llamada_id:llamadaId, tipo:tipo})});
@@ -989,7 +993,9 @@ function pintarTarifas(){
     + (porHora() ? `<div class="t" style="border-top:1px dashed var(--line);margin-top:4px;padding-top:7px"><span>⏱️ Hora trabajada</span><b>${cop(t['Hora'])}</b></div>
        <div class="t"><span>📄 Pidió cotización</span><b>+${cop(t['Cotización'])}</b></div>
        <div class="t"><span>💰 Venta pagada</span><b>+${cop(t['Venta'])}</b></div>
-       <div style="font-size:11px;color:var(--faint);margin-top:4px">La hora se cuenta sola con tus llamadas: si pasan más de 5 min entre una y otra (15 después de un interesado) ese rato no cuenta, y se pide un ritmo de 25 llamadas por hora.</div>` : '');
+       <div style="font-size:11px;color:var(--faint);margin-top:4px">La hora se cuenta sola con tus llamadas: si pasan más de 5 min entre una y otra (15 después de un interesado) ese rato no cuenta, y se pide un ritmo de 25 llamadas por hora.</div>`
+       : (conCotiz() && +t['Cotización']>0 ? `<div class="t" style="border-top:1px dashed var(--line);margin-top:4px;padding-top:7px"><span>📄 Pidió cotización</span><b>${cop(t['Cotización'])}</b></div>
+       <div style="font-size:11px;color:var(--faint);margin-top:4px">Se paga una o la otra: si el interesado pide cotización, vale ${cop(t['Cotización'])} en lugar de los ${cop(t['Interesado'])} del interesado.</div>` : ''));
   if(CAT_ABIERTA) verCategoria(CAT_ABIERTA, true);
 }
 async function verCategoria(k, mantener){
@@ -1662,7 +1668,7 @@ function filaInteresado(x, equipo, verBase){
 /* Nicho: cotizacion (la marca quien llamo, o el jefe). Se paga a quien
    consiguio el interesado. */
 function filaBonos(x){
-  if(!x.base_id || !porHora(TODAS_BASES[String(x.base_id)])) return '';
+  if(!x.base_id || !conCotiz(TODAS_BASES[String(x.base_id)])) return '';
   const b=BONOS[x.id]||{};
   const btn='style="font-size:12px;padding:6px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line);background:transparent;color:inherit;font-family:inherit;font-weight:700"';
   const cot = b.cotizacion ? '<span style="color:#22c55e;font-size:12px;font-weight:700">📄 cotizó ✓</span>'
@@ -2376,7 +2382,9 @@ async function verSemanas(id,nombre){
   let tp=0,tg=0,debeTot=0,nDebe=0;
   const G = jefe ? '26px 86px 1fr auto auto' : '86px 1fr auto auto';
   const filas=claves.map(k=>{
-    const s=sem[k], pa=pagado[k]||0, debe=s.plata-pa;
+    /* Decisión de José (10-nov-2026): solo se debe la semana en curso; todas las anteriores están al día,
+       aunque en mkr_pagos falte la fila. Así no aparecen deudas viejas que ya se resolvieron por fuera. */
+    const s=sem[k], pa=(k<actual)?Math.max(pagado[k]||0,s.plata):(pagado[k]||0), debe=s.plata-pa;
     tp+=s.plata; tg+=pa;
     const puede = debe>0;                 // solo se puede pagar lo que se debe
     if(puede){ debeTot+=debe; nDebe++; }
@@ -2420,7 +2428,8 @@ async function verSemanas(id,nombre){
       <span style="font-size:12px;opacity:.6;cursor:pointer" onclick="verSemanas('${id||''}','${esc(nombre).replace(/'/g,'')}')">cerrar ✕</span>
     </div>
     ${filas}
-    <div class="foot" style="margin-top:8px">Producido <b class="mono">${cop(tp)}</b> · pagado <b class="mono" style="color:#22c55e">${cop(tg)}</b>${
+    <div class="foot" style="margin-top:8px;color:#22c55e">✔ Al día: solo se debe la semana en curso; las anteriores están pagadas.</div>
+    <div class="foot" style="margin-top:4px">Producido <b class="mono">${cop(tp)}</b> · pagado <b class="mono" style="color:#22c55e">${cop(tg)}</b>${
       tp-tg>0?' · <b class="mono" style="color:#f59e0b">le deben '+cop(tp-tg)+'</b>':''}</div>
     ${barra}
   </div>`;
