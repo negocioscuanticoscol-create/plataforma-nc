@@ -401,7 +401,7 @@ label.chk-on{background:var(--gl)!important;border-color:var(--gm)!important;col
     <div id="errbanner2" style="display:none;background:#fff0f0;border:1px solid #d63031;border-radius:12px;padding:10px 14px;font-size:13px;color:#d63031;margin-bottom:10px"></div>
     <div class="field" style="margin-bottom:12px"><label>📋 Nivel de lista de precios *</label>
       <select id="lista-sel" onchange="setListaSel(this.value)" style="width:100%;padding:11px;border:1px solid #d9d9d9;border-radius:10px;font-size:14px">
-        <option value="0">L1 Muestras</option><option value="1">L2 Pyme</option><option value="2">L3 Mayorista</option><option value="3">L4 Distribuidor</option><option value="4">L5 Convenio</option><option value="5">L6 Grandes empresas</option>
+        <option value="0">L1 Muestras</option><option value="1">L2 Pyme</option><option value="2">L3 Mayorista</option><option value="3">L4 Distribuidor</option><option value="4">L5 Convenio</option><option value="5">L6 Grandes empresas</option><option value="6">L7 Pinar del Río</option>
       </select>
       <div style="font-size:11.5px;color:#7a7a7a;margin-top:4px">Se carga la lista que usaste con este cliente. Cámbiala si aplica otro nivel.</div>
     </div>
@@ -528,7 +528,7 @@ const COLDOT = {transparente:'t', blanco:'b', negro:'n'};
 const KIT_PRECIO = 60000;
 const KIT_L2     = 60000;
 const KIT_COMISION = 8000;
-const LISTA_NAMES = ['L1 Muestras','L2 Pyme','L3 Mayorista','L4 Distribuidor','L5 Convenio','L6 Grandes empresas'];
+const LISTA_NAMES = ['L1 Muestras','L2 Pyme','L3 Mayorista','L4 Distribuidor','L5 Convenio','L6 Grandes empresas','L7 Pinar del Río'];
 /* L6 no es un escalon mas de la escalera: es una lista MEZCLADA, pensada para
    las grandes empresas. Por eso no existe t[5] en ningun producto — el precio
    se arma tomando de las columnas que ya hay (ver precioLinea).
@@ -543,6 +543,14 @@ const EG_PRECIO = {f1001:1290};            // precio propio en L6 (juego vaso + 
 function precioEg(s){ return EG_PRECIO[s.prod.id] || s.prod.t[L_CONVENIO]; }
 const EG_PCT = 0.035;                      // ...y dejan 3,5% de comision
 function esEgConv(s){ return EG_CONVENIO.indexOf(s.prod.id) >= 0; }
+/* L7 Pinar del Río (José, 11-nov-2026): Industrias Alimenticias Pinar del Río SAS (Barranquilla).
+   Precio propio por unidad (envase + tapa, antes de IVA) en tres referencias, ENVÍO INCLUIDO en el precio
+   (no se suma flete) y 3,5% de comisión sobre el valor vendido. Cualquier otra referencia cae a
+   mayorista (L3) y comisiona como siempre. Es una lista de UN cliente: no tocar L6 (Indasan). */
+const L_PINAR = 6;
+const PINAR_PRECIO = {f240:652.20, f565:1128, f1001:1505};
+const PINAR_PCT = 0.035;
+function esPinar(s){ return PINAR_PRECIO[s.prod.id] != null; }
 const allProds = () => [...CAT.fp, ...CAT.pm, ...CAT.nr];
 
 let tipo = 'nat', envioDif = false, pedidoMuestras = false, tipoTransporte = 'incluido', kitTipo = '60';
@@ -719,6 +727,7 @@ function esFleteLegacy(){
 }
 
 function calcFlete(selItems){
+  if(listaActiva === L_PINAR) return 0;   // Pinar del Río: el envío va incluido en el precio de cada unidad
   const legacy=esFleteLegacy();
   const precioPaca   = legacy?FLETE_PACA_LEGACY:FLETE_PACA_NUEVA;
   const precioPacaPM = legacy?FLETE_PACA_PM_LEGACY:FLETE_PACA_PM_NUEVA;
@@ -985,7 +994,7 @@ function buildResumen(){
   let itemsHTML=sel.map(s=>{
     const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP';
     const clabel=s.color==='blanco'?'Blanco':'Transparente';
-    const precio=precioLinea(s); const subtotal=s.qty*precio; subBase+=subtotal;
+    const precio=precioLinea(s); const subtotal=Math.round(s.qty*precio); subBase+=subtotal;
     const listaLabel=promoOn?'precio especial':LISTA_NAMES[listaActiva];
     return `<div class="srow"><div class="srl">${group} ${s.prod.v} · ${clabel}<small>${fmtN(s.qty)} uds × ${fmt(precio)} s/IVA · ${listaLabel}</small></div><div class="srr">${fmt(subtotal)}</div></div>`;
   }).join('');
@@ -1087,6 +1096,7 @@ const PETMULTI1000_PCT = 0.035;
 function esPetMulti1000(s){ return s.prod.id==='pm1000'; }
 function precioLinea(s){
   if(esPetMulti1000(s)) return s.prod.t[2];                                  // pm1000 SIEMPRE mayorista
+  if(listaActiva === L_PINAR) return esPinar(s) ? PINAR_PRECIO[s.prod.id] : s.prod.t[2];
   if(listaActiva === L_EMPRESA) return esEgConv(s) ? precioEg(s) : s.prod.t[L_DISTRIB];
   return s.prod.t[listaActiva];
 }
@@ -1105,7 +1115,9 @@ function calcDescuento(subBase, sel){
 }
 function calcComision(sel){
   let com;
-  if(listaActiva === L_EMPRESA){
+  if(listaActiva === L_PINAR){
+    com = sel.reduce((a, s) => esPinar(s) ? a + s.qty*PINAR_PRECIO[s.prod.id]*PINAR_PCT : a + s.qty*(s.prod.t[2] - s.prod.t[4]), 0);
+  } else if(listaActiva === L_EMPRESA){
     /* Grandes empresas: el 520 y el 1.000 se venden a convenio (el 1.000 a $1.290) pero SI dejan 3,5%
        (si no, ese precio no le dejaria nada a quien vende). El resto comisiona
        como siempre: la diferencia contra el convenio. */
@@ -1130,7 +1142,7 @@ function calcComision(sel){
 
 async function registrarEnSheets(estadoCot, irAPedidos){
   const sel=getSel(); const IVA=0.19; let subBase=0;
-  const productos=sel.map(s=>{ const precio=precioLinea(s); const subtotal=s.qty*precio; subBase+=subtotal; const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; return { ref:group+' '+s.prod.v, color:COLNOM[s.color]||'Transparente', qty:s.qty, precio, subtotal }; });
+  const productos=sel.map(s=>{ const precio=precioLinea(s); const subtotal=Math.round(s.qty*precio); subBase+=subtotal; const group=CAT.pm.some(p=>p.id===s.prod.id)?'PetMulti PET':CAT.nr.some(p=>p.id===s.prod.id)?'Nueva Ref':'Flexipack PP'; return { ref:group+' '+s.prod.v, color:COLNOM[s.color]||'Transparente', qty:s.qty, precio, subtotal }; });
   const DSC=calcDescuento(subBase, sel); const subNeto=subBase-DSC.valor;
   const iva=Math.round(subNeto*IVA);
   const totalUds=sel.reduce((a,s)=>a+s.qty,0);
