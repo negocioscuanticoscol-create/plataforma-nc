@@ -15,7 +15,8 @@ const k=s=>String(s||'').trim().toLowerCase();
 async function cargarCob(cli){
   if(COB_CLI===cli && COB.length) return;
   const r=await GET('mkr_cobertura_geo?select=base_id,nicho,geo_depto,geo_municipio,geo_localidad,total,con_telefono,por_llamar,llamadas&cliente=eq.'+encodeURIComponent(cli)+'&limit=5000');
-  COB=(Array.isArray(r)?r:[]).map(x=>({base_id:String(x.base_id), nicho:x.nicho, depto:x.geo_depto||SIN, muni:x.geo_municipio||SIN, loc:x.geo_localidad||'', total:+x.total||0, tel:+x.con_telefono||0, por_llamar:+x.por_llamar||0, llamadas:+x.llamadas||0}));
+  if(!Array.isArray(r)){ COB=[]; COB_CLI=''; toast('No se pudo contar lo que queda (error '+GET.estado+'). Recarga la página.',true); return; }   // 18-nov-2026: antes un fallo se mostraba como "no tienes nichos"
+  COB=r.map(x=>({base_id:String(x.base_id), nicho:x.nicho, depto:x.geo_depto||SIN, muni:x.geo_municipio||SIN, loc:x.geo_localidad||'', total:+x.total||0, tel:+x.con_telefono||0, por_llamar:+x.por_llamar||0, llamadas:+x.llamadas||0}));
   COB_CLI=cli;
 }
 async function cargarPob(){

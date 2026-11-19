@@ -354,7 +354,7 @@ async function GETALL(p){
   const sep=base.includes('?')?'&':'?';
   const out=[];
   for(let i=0,off=0;i<60;i++,off+=1000){
-    let r; try{ r=await fetch(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H}); }catch(e){ break; }
+    let r; try{ r=await conReintento(SB+'/rest/v1/'+base+sep+'limit=1000&offset='+off,{headers:H}); }catch(e){ break; }
     if(!r.ok) break;
     let b; try{ b=await r.json(); }catch(e){ break; }
     if(!Array.isArray(b)||!b.length) break;
@@ -363,8 +363,19 @@ async function GETALL(p){
   }
   return out;
 }
+/* 18-nov-2026: la base le da a la app solo 3 s por consulta (statement_timeout del rol anon) y las vistas que cuentan lo que queda
+   (mkr_mapa_bases, mkr_cobertura_geo) tardan 1-4 s: a veces responden 500 y la pantalla decia "0 por llamar" / "No tienes nichos con
+   prospectos" aunque quedaban miles. Sara y Maria Fernanda creyeron que no tenian datos. Ahora un 5xx o un corte de red se REINTENTA. */
+async function conReintento(url,opts){
+  let r;
+  for(let i=0;i<4;i++){
+    try{ r=await fetch(url,opts); if(r.status<500) return r; }catch(e){ r=null; }
+    await new Promise(f=>setTimeout(f,700*(i+1)));
+  }
+  if(r) return r; throw new Error('sin red');
+}
 async function GET(p){
-  try{ const r=await fetch(SB+'/rest/v1/'+p,{headers:H});
+  try{ const r=await conReintento(SB+'/rest/v1/'+p,{headers:H});
     GET.estado=r.status;
     return r.ok?await r.json():null;
   }catch(e){ GET.estado=0; return null; }
