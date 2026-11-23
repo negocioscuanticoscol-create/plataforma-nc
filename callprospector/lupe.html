@@ -298,6 +298,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
   <div class="plata">
     <div class="lbl">Ganado hoy</div>
     <div class="val mono" id="plata">$0</div>
+    <div class="corte" id="tiempoHoy" style="font-size:13px;margin-top:4px"></div>
     <div class="pend" id="pend"></div>
     <div class="corte" id="corteHoy"></div>
     <div class="corte" id="repHoy" style="cursor:pointer" onclick="verRepetidos()"></div>
@@ -327,7 +328,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261111-pago-nuevo';
+const VER='20261123-tiempo-trabajado';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -1960,14 +1961,15 @@ function abrirPanel(fila,l,tarifa){
     <input id="pW" inputmode="tel" placeholder="WhatsApp" value="${esc(soloNum(l.cel))}">
     <input id="pW2" inputmode="tel" placeholder="Otro celular (si dan uno distinto)">
     <input id="pM" inputmode="email" placeholder="Correo">
-<!-- Cotizacion: sale en TODA base (14-oct-2026). Al marcarla pide los pares. El bono de $1.000 solo
-         lo paga la base que lo tenga en mkr_tarifa_base (hoy, las de hora). -->
-    <label style="display:flex;gap:9px;align-items:center;margin:4px 0 8px;font-size:13.5px;font-weight:700;cursor:pointer">
+<!-- Cotizacion: solo en las bases cuyo cliente tiene modulo de cotizar (20-nov-2026, Jose). En las de
+         Smart no sale: alla no se cotiza por pares y la casilla se estaba marcando en queserias. La base de
+         datos ya le ponia $0 a ese bono; esto quita la casilla para que ni siquiera se pueda marcar. -->
+    ${conCotiz()?`<label style="display:flex;gap:9px;align-items:center;margin:4px 0 8px;font-size:13.5px;font-weight:700;cursor:pointer">
       <input type="checkbox" id="pCot" style="width:20px;height:20px;accent-color:#22c55e" onchange="const q=$('pParesBox'); if(q){ q.style.display=this.checked?'block':'none'; if(this.checked) $('pPares').focus(); }">
       📄 Pidió cotización${(+tarifas()['Cotización']||0)>0?` <small style="font-weight:500;opacity:.75">(+${cop(tarifas()['Cotización'])})</small>`:''}</label>
     <div id="pParesBox" style="display:none;margin:0 0 8px">
       <input id="pPares" type="number" inputmode="numeric" min="1" step="1" placeholder="¿Cuántos pares quiere cotizar?">
-    </div>
+    </div>`:''}
     <!-- UN solo boton. Antes eran tres —Enviar info, Pendiente y Catalogo
          enviado— y en mitad de una llamada hay que decidir cual, sin que la
          diferencia entre ellos se vea en pantalla. Aqui solo se guarda lo que
@@ -1992,7 +1994,7 @@ async function guardarPanel(id,tarifa,catalogo){
   const c=($('pC')||{}).value||'', m=($('pM')||{}).value||'';
   const w2=($('pW2')||{}).value||'';
   let w=($('pW')||{}).value||'';
-  const cotiza=!!($('pCot')||{}).checked;
+  const cotiza=conCotiz() && !!($('pCot')||{}).checked;
   const pares=parseInt(($('pPares')||{}).value,10)||0;
   if(cotiza && pares<1){ toast('Escribe cuántos pares quiere cotizar',true); const q=$('pPares'); if(q) q.focus(); return; }
   /* Si mando el catalogo y no escribio otro WhatsApp, es al numero que tiene en
@@ -2074,12 +2076,27 @@ function verRepetidos(){
   if(!REP_HOY.length){ toast('✅ Hoy no se ha repetido ninguna empresa'); return; }
   alert('EMPRESAS LLAMADAS MAS DE UNA VEZ HOY\n\n'+REP_HOY.map(r=>'• '+(r.nombre||'?')+' ('+(r.tel||'')+')\n   '+(r.base||'')+'\n   '+(r.detalle||r.agentes||'')).join('\n\n'));
 }
+/* TIEMPO TRABAJADO (23-nov-2026, pedido de Sara y María Fernanda): debajo de «Ganado hoy» se ve cuánto llevan trabajando hoy y en la semana.
+   Cuenta como trabajo el marcar seguido: si pasan más de 5 minutos entre una llamada y la siguiente (15 si la anterior fue un Interesado),
+   ese rato no cuenta. «Hoy» empieza en cero cada día; «semana» acumula de lunes a domingo. La cuenta la hace la base (mkr_tiempo_trabajo),
+   con la misma regla que ya usa mkr_horas_dia para pagar por hora. */
+const hmTiempo=m=>{ m=Math.max(0,Math.round(+m||0)); const h=Math.floor(m/60), mm=m%60; return h?h+' h '+(mm<10?'0':'')+mm+' min':mm+' min'; };
+let _tmpUlt=0, _tmpInt=null;
+async function pintarTiempo(forzar){
+  const e=$('tiempoHoy'); if(!e||!YO||!YO.id) return;
+  if(!_tmpInt) _tmpInt=setInterval(()=>pintarTiempo(true),60000);
+  if(!forzar && Date.now()-_tmpUlt<15000) return; _tmpUlt=Date.now();
+  const r=await RPC('mkr_tiempo_trabajo',{p_agente:YO.id});
+  if(!r||typeof r!=='object') return;
+  e.innerHTML='⏱️ Hoy <b>'+hmTiempo(r.hoy_min)+'</b>'+(r.abierto?' <span style="color:var(--ok)">● marcando</span>':'')+' · Semana <b>'+hmTiempo(r.semana_min)+'</b>';
+}
 function pintarPlata(bump){
   /* El numero de marcaciones al lado de la plata: sin el, uno no sabe si el
      dia rindio poco porque llamo poco o porque los resultados pagaron poco. */
   const e=$('plata'); e.textContent=cop(miPlata)+(misLlamadas?'  ('+num(misLlamadas)+')':'');
   if(bump){ e.classList.add('bump'); setTimeout(()=>e.classList.remove('bump'),190); }
   $('pend').textContent = pendientes ? ('⏳ '+pendientes+' interesado(s) sin datos — no pagan todavía') : '';
+  pintarTiempo(!!bump);
 }
 
 /* ==================== TABLERO REAL ==================== */
