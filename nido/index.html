@@ -464,9 +464,14 @@ const d=await _paginar(this.SB+'/rest/v1/'+t+'?select=*&order=creado_en.desc',th
       T.venta+=c.venta; T.iva+=c.iva; T.costo+=c.costo; T.com+=c.com; T.rep+=c.rep; T.tRes+=c.tRes; });
     const gas=this._gas||[];
     const inv=gas.filter(g=>g.tipo==='inversion').reduce((a,g)=>a+(+g.monto||0),0);
-    const otros=gas.filter(g=>g.tipo!=='inversion'&&g.tipo!=='pauta').reduce((a,g)=>a+(+g.monto||0),0);
+    /* 23-nov-2026: la pauta de Meta ya quedó cargada semana por semana en la pestaña Gastos (categoría «Mercadeo y pauta», concepto «Pauta Meta · …»).
+       Esas filas NO se suman otra vez como «otros», y la pauta de Meta se toma de lo mayor entre lo cargado y lo que lee el tablero (así no se cuenta doble
+       y, si el tablero trae más reciente, gana ese). */
+    const esMeta=g=>g.categoria==='Mercadeo y pauta'&&/^Pauta Meta/i.test(g.concepto||'');
+    const otros=gas.filter(g=>g.tipo!=='inversion'&&g.tipo!=='pauta'&&!esMeta(g)).reduce((a,g)=>a+(+g.monto||0),0);
     const pautaMan=gas.filter(g=>g.tipo==='pauta').reduce((a,g)=>a+(+g.monto||0),0);
-    const pauta=(this._liqPauta||0)+pautaMan;
+    const pautaMeta=gas.filter(esMeta).reduce((a,g)=>a+(+g.monto||0),0);
+    const pauta=Math.max(this._liqPauta||0,pautaMeta)+pautaMan;
     const neto=T.rep-pauta-otros;              // antes de tocar la inversión
     const porRecup=Math.max(0,inv-Math.max(0,neto));
     const libre=neto-Math.min(inv,Math.max(0,neto));
