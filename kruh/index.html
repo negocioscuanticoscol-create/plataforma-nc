@@ -193,6 +193,20 @@ const App={
     const ventasReales=m=>{ const i=this.MESNOM.findIndex(x=>x&&m&&x.toLowerCase()===String(m).toLowerCase()); return i>0?(ventasPorMes[i]||0):0; };
     const liveVentas=ventas.filter(v=>new Date(v.creado_en)>=mesIni).reduce((a,v)=>a+(+v.monto||0),0);
     let liveCosto=0; peds.forEach(p=>{ if(new Date(p.creado_en)<mesIni)return; (p.items||[]).forEach(it=>{liveCosto+=(+it.qty||0)*(costoProd[it.producto_id]||0);}); });
+    /* (24 nov 2026) Costo y gastos reales de CADA mes del año, igual que las ventas: antes los meses viejos
+       salían con utilidad neta = ventas porque kruh_dashboard tiene costo y gastos en 0. El costo sale de los
+       pedidos del mes por la receta de hoy; los gastos, de la pestaña Gastos. */
+    const costoPorMes={}, gastoPorMes={};
+    peds.forEach(p=>{ const d=new Date(p.creado_en); if(isNaN(d)||d.getFullYear()!==now.getFullYear())return;
+      let c=0; (p.items||[]).forEach(it=>{c+=(+it.qty||0)*(costoProd[it.producto_id]||0);}); costoPorMes[d.getMonth()+1]=(costoPorMes[d.getMonth()+1]||0)+c; });
+    gastos.forEach(g=>{ const ym=(g.fecha||g.creado_en||'').slice(0,7); if(ym.slice(0,4)!==String(now.getFullYear()))return;
+      gastoPorMes[+ym.slice(5,7)]=(gastoPorMes[+ym.slice(5,7)]||0)+(+g.monto||0); });
+    const idxMes=m=>this.MESNOM.findIndex(x=>x&&m&&x.toLowerCase()===String(m).toLowerCase());
+    const costoReal=m=>costoPorMes[idxMes(m)]||0, gastoReal=m=>gastoPorMes[idxMes(m)]||0;
+    /* Los meses con ventas en la app entran a la lista aunque nadie los haya agregado a mano (faltaban octubre y noviembre). */
+    Object.keys(ventasPorMes).forEach(k=>{ const nombre=this.MESNOM[+k]; if(!nombre)return;
+      if(!meses.some(m=>m.mes&&m.mes.toLowerCase()===nombre.toLowerCase())) meses.push({mes:nombre,orden:+k,ventas:0,costo:0,gastos:0,meta:0,_auto:true}); });
+    meses.sort((a,b)=>rango(b)-rango(a));
     const manual=meses.find(m=>m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase())||{ventas:0,costo:0,meta:40000000};
     const auto=liveVentas>0;
     const ventasM=auto?liveVentas:(+manual.ventas||0), costo=liveCosto>0?liveCosto:(+manual.costo||0);
@@ -209,7 +223,7 @@ const App={
     const uneta=ubruta-gastosM;
     const vMes=m=>{const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase(); if(es)return ventasM; const r=ventasReales(m.mes); return r>0?r:(+m.ventas||0);};
     const registrados=leads.length, nuevosMes=leads.filter(l=>new Date(l.creado_en)>=mesIni).length;
-    this._dashCtx={meses,mesNom,auto,costo,gastosM,meta,ventasReales,vMes,ventas};
+    this._dashCtx={meses,mesNom,auto,costo,gastosM,meta,ventasReales,vMes,ventas,costoReal,gastoReal};
     this.set(`<h1>Dashboard</h1><div class="sub">${esc(mesNom)} ${auto?'· <span style="color:var(--ok);font-weight:700">automático con las ventas del mes</span>':'· simulado (al ingresar pedidos se calcula solo)'} · meta ${money(meta)}</div>
       <div class="kpis">
         <div class="kpi dark"><b>${money(ventasM)}</b><span>Ventas del mes</span></div>
@@ -301,10 +315,12 @@ const App={
      sin volver a pedirle nada a la base. */
   _dashLista(){
     const c=this._dashCtx; if(!c) return '';
-    const {meses,mesNom,auto,costo,gastosM,meta,ventasReales,vMes}=c, abierto=this._dashMes||'';
+    const {meses,mesNom,auto,costo,gastosM,meta,ventasReales,vMes,costoReal,gastoReal}=c, abierto=this._dashMes||'';
     return (meses||[]).map(m=>{
       const es=m.mes&&m.mes.toLowerCase()===mesNom.toLowerCase();
-      const v=vMes(m),cc=es?costo:(+m.costo||0),gg=es?gastosM:(+m.gastos||0),nn=v-cc-gg;
+      /* mes en curso: lo de arriba; meses pasados: costo de sus pedidos y gastos de su pestaña (si el mes está
+         cerrado 🔒 mandan los gastos escritos a mano); si no hay nada registrado, lo que se escribió a mano */
+      const v=vMes(m),cc=es?costo:(costoReal(m.mes)||+m.costo||0),gg=es?gastosM:(m.cerrado?(+m.gastos||0):(gastoReal(m.mes)||+m.gastos||0)),nn=v-cc-gg;
       const mt=+m.meta||meta,pct=mt>0?Math.min(100,v/mt*100):0,ab=abierto===m.mes;
       return `<div class="item"${ab?' style="border-color:var(--acc)"':''}><div class="top">
         <div style="cursor:pointer;flex:1" onclick="App.dashMes('${esc(m.mes)}')">
