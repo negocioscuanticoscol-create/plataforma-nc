@@ -25,6 +25,7 @@ button,a.b{font:inherit;border:0;border-radius:9px;padding:9px 12px;cursor:point
 .info{min-width:0}.msg{background:var(--bg);border-radius:8px;padding:9px 10px;margin:8px 0 0;font-size:13px}
 .tel{background:var(--card);color:var(--tx);border:2px solid var(--az);font-size:17px;letter-spacing:.5px;padding:7px 12px;margin-top:6px}.tel small{display:block;font-size:11px;color:var(--mu);font-weight:400;letter-spacing:0}
 .acc{display:flex;flex-direction:column;gap:6px;min-width:150px}.acc button,.acc a.b{width:100%;text-align:center;white-space:nowrap}.acc .g{background:var(--ver)}.acc .s{background:var(--mu)}.acc .ok{background:var(--card);color:var(--ver);border:2px solid var(--ver);cursor:default}
+.card.hecho{opacity:.6;background:var(--bg)}.card.hecho h3{color:var(--mu)}.tel.off{display:inline-block;border-color:var(--bd);color:var(--mu);border-radius:9px;font-weight:600}.msg.ok{color:var(--ver);font-weight:700}
 #aviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ver);color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:9}#aviso.on{opacity:1;transform:translateX(-50%)}
 @media(max-width:640px){.card{grid-template-columns:1fr}.acc{flex-direction:row;flex-wrap:wrap}.acc button,.acc a.b{width:auto;flex:1 1 45%}}
 .row{display:flex;gap:8px;margin:10px 0}#err{color:var(--rj);min-height:22px}
@@ -41,7 +42,7 @@ body.emb header{display:none}body.emb #login{margin:30px auto}body.emb{padding-b
 <div class="grid" id="lista"></div>
 </div></div>
 <script>
-const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261124-2';
+const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261124-3';
 let D=[],clave='',cajon='ya',modo='ped',cajonM='todas';
 const FR={todas:['Todas las muestras',[0,1e9]],f0:['Menos de 10 días',[0,10]],f1:['10 a 20 días',[10,20]],f2:['20 a 30 días',[20,30]],f3:['30 a 45 días',[30,45]],f4:['Más de 45 días',[45,1e9]],perd:['Perdidos',null]};
 const franjaDe=d=>d<10?'Menos de 10 días':d<20?'10 a 20 días':d<30?'20 a 30 días':d<45?'30 a 45 días':'Más de 45 días';
@@ -69,13 +70,15 @@ function pintar(){
   $('lista').innerHTML=L.map(card).join('')||'<p class="mu">Nada aquí</p>'}
 function card(p){const cel=(p.celular||'').replace(/\D/g,''),cls=p.estado==='TOCA YA'?'y':p.estado.startsWith('Tocó')?'r':p.estado.startsWith('Toca en')?'o':'';
   const telBonito=cel.length===10?cel.slice(0,3)+' '+cel.slice(3,6)+' '+cel.slice(6):cel;
-  return `<div class="card${esteMes(p)?' mes':''}" data-r="${p.rank}"><div class="info"><h3><span class="n">#${p.rank}</span>${esc(p.empresa)}</h3>
+  /* Ya enviado HOY: la tarjeta queda cerrada (sin copiar celular ni mensaje) para no tomarla dos veces ni pegarle a otro el mensaje que no era. */
+  const hecho=!!p.veces_enviado&&p.dias_enviado===0;
+  return `<div class="card${esteMes(p)?' mes':''}${hecho?' hecho':''}" data-r="${p.rank}"><div class="info"><h3><span class="n">#${p.rank}</span>${esc(p.empresa)}</h3>
   <div class="mu">${p.tipo==='muestra'?`Muestra enviada ${esc(p.fecha_muestra)} (hace ${p.dias_muestra} días) · kit ${m(p.total)}`:`<b>${m(p.total)}</b> · ${p.compras} compra${p.compras>1?'s':''} · última ${esc(p.ultima)} (${p.dias_sin} días) · ciclo ${p.ciclo} d`}</div>
   <div>${esteMes(p)?'<span class="pill m">Compró este mes</span>':''}${p.tipo==='muestra'?`<span class="pill ${p.dias_muestra>=45?'r':p.dias_muestra>=30?'o':p.dias_muestra>=10?'y':''}">${franjaDe(p.dias_muestra)}</span>`:`<span class="pill ${cls}">${esc(p.estado)}</span><span class="pill">próxima ${esc(p.proxima)}</span>`}${p.veces_enviado?`<span class="pill ${contactable(p)?'y':'o'}">Enviado ${esc(p.enviado)} (hace ${p.dias_enviado} d${p.veces_enviado>1?' · '+p.veces_enviado+' veces':''})</span>`:'<span class="pill">Sin enviar</span>'}</div>
   ${p.perdido?`<div class="mu"><span class="pill r">PERDIDO</span>${esc(p.motivo)}</div>`:''}${p.ultimo_pedido?`<div class="mu">${esc(p.ultimo_pedido)}</div>`:''}
-  ${cel?`<button class="tel" data-c="${cel}" title="Tocar para copiar">📞 ${telBonito}<small>tocar para copiar</small></button>`:'<span class="pill r">SIN CELULAR</span>'}
-  <div class="msg">${esc(p.mensaje)}</div></div>
-  <div class="acc"><button class="s" data-m="1">📋 Copiar mensaje</button>${p.veces_enviado&&p.dias_enviado===0?'<button class="ok" disabled>✓ Enviado hoy</button>':'<button class="g" data-e="1">📤 Enviado</button>'}<button class="${p.perdido?'g':'r'} pd" data-p="1" style="${p.perdido?'':'background:var(--rj)'}">${p.perdido?'↩ Recuperar':'🚫 Perdido'}</button></div></div>`}
+  ${hecho?`<div class="tel off">📞 ${telBonito}<small>ya se le escribió hoy</small></div>`:cel?`<button class="tel" data-c="${cel}" title="Tocar para copiar">📞 ${telBonito}<small>tocar para copiar</small></button>`:'<span class="pill r">SIN CELULAR</span>'}
+  ${hecho?'<div class="msg ok">✓ Mensaje enviado hoy. Esta tarjeta queda cerrada hasta mañana.</div>':`<div class="msg">${esc(p.mensaje)}</div>`}</div>
+  <div class="acc">${hecho?'<button class="ok" disabled>✓ Enviado hoy</button>':'<button class="s" data-m="1">📋 Copiar mensaje</button><button class="g" data-e="1">📤 Enviado</button>'}<button class="${p.perdido?'g':'r'} pd" data-p="1" style="${p.perdido?'':'background:var(--rj)'}">${p.perdido?'↩ Recuperar':'🚫 Perdido'}</button></div></div>`}
 function aviso(t){let a=$('aviso');if(!a){a=document.createElement('div');a.id='aviso';document.body.appendChild(a)}a.textContent=t;a.className='on';clearTimeout(aviso.t);aviso.t=setTimeout(()=>a.className='',1800)}
 async function marcar(p){let mot='';
   if(!p.perdido){mot=prompt('Marcar como PERDIDO: '+p.empresa+' - Motivo (opcional):','');if(mot===null)return}
