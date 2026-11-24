@@ -1,0 +1,23 @@
+name: recompra_smart
+
+# Recompra de Smart al día, sola (9 nov 2026). La tabla smart_recompra era una foto del 9-oct y cada compra nueva desaparecía de "última compra".
+# Todos los SÁBADOS a las 6 a. m. de Bogotá (José, 24 nov 2026: el cuadro se revisa los sábados) baja los pedidos y ventas,
+# recalcula quién ya compró, cada cuánto y a quién le toca, y reemplaza la tabla. También se puede correr a mano desde GitHub → Actions → recompra_smart → Run workflow.
+# Secreto: SR_ADMIN (clave propia de este proceso; vive en la tabla sr_admin de la base). Si falla, la corrida sale en rojo en GitHub Actions.
+on:
+  schedule:
+    - cron: '0 11 * * 6'
+  workflow_dispatch:
+jobs:
+  recalcular:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recalcular la recompra de Smart
+        env:
+          SR_ADMIN: ${{ secrets.SR_ADMIN }}
+        run: python .github/scripts/recompra_smart.py
