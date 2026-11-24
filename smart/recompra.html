@@ -36,16 +36,26 @@ body.emb header{display:none}body.emb #login{margin:30px auto}body.emb{padding-b
 <div id="app" hidden>
 <header><div class="wrap"><h1>Smart · clientes y recompra</h1><small id="sub"></small></div></header>
 <div class="wrap">
-<div class="tabs" id="modo" style="grid-template-columns:repeat(2,1fr)"></div>
+<div class="tabs" id="modo" style="grid-template-columns:repeat(3,1fr)"></div>
 <div class="tabs" id="tabs"></div>
 <div class="row"><input id="q" type="search" placeholder="Buscar empresa o celular…"><select id="env" style="max-width:230px"><option value="">Todos (enviados o no)</option><option value="ok">Contactables: sin envío o más de 15 días</option><option value="rec">Enviados hace 15 días o menos</option></select><select id="ord" style="max-width:200px"><option value="mayor">Mayor a menor compra</option><option value="dias">Más días sin comprar</option><option value="proxima">Próxima compra</option></select></div>
 <div class="grid" id="lista"></div>
 </div></div>
 <script>
-const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261124-3';
-let D=[],clave='',cajon='ya',modo='ped',cajonM='todas';
+const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261124-4';
+/* 24 nov 2026 (José): tercer cajón COTIZACIONES (las de nc_cotizaciones en curso, rpc sr_cotizaciones) con el mismo formato.
+   Regla: si un cliente tiene cotización en curso, se saca de Pedidos y de Muestras, para trabajarlo en UN solo sitio. */
+let D=[],C=[],clave='',cajon='ya',modo='ped',cajonM='todas',cajonC='todas';
 const FR={todas:['Todas las muestras',[0,1e9]],f0:['Menos de 10 días',[0,10]],f1:['10 a 20 días',[10,20]],f2:['20 a 30 días',[20,30]],f3:['30 a 45 días',[30,45]],f4:['Más de 45 días',[45,1e9]],perd:['Perdidos',null]};
+const FRC={todas:['Todas las cotizaciones',[0,1e9]],c0:['Menos de 7 días',[0,7]],c1:['7 a 15 días',[7,15]],c2:['15 a 30 días',[15,30]],c3:['Más de 30 días',[30,1e9]],perd:['Perdidas',null]};
 const franjaDe=d=>d<10?'Menos de 10 días':d<20?'10 a 20 días':d<30?'20 a 30 días':d<45?'30 a 45 días':'Más de 45 días';
+const franjaC=d=>d<7?'Menos de 7 días':d<15?'7 a 15 días':d<30?'15 a 30 días':'Más de 30 días';
+const normN=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\b(S\.?A\.?S\.?|SAS|LTDA|S\.?A\.?)\b/g,' ').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+let EXC_CEL=new Set(),EXC_NOM=new Set();
+function prepararCot(){
+  C.forEach((p,i)=>{p.rank='c'+(i+1);p.mensaje=`Hola ${p.contacto||p.empresa}, te enviamos la cotización ${p.folio} de envases Smart por ${m(p.total)}. ¿Pudiste revisarla? Si tienes alguna duda o quieres ajustar cantidades, cuéntanos y con gusto te ayudamos a cerrar tu pedido.`});
+  EXC_CEL=new Set(C.map(p=>p.celular).filter(Boolean));EXC_NOM=new Set(C.map(p=>normN(p.empresa)).filter(Boolean))}
+const conCot=p=>EXC_CEL.has((p.celular||'').replace(/\D/g,''))||EXC_NOM.has(normN(p.empresa));   // ya tiene cotización en curso → no va en Pedidos ni en Muestras
 const MESACT=new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'}).slice(0,7);
 const esteMes=p=>p.tipo!=='muestra'&&(p.ultima||'').startsWith(MESACT);
 const $=id=>document.getElementById(id);
@@ -56,26 +66,34 @@ const CAJ={ya:['TOCA YA','Deberían comprar YA'],q15:['Toca en 15 días','Compra
 const contactable=p=>!p.veces_enviado||p.dias_enviado>15;
 const enM=(p,k)=>p.tipo==='muestra'&&(k==='perd'?p.perdido:!p.perdido&&p.dias_muestra>=FR[k][1][0]&&p.dias_muestra<FR[k][1][1]);
 const en=(p,k)=>p.tipo==='muestra'?false:k==='perd'?p.perdido:p.perdido?false:k==='rep'?p.compras>=2:k==='todos'?true:p.estado===CAJ[k][0];
+const enC=(p,k)=>k==='perd'?p.perdido:!p.perdido&&p.dias>=FRC[k][1][0]&&p.dias<FRC[k][1][1];
+async function cargar(d){[D,C]=await Promise.all([rpc('sr_lista',{p_clave:d}),rpc('sr_cotizaciones',{p_clave:d}).catch(()=>[])]);prepararCot()}
 async function entrar(c){const d=c.replace(/\D/g,'');$('err').textContent='';
-  try{D=await rpc('sr_lista',{p_clave:d});clave=d;try{localStorage.sr_clave=d}catch(e){}$('login').hidden=true;$('app').hidden=false;pintar()}
+  try{await cargar(d);clave=d;try{localStorage.sr_clave=d}catch(e){}$('login').hidden=true;$('app').hidden=false;pintar()}
   catch(e){try{localStorage.removeItem('sr_clave')}catch(_){}$('err').textContent='Ese celular no tiene acceso'}}
 function pintar(){
-  const nP=D.filter(p=>p.tipo!=='muestra').length,nM=D.filter(p=>p.tipo==='muestra').length;
-  $('sub').textContent=`${nP} con pedido · ${nM} solo muestras · ${D.filter(p=>p.perdido).length} perdidos`;
-  $('modo').innerHTML=`<button class="tab ${modo==='ped'?'on':''}" data-modo="ped"><b>${nP}</b><span>Pedidos</span></button><button class="tab ${modo==='mue'?'on':''}" data-modo="mue"><b>${nM}</b><span>Muestras</span></button>`;
-  $('tabs').innerHTML=modo==='ped'?Object.keys(CAJ).map(k=>`<button class="tab ${k===cajon?'on':''}" data-k="${k}"><b>${D.filter(p=>en(p,k)).length}</b><span>${CAJ[k][1]}</span></button>`).join(''):Object.keys(FR).map(k=>`<button class="tab ${k===cajonM?'on':''}" data-k="${k}"><b>${D.filter(p=>enM(p,k)).length}</b><span>${FR[k][0]}</span></button>`).join('');
+  const DD=D.filter(p=>!conCot(p));   // los que tienen cotización en curso solo se trabajan en Cotizaciones
+  const nP=DD.filter(p=>p.tipo!=='muestra').length,nM=DD.filter(p=>p.tipo==='muestra').length,nC=C.length;
+  $('sub').textContent=`${nP} con pedido · ${nM} solo muestras · ${nC} cotizaciones en curso · ${D.filter(p=>p.perdido).length+C.filter(p=>p.perdido).length} perdidos`;
+  $('modo').innerHTML=`<button class="tab ${modo==='ped'?'on':''}" data-modo="ped"><b>${nP}</b><span>Pedidos</span></button><button class="tab ${modo==='mue'?'on':''}" data-modo="mue"><b>${nM}</b><span>Muestras</span></button><button class="tab ${modo==='cot'?'on':''}" data-modo="cot"><b>${nC}</b><span>Cotizaciones</span></button>`;
+  $('tabs').innerHTML=modo==='ped'?Object.keys(CAJ).map(k=>`<button class="tab ${k===cajon?'on':''}" data-k="${k}"><b>${DD.filter(p=>en(p,k)).length}</b><span>${CAJ[k][1]}</span></button>`).join('')
+    :modo==='mue'?Object.keys(FR).map(k=>`<button class="tab ${k===cajonM?'on':''}" data-k="${k}"><b>${DD.filter(p=>enM(p,k)).length}</b><span>${FR[k][0]}</span></button>`).join('')
+    :Object.keys(FRC).map(k=>`<button class="tab ${k===cajonC?'on':''}" data-k="${k}"><b>${C.filter(p=>enC(p,k)).length}</b><span>${FRC[k][0]}</span></button>`).join('');
   const q=$('q').value.toLowerCase().trim(),o=$('ord').value;
-  const ev=$('env').value;let L=D.filter(p=>(modo==='ped'?en(p,cajon):enM(p,cajonM))&&(!q||(p.empresa+' '+(p.celular||'')).toLowerCase().includes(q))&&(!ev||(ev==='ok')===contactable(p)));
-  L.sort((a,b)=>modo==='mue'?b.dias_muestra-a.dias_muestra:o==='dias'?b.dias_sin-a.dias_sin:o==='proxima'?a.proxima.localeCompare(b.proxima):b.total-a.total);
+  const ev=$('env').value;
+  const base=modo==='cot'?C:DD;
+  let L=base.filter(p=>(modo==='ped'?en(p,cajon):modo==='mue'?enM(p,cajonM):enC(p,cajonC))&&(!q||(p.empresa+' '+(p.contacto||'')+' '+(p.folio||'')+' '+(p.celular||'')).toLowerCase().includes(q))&&(!ev||(ev==='ok')===contactable(p)));
+  L.sort((a,b)=>modo==='cot'?(o==='dias'?b.dias-a.dias:b.total-a.total):modo==='mue'?b.dias_muestra-a.dias_muestra:o==='dias'?b.dias_sin-a.dias_sin:o==='proxima'?a.proxima.localeCompare(b.proxima):b.total-a.total);
   $('lista').innerHTML=L.map(card).join('')||'<p class="mu">Nada aquí</p>'}
-function card(p){const cel=(p.celular||'').replace(/\D/g,''),cls=p.estado==='TOCA YA'?'y':p.estado.startsWith('Tocó')?'r':p.estado.startsWith('Toca en')?'o':'';
+function card(p){const cel=(p.celular||'').replace(/\D/g,''),est=p.estado||'',cls=est==='TOCA YA'?'y':est.startsWith('Tocó')?'r':est.startsWith('Toca en')?'o':'';
+  const esCot=p.tipo==='cotizacion';
   const telBonito=cel.length===10?cel.slice(0,3)+' '+cel.slice(3,6)+' '+cel.slice(6):cel;
   /* Ya enviado HOY: la tarjeta queda cerrada (sin copiar celular ni mensaje) para no tomarla dos veces ni pegarle a otro el mensaje que no era. */
   const hecho=!!p.veces_enviado&&p.dias_enviado===0;
-  return `<div class="card${esteMes(p)?' mes':''}${hecho?' hecho':''}" data-r="${p.rank}"><div class="info"><h3><span class="n">#${p.rank}</span>${esc(p.empresa)}</h3>
-  <div class="mu">${p.tipo==='muestra'?`Muestra enviada ${esc(p.fecha_muestra)} (hace ${p.dias_muestra} días) · kit ${m(p.total)}`:`<b>${m(p.total)}</b> · ${p.compras} compra${p.compras>1?'s':''} · última ${esc(p.ultima)} (${p.dias_sin} días) · ciclo ${p.ciclo} d`}</div>
-  <div>${esteMes(p)?'<span class="pill m">Compró este mes</span>':''}${p.tipo==='muestra'?`<span class="pill ${p.dias_muestra>=45?'r':p.dias_muestra>=30?'o':p.dias_muestra>=10?'y':''}">${franjaDe(p.dias_muestra)}</span>`:`<span class="pill ${cls}">${esc(p.estado)}</span><span class="pill">próxima ${esc(p.proxima)}</span>`}${p.veces_enviado?`<span class="pill ${contactable(p)?'y':'o'}">Enviado ${esc(p.enviado)} (hace ${p.dias_enviado} d${p.veces_enviado>1?' · '+p.veces_enviado+' veces':''})</span>`:'<span class="pill">Sin enviar</span>'}</div>
-  ${p.perdido?`<div class="mu"><span class="pill r">PERDIDO</span>${esc(p.motivo)}</div>`:''}${p.ultimo_pedido?`<div class="mu">${esc(p.ultimo_pedido)}</div>`:''}
+  return `<div class="card${esteMes(p)?' mes':''}${hecho?' hecho':''}" data-r="${p.rank}"><div class="info"><h3><span class="n">${esCot?'📝':'#'+p.rank}</span>${esc(p.empresa)}${esCot&&p.contacto&&normN(p.contacto)!==normN(p.empresa)?` <span class="mu" style="font-weight:400">· ${esc(p.contacto)}</span>`:''}</h3>
+  <div class="mu">${esCot?`<b>${m(p.total)}</b> · cotización ${esc(p.folio)} del ${esc(p.fecha)} (hace ${p.dias} días)${p.lista?' · '+esc(p.lista):''}`:p.tipo==='muestra'?`Muestra enviada ${esc(p.fecha_muestra)} (hace ${p.dias_muestra} días) · kit ${m(p.total)}`:`<b>${m(p.total)}</b> · ${p.compras} compra${p.compras>1?'s':''} · última ${esc(p.ultima)} (${p.dias_sin} días) · ciclo ${p.ciclo} d`}</div>
+  <div>${esteMes(p)?'<span class="pill m">Compró este mes</span>':''}${esCot?`<span class="pill ${p.dias>=30?'r':p.dias>=15?'o':p.dias>=7?'y':''}">${franjaC(p.dias)}</span>`:p.tipo==='muestra'?`<span class="pill ${p.dias_muestra>=45?'r':p.dias_muestra>=30?'o':p.dias_muestra>=10?'y':''}">${franjaDe(p.dias_muestra)}</span>`:`<span class="pill ${cls}">${esc(p.estado)}</span><span class="pill">próxima ${esc(p.proxima)}</span>`}${p.veces_enviado?`<span class="pill ${contactable(p)?'y':'o'}">Enviado ${esc(p.enviado)} (hace ${p.dias_enviado} d${p.veces_enviado>1?' · '+p.veces_enviado+' veces':''})</span>`:'<span class="pill">Sin enviar</span>'}</div>
+  ${p.perdido?`<div class="mu"><span class="pill r">PERDIDO</span>${esc(p.motivo)}</div>`:''}${esCot&&p.productos?`<div class="mu">${esc(p.productos)}</div>`:p.ultimo_pedido?`<div class="mu">${esc(p.ultimo_pedido)}</div>`:''}
   ${hecho?`<div class="tel off">📞 ${telBonito}<small>ya se le escribió hoy</small></div>`:cel?`<button class="tel" data-c="${cel}" title="Tocar para copiar">📞 ${telBonito}<small>tocar para copiar</small></button>`:'<span class="pill r">SIN CELULAR</span>'}
   ${hecho?'<div class="msg ok">✓ Mensaje enviado hoy. Esta tarjeta queda cerrada hasta mañana.</div>':`<div class="msg">${esc(p.mensaje)}</div>`}</div>
   <div class="acc">${hecho?'<button class="ok" disabled>✓ Enviado hoy</button>':'<button class="s" data-m="1">📋 Copiar mensaje</button><button class="g" data-e="1">📤 Enviado</button>'}<button class="${p.perdido?'g':'r'} pd" data-p="1" style="${p.perdido?'':'background:var(--rj)'}">${p.perdido?'↩ Recuperar':'🚫 Perdido'}</button></div></div>`}
@@ -88,13 +106,13 @@ async function marcar(p){let mot='';
 async function enviar(p,si){
   if(si&&p.veces_enviado&&p.dias_enviado===0)return;   // ya quedó marcado hoy: no se duplica
   if(!si&&!confirm('¿Deshacer el último envío a '+p.empresa+'?'))return;
-  try{await rpc('sr_enviado',{p_clave:clave,p_empresa:p.empresa,p_enviado:si});D=await rpc('sr_lista',{p_clave:clave});pintar();if(si)aviso('✓ '+p.empresa+' marcado como enviado hoy')}catch(e){alert('No se guardó, revisa la señal')}}
+  try{await rpc('sr_enviado',{p_clave:clave,p_empresa:p.empresa,p_enviado:si});await cargar(clave);pintar();if(si)aviso('✓ '+p.empresa+' marcado como enviado hoy')}catch(e){alert('No se guardó, revisa la señal')}}
 async function copiar(t,b){try{await navigator.clipboard.writeText(t)}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}const x=b.innerHTML;b.textContent='✓ Copiado';setTimeout(()=>b.innerHTML=x,1200)}
 $('ent').onclick=()=>entrar($('cl').value);$('cl').onkeydown=e=>{if(e.key==='Enter')entrar($('cl').value)};
-$('tabs').onclick=e=>{const b=e.target.closest('.tab');if(b){if(modo==='ped')cajon=b.dataset.k;else cajonM=b.dataset.k;pintar()}};
+$('tabs').onclick=e=>{const b=e.target.closest('.tab');if(b){if(modo==='ped')cajon=b.dataset.k;else if(modo==='mue')cajonM=b.dataset.k;else cajonC=b.dataset.k;pintar()}};
 $('modo').onclick=e=>{const b=e.target.closest('.tab');if(b){modo=b.dataset.modo;pintar()}};
 $('q').oninput=$('ord').onchange=$('env').onchange=pintar;
-$('lista').onclick=e=>{const b=e.target.closest('button');if(!b)return;const p=D.find(x=>x.rank==b.closest('.card').dataset.r);if(b.dataset.c)copiar(b.dataset.c,b);if(b.dataset.m)copiar(p.mensaje,b);if(b.dataset.p)marcar(p);if(b.dataset.e)enviar(p,true);if(b.dataset.u)enviar(p,false)};
+$('lista').onclick=e=>{const b=e.target.closest('button');if(!b)return;const r=b.closest('.card').dataset.r;const p=D.find(x=>String(x.rank)===r)||C.find(x=>x.rank===r);if(!p)return;if(b.dataset.c)copiar(b.dataset.c,b);if(b.dataset.m)copiar(p.mensaje,b);if(b.dataset.p)marcar(p);if(b.dataset.e)enviar(p,true);if(b.dataset.u)enviar(p,false)};
 try{if(localStorage.sr_clave)entrar(localStorage.sr_clave)}catch(e){}
 
 /* 9 nov 2026 · dentro de Creador (Bruno › Recompra) se ve incrustada: sin la franja azul y avisando su alto para que el marco no tenga barra propia */
