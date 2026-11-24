@@ -24,7 +24,8 @@ button,a.b{font:inherit;border:0;border-radius:9px;padding:9px 12px;cursor:point
 .y{background:var(--ver);color:#fff;border-color:var(--ver)}.o{background:var(--am);color:#fff;border-color:var(--am)}.r{background:var(--rj);color:#fff;border-color:var(--rj)}
 .info{min-width:0}.msg{background:var(--bg);border-radius:8px;padding:9px 10px;margin:8px 0 0;font-size:13px}
 .tel{background:var(--card);color:var(--tx);border:2px solid var(--az);font-size:17px;letter-spacing:.5px;padding:7px 12px;margin-top:6px}.tel small{display:block;font-size:11px;color:var(--mu);font-weight:400;letter-spacing:0}
-.acc{display:flex;flex-direction:column;gap:6px;min-width:150px}.acc button,.acc a.b{width:100%;text-align:center;white-space:nowrap}.acc .g{background:var(--ver)}.acc .s{background:var(--mu)}
+.acc{display:flex;flex-direction:column;gap:6px;min-width:150px}.acc button,.acc a.b{width:100%;text-align:center;white-space:nowrap}.acc .g{background:var(--ver)}.acc .s{background:var(--mu)}.acc .ok{background:var(--card);color:var(--ver);border:2px solid var(--ver);cursor:default}
+#aviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ver);color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:9}#aviso.on{opacity:1;transform:translateX(-50%)}
 @media(max-width:640px){.card{grid-template-columns:1fr}.acc{flex-direction:row;flex-wrap:wrap}.acc button,.acc a.b{width:auto;flex:1 1 45%}}
 .row{display:flex;gap:8px;margin:10px 0}#err{color:var(--rj);min-height:22px}
 body.emb header{display:none}body.emb #login{margin:30px auto}body.emb{padding-bottom:10px}
@@ -40,7 +41,7 @@ body.emb header{display:none}body.emb #login{margin:30px auto}body.emb{padding-b
 <div class="grid" id="lista"></div>
 </div></div>
 <script>
-const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261124-1';
+const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261124-2';
 let D=[],clave='',cajon='ya',modo='ped',cajonM='todas';
 const FR={todas:['Todas las muestras',[0,1e9]],f0:['Menos de 10 días',[0,10]],f1:['10 a 20 días',[10,20]],f2:['20 a 30 días',[20,30]],f3:['30 a 45 días',[30,45]],f4:['Más de 45 días',[45,1e9]],perd:['Perdidos',null]};
 const franjaDe=d=>d<10?'Menos de 10 días':d<20?'10 a 20 días':d<30?'20 a 30 días':d<45?'30 a 45 días':'Más de 45 días';
@@ -74,15 +75,17 @@ function card(p){const cel=(p.celular||'').replace(/\D/g,''),cls=p.estado==='TOC
   ${p.perdido?`<div class="mu"><span class="pill r">PERDIDO</span>${esc(p.motivo)}</div>`:''}${p.ultimo_pedido?`<div class="mu">${esc(p.ultimo_pedido)}</div>`:''}
   ${cel?`<button class="tel" data-c="${cel}" title="Tocar para copiar">📞 ${telBonito}<small>tocar para copiar</small></button>`:'<span class="pill r">SIN CELULAR</span>'}
   <div class="msg">${esc(p.mensaje)}</div></div>
-  <div class="acc">${cel?`<a class="b g" target="_blank" href="https://wa.me/57${cel}?text=${encodeURIComponent(p.mensaje)}">💬 WhatsApp</a>`:''}<button class="s" data-m="1">📋 Copiar mensaje</button><button class="g" data-e="1">📤 Enviado</button>${p.veces_enviado?'<button class="s" data-u="1">↩ Deshacer envío</button>':''}<button class="${p.perdido?'g':'r'} pd" data-p="1" style="${p.perdido?'':'background:var(--rj)'}">${p.perdido?'↩ Recuperar':'🚫 Perdido'}</button></div></div>`}
+  <div class="acc"><button class="s" data-m="1">📋 Copiar mensaje</button>${p.veces_enviado&&p.dias_enviado===0?'<button class="ok" disabled>✓ Enviado hoy</button>':'<button class="g" data-e="1">📤 Enviado</button>'}<button class="${p.perdido?'g':'r'} pd" data-p="1" style="${p.perdido?'':'background:var(--rj)'}">${p.perdido?'↩ Recuperar':'🚫 Perdido'}</button></div></div>`}
+function aviso(t){let a=$('aviso');if(!a){a=document.createElement('div');a.id='aviso';document.body.appendChild(a)}a.textContent=t;a.className='on';clearTimeout(aviso.t);aviso.t=setTimeout(()=>a.className='',1800)}
 async function marcar(p){let mot='';
   if(!p.perdido){mot=prompt('Marcar como PERDIDO: '+p.empresa+' - Motivo (opcional):','');if(mot===null)return}
   else if(!confirm('¿Recuperar a '+p.empresa+'?'))return;
   const nuevo=!p.perdido;
   try{await rpc('sr_perdido',{p_clave:clave,p_empresa:p.empresa,p_perdido:nuevo,p_motivo:mot});p.perdido=nuevo;p.motivo=mot;pintar()}catch(e){alert('No se guardó, revisa la señal')}}
 async function enviar(p,si){
+  if(si&&p.veces_enviado&&p.dias_enviado===0)return;   // ya quedó marcado hoy: no se duplica
   if(!si&&!confirm('¿Deshacer el último envío a '+p.empresa+'?'))return;
-  try{await rpc('sr_enviado',{p_clave:clave,p_empresa:p.empresa,p_enviado:si});D=await rpc('sr_lista',{p_clave:clave});pintar()}catch(e){alert('No se guardó, revisa la señal')}}
+  try{await rpc('sr_enviado',{p_clave:clave,p_empresa:p.empresa,p_enviado:si});D=await rpc('sr_lista',{p_clave:clave});pintar();if(si)aviso('✓ '+p.empresa+' marcado como enviado hoy')}catch(e){alert('No se guardó, revisa la señal')}}
 async function copiar(t,b){try{await navigator.clipboard.writeText(t)}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}const x=b.innerHTML;b.textContent='✓ Copiado';setTimeout(()=>b.innerHTML=x,1200)}
 $('ent').onclick=()=>entrar($('cl').value);$('cl').onkeydown=e=>{if(e.key==='Enter')entrar($('cl').value)};
 $('tabs').onclick=e=>{const b=e.target.closest('.tab');if(b){if(modo==='ped')cajon=b.dataset.k;else cajonM=b.dataset.k;pintar()}};
