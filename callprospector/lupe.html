@@ -236,6 +236,7 @@ main{flex:1;padding:13px 15px 0}
 .rw .nm small{display:block;font-size:10.5px;color:var(--faint);font-weight:400}
 .rw .ll{font-size:11.5px;color:var(--dim);text-align:right}
 .rw .pl{font-size:14.5px;font-weight:800;text-align:right;color:var(--ok);min-width:74px}
+.rw .pl .rend{display:block;font-size:10.5px;font-weight:400;color:var(--dim);white-space:nowrap}.rw .pl .rend b{color:var(--ok);font-weight:700}
 .rw.yo{background:linear-gradient(90deg,rgba(232,98,26,.16),transparent)}
 .rw.yo .nm{color:var(--naranja2)}
 .rank .foot{padding:11px 16px;border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
@@ -328,7 +329,7 @@ footer{padding:16px 15px calc(20px + env(safe-area-inset-bottom));text-align:cen
    que la app se vigila sola: cada 5 minutos se pide a si misma sin cache y
    compara. Si cambio, avisa — no recarga sola, porque recargar en mitad de una
    llamada le borraria el panel del interesado a quien esta escribiendo. */
-const VER='20261123-tiempo-trabajado';
+const VER='20261124-rendimiento-hora';
 const SB='https://fnayedgvamxktxfvywwl.supabase.co';
 const K='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv';
 const H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json'};
@@ -2099,6 +2100,18 @@ function pintarPlata(bump){
   pintarTiempo(!!bump);
 }
 
+/* Tiempo trabajado hoy de cada agente del tablero (solo lo pide el supervisor). Guarda un minuto para no pedirlo en cada refresco. */
+const _tmpAg={};
+async function tiemposDeTodas(lista){
+  const out={};
+  await Promise.all(lista.filter(a=>a.id&&a.llamadas>0).map(async a=>{
+    const c=_tmpAg[a.id];
+    if(c&&Date.now()-c.t<60000){ out[a.id]=c.r; return; }
+    try{ const r=await RPC('mkr_tiempo_trabajo',{p_agente:a.id}); if(r&&typeof r==='object'){ _tmpAg[a.id]={t:Date.now(),r}; out[a.id]=r; } }catch(e){}
+  }));
+  return out;
+}
+
 /* ==================== TABLERO REAL ==================== */
 /* Las ciudades que me asignaron se leian UNA sola vez, al entrar. Si el
    supervisor le abria una ciudad desde Lupe Control, la telemercaderista
@@ -2345,13 +2358,19 @@ async function sincronizar(){
   cargarInteresados();                              // los que quedaron por trabajar
 
   const todos=Object.values(real).sort((a,b)=>b.plata-a.plata||b.llamadas-a.llamadas);
+  /* RENDIMIENTO POR HORA (24-nov-2026, José): solo el supervisor (nivel asesor, entra como Gloria) ve debajo de la plata de cada una
+     cuánto lleva trabajado hoy y cuánto le está rindiendo la hora (plata del día ÷ horas marcadas, misma cuenta de mkr_tiempo_trabajo).
+     Las telemercaderistas no lo ven. Se consulta a lo sumo una vez por minuto por persona. */
+  const tiempos = esAdmin() ? await tiemposDeTodas(todos) : {};
   $('rkBody').innerHTML=todos.map((a,i)=>{
     const soyYo=(a.id&&YO.id&&a.id===YO.id)||a.agente===YO.nombre;
+    const t=tiempos[a.id]; let rend='';
+    if(t&&t.hoy_min>=1){ const h=t.hoy_min/60; rend='<small class="rend">⏱ '+hmTiempo(t.hoy_min)+(t.abierto?' ●':'')+' · <b>'+(t.hoy_min>=10?cop(Math.round(a.plata/h))+'/h':'…')+'</b></small>'; }
     return `<div class="rw ${soyYo?'yo':''}" style="cursor:pointer" onclick="verSemanas('${a.id||''}','${esc(a.agente).replace(/'/g,'')}')" title="Toca para ver semana por semana">
       <div class="pos">${i+1}</div>
       <div class="nm">${esc(a.agente)}<small>${soyYo?'tú':(a.llamadas?'marcando':'todavía no marca')} · toca para ver tus semanas</small></div>
       <div class="ll">${num(a.llamadas)} ll.</div>
-      <div class="pl mono">${cop(a.plata)}</div>
+      <div class="pl mono">${cop(a.plata)}${rend}</div>
     </div>`;}).join('')||'<div class="vacio" style="padding:22px">Nadie ha marcado hoy.</div>';
   const activas=todos.filter(a=>a.llamadas>0).length;
   $('rkInfo').textContent=todos.length+' en la red · '+activas+(activas===1?' marcando':' marcando');
