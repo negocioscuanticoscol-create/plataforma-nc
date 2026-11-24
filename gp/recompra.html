@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>GP · Recompra</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--tx:#14202b;--mu:#5d6b78;--bd:#dde3e9;--az:#1e1e2b;--ver:#1a8a4a;--rj:#c0392b;--am:#b7791f;--mes:#7b2fbf}
+@media(prefers-color-scheme:dark){:root{--bg:#10171d;--card:#18222b;--tx:#e8eef3;--mu:#93a1ad;--bd:#27333e;--az:#c9a24a;--ver:#3ec17a;--rj:#e8685a;--am:#e0a84a;--mes:#c79cff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,sans-serif;padding-bottom:40px}
+header{background:var(--az);color:#fff;padding:14px 16px}header h1{margin:0;font-size:18px}header small{opacity:.9}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+#login{max-width:340px;margin:20vh auto;padding:0 16px;text-align:center}
+input,select{width:100%;font:inherit;padding:11px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx)}
+button,a.b{font:inherit;border:0;border-radius:9px;padding:9px 12px;cursor:pointer;background:var(--az);color:#fff;font-weight:600;text-decoration:none;display:inline-block}
+.tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:12px 0}
+.tab{background:var(--card);color:var(--tx);border:2px solid var(--bd);text-align:left}
+.tab b{display:block;font-size:22px}.tab span{font-size:12px;color:var(--mu);font-weight:400}.tab.on{border-color:var(--az)}
+/* 24 nov 2026 (José): una sola columna en orden de importancia, cada cliente en una fila horizontal:
+   datos a la izquierda, el mensaje justo debajo, el celular se copia al tocarlo y las acciones en botones al lado. */
+.grid{display:grid;grid-template-columns:1fr;gap:10px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:start}
+.card h3{margin:0;font-size:16px}.card h3 .n{display:inline-block;min-width:34px;color:var(--mu);font-weight:700}.mu{color:var(--mu);font-size:13px}.card.mes{border:2px solid var(--mes)}.card.mes h3{color:var(--mes)}.pill.m{background:var(--mes);color:#fff;border-color:var(--mes)}
+.pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--bd);margin:2px 4px 2px 0}
+.y{background:var(--ver);color:#fff;border-color:var(--ver)}.o{background:var(--am);color:#fff;border-color:var(--am)}.r{background:var(--rj);color:#fff;border-color:var(--rj)}
+.info{min-width:0}.msg{background:var(--bg);border-radius:8px;padding:9px 10px;margin:8px 0 0;font-size:13px}
+.tel{background:var(--card);color:var(--tx);border:2px solid var(--az);font-size:17px;letter-spacing:.5px;padding:7px 12px;margin-top:6px}.tel small{display:block;font-size:11px;color:var(--mu);font-weight:400;letter-spacing:0}
+.acc{display:flex;flex-direction:column;gap:6px;min-width:150px}.acc button,.acc a.b{width:100%;text-align:center;white-space:nowrap}.acc .g{background:var(--ver)}.acc .s{background:var(--mu)}.acc .ok{background:var(--card);color:var(--ver);border:2px solid var(--ver);cursor:default}
+.card.hecho{opacity:.6;background:var(--bg)}.card.hecho h3{color:var(--mu)}.tel.off{display:inline-block;border-color:var(--bd);color:var(--mu);border-radius:9px;font-weight:600}.msg.ok{color:var(--ver);font-weight:700}
+#aviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ver);color:#fff;padding:10px 16px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:9}#aviso.on{opacity:1;transform:translateX(-50%)}
+@media(max-width:640px){.card{grid-template-columns:1fr}.acc{flex-direction:row;flex-wrap:wrap}.acc button,.acc a.b{width:auto;flex:1 1 45%}}
+.row{display:flex;gap:8px;margin:10px 0}#err{color:var(--rj);min-height:22px}
+body.emb header{display:none}body.emb #login{margin:30px auto}body.emb{padding-bottom:10px}
+</style></head><body>
+<div id="login"><h1>GP · Recompra</h1><p class="mu">Escribe tu clave o celular</p>
+<input id="cl" type="text" placeholder="Clave o celular" autocomplete="off"><p id="err"></p><button id="ent" style="width:100%">Entrar</button></div>
+<div id="app" hidden>
+<header><div class="wrap"><h1>Grupo Pérez · clientes y recompra</h1><small id="sub"></small></div></header>
+<div class="wrap">
+<div class="tabs" id="modo" style="grid-template-columns:repeat(3,1fr)"></div>
+<div class="tabs" id="tabs"></div>
+<div class="row"><input id="q" type="search" placeholder="Buscar cliente o celular…"><select id="env" style="max-width:230px"><option value="">Todos (enviados o no)</option><option value="ok">Contactables: sin envío o más de 15 días</option><option value="rec">Enviados hace 15 días o menos</option></select><select id="ord" style="max-width:200px"><option value="mayor">Mayor a menor compra</option><option value="dias">Más días sin comprar</option><option value="proxima">Próxima compra</option></select></div>
+<div class="grid" id="lista"></div>
+</div></div>
+<script>
+const URL_='https://fnayedgvamxktxfvywwl.supabase.co',KEY='sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv',VER='20261124-gp1';
+/* gp/recompra.html = copia de smart/recompra.html (24 nov 2026) sobre las rpc gr_* (pedidos, clientes y cotizaciones de CED/GP).
+   Si se cambia el formato en una, cambiarlo en la otra.
+   24 nov 2026 (José): tercer cajón COTIZACIONES (las de la tabla cotizaciones de CED en curso, rpc gr_cotizaciones) con el mismo formato.
+   Regla: si un cliente tiene cotización en curso, se saca de Pedidos y de Muestras, para trabajarlo en UN solo sitio. */
+let D=[],C=[],clave='',cajon='ya',modo='ped',cajonM='todas',cajonC='todas';
+const FR={todas:['Todas las muestras',[0,1e9]],f0:['Menos de 10 días',[0,10]],f1:['10 a 20 días',[10,20]],f2:['20 a 30 días',[20,30]],f3:['30 a 45 días',[30,45]],f4:['Más de 45 días',[45,1e9]],perd:['Perdidos',null]};
+const FRC={todas:['Todas las cotizaciones',[0,1e9]],c0:['Menos de 7 días',[0,7]],c1:['7 a 15 días',[7,15]],c2:['15 a 30 días',[15,30]],c3:['Más de 30 días',[30,1e9]],perd:['Perdidas',null]};
+const franjaDe=d=>d<10?'Menos de 10 días':d<20?'10 a 20 días':d<30?'20 a 30 días':d<45?'30 a 45 días':'Más de 45 días';
+const franjaC=d=>d<7?'Menos de 7 días':d<15?'7 a 15 días':d<30?'15 a 30 días':'Más de 30 días';
+const normN=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\b(S\.?A\.?S\.?|SAS|LTDA|S\.?A\.?)\b/g,' ').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+let EXC_CEL=new Set(),EXC_NOM=new Set();
+function prepararCot(){
+  C.forEach((p,i)=>{p.rank='c'+(i+1);p.mensaje=`Hola ${p.contacto||p.empresa}, te enviamos la cotización ${p.folio} de botas de dotación por ${m(p.total)}. ¿Pudiste revisarla? Si tienes alguna duda o quieres ajustar cantidades, cuéntanos y con gusto te ayudamos a cerrar tu pedido.`});
+  EXC_CEL=new Set(C.map(p=>p.celular).filter(Boolean));EXC_NOM=new Set(C.map(p=>normN(p.empresa)).filter(Boolean))}
+const conCot=p=>EXC_CEL.has((p.celular||'').replace(/\D/g,''))||EXC_NOM.has(normN(p.empresa));   // ya tiene cotización en curso → no va en Pedidos ni en Muestras
+const MESACT=new Date().toLocaleDateString('en-CA',{timeZone:'America/Bogota'}).slice(0,7);
+const esteMes=p=>p.tipo==='pedido'&&(p.ultima||'').startsWith(MESACT);
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const m=n=>'$'+Math.round(n).toLocaleString('es-CO');
+async function rpc(fn,args){const r=await fetch(URL_+'/rest/v1/rpc/'+fn,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'},body:JSON.stringify(args)});if(!r.ok)throw new Error(r.status);const t=await r.text();return t?JSON.parse(t):null}
+const CAJ={ya:['TOCA YA','Deberían comprar YA'],q15:['Toca en 15 días','Compran en 15 días'],aun:['Aún no toca','Aún no les toca'],riesgo:['Tocó hace rato (en riesgo)','En riesgo (no vuelven)'],rep:[null,'Ya repusieron'],todos:[null,'Todos'],perd:[null,'Perdidos']};
+const contactable=p=>!p.veces_enviado||p.dias_enviado>15;
+const enM=(p,k)=>p.tipo==='muestra'&&(k==='perd'?p.perdido:!p.perdido&&p.dias_muestra>=FR[k][1][0]&&p.dias_muestra<FR[k][1][1]);
+const en=(p,k)=>p.tipo==='muestra'?false:k==='perd'?p.perdido:p.perdido?false:k==='rep'?p.compras>=2:k==='todos'?true:p.estado===CAJ[k][0];
+const enC=(p,k)=>k==='perd'?p.perdido:!p.perdido&&p.dias>=FRC[k][1][0]&&p.dias<FRC[k][1][1];
+async function cargar(d){[D,C]=await Promise.all([rpc('gr_lista',{p_clave:d}),rpc('gr_cotizaciones',{p_clave:d}).catch(()=>[])]);prepararCot()}
+async function entrar(c){const d=c.trim();$('err').textContent='';
+  try{await cargar(d);clave=d;try{localStorage.gr_clave=d}catch(e){}$('login').hidden=true;$('app').hidden=false;pintar()}
+  catch(e){try{localStorage.removeItem('gr_clave')}catch(_){}$('err').textContent='Ese celular no tiene acceso'}}
+function pintar(){
+  const DD=D.filter(p=>!conCot(p));   // los que tienen cotización en curso solo se trabajan en Cotizaciones
+  const nP=DD.filter(p=>p.tipo!=='muestra').length,nM=DD.filter(p=>p.tipo==='muestra').length,nC=C.length;
+  $('sub').textContent=`${nP} con pedido · ${nM} solo muestras · ${nC} cotizaciones en curso · ${D.filter(p=>p.perdido).length+C.filter(p=>p.perdido).length} perdidos`;
+  $('modo').innerHTML=`<button class="tab ${modo==='ped'?'on':''}" data-modo="ped"><b>${nP}</b><span>Pedidos</span></button><button class="tab ${modo==='mue'?'on':''}" data-modo="mue"><b>${nM}</b><span>Muestras</span></button><button class="tab ${modo==='cot'?'on':''}" data-modo="cot"><b>${nC}</b><span>Cotizaciones</span></button>`;
+  $('tabs').innerHTML=modo==='ped'?Object.keys(CAJ).map(k=>`<button class="tab ${k===cajon?'on':''}" data-k="${k}"><b>${DD.filter(p=>en(p,k)).length}</b><span>${CAJ[k][1]}</span></button>`).join('')
+    :modo==='mue'?Object.keys(FR).map(k=>`<button class="tab ${k===cajonM?'on':''}" data-k="${k}"><b>${DD.filter(p=>enM(p,k)).length}</b><span>${FR[k][0]}</span></button>`).join('')
+    :Object.keys(FRC).map(k=>`<button class="tab ${k===cajonC?'on':''}" data-k="${k}"><b>${C.filter(p=>enC(p,k)).length}</b><span>${FRC[k][0]}</span></button>`).join('');
+  const q=$('q').value.toLowerCase().trim(),o=$('ord').value;
+  const ev=$('env').value;
+  const base=modo==='cot'?C:DD;
+  let L=base.filter(p=>(modo==='ped'?en(p,cajon):modo==='mue'?enM(p,cajonM):enC(p,cajonC))&&(!q||(p.empresa+' '+(p.contacto||'')+' '+(p.folio||'')+' '+(p.celular||'')).toLowerCase().includes(q))&&(!ev||(ev==='ok')===contactable(p)));
+  L.sort((a,b)=>modo==='cot'?(o==='dias'?b.dias-a.dias:b.total-a.total):modo==='mue'?b.dias_muestra-a.dias_muestra:o==='dias'?b.dias_sin-a.dias_sin:o==='proxima'?a.proxima.localeCompare(b.proxima):b.total-a.total);
+  $('lista').innerHTML=L.map(card).join('')||'<p class="mu">Nada aquí</p>'}
+function card(p){const cel=(p.celular||'').replace(/\D/g,''),est=p.estado||'',cls=est==='TOCA YA'?'y':est.startsWith('Tocó')?'r':est.startsWith('Toca en')?'o':'';
+  const esCot=p.tipo==='cotizacion';
+  const telBonito=cel.length===10?cel.slice(0,3)+' '+cel.slice(3,6)+' '+cel.slice(6):cel;
+  /* Ya enviado HOY: la tarjeta queda cerrada (sin copiar celular ni mensaje) para no tomarla dos veces ni pegarle a otro el mensaje que no era. */
+  const hecho=!!p.veces_enviado&&p.dias_enviado===0;
+  return `<div class="card${esteMes(p)?' mes':''}${hecho?' hecho':''}" data-r="${p.rank}"><div class="info"><h3><span class="n">${esCot?'📝':'#'+p.rank}</span>${esc(p.empresa)}${esCot&&p.contacto&&normN(p.contacto)!==normN(p.empresa)?` <span class="mu" style="font-weight:400">· ${esc(p.contacto)}</span>`:''}</h3>
+  <div class="mu">${esCot?`<b>${m(p.total)}</b> · cotización ${esc(p.folio)} del ${esc(p.fecha)} (hace ${p.dias} días)${p.lista?' · '+esc(p.lista):''}`:p.tipo==='muestra'?`Muestra enviada ${esc(p.fecha_muestra)} (hace ${p.dias_muestra} días)${p.total>0?' · '+m(p.total):''}`:`<b>${m(p.total)}</b> · ${p.compras} compra${p.compras>1?'s':''} · última ${esc(p.ultima)} (${p.dias_sin} días) · ciclo ${p.ciclo} d`}</div>
+  <div>${esteMes(p)?'<span class="pill m">Compró este mes</span>':''}${esCot?`<span class="pill ${p.dias>=30?'r':p.dias>=15?'o':p.dias>=7?'y':''}">${franjaC(p.dias)}</span>`:p.tipo==='muestra'?`<span class="pill ${p.dias_muestra>=45?'r':p.dias_muestra>=30?'o':p.dias_muestra>=10?'y':''}">${franjaDe(p.dias_muestra)}</span>`:`<span class="pill ${cls}">${esc(p.estado)}</span><span class="pill">próxima ${esc(p.proxima)}</span>`}${p.veces_enviado?`<span class="pill ${contactable(p)?'y':'o'}">Enviado ${esc(p.enviado)} (hace ${p.dias_enviado} d${p.veces_enviado>1?' · '+p.veces_enviado+' veces':''})</span>`:'<span class="pill">Sin enviar</span>'}</div>
+  ${p.perdido?`<div class="mu"><span class="pill r">PERDIDO</span>${esc(p.motivo)}</div>`:''}${esCot&&p.productos?`<div class="mu">${esc(p.productos)}</div>`:p.ultimo_pedido?`<div class="mu">${esc(p.ultimo_pedido)}</div>`:''}
+  ${hecho?`<div class="tel off">📞 ${telBonito}<small>ya se le escribió hoy</small></div>`:cel?`<button class="tel" data-c="${cel}" title="Tocar para copiar">📞 ${telBonito}<small>tocar para copiar</small></button>`:'<span class="pill r">SIN CELULAR</span>'}
+  ${hecho?'<div class="msg ok">✓ Mensaje enviado hoy. Esta tarjeta queda cerrada hasta mañana.</div>':`<div class="msg">${esc(p.mensaje)}</div>`}</div>
+  <div class="acc">${hecho?'<button class="ok" disabled>✓ Enviado hoy</button>':'<button class="s" data-m="1">📋 Copiar mensaje</button><button class="g" data-e="1">📤 Enviado</button>'}<button class="${p.perdido?'g':'r'} pd" data-p="1" style="${p.perdido?'':'background:var(--rj)'}">${p.perdido?'↩ Recuperar':'🚫 Perdido'}</button></div></div>`}
+function aviso(t){let a=$('aviso');if(!a){a=document.createElement('div');a.id='aviso';document.body.appendChild(a)}a.textContent=t;a.className='on';clearTimeout(aviso.t);aviso.t=setTimeout(()=>a.className='',1800)}
+async function marcar(p){let mot='';
+  if(!p.perdido){mot=prompt('Marcar como PERDIDO: '+p.empresa+' - Motivo (opcional):','');if(mot===null)return}
+  else if(!confirm('¿Recuperar a '+p.empresa+'?'))return;
+  const nuevo=!p.perdido;
+  try{await rpc('gr_perdido',{p_clave:clave,p_empresa:p.empresa,p_perdido:nuevo,p_motivo:mot});p.perdido=nuevo;p.motivo=mot;pintar()}catch(e){alert('No se guardó, revisa la señal')}}
+async function enviar(p,si){
+  if(si&&p.veces_enviado&&p.dias_enviado===0)return;   // ya quedó marcado hoy: no se duplica
+  if(!si&&!confirm('¿Deshacer el último envío a '+p.empresa+'?'))return;
+  try{await rpc('gr_enviado',{p_clave:clave,p_empresa:p.empresa,p_enviado:si});await cargar(clave);pintar();if(si)aviso('✓ '+p.empresa+' marcado como enviado hoy')}catch(e){alert('No se guardó, revisa la señal')}}
+async function copiar(t,b){try{await navigator.clipboard.writeText(t)}catch(e){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');a.remove()}const x=b.innerHTML;b.textContent='✓ Copiado';setTimeout(()=>b.innerHTML=x,1200)}
+$('ent').onclick=()=>entrar($('cl').value);$('cl').onkeydown=e=>{if(e.key==='Enter')entrar($('cl').value)};
+$('tabs').onclick=e=>{const b=e.target.closest('.tab');if(b){if(modo==='ped')cajon=b.dataset.k;else if(modo==='mue')cajonM=b.dataset.k;else cajonC=b.dataset.k;pintar()}};
+$('modo').onclick=e=>{const b=e.target.closest('.tab');if(b){modo=b.dataset.modo;pintar()}};
+$('q').oninput=$('ord').onchange=$('env').onchange=pintar;
+$('lista').onclick=e=>{const b=e.target.closest('button');if(!b)return;const r=b.closest('.card').dataset.r;const p=D.find(x=>String(x.rank)===r)||C.find(x=>x.rank===r);if(!p)return;if(b.dataset.c)copiar(b.dataset.c,b);if(b.dataset.m)copiar(p.mensaje,b);if(b.dataset.p)marcar(p);if(b.dataset.e)enviar(p,true);if(b.dataset.u)enviar(p,false)};
+try{if(localStorage.gr_clave)entrar(localStorage.gr_clave)}catch(e){}
+
+/* 9 nov 2026 · dentro de Creador (Bruno › Recompra) se ve incrustada: sin la franja azul y avisando su alto para que el marco no tenga barra propia */
+if(/[?&]embed=1/.test(location.search)){window.addEventListener('message',e=>{const k=e.data&&e.data.recompraClave;if(k&&!clave)entrar(k)});try{parent.postMessage({recompraListo:1},'*')}catch(e){}document.body.classList.add('emb');const av=()=>{try{parent.postMessage({recompraAlto:document.documentElement.scrollHeight},'*')}catch(e){}};new MutationObserver(av).observe(document.body,{childList:true,subtree:true,attributes:true});window.addEventListener('load',av);setInterval(av,1500)}
+</script></body></html>
