@@ -78,7 +78,9 @@ function veredicto(ad,obj,hoy){
   const tags=[];let k,t,why;
   const base={d7,p7,fr,tags,ctr7:d7.ctr};
   if(!act){return Object.assign(base,{k:'off',t:'APAGADO',why:'No está entregando. Se muestra por si lo quieres volver a prender.',peso:5})}
-  if(d7.n<3||d7.gasto<15000){return Object.assign(base,{k:'wait',t:'ESPERAR',why:`Lleva ${d7.n} día${d7.n===1?'':'s'} con datos y ${$m(d7.gasto)} en la semana: todavía no hay base para juzgarlo. Se revisa cuando pase de 3 días y $15.000.`,peso:4})}
+  /* piso para opinar: 3 días con datos y plata para al menos 3 resultados a la meta (mínimo $6.000); con $3.400 diarios eso son 2 o 3 días */
+  const piso=Math.max(6000,3*(obj||2000));
+  if(d7.n<3||d7.gasto<piso){return Object.assign(base,{k:'wait',t:'ESPERAR',why:`Lleva ${d7.n} día${d7.n===1?'':'s'} con datos y ${$m(d7.gasto)} en la semana: todavía no hay base para juzgarlo. Se revisa cuando pase de 3 días y ${$m(piso)}.`,peso:4})}
   if(d7.res===0){
     if(d7.gasto>=3*(obj||5000)){k='down';t='BAJAR';why=`${$m(d7.gasto)} en 7 días y cero resultados. Bájale a la mitad o apágalo y pon esa plata en uno que sí responda.`}
     else{k='wait';t='ESPERAR';why=`${$m(d7.gasto)} en 7 días y todavía sin resultados; es poca plata para condenarlo.`}
@@ -92,7 +94,8 @@ function veredicto(ad,obj,hoy){
   /* modificadores */
   if(fr>=2.5){tags.push(`🔁 Frecuencia ${fr.toFixed(1)}: la misma gente ya lo vio varias veces. Toca cambiar el video o abrir el público.`);if(k==='up'){k='watch';t='VIGILAR';why+=' Ojo: no le subas sin cambiar el creativo, está quemado.'}}
   if(d7.ctr!=null&&d7.ctr<0.6)tags.push(`👆 CTR ${d7.ctr.toFixed(2)}%: el video no detiene el dedo. Prueba otro gancho en los primeros 2 segundos.`);
-  if(p7.costo&&d7.costo){const dif=(d7.costo-p7.costo)/p7.costo*100;if(Math.abs(dif)>=25)tags.push(`${dif>0?'📈 Se encareció':'📉 Se abarató'} ${Math.abs(dif).toFixed(0)}% frente a la semana anterior (${$m(p7.costo)} → ${$m(d7.costo)}).`)}
+  if(p7.costo&&d7.costo){const dif=(d7.costo-p7.costo)/p7.costo*100;if(Math.abs(dif)>=25)tags.push(`${dif>0?'📈 Se encareció':'📉 Se abarató'} ${Math.abs(dif).toFixed(0)}% frente a la semana anterior (${$m(p7.costo)} → ${$m(d7.costo)}).`);
+    if(dif>=50&&k==='up'){k='keep';t='MANTENER';why=`Costo ${$m(d7.costo)}, todavía bajo la meta de ${$m(obj)}, pero viene encareciéndose rápido: no le subas hasta que se estabilice.`}}
   if(e.c_all!=null){
     if(e.c7>0)tags.push(`💬 Valentina recibió ${e.c7} contacto${e.c7===1?'':'s'} real${e.c7===1?'':'es'} esta semana${e.inter7?`, ${e.inter7} interesado${e.inter7===1?'':'s'} (${$m(d7.gasto/e.inter7)} por interesado)`:''}.`);
     else if(d7.res>=3&&new Date(e.desde||hoy)<=new Date(hoy+'T00:00:00'))tags.push(`⚠️ Meta cuenta ${d7.res} conversaciones esta semana pero a Valentina no le llegó ninguna: revisa que el anuncio apunte al número correcto.`);
