@@ -9,15 +9,15 @@
 <style>
 /* Layout: barra negra de marca arriba, migas de pan como navegación, una sola columna de tarjetas que se va abriendo por niveles */
 :root{
-  --ink:#2a2622; --paper:#fbf8f4; --card:#ffffff; --line:#eadfd3; --muted:#756c63; --tint1:#ffe6d3; --tint2:#fff3e8;
-  --accent:#f26a1b; --accent-ink:#ffffff; --ok:#1f8a4c; --bad:#b3372e;
-  --f1:#f26a1b; --f2:#2d6cdf; --f3:#1f8a4c;
+  --ink:#2a2622; --paper:#fbf8f4; --card:#ffffff; --line:#eadfd3; --muted:#756c63; --tint1:#e3e8f2; --tint2:#f1f4f9;
+  --accent:#14213d; --accent-ink:#ffffff; --ok:#1f8a4c; --bad:#b3372e;
+  --f1:#b7791f; --f2:#2d6cdf; --f3:#1f8a4c;
   --display:"Poppins",system-ui,sans-serif; --body:"Poppins",system-ui,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
-header{background:#16181d;color:#fff;border-bottom:5px solid var(--accent);padding:18px 20px}
+header{background:#16181d;color:#fff;border-bottom:5px solid #eab308;padding:18px 20px}
 header .in,main{max-width:980px;margin:0 auto}
 header h1{font-family:var(--display);font-size:22px;margin:0;font-weight:700;text-wrap:balance}
 header p{margin:2px 0 0;color:#c9c9cc;font-size:13px}
@@ -107,18 +107,18 @@ header .gpt .tag{margin:0;color:#cbd5e1;font-size:13px;max-width:34ch}
 @media (max-width:560px){.brands{grid-template-columns:repeat(4,minmax(0,1fr));width:100%}header .gpt h1{font-size:32px}}
 
 :root{color-scheme:light}
-.row.l0{background:var(--tint1);color:var(--ink);border-color:#f6c9a6;border-left:6px solid var(--accent)}
+.row.l0{background:var(--tint1);color:var(--ink);border-color:#b9c4d9;border-left:6px solid var(--accent)}
 .row.l0 b{font-size:16px}
 .row.l0 .meta{color:var(--muted)}
-.row.l1{background:var(--tint2);border-color:#f3dcc8}
+.row.l1{background:var(--tint2);border-color:#d6dde9}
 .row.l2{background:var(--card)}
 .row.l3{background:var(--card);border-style:dashed}
-.kids{border-left-color:#f6c9a6}
-.bar{background:#efe6dc}
+.kids{border-left-color:#b9c4d9}
+.bar{background:#e1e6ee}
 th{background:var(--tint1);color:var(--ink);border-bottom:2px solid var(--accent)}
-.alanbar{background:var(--accent);border-top:0;border-bottom:0}
+.alanbar{background:var(--accent);border-top:0;border-bottom:3px solid #eab308}
 .alanbar span{color:#fff;opacity:.92}
-.hs{background:#f6efe7}
+.hs{background:#eef1f6}
 .note{background:var(--tint2)}
 </style>
 </head>
