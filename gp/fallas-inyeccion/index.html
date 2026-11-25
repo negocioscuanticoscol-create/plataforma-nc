@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Fallas de Inyección</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: una columna de celular, pestañas arriba, botones grandes para usar con guantes o afán. */
+:root{
+  --bg:#eef0f2; --surface:#ffffff; --ink:#1b2329; --muted:#5d6b75; --line:#cfd6db;
+  --accent:#0f5e8c; --accent-ink:#ffffff; --crit:#b3261e; --crit-bg:#fbe9e7; --ok:#1d6b3a; --ok-bg:#e4f3e9;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Barlow",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#12181c; --surface:#1c252b; --ink:#e8edf0; --muted:#9aa8b1; --line:#34424b;
+    --accent:#58b0e0; --accent-ink:#08202e; --crit:#ff8a80; --crit-bg:#3a1d1b; --ok:#7fd49b; --ok-bg:#16301f;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.4}
+.wrap{max-width:520px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.logo{display:block;height:40px;width:auto;max-width:100%;align-self:flex-start;border-radius:6px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--display);font-size:30px;line-height:1;margin:0;letter-spacing:.3px;text-transform:uppercase}
+.fecha{color:var(--muted);font-weight:500;font-variant-numeric:tabular-nums}
+nav{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+nav button{font:600 15px var(--body);padding:10px 4px;border:1px solid var(--line);background:var(--surface);color:var(--muted);border-radius:8px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+section{display:none;flex-direction:column;gap:14px}
+section.on{display:flex}
+.campo{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.campo>span,.lbl{font-family:var(--display);font-size:17px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{font:600 18px var(--body);min-width:52px;min-height:48px;padding:8px 14px;border:2px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;cursor:pointer;font-variant-numeric:tabular-nums}
+.chips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.dos .chips button{flex:1}
+.paso{display:flex;align-items:center;gap:14px}
+.paso button{width:52px;height:48px;font:700 24px var(--body);border:2px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;cursor:pointer}
+.paso output{font:700 30px var(--display);min-width:40px;text-align:center;font-variant-numeric:tabular-nums}
+.grabar{font:700 26px var(--display);letter-spacing:1px;text-transform:uppercase;padding:16px;border:0;border-radius:10px;background:var(--crit);color:#fff;cursor:pointer}
+.grabar[disabled]{opacity:.6;cursor:wait}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .grabar{color:#2a0b08}}
+.btn{display:inline-block;font:600 16px var(--body);padding:11px 14px;border-radius:8px;border:2px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer;text-decoration:none;text-align:center}
+.btn.sec{background:transparent;color:var(--accent)}
+.fila{display:flex;gap:8px;flex-wrap:wrap}
+.aviso{border-left:6px solid var(--crit);background:var(--crit-bg);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.aviso.ok{border-color:var(--ok);background:var(--ok-bg)}
+.aviso strong{font-family:var(--display);font-size:20px;text-transform:uppercase;letter-spacing:.4px}
+.nota{color:var(--muted);font-size:14px;margin:0}
+.molde{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.molde.crit{border-left-color:var(--crit)}
+.molde .cab{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.molde h3{font:700 22px var(--display);margin:0;text-transform:uppercase;letter-spacing:.3px}
+.pill{font:700 15px var(--body);padding:4px 10px;border-radius:99px;background:var(--bg);border:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+.crit .pill{background:var(--crit);border-color:var(--crit);color:#fff}
+.det{margin:0;padding-left:18px;color:var(--muted);font-size:15px}
+.hist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.hist li{background:var(--ok-bg);border-radius:6px;padding:8px}
+.hist li.mal{background:var(--crit-bg)}
+.hist b{display:block;color:var(--ok)}
+.hist li.mal b{color:var(--crit)}
+.hist small{color:var(--muted);display:block}
+textarea,input[type=text],input[type=tel],input[type=number]{width:100%;font:400 16px var(--body);padding:10px;border:2px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+textarea{min-height:70px;resize:vertical}
+pre{white-space:pre-wrap;word-break:break-word;font:400 15px var(--body);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;margin:0}
+.resumen{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.resumen div{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.resumen b{font:700 34px var(--display);display:block;line-height:1;font-variant-numeric:tabular-nums}
+.resumen span{color:var(--muted);font-size:14px}
+button:focus-visible,a:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.vacio{color:var(--muted);text-align:center;padding:24px 8px}
+#estado{font-size:13px;color:var(--muted);text-align:right}
+#estado.mal{color:var(--crit);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <img class="logo" alt="Grupo Perez" src="logo.png">
+  <header>
+    <h1>Fallas de inyección</h1>
+    <span class="fecha" id="fecha"></span>
+  </header>
+  <div id="estado" aria-live="polite">Cargando…</div>
+  <nav role="tablist">
+    <button role="tab" data-tab="reportar" aria-selected="true">Reportar</button>
+    <button role="tab" data-tab="hoy" aria-selected="false">Hoy</button>
+    <button role="tab" data-tab="cierre" aria-selected="false">Cierre</button>
+    <button role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
+  </nav>
+
+  <section id="reportar" class="on">
+    <div class="campo"><span>Planta</span><div class="chips" id="c-planta"></div></div>
+    <div class="campo"><span>Quién reporta</span><div class="chips" id="c-rol"></div></div>
+    <div class="campo"><span>Bota (referencia)</span><div class="chips" id="c-ref"></div>
+      <div class="fila"><input type="text" id="nueva-ref" placeholder="Nueva referencia" aria-label="Nueva referencia" style="flex:1;min-width:150px"><button type="button" class="btn sec" id="crear-ref">Crear</button></div>
+    </div>
+    <div class="campo"><span>Talla</span><div class="chips" id="c-talla"></div></div>
+    <div class="campo"><span>Molde (repetición)</span><div class="chips" id="c-molde"></div></div>
+    <div class="dos">
+      <div class="campo"><span>Pie</span><div class="chips" id="c-pie"></div></div>
+      <div class="campo"><span>Cara</span><div class="chips" id="c-cara"></div></div>
+    </div>
+    <div class="campo"><span>Falla</span><div class="chips" id="c-falla"></div></div>
+    <div class="campo"><span>Se clasifica como</span><div class="chips" id="c-destino"></div></div>
+    <div class="campo"><span>Pares con la falla</span>
+      <div class="paso"><button type="button" id="menos" aria-label="Quitar un par">−</button><output id="pares">1</output><button type="button" id="mas" aria-label="Sumar un par">+</button></div>
+    </div>
+    <button type="button" class="grabar" id="grabar">Grabar falla</button>
+    <div id="resultado" aria-live="polite"></div>
+  </section>
+
+  <section id="hoy">
+    <div class="resumen">
+      <div><b id="r-pares">0</b><span>pares con falla hoy</span></div>
+      <div><b id="r-moldes">0</b><span>moldes en alerta</span></div>
+      <div><b id="r-seg">0</b><span>pares a segunda</span></div>
+      <div><b id="r-arr">0</b><span>pares a arreglo</span></div>
+    </div>
+    <div id="lista-hoy"></div>
+  </section>
+
+  <section id="cierre">
+    <p class="nota">Este es el mensaje que le llega al dueño al final del día.</p>
+    <pre id="txt-cierre"></pre>
+    <div class="fila">
+      <a class="btn" id="wa-dueno" target="_blank" rel="noopener">Enviar al dueño por WhatsApp</a>
+      <button type="button" class="btn sec" id="copiar">Copiar</button>
+    </div>
+  </section>
+
+  <section id="ajustes">
+    <div class="campo"><label class="lbl" for="a-plantas">Plantas (una por línea)</label><textarea id="a-plantas"></textarea></div>
+    <div class="campo"><label class="lbl" for="a-refs">Botas (una por línea)</label><textarea id="a-refs"></textarea></div>
+    <div class="campo"><label class="lbl" for="a-tallas">Tallas (separadas por coma)</label><input type="text" id="a-tallas"></div>
+    <div class="campo"><label class="lbl" for="a-moldes">Máximo de moldes repetidos por talla</label><input type="number" id="a-moldes" min="1" max="8"></div>
+    <div class="campo"><label class="lbl" for="a-umbral">Avisar al supervisor cuando un molde pase de estos pares</label><input type="number" id="a-umbral" min="1" max="50"></div>
+    <div class="campo"><label class="lbl" for="a-sup">WhatsApp del supervisor (con 57)</label><input type="tel" id="a-sup" placeholder="573001234567"></div>
+    <div class="campo"><label class="lbl" for="a-due">WhatsApp del dueño (con 57)</label><input type="tel" id="a-due" placeholder="573001234567"></div>
+    <div class="fila">
+      <button type="button" class="btn" id="guardar-aj">Guardar ajustes</button>
+      <button type="button" class="btn sec" id="borrar-ej">Borrar datos de ejemplo</button>
+    </div>
+    <p class="nota" id="msg-aj" aria-live="polite"></p>
+    <p class="nota">Todo lo que se graba aquí queda guardado en la base de Negocios Cuánticos (tablas gp_fallas): se ve igual desde cualquier celular y no se pierde al cerrar el navegador.</p>
+  </section>
+</div>
+
+<script>
+/* 24 nov 2026 (José): misma app de la maqueta, pero TODO se guarda en Supabase (gp_fallas, gp_fallas_correctivo, gp_fallas_cfg)
+   en vez del navegador, para que cualquiera en la planta la abra y pruebe de una, sin clave. Sin internet no graba: lo dice arriba. */
+(function(){
+  var URL_="https://fnayedgvamxktxfvywwl.supabase.co/rest/v1/", KEY="sb_publishable_NVTYNkJ0V6obLwgwjXza1g_3Ihp-xMv", VER="20261124-1";
+  var DIAS_ATRAS=45;   /* cuántos días de historial se traen (para saber si un molde sigue fallando después de un correctivo) */
+  function api(path,metodo,body,prefer){
+    var h={apikey:KEY,Authorization:"Bearer "+KEY,"Content-Type":"application/json"}; if(prefer)h.Prefer=prefer;
+    return fetch(URL_+path,{method:metodo||"GET",headers:h,body:body?JSON.stringify(body):undefined}).then(function(r){
+      if(!r.ok)throw new Error("HTTP "+r.status); return r.status===204?null:r.text().then(function(t){return t?JSON.parse(t):null});
+    });
+  }
+  var hoy=(function(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")})();
+  function hora(){var d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
+  function desde(){var d=new Date();d.setDate(d.getDate()-DIAS_ATRAS);return d.toISOString().slice(0,10)}
+  var CFG0={plantas:["Agro","Basarilly","Superior"],refs:["Soldador","Ingeniero"],tallas:["36","37","38","39","40","41","42","43","44","45"],moldes:4,umbral:3,sup:"",due:""};
+  var S={cfg:CFG0,fallas:[],correctivos:[]};
+  var F={planta:null,rol:"Inyector",ref:null,talla:null,molde:null,pie:null,cara:null,falla:"No llena",destino:null,pares:1};
+  function $(id){return document.getElementById(id)}
+  function esc(t){return String(t).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+  function estado(t,mal){var e=$("estado");e.textContent=t;e.className=mal?"mal":""}
+
+  function cargar(){
+    estado("Cargando…");
+    return Promise.all([
+      api("gp_fallas_cfg?id=eq.1&select=cfg"),
+      api("gp_fallas?select=*&fecha=gte."+desde()+"&order=ts"),
+      api("gp_fallas_correctivo?select=*&fecha=gte."+desde()+"&order=ts")
+    ]).then(function(r){
+      S.cfg=(r[0]&&r[0][0]&&r[0][0].cfg)||CFG0;
+      if(!S.cfg.plantas||!S.cfg.plantas.length)S.cfg.plantas=CFG0.plantas;
+      S.fallas=(r[1]||[]).map(function(f){f.ts=+f.ts||0;f.molde=+f.molde;return f});
+      S.correctivos=(r[2]||[]).map(function(c){c.ts=+c.ts||0;return c});
+      if(!F.planta||S.cfg.plantas.indexOf(F.planta)<0)F.planta=S.cfg.plantas[0];
+      if(!F.ref||S.cfg.refs.indexOf(F.ref)<0)F.ref=S.cfg.refs[0];
+      estado("Guardado en la base · v"+VER);
+      todo();
+    }).catch(function(e){estado("Sin conexión con la base: no se puede grabar. Revisa la señal y recarga.",true);todo()});
+  }
+
+  function chips(id,ops,campo){
+    var c=$(id);c.innerHTML="";
+    ops.forEach(function(o){
+      var b=document.createElement("button");b.type="button";b.textContent=o;
+      b.setAttribute("aria-pressed",String(F[campo])===String(o)?"true":"false");
+      b.addEventListener("click",function(){F[campo]=o;chips(id,ops,campo)});
+      c.appendChild(b);
+    });
+  }
+  function pintarForm(){
+    chips("c-planta",S.cfg.plantas,"planta");
+    chips("c-rol",["Inyector","Revisor"],"rol");
+    chips("c-ref",S.cfg.refs,"ref");
+    chips("c-talla",S.cfg.tallas,"talla");
+    var m=[];for(var i=1;i<=S.cfg.moldes;i++)m.push(i);
+    chips("c-molde",m,"molde");
+    chips("c-pie",["Derecho","Izquierdo"],"pie");
+    chips("c-cara",["Interna","Externa"],"cara");
+    chips("c-falla",["No llena","Rebaba","Cardado visible"],"falla");
+    chips("c-destino",["Segunda","Arreglo"],"destino");
+    $("pares").textContent=F.pares;
+  }
+  function clave(x){return x.planta+"|"+x.ref+"|"+x.talla+"|"+x.molde}
+  function nombre(x){return x.planta+" · "+x.ref+" · Talla "+x.talla+" · Molde "+x.molde}
+  function grupos(){
+    var g={};
+    S.fallas.filter(function(f){return f.fecha===hoy}).forEach(function(f){
+      var k=clave(f);if(!g[k])g[k]={k:k,planta:f.planta,ref:f.ref,talla:f.talla,molde:f.molde,pares:0,seg:0,arr:0,det:{}};
+      g[k].pares+=f.pares;if(f.destino==="Segunda")g[k].seg+=f.pares;if(f.destino==="Arreglo")g[k].arr+=f.pares;
+      var d=f.pie+", cara "+String(f.cara||"").toLowerCase()+", "+String(f.falla||"").toLowerCase();
+      g[k].det[d]=(g[k].det[d]||0)+f.pares;
+    });
+    return Object.keys(g).map(function(k){return g[k]}).sort(function(a,b){return b.pares-a.pares});
+  }
+  function clasif(g){return "Segunda: "+g.seg+" · Arreglo: "+g.arr}
+  function detTxt(g){return Object.keys(g.det).sort(function(a,b){return g.det[b]-g.det[a]}).map(function(d){return d+": "+g.det[d]})}
+  function ts(x){return x.ts||new Date(x.fecha+"T"+(x.hora||"00:00")+":00").getTime()}
+  function corrDe(k,soloHoy){return S.correctivos.filter(function(c){return c.k===k&&(!soloHoy||c.fecha===hoy)}).sort(function(a,b){return ts(a)-ts(b)})}
+  /* Pares con falla del mismo molde grabados después de un correctivo (y antes del siguiente). */
+  function despues(c){
+    var sig=corrDe(c.k,false).filter(function(x){return ts(x)>ts(c)})[0];
+    return S.fallas.filter(function(f){return clave(f)===c.k&&ts(f)>ts(c)&&(!sig||ts(f)<=ts(sig))}).reduce(function(a,f){return a+f.pares},0);
+  }
+  function resultado(c){var n=despues(c);return n?"NO corrigió: "+n+(n===1?" par":" pares")+" con falla después":"Sin fallas después"}
+  function ultimoCorr(k){var cs=corrDe(k,true);return cs[cs.length-1]}
+  function wa(tel,txt){return "https://wa.me/"+(tel||"").replace(/\D/g,"")+"?text="+encodeURIComponent(txt)}
+  function msgSup(g){
+    var u=ultimoCorr(g.k),n=u?despues(u):0;
+    return "⚠️ CALIDAD INYECCIÓN\n"+nombre(g)+" lleva "+g.pares+" pares con falla hoy ("+clasif(g)+").\n"+detTxt(g).map(function(l){return "• "+l}).join("\n")+
+      (n?"\n❌ Sigue fallando después del correctivo de las "+u.hora+" («"+u.txt+"»): "+n+(n===1?" par":" pares")+" más.":"")+
+      "\nRevisar altura de la horma contra el cierre del anillo y el programa de cardado. Registre el correctivo en la app.";
+  }
+  function guardarCfg(){return api("gp_fallas_cfg?id=eq.1","PATCH",{cfg:S.cfg,actualizado_en:new Date().toISOString()},"return=minimal")}
+
+  $("crear-ref").addEventListener("click",function(){
+    var i=$("nueva-ref"),v=i.value.trim();if(!v){i.focus();return}
+    var ya=S.cfg.refs.filter(function(x){return x.toLowerCase()===v.toLowerCase()})[0];
+    F.ref=ya||v;i.value="";
+    if(!ya){S.cfg.refs.push(v);guardarCfg().catch(function(){estado("No se pudo guardar la referencia nueva en la base.",true)})}
+    pintarForm();pintarAjustes();
+  });
+  $("menos").addEventListener("click",function(){if(F.pares>1){F.pares--;$("pares").textContent=F.pares}});
+  $("mas").addEventListener("click",function(){F.pares++;$("pares").textContent=F.pares});
+  $("grabar").addEventListener("click",function(){
+    var falta=[];
+    if(!F.talla)falta.push("talla");if(!F.molde)falta.push("molde");if(!F.pie)falta.push("pie");if(!F.cara)falta.push("cara");if(!F.destino)falta.push("segunda o arreglo");
+    var R=$("resultado"),B=$("grabar");
+    if(falta.length){R.innerHTML='<div class="aviso"><strong>Falta marcar</strong><span>'+esc(falta.join(", "))+'</span></div>';return}
+    var fila={ts:Date.now(),fecha:hoy,hora:hora(),planta:F.planta,rol:F.rol,ref:F.ref,talla:String(F.talla),molde:F.molde,pie:F.pie,cara:F.cara,falla:F.falla,destino:F.destino,pares:F.pares,ej:false};
+    B.disabled=true;B.textContent="Grabando…";
+    api("gp_fallas","POST",fila,"return=representation").then(function(r){
+      var f=(r&&r[0])||fila;f.ts=+f.ts;f.molde=+f.molde;S.fallas.push(f);
+      var g=grupos().filter(function(x){return x.k===clave(f)})[0];
+      var u=ultimoCorr(g.k),sigue=u&&despues(u)>0;
+      if(g.pares>S.cfg.umbral||sigue){
+        R.innerHTML='<div class="aviso"><strong>Aviso al supervisor</strong><span>'+esc(nombre(g))+' ya lleva <b>'+g.pares+' pares</b> con falla hoy.'+(sigue?' Sigue fallando después del correctivo.':'')+'</span>'+
+          '<a class="btn" target="_blank" rel="noopener" href="'+esc(wa(S.cfg.sup,msgSup(g)))+'">Enviar aviso por WhatsApp</a></div>';
+      }else{
+        R.innerHTML='<div class="aviso ok"><strong>Grabado</strong><span>'+esc(nombre(g))+' lleva '+g.pares+(g.pares===1?' par':' pares')+' hoy.</span></div>';
+      }
+      F.pares=1;F.pie=null;F.cara=null;F.destino=null;pintarForm();pintarHoy();pintarCierre();
+    }).catch(function(){
+      R.innerHTML='<div class="aviso"><strong>No se grabó</strong><span>No hay conexión con la base. Revisa la señal y vuelve a oprimir Grabar.</span></div>';
+    }).then(function(){B.disabled=false;B.textContent="Grabar falla";R.scrollIntoView({block:"nearest"})});
+  });
+
+  function pintarHoy(){
+    var gs=grupos(),tot=0,al=0,sg=0,ar=0,h="";
+    gs.forEach(function(g){
+      tot+=g.pares;sg+=g.seg;ar+=g.arr;var crit=g.pares>S.cfg.umbral;if(crit)al++;
+      var cs=corrDe(g.k,false);
+      h+='<div class="molde'+(crit?' crit':'')+'"><div class="cab"><h3>'+esc(nombre(g))+'</h3><span class="pill">'+g.pares+(g.pares===1?' par':' pares')+'</span></div>'+
+        '<p class="nota"><b>'+esc(clasif(g))+'</b></p><ul class="det">'+detTxt(g).map(function(l){return '<li>'+esc(l)+'</li>'}).join("")+'</ul>'+
+        (cs.length?'<ul class="hist">'+cs.map(function(c){return '<li class="'+(despues(c)?'mal':'')+'">'+esc(c.txt)+'<small>'+esc(c.fecha+" "+c.hora)+'</small><b>'+esc(resultado(c))+'</b></li>'}).join("")+'</ul>':'')+
+        '<textarea data-cx="'+esc(g.k)+'" placeholder="Qué se hizo en el puesto o en el molde. Ej: se ajustó la altura 2 mm y se corrigió el programa de cardado."></textarea>'+
+        '<button type="button" class="btn sec" data-k="'+esc(g.k)+'">Guardar correctivo</button></div>';
+    });
+    $("r-pares").textContent=tot;$("r-seg").textContent=sg;$("r-arr").textContent=ar;$("r-moldes").textContent=al;
+    $("lista-hoy").innerHTML=h?'<div style="display:flex;flex-direction:column;gap:12px">'+h+'</div>':'<p class="vacio">Hoy no se han reportado fallas.</p>';
+  }
+  $("lista-hoy").addEventListener("click",function(e){
+    var b=e.target.closest&&e.target.closest("button[data-k]");if(!b)return;var k=b.getAttribute("data-k");
+    var t=document.querySelector('textarea[data-cx="'+k.replace(/"/g,'\\"')+'"]');var v=t.value.trim();if(!v){t.focus();return}
+    var c={k:k,ts:Date.now(),fecha:hoy,hora:hora(),txt:v};
+    b.disabled=true;b.textContent="Guardando…";
+    api("gp_fallas_correctivo","POST",c,"return=representation").then(function(r){S.correctivos.push((r&&r[0])||c);pintarHoy();pintarCierre()})
+      .catch(function(){b.disabled=false;b.textContent="Guardar correctivo";estado("No se guardó el correctivo: sin conexión con la base.",true)});
+  });
+
+  function txtCierre(){
+    var gs=grupos(),tot=gs.reduce(function(a,g){return a+g.pares},0);
+    var p=hoy.split("-"),f=p[2]+"/"+p[1]+"/"+p[0];
+    if(!gs.length)return "📋 REPORTE DE CALIDAD · "+f+"\nHoy no se reportaron fallas de inyección.\n\nResponda OK para confirmar recibido.";
+    var t="📋 REPORTE DE CALIDAD · "+f+"\nTotal: "+tot+" pares con falla en "+gs.length+(gs.length===1?" molde":" moldes")+"\nSegunda: "+gs.reduce(function(a,g){return a+g.seg},0)+" · Arreglo: "+gs.reduce(function(a,g){return a+g.arr},0)+"\n";
+    var sin=[];
+    gs.forEach(function(g,i){
+      var cs=corrDe(g.k,true);
+      t+="\n"+(i+1)+". "+nombre(g)+": "+g.pares+" pares"+(g.pares>S.cfg.umbral?" ⚠️":"")+" ("+clasif(g)+")\n"+detTxt(g).map(function(l){return "   • "+l}).join("\n")+"\n";
+      if(cs.length)cs.forEach(function(c){t+="   "+(despues(c)?"❌":"✅")+" "+c.hora+" Correctivo: "+c.txt+" → "+resultado(c)+"\n"});else sin.push(nombre(g));
+    });
+    if(sin.length)t+="\nSin correctivo registrado:\n"+sin.map(function(s){return "• "+s}).join("\n")+"\n";
+    return t+"\nResponda OK para confirmar recibido.";
+  }
+  function pintarCierre(){var t=txtCierre();$("txt-cierre").textContent=t;$("wa-dueno").href=wa(S.cfg.due,t)}
+  $("copiar").addEventListener("click",function(){
+    var b=this;try{navigator.clipboard.writeText(txtCierre()).then(function(){b.textContent="Copiado";setTimeout(function(){b.textContent="Copiar"},1500)},function(){})}catch(e){}
+  });
+
+  function pintarAjustes(){
+    $("a-plantas").value=S.cfg.plantas.join("\n");$("a-refs").value=S.cfg.refs.join("\n");$("a-tallas").value=S.cfg.tallas.join(", ");
+    $("a-moldes").value=S.cfg.moldes;$("a-umbral").value=S.cfg.umbral;$("a-sup").value=S.cfg.sup||"";$("a-due").value=S.cfg.due||"";
+  }
+  $("guardar-aj").addEventListener("click",function(){
+    var refs=$("a-refs").value.split("\n").map(function(s){return s.trim()}).filter(Boolean);
+    var tallas=$("a-tallas").value.split(",").map(function(s){return s.trim()}).filter(Boolean);
+    var plantas=$("a-plantas").value.split("\n").map(function(s){return s.trim()}).filter(Boolean);
+    if(!refs.length||!tallas.length){$("msg-aj").textContent="Escriba al menos una bota y una talla.";return}
+    if(plantas.length){S.cfg.plantas=plantas;if(plantas.indexOf(F.planta)<0)F.planta=plantas[0]}
+    S.cfg.refs=refs;S.cfg.tallas=tallas;
+    S.cfg.moldes=Math.min(8,Math.max(1,parseInt($("a-moldes").value,10)||4));
+    S.cfg.umbral=Math.max(1,parseInt($("a-umbral").value,10)||3);
+    S.cfg.sup=$("a-sup").value.trim();S.cfg.due=$("a-due").value.trim();
+    if(refs.indexOf(F.ref)<0)F.ref=refs[0];if(tallas.indexOf(String(F.talla))<0)F.talla=null;if(F.molde>S.cfg.moldes)F.molde=null;
+    $("msg-aj").textContent="Guardando…";
+    guardarCfg().then(function(){todo();$("msg-aj").textContent="Ajustes guardados en la base."}).catch(function(){$("msg-aj").textContent="No se guardaron: sin conexión con la base."});
+  });
+  $("borrar-ej").addEventListener("click",function(){
+    $("msg-aj").textContent="Borrando…";
+    api("gp_fallas?ej=eq.true","DELETE",null,"return=minimal").then(function(){S.fallas=S.fallas.filter(function(f){return !f.ej});todo();$("msg-aj").textContent="Datos de ejemplo borrados."})
+      .catch(function(){$("msg-aj").textContent="No se pudo borrar: sin conexión con la base."});
+  });
+
+  document.querySelectorAll("nav button").forEach(function(b){
+    b.addEventListener("click",function(){
+      document.querySelectorAll("nav button").forEach(function(x){x.setAttribute("aria-selected",x===b?"true":"false")});
+      document.querySelectorAll("section").forEach(function(s){s.classList.toggle("on",s.id===b.dataset.tab)});
+      if(b.dataset.tab==="hoy"||b.dataset.tab==="cierre")cargar();   /* al cambiar de pestaña se refresca: otro celular pudo grabar */
+    });
+  });
+  function todo(){pintarForm();pintarHoy();pintarCierre();pintarAjustes()}
+  var p=hoy.split("-");$("fecha").textContent=p[2]+"/"+p[1]+"/"+p[0];
+  todo();cargar();
+})();
+</script>
+</body>
+</html>
